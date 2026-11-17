@@ -130,7 +130,7 @@ create table if not exists public.leads (
 create index if not exists leads_team_date on public.leads (team_id, date);
 
 -- ---------- fechas de modificación ----------
-create or replace function public.touch() returns trigger language plpgsql as $$
+create or replace function public.touch() returns trigger language plpgsql set search_path = public as $$
 begin new.updated_at := now(); return new; end $$;
 drop trigger if exists sales_touch on public.sales;
 create trigger sales_touch before update on public.sales for each row execute function public.touch();
@@ -369,6 +369,9 @@ grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.sales, public.settings, public.adjustments, public.agenda, public.shifts, public.snippets, public.leads to authenticated;
 grant select, update on public.teams, public.profiles to authenticated;
 grant execute on function public.my_team(), public.my_role() to authenticated;
+-- las funciones internas no se llaman desde la app sin sesión
+revoke execute on function public.my_team(), public.my_role() from public, anon;
+revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch() from public, anon, authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$
