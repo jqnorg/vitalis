@@ -4,18 +4,20 @@
 <meta charset="utf-8">
 <title>Vitalis · aviso</title>
 <style>
-  body{margin:0;background:#060a07;color:#b9f3b4;font:13px/1.45 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;text-shadow:0 0 5px rgba(125,255,138,.25)}
+  body{margin:0;background:#f1f4ef;color:#15201a;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   main{padding:12px;display:flex;flex-direction:column;gap:10px}
-  .card{border:1px solid #ffc266;border-left:4px solid #ffc266;border-radius:6px;padding:10px 12px}
+  .card{--c:#e08a1e;background:#fff;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px}
+  .card.crm{--c:#2f7fd0}
   .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  .tag{background:#b9f3b4;color:#060a07;font-weight:700;letter-spacing:.1em;padding:0 6px;border-radius:2px;text-shadow:none;font-size:11px}
-  .t{color:#ffc266;font-weight:700}
-  .id{font-size:20px;font-weight:700;color:#ffc266}
-  .m{color:#4f7754;font-size:11.5px}
-  .b{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-  button{font:inherit;font-size:11.5px;color:#ffc266;background:transparent;border:1px solid #ffc266;border-radius:3px;padding:2px 9px;cursor:pointer}
-  button:hover,button.p{background:#ffc266;color:#060a07}
-  button.p{font-weight:700}
+  .mk{width:22px;height:22px}
+  .tag{font-weight:800;font-size:15px;letter-spacing:-.03em}
+  .t{color:var(--c);font-weight:800;font-size:12.5px}
+  .id{font-size:24px;font-weight:800;letter-spacing:-.02em}
+  .m{color:#5b685f;font-size:12.5px}
+  .b{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+  button{font:inherit;font-size:13px;font-weight:700;color:#15201a;background:#fff;border:1px solid #dfe5dc;border-radius:999px;padding:5px 12px;cursor:pointer}
+  button:hover{border-color:#5b685f}
+  button.p{background:#1b874a;border-color:#1b874a;color:#fff}
 </style>
 </head>
 <body><main id="list"></main><script src="alarm.js"></script></body>

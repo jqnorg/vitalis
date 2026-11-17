@@ -1,6 +1,7 @@
-// FTD · en el CRM:
-//   1) botón para pasar al panel las ventas aprobadas que todavía no están
-//   2) vigilar una página (la de clientes): se refresca sola y avisa cuando aparece un cliente en "new"
+// Vitalis · en el CRM:
+//   1) botón para pasar a Vitalis las ventas aprobadas que todavía no están
+//   2) los clientes en "new" se anotan en el registro de Vitalis (conversión del día)
+//   3) vigilar una página (la de clientes): se refresca sola y avisa cuando aparece un cliente en "new"
 (() => {
   if (window.__ftdCrm) return;
   window.__ftdCrm = true;
@@ -18,7 +19,11 @@
 
   /* ================= tablas de la página ================= */
   const match = (l, al) => al.some((a) => l === a || l.startsWith(a + ' '));
-  const idxOf = (labels, al) => labels.findIndex((l) => match(l, al));
+  const idxOf = (labels, al) => { // el alias más específico primero: "client id" no es el nombre aunque empiece con "client"
+    for (const a of al) { const i = labels.findIndex((l) => l === a); if (i >= 0) return i; }
+    for (const a of al) { const i = labels.findIndex((l) => l.startsWith(a + ' ')); if (i >= 0) return i; }
+    return -1;
+  };
   function tables() { // [{labels, rows: [[texto de cada celda]]}]
     const out = [];
     for (const t of document.querySelectorAll('table')) {
@@ -195,6 +200,17 @@
     send({ type: 'crm-clients', clients: clients || [], ok: !!clients, login, title: document.title });
   }
 
+  // clientes en "new": van al registro de Vitalis (para la conversión del día), estés vigilando o no
+  let lastLeads = '';
+  function reportLeads(list) {
+    if (!list || !list.length) return;
+    const rows = list.filter((c) => c.id || c.name).map((c) => ({ id: c.id, name: c.name, country: c.country }));
+    const sig = rows.map((c) => c.id || c.name).join('|');
+    if (sig === lastLeads) return;
+    lastLeads = sig;
+    send({ type: 'crm-leads', clients: rows.slice(0, 300) });
+  }
+
   /* ================= botón ================= */
   let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null;
   function build() {
@@ -203,30 +219,31 @@
     h.style.cssText = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;';
     const root = h.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>
-      .box{font:12.5px/1.45 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;background:#060a07;color:#b9f3b4;border:1px solid #4f7754;border-radius:6px;padding:8px 10px;box-shadow:0 8px 28px rgba(0,0,0,.45);min-width:250px;max-width:370px;text-shadow:0 0 5px rgba(125,255,138,.25)}
+      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-radius:16px;padding:10px 12px;box-shadow:0 14px 40px rgba(0,0,0,.22);min-width:260px;max-width:370px}
       .h{display:flex;align-items:center;gap:8px}
-      .tag{background:#b9f3b4;color:#060a07;font-weight:700;letter-spacing:.1em;padding:0 6px;border-radius:2px;text-shadow:none;font-size:11px}
-      .t{flex:1;color:#4f7754;font-size:11.5px}
-      .x{all:unset;cursor:pointer;color:#4f7754;padding:0 2px}.x:hover{color:#b9f3b4}
-      .sec{margin-top:7px}.sec[hidden]{display:none}
-      .sec+.sec{border-top:1px solid #1b2a1d;padding-top:7px}
-      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#b9f3b4;color:#060a07;font-weight:700;border-radius:3px;padding:5px 10px;text-shadow:none}
-      .go:hover{background:#7dff8a;box-shadow:0 0 10px rgba(125,255,138,.4)}
-      .go[disabled]{background:transparent;color:#4f7754;border:1px solid #2a3f2d;cursor:default;box-shadow:none;font-weight:400}
-      .go.alt{background:transparent;color:#b9f3b4;border:1px solid #4f7754;font-weight:400}
-      .go.alt:hover{background:#b9f3b4;color:#060a07}
+      .mk{width:22px;height:22px;flex:none}
+      .tag{font-weight:800;font-size:16px;letter-spacing:-.03em}
+      .t{flex:1;color:#5b685f;font-size:12px;text-align:right}
+      .x{all:unset;cursor:pointer;color:#5b685f;padding:0 6px;border-radius:6px;font-size:15px}.x:hover{background:#ecf0e9;color:#15201a}
+      .sec{margin-top:9px}.sec[hidden]{display:none}
+      .sec+.sec{border-top:1px solid #ecf0e9;padding-top:9px}
+      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#1b874a;color:#fff;font-weight:700;border-radius:999px;padding:7px 12px}
+      .go:hover{background:#156f3c}
+      .go[disabled]{background:#ecf0e9;color:#5b685f;cursor:default;font-weight:600}
+      .go.alt{background:#fff;color:#15201a;border:1px solid #dfe5dc}
+      .go.alt:hover{border-color:#5b685f}
       .row{display:flex;gap:6px;align-items:center}
       .row .go{flex:1}
-      select{font:inherit;font-size:11.5px;background:#060a07;color:#b9f3b4;border:1px solid #4f7754;border-radius:3px;padding:3px}
-      .ids{margin-top:5px;color:#4f7754;font-size:11px;word-break:break-word}
-      .ids b{color:#b9f3b4;font-weight:400}
-      .st{color:#4f7754;font-size:11.5px;margin-bottom:5px}
-      .on{color:#7dff8a}
-      .msg{margin-top:6px;font-size:11.5px}
-      .ok{color:#7dff8a}.warn{color:#ffc266}.err{color:#ff6b5e}
-      .lnk{all:unset;cursor:pointer;color:#79d4ff;text-decoration:underline;margin-left:6px}
+      select{font:inherit;font-size:12.5px;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-radius:999px;padding:5px 8px}
+      .ids{margin-top:6px;color:#5b685f;font-size:12px;word-break:break-word}
+      .ids b{color:#15201a}
+      .st{color:#5b685f;font-size:12px;margin-bottom:6px}
+      .on{color:#1b874a;font-weight:700}
+      .msg{margin-top:7px;font-size:12.5px;font-weight:600}
+      .ok{color:#1b874a}.warn{color:#b0620a}.err{color:#cf3049}
+      .lnk{all:unset;cursor:pointer;color:#2f7fd0;text-decoration:underline;margin-left:6px}
       .min .sec{display:none}
-    </style><div class="box"><div class="h"><span class="tag">VITALIS</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
+    </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
       <div class="sec" id="sSales"><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
       <div class="sec" id="sWatch"><div class="st" id="wst"></div><div class="row"><button class="go alt" id="wgo"></button><select id="wint" title="Cada cuánto se actualiza la lista"><option value="10">10 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option></select></div><div class="ids" id="wids"></div></div></div>`;
     root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales()));
@@ -245,15 +262,15 @@
     const looksFtd = !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
     ui.diag = looksFtd;
     $('sSales').hidden = !sales && !looksFtd;
-    if (looksFtd) { head.push('no encuentro la tabla de FTDs'); $('go').disabled = false; $('go').textContent = 'copiar diagnóstico'; $('ids').textContent = ''; }
+    if (looksFtd) { head.push('no encuentro la tabla de FTDs'); $('go').disabled = false; $('go').textContent = 'Copiar diagnóstico'; $('ids').textContent = ''; }
     else if (sales) {
       const n0 = sales.filter((s) => !isKnown(s)), espera = n0.filter(isQueued), nuevas = n0.filter((s) => !isQueued(s)), ya = sales.length - n0.length;
       head.push(`${plural(sales.length, 'aprobada')}${known ? ` · ${ya} ya en Vitalis` : ''}`);
       const go = $('go');
-      if (busy) { go.disabled = true; go.textContent = 'enviando…'; }
-      else if (!nuevas.length) { go.disabled = true; go.textContent = espera.length ? `⏳ ${espera.length} en espera de abrir Vitalis` : sales.length ? '✔ ya están todas en Vitalis' : 'sin ventas aprobadas'; }
-      else { go.disabled = false; go.textContent = `⇪ Agregar ${plural(nuevas.length, 'venta nueva', 'ventas nuevas')} a Vitalis`; }
-      $('ids').innerHTML = nuevas.length ? 'nuevas: ' + nuevas.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>`).join(', ') + (nuevas.length > 12 ? '…' : '') : '';
+      if (busy) { go.disabled = true; go.textContent = 'Enviando…'; }
+      else if (!nuevas.length) { go.disabled = true; go.textContent = espera.length ? `${espera.length} esperando que abras Vitalis` : sales.length ? 'Ya están todas en Vitalis' : 'Sin ventas aprobadas'; }
+      else { go.disabled = false; go.textContent = `Pasar ${plural(nuevas.length, 'venta nueva', 'ventas nuevas')} a Vitalis`; }
+      $('ids').innerHTML = nuevas.length ? 'Nuevas: ' + nuevas.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>`).join(', ') + (nuevas.length > 12 ? '…' : '') : '';
     }
     $('msg').className = 'msg ' + (msg ? msg.cls : '');
     $('msg').innerHTML = msg ? msg.html : (sales && !known ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
@@ -264,11 +281,11 @@
       const n = clients ? clients.length : 0;
       if (clients && !sales) head.push(`${n} en new`);
       $('wst').innerHTML = watched
-        ? `<span class="on">● vigilando esta página</span> · ${clients ? plural(n, 'cliente') + ' en new' : 'esperando la tabla'}${watch && watch.lastRefresh ? ' · actualizada ' + new Date(watch.lastRefresh).toTimeString().slice(0, 8) : ''}`
-        : 'Te aviso con sonido cuando aparezca un cliente en new, estés en la pestaña que estés.';
-      $('wgo').textContent = watched ? '■ dejar de vigilar' : '👁 vigilar esta página';
+        ? `<span class="on">Vigilando esta página</span> · ${clients ? plural(n, 'cliente') + ' en new' : 'esperando la tabla'}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 5) : ''}`
+        : 'Te aviso con sonido cuando aparezca un cliente en new, estés en la pestaña que estés. Los new se anotan solos en Vitalis.';
+      $('wgo').textContent = watched ? 'Dejar de vigilar' : 'Vigilar esta página';
       $('wint').value = String(watch && watched ? (watch.sec || 60) : 30);
-      $('wids').innerHTML = clients && clients.length ? 'en new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
+      $('wids').innerHTML = clients && clients.length ? 'En new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
     }
     $('t').textContent = head.join(' · ');
   }
@@ -278,18 +295,19 @@
     clients = scanClients(T);
     const looksFtd = !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
     if (watched) report(clients, force);
+    reportLeads(clients);
     if (!sales && !clients && !looksFtd && !watched) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
     render();
   }
   function result(res) {
     busy = false;
-    if (!res) return setMsg('✖ La extensión no respondió. Recargá la página.', 'err');
-    if (res.err) return setMsg('✖ ' + escH(res.err), 'err');
-    if (res.queued) return setMsg(`⏳ ${plural(res.queued, 'venta')} en espera: se cargan cuando abras Vitalis.<button class="lnk" data-open>abrir Vitalis</button>`, 'warn');
-    const mes = res.mes ? ` · este mes: ${res.mes.n} FTDs, ${res.mes.usd} USD` : '';
-    if (res.added) setMsg(`✔ ${res.added === 1 ? 'Agregada 1 venta' : 'Agregadas ' + res.added + ' ventas'}${mes}`, 'ok', 12000);
-    else setMsg(`✔ No había nada nuevo${mes}`, 'ok', 8000);
+    if (!res) return setMsg('La extensión no respondió. Recargá la página.', 'err');
+    if (res.err) return setMsg(escH(res.err), 'err');
+    if (res.queued) return setMsg(`${plural(res.queued, 'venta')} en espera: se cargan cuando abras Vitalis.<button class="lnk" data-open>Abrir Vitalis</button>`, 'warn');
+    const mes = res.mes ? ` Este mes: ${res.mes.n} FTDs, ${res.mes.usd} USD.` : '';
+    if (res.added) setMsg(`${res.added === 1 ? 'Pasé 1 venta' : 'Pasé ' + res.added + ' ventas'} a Vitalis.${mes}`, 'ok', 12000);
+    else setMsg(`No había nada nuevo.${mes}`, 'ok', 8000);
   }
   async function sendSales() {
     if (busy) return;
@@ -307,7 +325,7 @@
     const el = [...document.querySelectorAll('th,td,div,span')].find((e) => /^transaction id$/i.test(cellText(e)));
     let box = el; for (let i = 0; i < 6 && box && box.parentElement; i++) box = box.parentElement;
     const html = (box ? box.outerHTML : document.body.outerHTML).slice(0, 15000);
-    navigator.clipboard.writeText(html).then(() => setMsg('✔ Copiado. Mandáselo a quien mantiene Vitalis para ajustar el botón.', 'ok', 10000), () => setMsg('✖ No pude copiar.', 'err'));
+    navigator.clipboard.writeText(html).then(() => setMsg('Copiado. Mandáselo a quien mantiene Vitalis para ajustar el botón.', 'ok', 10000), () => setMsg('No pude copiar.', 'err'));
   }
 
   let t = null;

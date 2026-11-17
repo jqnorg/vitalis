@@ -2,11 +2,20 @@
 /* ============================================================
    Vistas
    ============================================================ */
-function bonoMeter(n){
+function bonoTrack(n,lite){ // la pista del mes: el mate avanza con cada FTD
   const T=tiers();if(!T.length)return '';
-  const top=Math.max(T[T.length-1][0]+4,n+1),P=v=>Math.min(100,v/top*100),cur=porCantidad(n).tier;
-  return `<div class="meter" role="meter" aria-valuemin="0" aria-valuemax="${top}" aria-valuenow="${n}" aria-label="FTDs del mes hacia los bonos"><div class="fill" style="width:${P(n)}%"></div>${T.map(([t])=>`<i class="tk${n>=t?' on':''}" style="left:${P(t)}%"></i>`).join('')}</div>
-  <div class="mlab">${T.map(([t,b])=>`<span class="${t===cur?'at':n>=t?'on':''}" style="left:${P(t)}%">${t}<small>${b} USD</small></span>`).join('')}</div>`;
+  const top=Math.max(T[T.length-1][0]+3,n+1),P=v=>Math.min(100,v/top*100),cur=porCantidad(n).tier;
+  return `<div class="track${lite?' lite':''}" role="meter" aria-valuemin="0" aria-valuemax="${top}" aria-valuenow="${n}" aria-label="FTDs del mes hacia los bonos">
+    <div class="rail"></div><div class="fill" style="width:${P(n)}%"></div>
+    ${T.map(([t])=>`<i class="st${n>=t?' on':''}" style="left:${P(t)}%"></i>`).join('')}
+    ${T.map(([t,b])=>`<span class="lb${t===cur?' at':''}" style="left:${P(t)}%"><b>${t}</b><span class="us">${b} USD</span></span>`).join('')}
+    <span class="mate" style="left:${P(n)}%" title="${plural(n,'FTD')}"><svg aria-hidden="true"><use href="#mate"/></svg></span></div>`;
+}
+const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
+function convCards(uid){ // conversión de hoy, la semana y el mes: FTDs ÷ clientes new
+  const te=todayS(),P=[['Hoy',te,te],['Esta semana',weekStart(te),te],['Este mes',te.slice(0,8)+'01',te]];
+  return `<div class="conv3">${P.map(([l,a,b])=>{const c=convPeriod(a,b,uid);
+    return `<div class="cv"><div class="lb">${l}</div><div class="v${c.rate==null?' none':''}">${c.rate==null?'—':pct(c.rate)}</div><div class="s">${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente')}</div><div class="bar"><i style="width:${c.rate==null?0:Math.min(100,c.rate*100)}%"></i></div></div>`}).join('')}</div>`;
 }
 const kpi=(lb,v,s,cls='',extra='')=>`<div class="kpi ${cls}"${extra}><div class="lb">${lb}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
 const rw=(k,v,cls='')=>`<div class="rw ${cls}"><span class="k">${k}</span><span class="d"></span><span class="v">${v}</span></div>`;
@@ -16,56 +25,61 @@ V.inicio={
   k:'',
   build(){bindAgForm($('#iaForm'))},
   render(){
-    const now=new Date(),te=todayS(),ym=ymNow(),s=calc(ym),P=sueldoPesos(s);
-    $('#iFecha').textContent=`${DIAL[now.getDay()]} ${dm(te)}/${te.slice(0,4)}`;
+    const now=new Date(),te=todayS(),ym=ymNow(),s=calc(ym),P=sueldoPesos(s),h=now.getHours();
+    $('#iHola').textContent=`${h<13?'Buen día':h<20?'Buenas tardes':'Buenas noches'}, ${profile.name.split(/\s+/)[0]}`;
+    $('#iFecha').textContent=`${cap(DIAL[now.getDay()])} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
     const hoy=ftds.filter(f=>f.date===te),t=openTurno()||turnos[te],m=t?metr(t):null;
     const mes=MES[+ym.slice(5,7)-1];
-    const sub=s.extra?`${s.loaded} cargado${s.loaded===1?'':'s'} + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
+    const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
+    const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
+    $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">FTDs en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
+      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n)}`;
+    const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=
-      `<div class="kpi hero span2"><div class="lb">FTDs · ${esc(mes)}<span class="grow"></span><button type="button" class="btn sm wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes sin detalle">✎ sin detalle</button></div>
-        <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap"><div class="v">${s.n}</div><div class="s" style="white-space:normal;line-height:1.6">${esc(sub)}<br>${s.next?sp('hot b',`faltan ${s.next[0]-s.n} para ${s.next[1]} USD`):s.n?sp('ok b','bono máximo 🔥'):''}</div></div>${bonoMeter(s.n)}</div>`+
-      kpi('Variable',`${money(s.usd)} <small>USD</small>`,`${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''}`)+
-      kpi('Líquido ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','dólar viejo · '+tcTxt()):esc(tcTxt())):sp('hot','cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
-      kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`);
+      kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
+      kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
+      kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
     this.turno(true);
     // agenda
     const open=pend.filter(p=>!p.done&&p.due.slice(0,10)<=te).sort(byDue),next=pend.filter(p=>!p.done&&p.due.slice(0,10)>te).sort(byDue)[0];
     const venc=open.filter(p=>parseDue(p.due)<=now).length;
-    $('#iaSub').innerHTML=`${open.length} hoy${venc?' · '+sp('hot',venc+' vencido'+(venc>1?'s':'')):''}`;
-    $('#iaList').innerHTML=(open.length?`<div class="alist">${open.map(p=>pendItem(p,now,true)).join('')}</div>`:'<div class="p-empty" style="padding:8px 0">Sin pendientes para hoy.</div>')+
-      (next?`<div class="note">próximo: ${esc(whenTxt(parseDue(next.due)))} · <b class="b" style="color:var(--fg)">${esc(next.id)}</b> · ${esc(next.kw)}</div>`:'');
+    $('#iaSub').innerHTML=`${plural(open.length,'pendiente')}${venc?' · '+sp('hot b',plural(venc,'vencido')):''}`;
+    $('#iaList').innerHTML=(open.length?`<div class="alist">${open.map(p=>pendItem(p,now,true)).join('')}</div>`:'<div class="p-empty" style="padding:10px 0">Nada pendiente para hoy.</div>')+
+      (next?`<div class="note">Próximo: ${esc(whenTxt(parseDue(next.due)))}, <b style="color:var(--fg)">${esc(next.id)}</b> ${esc(next.kw)}</div>`:'');
+    // conversión
+    $('#iConvBody').innerHTML=convCards(me);
     // FTDs por día
     const [Y,M]=ym.split('-').map(Number),days=new Date(Y,M,0).getDate(),bd={};
     for(const f of s.list){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
     const data=[];for(let d=1;d<=days;d++){const o=bd[d]||{a:0,b:0,m:0},dw=new Date(Y,M-1,d).getDay();data.push({lab:String(d),a:o.a,b:o.b,m:o.m,d,dw,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
-    $('#idTitle').textContent=`FTDs POR DÍA · ${mes.toUpperCase()}`;
+    $('#idTitle').textContent=`FTDs por día en ${mes}`;
     colChart($('#iChart'),data,{h:200,capMin:18,label:'FTDs por día',empty:'Sin FTDs este mes.',
-      tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
+      tip:d=>({title:`${cap(DIAL[d.dw])} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     // últimas ventas
-    const lastF=[...ftds].sort((a,b)=>-byDate(a,b)).slice(0,8);
-    $('#iLast').innerHTML=lastF.length?`<div class="lst">${lastF.map(f=>`<div class="li"><span class="t">${esc(f.date===te?'hoy':dm(f.date))} ${esc(f.time||'')}</span><span class="n" title="${esc(f.name)} · ${esc(f.camp)}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)} · ${esc(f.camp)}</small></span><span class="m">${money(f.amount)}</span><span>${tipoBadge(f)}</span><span class="wr"><button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="editar">✎</button></span></div>`).join('')}</div>`
-      :'<div class="p-empty">Todavía no hay ventas.</div>';
+    const lastF=[...ftds].sort((a,b)=>-byDate(a,b)).slice(0,7);
+    $('#iLast').innerHTML=lastF.length?`<div class="lst">${lastF.map(f=>`<div class="li"><span class="t">${esc(f.date===te?'hoy':dm(f.date))} ${esc(f.time||'')}</span><span class="n" title="${esc(f.name)} · ${esc(f.camp)}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)}</small></span><span class="m">${money(f.amount)}</span><span>${tipoBadge(f)}</span><span class="wr"><button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button></span></div>`).join('')}</div>`
+      :'<div class="p-empty">Todavía no cargaste ventas. Tocá <b>Venta</b> arriba a la derecha.</div>';
   },
   turno(force){
     if(cur!=='inicio')return;
     const {t,b,h,key}=turnoState(),now=Date.now(),day=t||h;
     if(force||key!==this.k){
       this.k=key;let bt='';
-      if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">▶ reabrir</button>':'<button type="button" class="btn pri big" data-act="entrada">▶ Entrada</button>';
-      else if(b)bt='<button type="button" class="btn pri big" data-act="vuelta">↩ Vuelta</button>';
-      else bt=`<button type="button" class="btn big" data-act="d10">☕ 10'</button><button type="button" class="btn big" data-act="d30">☕ 30'</button><button type="button" class="btn pri big" data-act="salida">■ Salida</button>`;
-      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-act="deshacer" title="Deshacer la última marca">↶ deshacer</button><button type="button" class="ib" data-act="editHoy" title="Editar las horas de hoy">✎ editar</button>';
+      if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">Reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">Marcar entrada</button>';
+      else if(b)bt='<button type="button" class="btn pri big" data-act="vuelta">Volví del descanso</button>';
+      else bt=`<button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
+      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-act="deshacer" title="Deshacer la última marca">Deshacer</button><button type="button" class="ib" data-act="editHoy" title="Editar las horas de hoy">Editar</button>';
       $('#itBtns').innerHTML=bt;
     }
-    let st='<span class="dim">Sin entrada hoy.</span>';
+    let st='<span class="dim">Todavía no marcaste entrada hoy.</span>';
     if(day){
       const m=metr(day,now);
-      if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>descanso de ${b.k}' · ${left>=0?'volvés '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
-      else if(t){const rest=m.salidaEst-now;st=`<span class="big">${durS(m.total)}</span><span>${rest>0?`salida ${hhmm(m.salidaEst)} · faltan ${dur(rest)}`:sp('hot','+'+dur(-rest)+' extra')}</span>`}
-      else st=`<span class="big">${durS(m.total)}</span><span>✔ ${hhmm(day.in)}–${hhmm(day.out)} · ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
+      if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>Descanso de ${b.k}': ${left>=0?'volvés a las '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
+      else if(t){const rest=m.salidaEst-now;st=`<span class="big">${durS(m.total)}</span><span>${rest>0?`Salís a las ${hhmm(m.salidaEst)}, faltan ${dur(rest)}`:sp('hot','+'+dur(-rest)+' extra')}</span>`}
+      else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
     $('#itState').innerHTML=st;
-    $('#itSub').textContent=day?`${DIA[parseYMD(day.date).getDay()]} ${dm(day.date)} · jornada ${durS(jorMs())}`:`jornada ${durS(jorMs())}`;
+    $('#itSub').textContent=`Jornada de ${durS(jorMs())}`;
     $('#itTl').innerHTML=day?timeline(day,now):'';
     $('#itMarks').innerHTML=day?marksHTML(day):'';
   },
@@ -79,28 +93,28 @@ function timeline(t,now){
   return `<div class="tl" role="img" aria-label="Jornada desde ${hhmm(t.in)}">${s}</div><div class="tll"><span>${hhmm(t.in)}</span><span>${t.out?'salida '+hhmm(t.out):'fin '+hhmm(tgt)}</span></div>`;
 }
 function marksHTML(t){
-  const p=[`▶ <b>${hhmm(t.in)}</b> entrada`];
-  for(const b of t.breaks){const d=(b.e||Date.now())-b.s,ex=d-b.k*6e4;p.push(`☕ <b>${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}</b> ${b.k}'${b.e?` · ${mins(d)} min${ex>=6e4?' '+sp('hot','+'+mins(ex)):''}`:''}`)}
-  if(t.out)p.push(`■ <b>${hhmm(t.out)}</b> salida`);
+  const p=[`Entrada <b>${hhmm(t.in)}</b>`];
+  for(const b of t.breaks){const d=(b.e||Date.now())-b.s,ex=d-b.k*6e4;p.push(`Descanso ${b.k}' <b>${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}</b>${b.e?` ${mins(d)} min${ex>=6e4?' '+sp('hot','+'+mins(ex)):''}`:''}`)}
+  if(t.out)p.push(`Salida <b>${hhmm(t.out)}</b>`);
   return p.map(x=>`<span>${x}</span>`).join('');
 }
 
 /* ---------- ventas ---------- */
 let pF={},pShow=40,pExpand={},pBuiltKey='',pWho='me';
 const whoList=()=>pWho==='me'?ftds:pWho==='all'?team:team.filter(f=>f.uid===pWho);
-const whoLabel=()=>pWho==='me'?'mis ventas':pWho==='all'?'toda la mesa':memberName(pWho);
+const whoLabel=()=>pWho==='me'?'Mis ventas':pWho==='all'?'Toda la mesa':memberName(pWho);
 V.ventas={
   build(){
     let qt=null;
     $('#pQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{pF.q=e.target.value.trim()||undefined;pShow=40;this.render({})},180)});
-    $('#pChartTblBtn').addEventListener('click',()=>{const t=$('#pChartTbl');t.hidden=!t.hidden;$('#pChartTblBtn').textContent=t.hidden?'ver tabla':'ocultar tabla'});
+    $('#pChartTblBtn').addEventListener('click',()=>{const t=$('#pChartTbl');t.hidden=!t.hidden;$('#pChartTblBtn').textContent=t.hidden?'Ver tabla':'Ocultar tabla'});
     $('#pMore').addEventListener('click',()=>{pShow+=60;this.render({})});
     $('#pWho').addEventListener('change',e=>{pWho=e.target.value;pShow=40;pBuiltKey='';this.render({})});
   },
   whoSelect(){
     const sel=$('#pWho');if(sel===document.activeElement)return;
     const ms=members.filter(m=>m.id!==me&&(m.active||team.some(f=>f.uid===m.id)));
-    sel.innerHTML=`<option value="me">yo</option><option value="all">toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.active?'':' (baja)'}</option>`).join('');
+    sel.innerHTML=`<option value="me">Yo</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.active?'':' (baja)'}</option>`).join('');
     if(![...sel.options].some(o=>o.value===pWho))pWho='me';
     sel.value=pWho;
   },
@@ -123,7 +137,7 @@ V.ventas={
         `<label>Campaña<input data-f="camp" list="dlCamp" placeholder="todas" autocomplete="off"></label>`+
         `<label>País<select data-f="pais">${o('','todos')}${countries.map(p=>o(p,p)).join('')}</select></label>`+
         `<label>Tipo<select data-f="late">${o('','todos')}${o('no','new')}${o('si','late')}</select></label>`+
-        `<button class="btn sm" type="button" id="pClear" style="margin-bottom:3px">limpiar</button>`+
+        `<button class="btn sm" type="button" id="pClear" style="margin-bottom:4px">Limpiar</button>`+
         dlist('dlAff',affs)+dlist('dlCamp',camps);
       $$('[data-f]',$('#pFilters')).forEach(el=>{
         el.addEventListener('change',()=>{const v=el.value.trim();pF[el.dataset.f]=v||undefined;pShow=40;this.render({})});
@@ -172,7 +186,7 @@ V.ventas={
     for(const dim of many?['vendedores','campanas','afiliados','paises']:['campanas','afiliados','paises','marcas']){
       const D=DIMS[dim],g=groupBy(list,dim),max=g[0]?g[0].n:1;
       const card=document.createElement('section');card.className='card';
-      card.innerHTML=`<div class="card-h"><h3>${esc(D.t.toUpperCase())}</h3><span class="p-sub">${g.length}</span></div>`;
+      card.innerHTML=`<div class="card-h"><h3>${esc(D.t)}</h3><span class="p-sub">${g.length}</span></div>`;
       const box=document.createElement('div');box.className='rk';
       const lim=pExpand[dim]?g.length:8;
       box.style.setProperty('--vw',Math.max(4,...g.slice(0,lim).map(x=>(`${x.n} · ${money(x.monto)}${x.lates?' · '+x.lates+' late':''}`).length))+'ch');
@@ -186,7 +200,7 @@ V.ventas={
       }
       if(!g.length)box.innerHTML='<div class="p-empty">Sin datos</div>';
       card.appendChild(box);
-      if(g.length>8){const mb=document.createElement('button');mb.type='button';mb.className='btn sm rk-more';mb.textContent=pExpand[dim]?'ver menos':`ver todas (${g.length})`;
+      if(g.length>8){const mb=document.createElement('button');mb.type='button';mb.className='btn sm rk-more';mb.textContent=pExpand[dim]?'Ver menos':`Ver todas (${g.length})`;
         mb.addEventListener('click',()=>{pExpand[dim]=!pExpand[dim];this.render({})});card.appendChild(mb)}
       rk.appendChild(card);
     }
@@ -194,7 +208,7 @@ V.ventas={
     const rows=[...list].sort((a,b)=>-byDate(a,b));
     $('#pCount').textContent=`${plural(rows.length,'venta')} · ${money(R.monto)} USD`;
     $('#pTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>País</th><th>Afiliado</th><th>Campaña</th><th class="r">Monto</th><th>Registro</th><th>Tipo</th><th>Marca</th>${pWho!=='me'?'<th>Vendedor</th>':''}<th class="act"></th></tr></thead><tbody>`+
-      rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td>${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:'<i class="dot n"></i><span class="d">new</span>'}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="editar">✎</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="borrar">✕</button>`:''}</td></tr>`).join('')+'</tbody></table>'
+      rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td>${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:'<i class="dot n"></i><span class="d">new</span>'}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="Borrar">Borrar</button>`:''}</td></tr>`).join('')+'</tbody></table>'
       :'<div class="p-empty">Sin ventas para estos filtros.</div>';
     $('#pMore').hidden=rows.length<=pShow;
   },
@@ -226,18 +240,18 @@ V.agenda={
     const now=new Date(),te=todayS();
     const open=pend.filter(p=>!p.done).sort(byDue),done=pend.filter(p=>p.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||''));
     const venc=open.filter(p=>parseDue(p.due)<=now),hoy=open.filter(p=>parseDue(p.due)>now&&p.due.slice(0,10)===te),prox=open.filter(p=>p.due.slice(0,10)>te);
-    $('#agSub').innerHTML=`${plural(open.length,'pendiente')}${venc.length?' · '+sp('hot',venc.length+' vencido'+(venc.length>1?'s':'')):''}${extOn()?' · '+sp('ok','🔔 avisos de Chrome'):''}`;
-    const grp=(t,list,cls='')=>list.length?`<div class="grp"><h4 class="${cls}">${t} · ${list.length}</h4><div class="alist">${list.map(p=>pendItem(p,now)).join('')}</div></div>`:'';
+    $('#agSub').innerHTML=`${plural(open.length,'pendiente')}${venc.length?' · '+sp('hot b',plural(venc.length,'vencido')):''}${extOn()?' · '+sp('ok','avisos de Chrome activos'):''}`;
+    const grp=(t,list,cls='')=>list.length?`<div class="grp"><h4 class="${cls}">${t} (${list.length})</h4><div class="alist">${list.map(p=>pendItem(p,now)).join('')}</div></div>`:'';
     const shown=agAllDone?done:done.slice(0,10);
-    $('#agLists').innerHTML=(open.length?'':'<div class="p-empty">Sin pendientes.</div>')+grp('⚠ vencidos',venc,'warn')+grp('hoy',hoy)+grp('próximos',prox)+
-      (done.length?`<div class="grp"><h4>hechos · ${done.length}</h4><div class="alist">${shown.map(p=>pendItem(p,now)).join('')}</div>${done.length>10?`<button type="button" class="btn sm rk-more" id="agMore">${agAllDone?'ver menos':'ver todos'}</button>`:''}</div>`:'');
+    $('#agLists').innerHTML=(open.length?'':'<div class="p-empty">Nada pendiente. Buen momento para un mate.</div>')+grp('Vencidos',venc,'warn')+grp('Hoy',hoy)+grp('Próximos',prox)+
+      (done.length?`<div class="grp"><h4>Hechos (${done.length})</h4><div class="alist">${shown.map(p=>pendItem(p,now)).join('')}</div>${done.length>10?`<button type="button" class="btn sm rk-more" id="agMore">${agAllDone?'Ver menos':'Ver todos'}</button>`:''}</div>`:'');
     const mb=$('#agMore');if(mb)mb.onclick=()=>{agAllDone=!agAllDone;this.render({})};
   },
 };
 
 /* ---------- turnos ---------- */
 let tuPer='semana',tuYm='';
-const PER=[['hoy','hoy'],['semana','esta semana'],['semanaP','semana pasada'],['mes','este mes'],['mesP','mes anterior']];
+const PER=[['hoy','Hoy'],['semana','Esta semana'],['semanaP','Semana pasada'],['mes','Este mes'],['mesP','Mes anterior']];
 function perDates(){
   const te=todayS();
   if(tuYm)return Object.keys(turnos).filter(k=>k.startsWith(tuYm)).sort();
@@ -251,14 +265,14 @@ function perDates(){
 }
 V.turnos={
   build(){
-    $('#tuPer').innerHTML=PER.map(([k,l])=>`<button type="button" class="chip" data-per="${k}">${l}</button>`).join('');
+    $('#tuPer').innerHTML=PER.map(([k,l])=>`<button type="button" data-per="${k}">${l}</button>`).join('');
     $('#tuPer').addEventListener('click',e=>{const c=e.target.closest('[data-per]');if(!c)return;tuPer=c.dataset.per;tuYm='';this.render({})});
     $('#tuMes').addEventListener('change',e=>{tuYm=e.target.value;this.render({})});
   },
   render(){
     $$('[data-per]',$('#tuPer')).forEach(c=>c.classList.toggle('on',!tuYm&&c.dataset.per===tuPer));
     const months=[...new Set(Object.keys(turnos).map(k=>k.slice(0,7)))].sort().reverse();
-    $('#tuMes').innerHTML=`<option value="">mes…</option>`+months.map(m=>`<option value="${m}"${m===tuYm?' selected':''}>${esc(mLabel(m))}</option>`).join('');
+    $('#tuMes').innerHTML=`<option value="">Otro mes…</option>`+months.map(m=>`<option value="${m}"${m===tuYm?' selected':''}>${esc(mLabel(m))}</option>`).join('');
     const rows=perDates().map(d=>turnos[d]).filter(Boolean).sort((a,b)=>a.date<b.date?-1:1).map(t=>({t,...metr(t)}));
     $('#tuSub').textContent=tuYm?mLong(tuYm):PER.find(p=>p[0]===tuPer)[1];
     const n=rows.length;
@@ -279,7 +293,7 @@ V.turnos={
       tip:d=>({title:`${DIAL[parseYMD(d.r.t.date).getDay()]} ${dm(d.r.t.date)}`,rows:[{key:'var(--s1)',v:dur(d.r.total),l:'trabajadas'},{v:`${hhmm(d.r.t.in)}–${d.r.t.out?hhmm(d.r.t.out):'…'}`,l:''},{v:mins(d.r.desc)+' min',l:'descansos'+(d.r.exceso>=6e4?` (+${mins(d.r.exceso)})`:'')},{v:String(d.r.ftd),l:'FTDs'}]})});
     $('#tuCount').textContent=plural(n,'jornada');
     $('#tuTable').innerHTML=`<table class="pt"><thead><tr><th>Día</th><th>Entrada</th><th>Salida</th><th class="r">Horas</th><th class="r">Extra</th><th class="r">Descansos</th><th class="r">FTDs</th><th class="r">FTD/h</th><th class="r">Contactos</th><th class="act"></th></tr></thead><tbody>`+
-      [...rows].reverse().map(r=>`<tr${r.t.out?'':' class="cur"'}><td>${DIA[parseYMD(r.t.date).getDay()]} ${dm(r.t.date)}</td><td>${hhmm(r.t.in)}</td><td>${r.t.out?hhmm(r.t.out):'<span class="info">en curso</span>'}</td><td class="r">${durS(r.total)}</td><td class="r${r.extra>=6e4&&r.t.out?' hot':''}">${!r.t.out?'':Math.abs(r.extra)<6e4?'0':(r.extra>0?'+':'−')+durS(Math.abs(r.extra))}</td><td class="r${r.exceso>=6e4?' hot':''}">${mins(r.desc)} min${r.exceso>=6e4?' (+'+mins(r.exceso)+')':''}</td><td class="r">${r.ftd}</td><td class="r">${r.fph!=null?nf(r.fph,2):'—'}</td><td class="r d">${r.cont||''}</td><td class="act wr"><button type="button" class="ib" data-act="editTurno" data-d="${r.t.date}" title="editar">✎</button></td></tr>`).join('')+'</tbody></table>';
+      [...rows].reverse().map(r=>`<tr${r.t.out?'':' class="cur"'}><td>${DIA[parseYMD(r.t.date).getDay()]} ${dm(r.t.date)}</td><td>${hhmm(r.t.in)}</td><td>${r.t.out?hhmm(r.t.out):'<span class="info">en curso</span>'}</td><td class="r">${durS(r.total)}</td><td class="r${r.extra>=6e4&&r.t.out?' hot':''}">${!r.t.out?'':Math.abs(r.extra)<6e4?'0':(r.extra>0?'+':'−')+durS(Math.abs(r.extra))}</td><td class="r${r.exceso>=6e4?' hot':''}">${mins(r.desc)} min${r.exceso>=6e4?' (+'+mins(r.exceso)+')':''}</td><td class="r">${r.ftd}</td><td class="r">${r.fph!=null?nf(r.fph,2):'—'}</td><td class="r d">${r.cont||''}</td><td class="act wr"><button type="button" class="ib" data-act="editTurno" data-d="${r.t.date}" title="Editar">Editar</button></td></tr>`).join('')+'</tbody></table>';
   },
 };
 
@@ -315,11 +329,11 @@ V.sueldo={
     $('#suMes').innerHTML=months.map(m=>`<option value="${m}"${m===suYm?' selected':''}>${esc(mLong(m))}</option>`).join('');
     const i=months.indexOf(suYm);$('#suPrev').disabled=i>=months.length-1;$('#suNext').disabled=i<=0;
     const s=calc(suYm),P=sueldoPesos(s);
-    $('#suNomSub').textContent=suYm===now?'este mes':'';
+    $('#suNomSub').textContent=suYm===now?'Este mes':'';$('#suSub').textContent=mLong(suYm);
     $('#suNom').innerHTML=`<div class="rows">`+
       rw('FTDs',`<b>${s.n}</b>`,'big')+
-      rw('&nbsp;&nbsp;cargados',String(s.loaded))+
-      rw('&nbsp;&nbsp;sin detalle',readOnly?String(s.extra):`<span class="step"><button type="button" data-aj="-1" aria-label="menos">−</button><input type="number" id="suAj" min="0" max="999" value="${s.extra}" aria-label="FTDs sin detalle"><button type="button" data-aj="1" aria-label="más">+</button></span>`)+
+      rw('Cargados',String(s.loaded))+
+      rw('Sin detalle',readOnly?String(s.extra):`<span class="step"><button type="button" data-aj="-1" aria-label="menos">−</button><input type="number" id="suAj" min="0" max="999" value="${s.extra}" aria-label="FTDs sin detalle"><button type="button" data-aj="1" aria-label="más">+</button></span>`)+
       rw('Fijo',`${pesos(cfg.base)} UYU`)+
       rw(`Por FTD (${s.n} × ${cfg.porftd} USD)`,`${money(s.porftd)} USD`)+
       rw(s.tier?`Bono (${s.tier}+ FTDs)`:'Bono',`${money(s.bono)} USD`)+
@@ -327,18 +341,18 @@ V.sueldo={
       rw('Total nominal',`${pesos(cfg.base)} + ${money(s.usd)} USD`)+
       (cfg.tc>0?rw('≈ en pesos',`${pesos(cfg.base+s.usd*cfg.tc)} UYU`):'')+
       `</div>`+(s.monto?`<div class="note">${money(s.monto)} USD depositados por tus FTDs</div>`:'');
-    $('#suLiqSub').textContent=P?(cfg.comRecibo?'comisiones en el recibo':'comisiones aparte'):'';
-    $('#suLiq').innerHTML=!P?`<div class="p-empty">Falta el dólar BROU compra.<br><button type="button" class="btn sm wr" style="margin-top:8px" data-act="focusTc">cargar dólar</button></div>`:
+    $('#suLiqSub').textContent=P?(cfg.comRecibo?'Comisiones en el recibo':'Comisiones aparte'):'';
+    $('#suLiq').innerHTML=!P?`<div class="p-empty">Falta el dólar BROU compra.<br><button type="button" class="btn sm wr" style="margin-top:8px" data-act="focusTc">Cargar dólar</button></div>`:
       `<div class="rows">`+rw(cfg.comRecibo?'Nominal gravado':'Nominal gravado (fijo)',pesos(P.N))+
       rw('− Aporte jubilatorio 15%',pesos(P.jub))+rw(`− FONASA ${nf(P.rF*100,1).replace(',0','')}%`,pesos(P.fon))+rw('− FRL 0,1%',pesos(P.frl))+rw('− IRPF',pesos(P.irpf))+
       rw('Líquido',`${pesos(P.neto)} UYU`,'tot hl big')+
       (P.tc>0&&cfg.comRecibo?rw('≈ en dólares',`${money(Math.round(P.neto/P.tc))} USD`):'')+
       (P.usdAparte?rw('+ Comisiones aparte',`${money(P.usdAparte)} USD`)+(P.total!=null?rw('≈ Total en mano',`${pesos(P.total)} UYU`,'tot hl'):''):'')+`</div>`;
     // bonos
-    $('#suBonoSub').textContent=s.next?`faltan ${s.next[0]-s.n} para ${s.next[1]} USD`:s.n?'bono máximo 🔥':'';
+    $('#suBonoSub').textContent=s.next?`Faltan ${s.next[0]-s.n} para ${s.next[1]} USD`:s.n?'Bono máximo 🧉':'';
     const T=tiers();
-    $('#suBono').innerHTML=bonoMeter(s.n)+`<table class="pt" style="margin-top:6px"><thead><tr><th>FTDs</th><th class="r">Bono</th><th class="r">Variable</th><th class="r">Líquido ≈</th></tr></thead><tbody>`+
-      T.map(([t,b])=>{const q=porCantidad(t),L=sueldoPesos(q);return `<tr${t===s.tier?' class="cur"':''}><td>${t}+${t===s.tier?' <span class="ok">◂</span>':''}</td><td class="r">${money(b)} USD</td><td class="r">${money(q.usd)} USD</td><td class="r">${L&&L.total!=null?pesos(L.total):'—'}</td></tr>`}).join('')+'</tbody></table>';
+    $('#suBono').innerHTML=bonoTrack(s.n,true)+`<table class="pt" style="margin-top:10px"><thead><tr><th>FTDs</th><th class="r">Bono</th><th class="r">Variable</th><th class="r">Líquido ≈</th></tr></thead><tbody>`+
+      T.map(([t,b])=>{const q=porCantidad(t),L=sueldoPesos(q);return `<tr${t===s.tier?' class="cur"':''}><td>${t}+${t===s.tier?' <span class="badge paid">ahora</span>':''}</td><td class="r">${money(b)} USD</td><td class="r">${money(q.usd)} USD</td><td class="r">${L&&L.total!=null?pesos(L.total):'—'}</td></tr>`}).join('')+'</tbody></table>';
     // dólar
     if($('#suTc')!==document.activeElement)$('#suTc').value=cfg.tc>0?nf(cfg.tc,2):'';
     $('#suTcInfo').innerHTML=cfg.tc>0?(tcViejo()?sp('hot','⚠ '+tcTxt()+' · actualizalo'):esc(tcTxt())):sp('hot','sin cargar');
@@ -364,13 +378,20 @@ V.sueldo={
 };
 
 /* ---------- config ---------- */
-const TEMAS=[['verde','#7dff8a','#060a07'],['ambar','#ffcf87','#0b0703'],['hielo','#d7e3fa','#080b10']];
-function applyTheme(){document.body.classList.remove('ambar','hielo');if(cfg.tema&&cfg.tema!=='verde')document.body.classList.add(cfg.tema)}
+const TEMAS=[['auto','Automático'],['claro','Claro'],['oscuro','Oscuro']];
+const darkMq=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
+function applyTheme(t){
+  t=t||cfg.tema;if(!['claro','oscuro'].includes(t))t='auto';local.set('tema',t);
+  const dark=t==='oscuro'||(t==='auto'&&!!(darkMq&&darkMq.matches));
+  document.body.classList.toggle('dark',dark);
+  const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#0d1210':'#f1f4ef';
+}
+if(darkMq&&darkMq.addEventListener)darkMq.addEventListener('change',()=>{applyTheme(ready?cfg.tema:local.get('tema','auto'));if(ready)refresh()});
 let bonosDraft=null;
 V.config={
   build(){
-    $('#cfTemas').innerHTML=TEMAS.map(([t,fg,bg])=>`<button type="button" class="th" data-tema="${t}"><i style="background:${bg};box-shadow:inset 0 0 0 3px ${fg}"></i>${t}</button>`).join('');
-    $('#cfTemas').addEventListener('click',async e=>{const b=e.target.closest('[data-tema]');if(!b)return;cfg={...cfg,tema:b.dataset.tema};applyTheme();this.render({});if(!readOnly&&await B.saveCfg())this.saved()});
+    $('#cfTemas').innerHTML=TEMAS.map(([t,l])=>`<button type="button" data-tema="${t}">${l}</button>`).join('');
+    $('#cfTemas').addEventListener('click',async e=>{const b=e.target.closest('[data-tema]');if(!b)return;cfg={...cfg,tema:b.dataset.tema};applyTheme();refresh();if(!readOnly&&await B.saveCfg())this.saved()});
     $$('[data-c]',$('#v-config')).forEach(el=>el.addEventListener('change',()=>this.set(el)));
     $('#cfBonoAdd').onclick=()=>{this.readBonos();bonosDraft.push(['','']);this.drawBonos()};
     $('#cfBonoSave').onclick=()=>this.saveBonos();
@@ -422,7 +443,7 @@ V.config={
   },
   readBonos(){bonosDraft=$$('.brow',$('#cfBonos')).map(r=>[r.querySelector('.bt').value,r.querySelector('.bu').value])},
   drawBonos(){
-    $('#cfBonos').innerHTML=bonosDraft.map(([t,u],i)=>`<div class="brow" style="grid-template-columns:auto 1fr auto 1fr auto"><span class="dim">desde</span><input class="bt" inputmode="numeric" value="${esc(t)}" aria-label="FTDs"><span class="dim">FTDs →</span><input class="bu" inputmode="decimal" value="${esc(u)}" aria-label="USD"><button type="button" class="ib del wr" data-rmb="${i}" aria-label="Quitar">✕</button></div>`).join('');
+    $('#cfBonos').innerHTML=bonosDraft.map(([t,u],i)=>`<div class="brow" style="grid-template-columns:auto 1fr auto 1fr auto"><span class="dim">desde</span><input class="bt" inputmode="numeric" value="${esc(t)}" aria-label="FTDs"><span class="dim">FTDs →</span><input class="bu" inputmode="decimal" value="${esc(u)}" aria-label="USD"><button type="button" class="ib del wr" data-rmb="${i}" aria-label="Quitar">Quitar</button></div>`).join('');
   },
   async saveBonos(){
     if(!noRO())return;
@@ -431,7 +452,7 @@ V.config={
     if(b.some(([t,u])=>isNaN(t)||isNaN(u)||t<1||u<0||!Number.isInteger(t)))return $('#cfBonoErr').textContent='Revisá los valores.';
     if(new Set(b.map(x=>x[0])).size!==b.length)return $('#cfBonoErr').textContent='Hay escalones repetidos.';
     cfg={...cfg,bonos:b.sort((x,y)=>x[0]-y[0])};bonosDraft=null;
-    if(await B.saveCfg()){this.saved();toast('✔ Bonos guardados.')}
+    if(await B.saveCfg()){this.saved();toast('Bonos guardados.')}
   },
   render(){
     $$('[data-c]',$('#v-config')).forEach(el=>{
@@ -443,19 +464,19 @@ V.config={
       el.disabled=readOnly;
     });
     if(!bonosDraft||!$('#cfBonos').contains(document.activeElement)){bonosDraft=tiers().map(([t,u])=>[String(t),String(u)]);this.drawBonos()}
-    $$('[data-tema]',$('#cfTemas')).forEach(b=>b.classList.toggle('on',b.dataset.tema===(cfg.tema||'verde')));
+    const tm=['claro','oscuro'].includes(cfg.tema)?cfg.tema:'auto';$$('[data-tema]',$('#cfTemas')).forEach(b=>b.classList.toggle('on',b.dataset.tema===tm));
     const LB=cfg.laborables||DEF.laborables;$$('[data-dow]',$('#cfDow')).forEach(c=>c.classList.toggle('on',LB.includes(+c.dataset.dow)));
     if($('#cfInicio')!==document.activeElement)$('#cfInicio').value=cfg.inicio||'';
     const sf=cfg.sinFer||DEF.sinFer,y=+todayS().slice(0,4),fl=t=>feriadosUY(y).filter(x=>x.t===t).map(x=>`${dm(x.d)} ${x.n}`).join('\n');
-    $('#cfFer').innerHTML=`<button type="button" class="chip${sf.no?' on':''}" data-fer="no" title="${esc(fl('no'))}">no laborables</button><button type="button" class="chip${sf.lab?' on':''}" data-fer="lab" title="${esc(fl('lab'))}">laborables</button>`;
+    $('#cfFer').innerHTML=`<button type="button" class="chip${sf.no?' on':''}" data-fer="no" title="${esc(fl('no'))}">No laborables</button><button type="button" class="chip${sf.lab?' on':''}" data-fer="lab" title="${esc(fl('lab'))}">Laborables</button>`;
     const L=cfg.libres||[];
-    $('#cfLibres').innerHTML=L.length?L.map(x=>`<button type="button" class="chip on" data-lib="${x}" title="Quitar">${+x.slice(3,5)}/${+x.slice(0,2)} ✕</button>`).join(''):'<span class="p-sub">ninguno</span>';
+    $('#cfLibres').innerHTML=L.length?L.map(x=>`<button type="button" class="chip on" data-lib="${x}" title="Quitar">${+x.slice(3,5)}/${+x.slice(0,2)} ✕</button>`).join(''):'<span class="p-sub">Ninguno</span>';
     const F=cfg.faltas||[],fj=F.filter(x=>x.j).length;
-    $('#cfFaltas').innerHTML=F.length?`<div class="alist">${F.map(x=>`<div class="ai" style="grid-template-columns:auto 1fr auto"><span class="wh">${DIA[parseYMD(x.d).getDay()]} ${dm(x.d)}/${x.d.slice(0,4)}</span><button type="button" class="chip${x.j?' on':''}" data-fal="${x.d}" data-op="j" title="Cambiar" style="justify-self:start">${x.j?'justificada':'sin justificar'}</button><button type="button" class="ib del wr" data-fal="${x.d}" data-op="rm" title="Quitar">✕</button></div>`).join('')}</div>`:'<span class="p-sub">ninguna</span>';
+    $('#cfFaltas').innerHTML=F.length?`<div class="alist">${F.map(x=>`<div class="ai" style="grid-template-columns:auto 1fr auto"><span class="wh">${DIA[parseYMD(x.d).getDay()]} ${dm(x.d)}/${x.d.slice(0,4)}</span><button type="button" class="chip${x.j?' on':''}" data-fal="${x.d}" data-op="j" title="Cambiar" style="justify-self:start">${x.j?'Justificada':'Sin justificar'}</button><button type="button" class="ib del wr" data-fal="${x.d}" data-op="rm" title="Quitar">Quitar</button></div>`).join('')}</div>`:'<span class="p-sub">Ninguna</span>';
     $('#cfDiasSub').textContent=F.length?`${plural(F.length,'falta')} · ${fj} justificada${fj===1?'':'s'}`:'';
-    $('#cfDb').textContent=teamInfo?'Vitalis · '+teamInfo.name:'';
+    $('#cfDb').textContent=teamInfo?teamInfo.name:'';$('#cfSub').textContent=`Vitalis ${VERSION}`;
     V.cuenta.render();
-    $('#cfExt').innerHTML=extOn()?sp('ok','🔔 extensión de Chrome conectada · '+plural(extN,'aviso programado','avisos programados')):'sin extensión de Chrome';
+    $('#cfExt').innerHTML=extOn()?sp('ok b','Extensión conectada')+`: ${plural(extN,'aviso programado','avisos programados')}, ${plural(activeSnips().length,'snippet')}.`:'La extensión no está conectada en esta pestaña. Con ella tenés avisos en cualquier pestaña, el botón del CRM, el registro de clientes new y los snippets.';
     const lat=ftds.filter(isLate).length;
     $('#cfCount').textContent=`${plural(ftds.length,'venta')} (${lat} late) · ${plural(pend.length,'contacto')} · ${plural(Object.keys(turnos).length,'jornada')} · ${Object.keys(ajustes).length?Object.entries(ajustes).map(([k,v])=>`${mLabel(k)}: ${v} sin detalle`).join(' · '):'sin ajustes'}`;
   },
@@ -478,8 +499,9 @@ V.equipo={
     const i=months.indexOf(eqYm);$('#eqPrev').disabled=i>=months.length-1;$('#eqNext').disabled=i<=0;
     const list=team.filter(f=>f.date.slice(0,7)===eqYm),R=resumen(list);
     const act=members.filter(m=>m.active);
-    const per=act.map(m=>{const l=list.filter(f=>f.uid===m.id);return {m,n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:l.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null)}});
-    for(const uid of new Set(list.map(f=>f.uid)))if(!per.some(p=>p.m.id===uid)){const l=list.filter(f=>f.uid===uid);per.push({m:{id:uid,name:memberName(uid)+' (baja)'},n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:null})}
+    const [ya,ma]=eqYm.split('-').map(Number),mFrom=eqYm+'-01',mTo=ymd(new Date(ya,ma,0));
+    const per=act.map(m=>{const l=list.filter(f=>f.uid===m.id);return {m,n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:l.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null),cv:convPeriod(mFrom,mTo,m.id)}});
+    for(const uid of new Set(list.map(f=>f.uid)))if(!per.some(p=>p.m.id===uid)){const l=list.filter(f=>f.uid===uid);per.push({m:{id:uid,name:memberName(uid)+' (baja)'},n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:null,cv:convPeriod(mFrom,mTo,uid)})}
     per.sort((a,b)=>b.n-a.n||b.monto-a.monto||a.m.name.localeCompare(b.m.name));
     const conV=per.filter(p=>p.n).length;
     $('#eqSub').textContent=`${teamInfo?teamInfo.name:''} · ${plural(act.length,'integrante')}`;
@@ -487,6 +509,7 @@ V.equipo={
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+
+      (()=>{const c=convPeriod(mFrom,mTo,null);return k('Conversión de la mesa',c.rate==null?'—':pct(c.rate),`${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente new','clientes new')}`)})()+
       (per[0]&&per[0].n?k('Primero',per[0].m.name,plural(per[0].n,'FTD')):'');
     const max=Math.max(1,...per.map(p=>p.n));
     $('#eqRank').innerHTML=`<div class="rk" style="--vw:${Math.max(6,...per.map(p=>(`${p.n} · ${money(p.monto)}${p.late?' · '+p.late+' late':''}`).length))}ch">`+
@@ -497,44 +520,174 @@ V.equipo={
     colChart($('#eqChart'),data,{h:210,capMin:18,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     $('#eqCount').textContent=`${plural(conV,'agente')} con ventas · ${nf(days?R.n/days:0,2)} FTDs por día`;
-    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Rol</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th>Último FTD</th></tr></thead><tbody>`+
-      per.map(p=>`<tr${p.m.id===me?' class="cur"':''}><td>${esc(p.m.name)}</td><td class="d">${p.m.role==='admin'?'admin':p.m.role==='leader'?'team leader':p.m.role?'agente':''}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')} · ${esc(p.last.id)}`:''}</td></tr>`).join('')+'</tbody></table>';
+    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Rol</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th>Último FTD</th></tr></thead><tbody>`+
+      per.map(p=>`<tr${p.m.id===me?' class="cur"':''}><td><span class="who-cell">${avatar(p.m.name)}${esc(p.m.name)}</span></td><td class="d">${p.m.role?roleTxt(p.m.role):''}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td></tr>`).join('')+'</tbody></table>';
   },
 };
 
-/* ---------- mi cuenta y la mesa (en config) ---------- */
-const who=()=>(profile&&profile.name?norm(profile.name.split(/\s+/)[0]).replace(/[^a-z0-9]/g,''):'')||'vitalis';
+/* ---------- mi cuenta y la mesa (en ajustes) ---------- */
+async function reloadMembers(){try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'));refresh()}catch(e){}}
+const inviteLink=()=>`${location.origin}${location.pathname}#mesa=${encodeURIComponent(teamInfo.invite_code)}`;
 V.cuenta={
   build(){
-    $('#cfNameSave').onclick=async()=>{const v=$('#cfName').value.trim();if(!v)return toast('Escribí tu nombre.','err');if(v===profile.name)return;if(await B.saveName(v))toast('✔ Nombre guardado.')};
+    $('#cfNameSave').onclick=async()=>{const v=$('#cfName').value.trim();if(!v)return toast('Escribí tu nombre.','err');if(v===profile.name)return;if(await B.saveName(v))toast('Nombre guardado.')};
     $('#cfName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#cfNameSave').click()}});
-    $('#cfPass').onclick=()=>passModal();
-    $('#cfCodeCopy').onclick=()=>navigator.clipboard.writeText(teamInfo.invite_code).then(()=>toast('✔ Código copiado.'),()=>toast('No pude copiar.','err'));
-    $('#cfCodeNew').onclick=async()=>{if(await confirmar('Cambiar código','El código actual deja de servir para registrarse. Los que ya están siguen entrando normal.','cambiar'))if(await B.newCode())toast('✔ Nuevo código: <b>'+esc(teamInfo.invite_code)+'</b>')};
+    $('#cfPin').onclick=()=>pinModal();
+    $('#cfLinkCopy').onclick=()=>navigator.clipboard.writeText(inviteLink()).then(()=>toast('Link copiado. Quien lo abra solo elige su nombre y pone su PIN.'),()=>toast('No pude copiar.','err'));
+    $('#cfCodeNew').onclick=async()=>{if(await confirmar('Cambiar el código','El código actual deja de servir en las computadoras que todavía no entraron. Los que ya tienen la sesión abierta siguen normal.','Cambiar'))if(await B.newCode())toast('Nuevo código: <b>'+esc(teamInfo.invite_code)+'</b>')};
+    $('#cfAddM').onclick=()=>addMemberModal();
     $('#cfMembers').addEventListener('change',async e=>{const s=e.target.closest('[data-role]');if(!s)return;const m=members.find(x=>x.id===s.dataset.role);
-      if(m&&await B.setMember(m.id,{role:s.value}))toast(`✔ ${esc(m.name)}: ${s.value==='admin'?'admin':s.value==='leader'?'team leader':'agente'}`);else this.render()});
-    $('#cfMembers').addEventListener('click',async e=>{const b=e.target.closest('[data-act-m]');if(!b)return;const m=members.find(x=>x.id===b.dataset.id);if(!m)return;
-      if(m.active){if(!await confirmar('Dar de baja',`¿Dar de baja a <b>${esc(m.name)}</b>? Deja de poder entrar a Vitalis. Sus ventas quedan en la mesa.`,'dar de baja',true))return;if(await B.setMember(m.id,{active:false}))toast(`✔ ${esc(m.name)} dado de baja.`)}
-      else if(await B.setMember(m.id,{active:true}))toast(`✔ ${esc(m.name)} reactivado.`)});
+      if(m&&await B.setMember(m.id,{role:s.value}))toast(`${esc(m.name)}: ${roleTxt(s.value).toLowerCase()}`);else this.render()});
+    $('#cfMembers').addEventListener('click',async e=>{const b=e.target.closest('[data-mact]');if(!b)return;const m=members.find(x=>x.id===b.dataset.id);if(!m)return;
+      if(b.dataset.mact==='pin'){
+        if(!await confirmar('Resetear PIN',`El PIN de <b>${esc(m.name)}</b> vuelve a ser 0000 y la próxima vez que entre crea uno nuevo.`,'Resetear'))return;
+        if(await B.rpc('reset_pin',{uid:m.id})){m.pin_set=false;toast(`PIN de ${esc(m.name)}: 0000.`);this.render()}
+        return;
+      }
+      if(m.active){if(!await confirmar('Dar de baja',`¿Dar de baja a <b>${esc(m.name)}</b>? Deja de aparecer en la lista y no puede entrar. Sus ventas quedan en la mesa.`,'Dar de baja',true))return;if(await B.setMember(m.id,{active:false}))toast(`${esc(m.name)} dado de baja.`)}
+      else if(await B.setMember(m.id,{active:true}))toast(`${esc(m.name)} reactivado.`)});
   },
   render(){
     if(!profile)return;
     if($('#cfName')!==document.activeElement)$('#cfName').value=profile.name;
-    $('#cfEmail').textContent=(profile.email||'')+(teamInfo?' · '+teamInfo.name:'');
-    $('#cfRole').textContent=profile.role==='admin'?'administrador':profile.role==='leader'?'team leader':'agente';
+    $('#cfEmail').textContent=profile.login?`Entrás eligiendo tu nombre y tu PIN${teamInfo?' en '+teamInfo.name:''}.`:(profile.email||'')+(teamInfo?' · '+teamInfo.name:'');
+    $('#cfPin').hidden=!profile.login;
+    $('#cfRole').textContent=roleTxt(profile.role);
     $('#cfTeamCard').hidden=!isAdmin();
     if(!isAdmin())return;
     $('#cfTeamName').textContent=teamInfo.name;$('#cfCode').textContent=teamInfo.invite_code;
     const list=[...members].sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name));
-    $('#cfMembers').innerHTML=`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th class="r">FTDs</th><th class="act"></th></tr></thead><tbody>`+
-      list.map(m=>`<tr${m.active?'':' class="warn"'}><td>${esc(m.name)}${m.id===me?' <span class="dim">(vos)</span>':''}</td><td class="d trunc">${esc(m.email||'')}</td><td>${m.id===me||!m.active?`<span class="d">${m.role==='admin'?'admin':m.role==='leader'?'team leader':'agente'}</span>`:`<select data-role="${esc(m.id)}" aria-label="Rol de ${esc(m.name)}"><option value="agent"${m.role==='agent'?' selected':''}>agente</option><option value="leader"${m.role==='leader'?' selected':''}>team leader</option><option value="admin"${m.role==='admin'?' selected':''}>admin</option></select>`}</td><td class="r">${team.filter(f=>f.uid===m.id).length}</td><td class="act">${m.id===me?'':`<button type="button" class="btn sm${m.active?' danger':''}" data-act-m="1" data-id="${esc(m.id)}">${m.active?'dar de baja':'reactivar'}</button>`}</td></tr>`).join('')+'</tbody></table></div>';
+    $('#cfMembers').innerHTML=`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th class="r">FTDs</th><th class="act"></th></tr></thead><tbody>`+
+      list.map(m=>`<tr${m.active?'':' class="warn"'}><td><span class="who-cell">${avatar(m.name)}${esc(m.name)}${m.id===me?' <span class="dim">(vos)</span>':''}</span></td>
+        <td>${m.id===me||!m.active?`<span class="d">${roleTxt(m.role)}</span>`:`<select data-role="${esc(m.id)}" aria-label="Rol de ${esc(m.name)}"><option value="agent"${m.role==='agent'?' selected':''}>Agente</option><option value="leader"${m.role==='leader'?' selected':''}>Team leader</option><option value="admin"${m.role==='admin'?' selected':''}>Administrador</option></select>`}</td>
+        <td>${!m.login?'<span class="d">Cuenta vieja (email)</span>':m.pin_set?'<span class="badge paid">Creado</span>':'<span class="badge">0000, sin entrar</span>'}</td>
+        <td class="r">${team.filter(f=>f.uid===m.id).length}</td>
+        <td class="act">${m.login&&m.active&&m.id!==me&&m.pin_set?`<button type="button" class="ib" data-mact="pin" data-id="${esc(m.id)}">Resetear PIN</button>`:''}${m.id===me?'':`<button type="button" class="ib${m.active?' del':''}" data-mact="baja" data-id="${esc(m.id)}">${m.active?'Dar de baja':'Reactivar'}</button>`}</td></tr>`).join('')+'</tbody></table></div>';
   },
 };
-function passModal(){
-  modal({title:'Cambiar contraseña',body:`<label class="fld"><span>Nueva contraseña (mínimo 6)</span><input type="password" id="np1" autocomplete="new-password"></label><label class="fld" style="margin-top:10px"><span>Repetila</span><input type="password" id="np2" autocomplete="new-password"></label><div class="ebox" id="npErr"></div>`,
-    actions:[{l:'cancelar'},{l:'guardar',cls:'pri',fn:async api=>{const a=api.q('#np1').value,b=api.q('#np2').value;
-      if(a.length<6){api.q('#npErr').textContent='Tiene que tener al menos 6 caracteres.';return false}if(a!==b){api.q('#npErr').textContent='No coinciden.';return false}
-      const {error}=await sb.auth.updateUser({password:a});if(error){api.q('#npErr').textContent=errMsg(error);return false}toast('✔ Contraseña cambiada.')}}]});
+function pinModal(){
+  const f=(id,l)=>`<label class="fld" style="margin-top:10px"><span>${l}</span><input type="password" id="${id}" inputmode="numeric" maxlength="4" autocomplete="off" pattern="[0-9]*"></label>`;
+  modal({title:'Cambiar PIN',body:f('pin0','PIN actual')+f('pin1','PIN nuevo (4 números)')+f('pin2','Repetilo')+'<div class="ebox" id="pinErr"></div>',
+    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
+      const a=api.q('#pin0').value,b=api.q('#pin1').value,c=api.q('#pin2').value,err=t=>{api.q('#pinErr').textContent=t;return false};
+      if(!/^\d{4}$/.test(b))return err('El PIN nuevo son 4 números.');if(b!==c)return err('No coinciden.');
+      const {error}=await sb.rpc('set_pin',{new_pin:b,old_pin:a});if(error)return err(errMsg(error));toast('PIN cambiado.')}}]});
+}
+function addMemberModal(){
+  modal({title:'Sumar a la mesa',body:`<label class="fld"><span>Nombre (como aparece en la lista)</span><input id="amN" maxlength="40" autofocus></label>
+    <label class="fld" style="margin-top:10px"><span>Rol</span><select id="amR"><option value="agent">Agente</option><option value="leader">Team leader</option><option value="admin">Administrador</option></select></label>
+    <p class="note">Entra con PIN 0000 la primera vez y crea el suyo.</p><div class="ebox" id="amErr"></div>`,
+    actions:[{l:'Cancelar'},{l:'Sumar',cls:'pri',fn:async api=>{
+      const n=api.q('#amN').value.trim();if(!n){api.q('#amErr').textContent='Escribí el nombre.';return false}
+      const {error}=await sb.rpc('add_member',{nm:n,rl:api.q('#amR').value});if(error){api.q('#amErr').textContent=errMsg(error);return false}
+      toast(`${esc(n)} ya está en la lista. Entra con PIN 0000.`);reloadMembers()}}]});
+}
+
+/* ---------- clientes new: registro y conversión ---------- */
+let clPer='hoy',clWho='me',clQ='',clShow=60;
+const CLP=[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['todo','Todo']];
+function clRange(){const te=todayS();return clPer==='hoy'?[te,te]:clPer==='semana'?[weekStart(te),te]:clPer==='mes'?[te.slice(0,8)+'01',te]:['0000-01-01','9999-12-31']}
+const clUid=()=>clWho==='me'?me:clWho==='all'?null:clWho;
+function soldMap(){const m=new Map();for(const f of [...team].sort(byDate)){const k=norm(f.id);if(!m.has(k))m.set(k,f)}return m}
+V.clientes={
+  build(){
+    $('#clPer').innerHTML=CLP.map(([k,l])=>`<button type="button" data-clp="${k}">${l}</button>`).join('');
+    $('#clPer').addEventListener('click',e=>{const b=e.target.closest('[data-clp]');if(!b)return;clPer=b.dataset.clp;clShow=60;this.render({})});
+    $('#clWho').addEventListener('change',e=>{clWho=e.target.value;clShow=60;this.render({})});
+    let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
+    $('#clMore').onclick=()=>{clShow+=100;this.render({})};
+    $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
+      if(b.dataset.cl==='ag')return agendarModal(l.id,l.name);
+      if(b.dataset.cl==='del'){if(!await confirmar('Borrar cliente',`¿Sacar a <b>${esc(l.id)}</b> ${esc(l.name)} del registro?`,'Borrar',true))return;if(await B.delLead(l))toast('Cliente borrado del registro.')}});
+  },
+  render(){
+    $$('[data-clp]',$('#clPer')).forEach(b=>b.classList.toggle('on',b.dataset.clp===clPer));
+    const sel=$('#clWho');
+    if(sel!==document.activeElement){
+      const ms=members.filter(m=>m.id!==me&&(m.active||leads.some(l=>l.uid===m.id)));
+      sel.innerHTML=`<option value="me">Mis clientes</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+      if(![...sel.options].some(o=>o.value===clWho))clWho='me';sel.value=clWho;
+    }
+    const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
+    $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
+    $('#clKpis').innerHTML=convCards(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    // gráfico: últimos 30 días
+    const start=addDays(te,-29),own=l=>uid==null||l.uid===uid,data=[];
+    for(let i=0;i<30;i++){const d=addDays(start,i),L=leads.filter(l=>l.date===d&&own(l)),paid=L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
+      data.push({lab:String(+d.slice(8)),a:paid,b:L.length-paid,d,dw,ftd:team.filter(f=>f.date===d&&own(f)).length,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
+    $('#clChartSub').textContent='Últimos 30 días';
+    colChart($('#clChart'),data,{h:190,capMin:18,cb:'var(--sx)',label:'Clientes new por día',empty:'Todavía no hay clientes registrados. Abrí el CRM con la extensión instalada o cargalos con + Cliente.',
+      tip:x=>({title:`${cap(DIAL[x.dw])} ${dm(x.d)}`,rows:[{v:String(x.a+x.b),l:'clientes new'},{key:'var(--s1)',v:String(x.a),l:'ya depositaron'},{key:'var(--sx)',v:String(x.b),l:'todavía no'},{v:String(x.ftd),l:'FTDs ese día'}]})});
+    // registro
+    const q=norm(clQ);
+    const rows=leads.filter(l=>own(l)&&l.date>=from&&l.date<=to&&(!q||norm(l.name).includes(q)||norm(l.id).includes(q))).sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:(b._id>a._id?1:-1));
+    $('#clListT').textContent=clPer==='hoy'?'Clientes de hoy':clPer==='semana'?'Clientes de esta semana':clPer==='mes'?'Clientes de este mes':'Todos los clientes';
+    const paidN=rows.filter(l=>sold.has(norm(l.id))).length;
+    $('#clCount').textContent=rows.length?`${plural(rows.length,'cliente')}, ${paidN} ${paidN===1?'ya depositó':'ya depositaron'}`:'';
+    const many=clWho!=='me';
+    $('#clTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th>${many?'<th>Agente</th>':''}<th>Estado</th><th>Origen</th><th class="act"></th></tr></thead><tbody>`+
+      rows.slice(0,clShow).map(l=>{const f=sold.get(norm(l.id));return `<tr><td>${l.date===te?'Hoy':`${DIA[parseYMD(l.date).getDay()]} ${dm(l.date)}`}</td><td><b>${esc(l.id)}</b></td><td class="trunc" title="${esc(l.name)}">${esc(l.name)}</td><td class="d">${esc(l.country)}</td>${many?`<td class="trunc">${esc(memberName(l.uid))}</td>`:''}
+        <td>${f?`<span class="badge paid" title="${esc(money(f.amount))} USD">Depositó ${f.date===te?'hoy':dm(f.date)}</span>`:'<span class="d">Todavía no</span>'}</td><td class="d">${l.source==='manual'?'A mano':'CRM'}</td>
+        <td class="act wr">${f?'':`<button type="button" class="ib" data-cl="ag" data-id="${esc(l._id)}">Agendar</button>`}${l.uid===me||isLeader()?`<button type="button" class="ib del" data-cl="del" data-id="${esc(l._id)}">Borrar</button>`:''}</td></tr>`}).join('')+'</tbody></table>'
+      :`<div class="p-empty">${clQ?'No hay clientes con esa búsqueda.':clPer==='hoy'?'Todavía no entró ningún cliente hoy.':'Sin clientes en este período.'}</div>`;
+    $('#clMore').hidden=rows.length<=clShow;
+  },
+};
+
+/* ---------- snippets ---------- */
+let snQ='';
+const canEditSnip=s=>s.uid===me||(s.shared&&isLeader());
+V.snippets={
+  build(){
+    $('#snQ').addEventListener('input',e=>{snQ=e.target.value.trim();this.render({})});
+    $('#snList').addEventListener('click',async e=>{
+      const b=e.target.closest('[data-sn]');if(!b)return;
+      if(b.dataset.sn==='new')return snipModal();
+      const sn=snippets.find(x=>x._id===b.dataset.id);if(!sn)return;
+      if(b.dataset.sn==='copy'){try{await navigator.clipboard.writeText(fillSnip(sn.body));toast(`/${esc(sn.shortcut)} copiado.`)}catch(x){toast('No pude copiar.','err')}return}
+      if(b.dataset.sn==='edit')return snipModal(sn);
+      if(b.dataset.sn==='del'){if(!await confirmar('Borrar snippet',`¿Borrar <b>/${esc(sn.shortcut)}</b>${sn.uid!==me?` de ${esc(memberName(sn.uid))}`:''}?`,'Borrar',true))return;if(await B.delSnip(sn))toast(`/${esc(sn.shortcut)} borrado.`)}
+    });
+  },
+  render(){
+    const q=norm(snQ),mine_=new Set(snippets.filter(x=>x.uid===me).map(x=>x.shortcut));
+    const list=snippets.filter(x=>!q||norm(x.shortcut+' '+x.title+' '+x.body).includes(q))
+      .sort((a,b)=>(a.uid===me?0:1)-(b.uid===me?0:1)||a.shortcut.localeCompare(b.shortcut));
+    if(!snippets.length){$('#snList').innerHTML=`<div class="sn-empty"><b>Tu primer snippet</b>Guardá el texto del KYC, el saludo o lo que escribas siempre, y pegalo escribiendo /atajo.<div style="margin-top:14px"><button type="button" class="btn pri wr" data-sn="new">Crear snippet</button></div></div>`;return}
+    $('#snList').innerHTML=list.length?list.map(x=>{
+      const other=x.uid!==me,shadow=other&&mine_.has(x.shortcut);
+      return `<article class="sn"><div class="h"><span class="sc">/${esc(x.shortcut)}</span><span class="tt">${esc(x.title)}</span>${x.shared&&!other?'<span class="badge">Compartido</span>':''}</div>
+        <div class="bd">${esc(x.body).replace(/\{(fecha|hora|yo|cursor)\}/g,'<span class="var">{$1}</span>')}</div>
+        <div class="ft">${other?`<span class="who-cell p-sub">${avatar(memberName(x.uid))}De ${esc(memberName(x.uid).split(/\s+/)[0])}${shadow?', usás el tuyo':''}</span>`:''}<span class="grow"></span>
+          <button type="button" class="ib" data-sn="copy" data-id="${esc(x._id)}">Copiar</button>${canEditSnip(x)?`<button type="button" class="ib wr" data-sn="edit" data-id="${esc(x._id)}">Editar</button><button type="button" class="ib del wr" data-sn="del" data-id="${esc(x._id)}">Borrar</button>`:''}</div></article>`}).join('')
+      :'<div class="sn-empty">Ningún snippet con esa búsqueda.</div>';
+  },
+};
+function snipModal(sn){
+  if(!noRO())return;
+  const VARS=[['{fecha}','Fecha de hoy'],['{hora}','Hora'],['{yo}','Tu nombre'],['{cursor}','Dónde queda el cursor']];
+  const body=`<div class="fgrid">
+      <label class="fld"><span>Atajo</span><span class="scin"><span>/</span><input id="snS" maxlength="30" autocomplete="off" spellcheck="false" placeholder="kyc" value="${esc(sn?sn.shortcut:'')}" data-vitalis-nosnip></span></label>
+      <label class="fld"><span>Título (opcional)</span><input id="snT" maxlength="60" value="${esc(sn?sn.title:'')}" data-vitalis-nosnip></label>
+      <label class="fld full"><span>Texto</span><textarea id="snB" rows="8" maxlength="20000" data-vitalis-nosnip>${esc(sn?sn.body:'')}</textarea></label></div>
+    <div class="vars"><span class="p-sub">Insertar:</span>${VARS.map(([v,l])=>`<button type="button" class="chip" data-var="${v}" title="${l}">${v}</button>`).join('')}</div>
+    <label class="tog" style="margin-top:14px"><input type="checkbox" id="snSh"${sn&&sn.shared?' checked':''}${sn&&sn.uid!==me?' disabled':''}>Compartir con la mesa</label>
+    <div class="fld" style="margin-top:14px"><span>Así se pega</span><div class="prev" id="snP"></div></div><div class="ebox" id="snE"></div>`;
+  const acts=[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
+    const sc=api.q('#snS').value.trim().replace(/^\/+/,'').toLowerCase(),b=api.q('#snB').value,err=t=>{api.q('#snE').textContent=t;return false};
+    if(!/^[a-z0-9_-]{1,30}$/.test(sc))return err('El atajo va sin espacios ni tildes: letras, números, - o _.');
+    if(!b.trim())return err('Falta el texto.');
+    const r=await B.saveSnip(sn,{shortcut:sc,title:api.q('#snT').value.trim(),body:b,shared:sn&&sn.uid!==me?sn.shared:api.q('#snSh').checked});
+    if(!r)return false;toast(`/${esc(sc)} guardado.${extOn()?' Ya lo podés usar en cualquier página.':''}`);
+  }}];
+  if(sn&&canEditSnip(sn))acts.unshift({l:'Borrar',cls:'danger l',fn:async()=>{if(!await confirmar('Borrar snippet',`¿Borrar <b>/${esc(sn.shortcut)}</b>?`,'Borrar',true))return false;await B.delSnip(sn)}});
+  modal({title:sn?`Editar /${esc(sn.shortcut)}`:'Nuevo snippet',body,actions:acts,wide:1,onOpen(api){
+    const ta=api.q('#snB'),prev=()=>{api.q('#snP').textContent=fillSnip(ta.value)||' '};
+    api.box.addEventListener('input',prev);prev();
+    api.box.addEventListener('click',e=>{const c=e.target.closest('[data-var]');if(!c)return;const v=c.dataset.var,a=ta.selectionStart,z_=ta.selectionEnd;
+      ta.setRangeText(v,a,z_,'end');ta.focus();prev()});
+    api.q('#snS').addEventListener('input',e=>{const v=e.target.value.replace(/^\/+/,'').toLowerCase().replace(/\s+/g,'-');if(v!==e.target.value)e.target.value=v});
+  }});
 }
 
 /* ---------- respaldo del panel anterior ---------- */
@@ -571,16 +724,16 @@ function importarRespaldo(){
 function onReady(){
   ready=true;applyTheme();
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
-  $$('.who').forEach(e=>e.textContent=who());
   $('#navEquipo').hidden=!isLeader();
   let h='';try{h=location.hash.slice(1)}catch(e){}
   go(VIEWS.includes(h)?h:'inicio');
   status();check();setInterval(check,15000);setInterval(tick,1000);turnoBar(true);
   addEventListener('online',status);addEventListener('offline',status);
-  if(!ftds.length&&!team.length)toast(`👋 Bienvenido a Vitalis, ${esc(profile.name)}. Cargá tu primera venta con <b>+ FTD</b> o importá tu historial en config.`,'ok',{ms:12000});
+  if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Cargá tu primera venta con <b>Venta</b> o importá tu historial en Ajustes.`,'ok',{ms:12000});
 }
 function boot(){
-  $('#ver').textContent='v'+VERSION;
+  applyTheme(local.get('tema','auto'));
+  $('#ver').textContent='Vitalis '+VERSION;
   for(const v of VIEWS)V[v].build();
   V.cuenta.build();
   window.addEventListener('hashchange',()=>{if(!ready)return;let h='';try{h=location.hash.slice(1)}catch(e){}if(VIEWS.includes(h)&&h!==cur)go(h)});

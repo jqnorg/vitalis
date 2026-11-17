@@ -82,31 +82,31 @@ function colPath(x,y,w,h,r){
 function colChart(el,data,o={}){
   el.textContent='';hideTip();
   if(!data.length||!data.some(d=>d.a+d.b>0)){el.innerHTML=`<div class="p-empty">${esc(o.empty||'Sin datos.')}</div>`;return}
-  const W=Math.max(300,el.clientWidth||800),H=o.h||220,m={t:22,r:8,b:28,l:36},iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const W=Math.max(300,el.clientWidth||800),H=o.h||220,m={t:24,r:8,b:30,l:38},iw=W-m.l-m.r,ih=H-m.t-m.b;
   const max=Math.max(1e-9,...data.map(d=>d.a+d.b),o.ref||0),st=niceStep(max/4),top=Math.ceil(max/st-1e-9)*st;
   const y=v=>m.t+ih-(v/top)*ih,band=iw/data.length,bw=Math.max(3,Math.min(26,band*.62));
   const fmt=o.fmt||(v=>String(v));
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
   svg.setAttribute('width',W);svg.setAttribute('height',H);svg.setAttribute('role','img');svg.setAttribute('aria-label',o.label||'gráfico');
-  const grid=getComputedStyle(document.body).getPropertyValue('--dim').trim()||'#4f7754';
+  const grid=getComputedStyle(document.body).getPropertyValue('--dim').trim()||'#5b685f';
   let s='';
   for(let v=0;v<=top+1e-9;v+=st){
-    s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}" stroke-opacity="${v?0.22:0.55}" stroke-width="1" shape-rendering="crispEdges"/>`;
-    s+=`<text x="${m.l-8}" y="${y(v)+3.5}" text-anchor="end" font-size="10" fill="${grid}" style="font-variant-numeric:tabular-nums">${esc(o.fmtY?o.fmtY(v):nf(v,st<1?1:0))}</text>`;
+    s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="${grid}" stroke-opacity="${v?0.18:0.45}" stroke-width="1" shape-rendering="crispEdges"/>`;
+    s+=`<text x="${m.l-8}" y="${y(v)+3.5}" text-anchor="end" font-size="11" fill="${grid}" style="font-variant-numeric:tabular-nums">${esc(o.fmtY?o.fmtY(v):nf(v,st<1?1:0))}</text>`;
   }
   const lblEvery=o.every||(band>=30?1:band>=16?2:band>=9?3:6),capAll=band>=(o.capMin||22),tot=data.map(d=>d.a+d.b),mx=Math.max(...tot),maxI=tot.indexOf(mx);
   data.forEach((d,i)=>{
     const x=m.l+i*band+(band-bw)/2,hA=d.a/top*ih,hB=d.b/top*ih,gap=d.a&&d.b?2:0;
     let g=`<g class="col" data-i="${i}">`;
     if(d.a)g+=`<path d="${d.b?`M${x},${y(0)}V${y(0)-hA}H${x+bw}V${y(0)}Z`:colPath(x,y(0)-hA,bw,hA,4)}" style="fill:${d.ca||'var(--s1)'}"/>`;
-    if(d.b)g+=`<path d="${colPath(x,y(0)-hA-gap-hB,bw,hB,4)}" style="fill:var(--s2)"/>`;
+    if(d.b)g+=`<path d="${colPath(x,y(0)-hA-gap-hB,bw,hB,4)}" style="fill:${o.cb||'var(--s2)'}"/>`;
     s+=g+'</g>';
     const v=d.a+d.b;
-    if(v&&(capAll||i===maxI||(o.capLast!==false&&i===data.length-1)))s+=`<text x="${x+bw/2}" y="${y(v)-gap-5}" text-anchor="middle" font-size="10" style="fill:var(--fg);font-variant-numeric:tabular-nums">${esc(fmt(v))}</text>`;
-    if(i%lblEvery===0||i===data.length-1)s+=`<text x="${m.l+i*band+band/2}" y="${H-m.b+15}" text-anchor="middle" font-size="10" fill="${d.labC||grid}">${esc(d.lab)}</text>`;
+    if(v&&(capAll||i===maxI||(o.capLast!==false&&i===data.length-1)))s+=`<text x="${x+bw/2}" y="${y(v)-gap-5}" text-anchor="middle" font-size="11" style="fill:var(--fg);font-variant-numeric:tabular-nums">${esc(fmt(v))}</text>`;
+    if(i%lblEvery===0||i===data.length-1)s+=`<text x="${m.l+i*band+band/2}" y="${H-m.b+15}" text-anchor="middle" font-size="11" fill="${d.labC||grid}">${esc(d.lab)}</text>`;
   });
   if(o.ref){s+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(o.ref)}" y2="${y(o.ref)}" style="stroke:var(--fg)" stroke-opacity=".6" stroke-dasharray="4 4" stroke-width="1" shape-rendering="crispEdges"/>`;
-    if(o.refLab)s+=`<text x="${W-m.r}" y="${y(o.ref)-5}" text-anchor="end" font-size="10" style="fill:var(--fg)" fill-opacity=".8">${esc(o.refLab)}</text>`}
+    if(o.refLab)s+=`<text x="${W-m.r}" y="${y(o.ref)-5}" text-anchor="end" font-size="11" style="fill:var(--fg)" fill-opacity=".8">${esc(o.refLab)}</text>`}
   svg.innerHTML=s;el.appendChild(svg);
   const cols=[...svg.querySelectorAll('.col')];let hot=-1;
   svg.addEventListener('pointermove',e=>{
@@ -119,7 +119,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ventas','agenda','turnos','sueldo','config','equipo'];
+const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','config','equipo'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 function go(v,opts){
@@ -135,20 +135,24 @@ let rT=null;
 function refresh(){clearTimeout(rT);rT=setTimeout(()=>{if(!ready)return status();status();V[cur].render({});syncExt()},60)}
 
 /* ---------- barra de estado ---------- */
+const avHue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h};
+const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+const avatar=(name,cls='')=>`<span class="av ${cls}" style="--h:${avHue(name)}" aria-hidden="true">${esc(initials(name))}</span>`;
+const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':'Agente';
 function status(){
   const now=new Date(),te=todayS();
   $('#sClock').textContent=`${z(now.getHours())}:${z(now.getMinutes())}`;$('#sClock').title=`${DIAL[now.getDay()]} ${dm(te)}`;
-  if(!ready){$('#sMes').textContent='cargando…';return}
+  if(!ready){$('#sMes').textContent='Cebando…';return}
   const s=calc(ymNow());
-  $('#sMes').innerHTML=`${esc(MES[now.getMonth()].slice(0,3))} · ${sp('b',plural(s.n,'FTD'))} · ${sp('ok',money(s.usd)+' USD')}`+(s.next?` · ${sp('hot','faltan '+(s.next[0]-s.n)+'→'+s.next[1])}`:s.n?' · 🔥':'');
+  $('#sMes').innerHTML=`<b>${s.n}</b> FTDs en ${esc(MES[now.getMonth()])}`+(s.next?` <span class="dim">faltan ${s.next[0]-s.n} para ${s.next[1]} USD</span>`:s.n?' <span class="dim">bono máximo</span>':'');
   const P=sueldoPesos(s);
-  $('#sLiq').innerHTML=P&&P.total!=null?`líq ≈ ${sp('ok b',pesos(P.total))}${tcViejo()?' '+sp('hot','(dólar viejo)'):''}`:`líq: ${sp('hot','cargá el dólar')}`;
+  $('#sLiq').innerHTML=P&&P.total!=null?`Líquido ≈ <b>${esc(pesos(P.total))}</b>${tcViejo()?' <span class="hot">dólar viejo</span>':''}`:`Líquido <span class="hot">cargá el dólar</span>`;
   const open=pend.filter(p=>!p.done),venc=open.filter(p=>parseDue(p.due)<=now).length,hoy=open.filter(p=>p.due.slice(0,10)===te).length;
-  $('#sPend').innerHTML=`agenda ${sp('b',hoy)}`+(venc?` · ${sp('hot','⚠ '+venc+' vencido'+(venc>1?'s':''))}`:'');
+  $('#sPend').innerHTML=`Agenda <b>${hoy}</b>`+(venc?` <span class="hot b">${plural(venc,'vencido')}</span>`:'');
   $('#nbAg').textContent=venc||'';
-  const off=!navigator.onLine;$('#sDb').classList.toggle('hide',!off);
-  $('#sDb').innerHTML=sp('hot','⚠ sin conexión');
-  $('#sMe').innerHTML=`${esc(profile?profile.name:'')} ${profile&&profile.role!=='agent'?sp('dim','· '+(profile.role==='admin'?'admin':'team leader')):''}`;
+  const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
+  $('#sDb').hidden=navigator.onLine;
+  $('#sMe').innerHTML=profile?`${avatar(profile.name)}<span style="min-width:0"><span class="nm">${esc(profile.name)}</span><span class="rl">${esc(roleTxt(profile.role))}</span></span>`:'';
   turnoBar();
 }
 let turnoKey='';
@@ -156,14 +160,14 @@ function turnoState(){const t=openTurno(),b=breakAbierto(t),h=turnos[todayS()];r
 function turnoBar(force){
   const el=$('#sTurno');if(!ready){el.innerHTML='';return}
   const {t,b,h,key}=turnoState(),now=Date.now();
-  const btn=(act,label,title)=>`<button type="button" class="bb wr" data-act="${act}" title="${title}">${label}</button>`;
+  const btn=(act,label,title,cls='')=>`<button type="button" class="tb wr ${cls}" data-act="${act}" title="${title}">${label}</button>`;
   if(force||key!==turnoKey){
     turnoKey=key;
-    if(!t)el.innerHTML=h&&h.out?`✔ hoy ${sp('ok b',durS(h.out-h.in))}`:btn('entrada','▶ entrada','Marcar entrada');
-    else if(b)el.innerHTML=`☕ ${b.k}' <span class="tLive"></span> ${btn('vuelta','↩ vuelta','Volver del descanso')}`;
-    else el.innerHTML=`⏱ <span class="tLive"></span> ${btn('d10',"☕10'",'Descanso de 10 minutos')}${btn('d30',"☕30'",'Descanso de 30 minutos')}${btn('salida','■ salida','Marcar salida')}`;
+    if(!t)el.innerHTML=h&&h.out?`Turno de hoy <b>${durS(h.out-h.in)}</b>&nbsp;`:`Sin entrada ${btn('entrada','Entrada','Marcar entrada','go')}`;
+    else if(b)el.innerHTML=`Descanso ${b.k}' <span class="tLive"></span> ${btn('vuelta','Volví','Volver del descanso','go')}`;
+    else el.innerHTML=`<span class="tLive"></span> ${btn('d10',"10'",'Descanso de 10 minutos')}${btn('d30',"30'",'Descanso de 30 minutos')}${btn('salida','Salida','Marcar salida')}`;
   }
   const live=el.querySelector('.tLive');if(!live||!t)return;
-  if(b){const left=b.s+b.k*6e4-now;live.innerHTML=left>=0?sp('ok b',mmss(left)):sp('hot','+'+mmss(-left))}
-  else{const rest=t.in+jorMs()-now;live.innerHTML=`${sp('b',durS(now-t.in))} · ${rest>0?'sal '+hhmm(t.in+jorMs()):sp('hot','+'+durS(-rest)+' extra')}`}
+  if(b){const left=b.s+b.k*6e4-now;live.innerHTML=left>=0?`<b>${mmss(left)}</b>`:`<b class="hot">+${mmss(-left)}</b>`}
+  else{const rest=t.in+jorMs()-now;live.innerHTML=`<b>${durS(now-t.in)}</b> <span class="dim">${rest>0?'salís '+hhmm(t.in+jorMs()):''}</span>${rest>0?'':` <span class="hot">+${durS(-rest)}</span>`}`}
 }

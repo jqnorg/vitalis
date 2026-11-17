@@ -12,9 +12,12 @@ const hm = (ms) => { const d = new Date(ms); return `${z(d.getHours())}:${z(d.ge
 const keyOf = (it) => it.k + '@' + it.due;
 
 async function state() {
-  const s = await chrome.storage.local.get(['items', 'fired', 'url', 'lastSync', 'cmds', 'importQ']);
-  return { items: s.items || [], fired: s.fired || {}, url: s.url || null, lastSync: s.lastSync || 0, cmds: s.cmds || [], importQ: s.importQ || [] };
+  const s = await chrome.storage.local.get(['items', 'fired', 'url', 'lastSync', 'cmds', 'importQ', 'leadQ', 'leadIds']);
+  return { items: s.items || [], fired: s.fired || {}, url: s.url || null, lastSync: s.lastSync || 0, cmds: s.cmds || [], importQ: s.importQ || [], leadQ: s.leadQ || [], leadIds: s.leadIds || [] };
 }
+const nrm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // igual que en Vitalis
+const leadKey = (c) => nrm(c.id ? String(c.id).replace(/\s+/g, ' ').trim().slice(0, 60) : 'n:' + nrm(c.name));
+const ymdLocal = () => { const d = new Date(); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`; };
 const sess = {
   async get(k, d) { const s = await chrome.storage.session.get(k); return s[k] ?? d; },
   set(k, v) { return chrome.storage.session.set({ [k]: v }); },
@@ -51,22 +54,24 @@ function ftdOverlay(items) {
     host.style.cssText = 'all:initial;position:fixed;top:14px;right:14px;z-index:2147483647;';
     (document.body || document.documentElement).appendChild(host);
     host.attachShadow({ mode: 'open' }).innerHTML = `<style>
-      .stack{display:flex;flex-direction:column;gap:10px;width:min(380px,calc(100vw - 28px));font:13px/1.45 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace}
-      .card{--c:#ffc266;background:#060a07;color:#b9f3b4;border:1px solid var(--c);border-left:4px solid var(--c);border-radius:6px;padding:10px 12px;box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 22px rgba(255,194,102,.25);animation:in .2s ease-out,pulse 1.2s ease-in-out 3;text-shadow:0 0 5px rgba(125,255,138,.25)}
-      .card.crm{--c:#79d4ff;box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 22px rgba(121,212,255,.25)}
-      @keyframes in{from{opacity:0;transform:translateX(16px)}}
-      @keyframes pulse{50%{box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 0 4px rgba(255,194,102,.35)}}
+      .stack{display:flex;flex-direction:column;gap:10px;width:min(370px,calc(100vw - 28px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+      .card{--c:#e08a1e;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px 13px;box-shadow:0 18px 48px rgba(0,0,0,.28);animation:in .25s ease-out,nudge .6s ease-in-out .3s 2}
+      .card.crm{--c:#2f7fd0}
+      @keyframes in{from{opacity:0;transform:translateY(-10px)}}
+      @keyframes nudge{50%{transform:rotate(-1.2deg) scale(1.02)}}
       .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-      .tag{background:#b9f3b4;color:#060a07;font-weight:700;letter-spacing:.1em;padding:0 6px;border-radius:2px;text-shadow:none;font-size:11px}
-      .t{color:var(--c);font-weight:700;flex:1}
-      .x{all:unset;cursor:pointer;color:#4f7754;padding:0 4px}.x:hover{color:#b9f3b4}
-      .id{font-size:20px;font-weight:700;color:var(--c)}
+      .mk{width:22px;height:22px}
+      .tag{font-weight:800;font-size:15px;letter-spacing:-.03em}
+      .t{color:var(--c);font-weight:800;flex:1;font-size:12.5px;text-transform:none}
+      .x{all:unset;cursor:pointer;color:#5b685f;padding:0 6px;border-radius:6px}.x:hover{background:#ecf0e9;color:#15201a}
+      .id{font-size:24px;font-weight:800;letter-spacing:-.02em}
       .kw{margin:2px 0 4px;word-break:break-word}
-      .m{color:#4f7754;font-size:11.5px}
-      .b{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-      .b button{all:unset;cursor:pointer;font-size:11.5px;color:var(--c);border:1px solid var(--c);border-radius:3px;padding:2px 9px}
-      .b button:hover{background:var(--c);color:#060a07}
-      .b button.p{background:var(--c);color:#060a07;font-weight:700}
+      .m{color:#5b685f;font-size:12.5px}
+      .b{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
+      .b button{all:unset;cursor:pointer;font-size:13px;font-weight:700;color:#15201a;border:1px solid #dfe5dc;border-radius:999px;padding:5px 12px}
+      .b button:hover{border-color:#5b685f}
+      .b button.p{background:#1b874a;border-color:#1b874a;color:#fff}
+      .b button.p:hover{background:#156f3c}
     </style><div class="stack"></div>`;
   }
   const stack = host.shadowRoot.querySelector('.stack');
@@ -74,12 +79,13 @@ function ftdOverlay(items) {
     if (stack.querySelector(`[data-k="${CSS.escape(d.k)}"]`)) continue;
     const card = document.createElement('div');
     card.className = 'card' + (d.kind === 'crm' ? ' crm' : ''); card.dataset.k = d.k; card.setAttribute('role', 'alert');
-    card.innerHTML = '<div class="h"><span class="tag">VITALIS</span><span class="t"></span><button class="x" data-a="close" title="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>';
-    card.querySelector('.t').textContent = d.title || '⏰ CONTACTAR';
+    card.innerHTML = '<div class="h"><img class="mk" alt=""><span class="tag">vitalis</span><span class="t"></span><button class="x" data-a="close" title="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>';
+    try { card.querySelector('.mk').src = chrome.runtime.getURL('icons/48.png'); } catch (e) { card.querySelector('.mk').remove(); }
+    card.querySelector('.t').textContent = d.title || 'Contactar';
     card.querySelector('.id').textContent = d.id;
     card.querySelector('.kw').textContent = d.kw;
     card.querySelector('.m').textContent = d.meta || '';
-    for (const [a, l, p] of d.btns || [['done', '✔ hecho', 1], ['snooze', '+15 min'], ['open', 'abrir Vitalis']]) {
+    for (const [a, l, p] of d.btns || [['done', 'Hecho', 1], ['snooze', '+15 min'], ['open', 'Abrir Vitalis']]) {
       const b = document.createElement('button'); b.dataset.a = a; b.textContent = l; if (p) b.className = 'p'; card.querySelector('.b').appendChild(b);
     }
     card.addEventListener('click', (e) => {
@@ -148,8 +154,8 @@ async function alertItem(it, { snooze = false } = {}) {
   await chrome.storage.local.set({ fired: st.fired });
   const late = Date.now() - it.due > 5 * 6e4;
   const tag = snooze ? 'recordatorio' : late ? 'atrasado' : '';
-  const info = { k: it.k, kind: 'agenda', title: '⏰ CONTACTAR', id: it.id, kw: it.kw || '(sin palabra clave)', meta: `#${it.n} · ${dayTxt(it.due)}${tag ? ' · ' + tag : ''}`,
-    btns: [['done', '✔ hecho', 1], ['snooze', '+15 min'], ['open', 'abrir Vitalis']] };
+  const info = { k: it.k, kind: 'agenda', title: 'Hora de contactar', id: it.id, kw: it.kw || '(sin palabra clave)', meta: `${dayTxt(it.due)}${tag ? ', ' + tag : ''}`,
+    btns: [['done', 'Hecho', 1], ['snooze', '+15 min'], ['open', 'Abrir Vitalis']] };
   const live = (await sess.get('live', [])).filter((x) => x.k !== it.k);
   await sess.set('live', [...live, info]);
   const sound = await playSound('agenda');
@@ -163,7 +169,8 @@ async function alertItem(it, { snooze = false } = {}) {
 }
 
 /* ---------- sincronización con el panel ---------- */
-async function sync(items, url, known) {
+async function sync(msg) {
+  const { items, url, known } = msg;
   const st = await state();
   const now = Date.now();
   const keys = new Set(items.map(keyOf));
@@ -171,6 +178,9 @@ async function sync(items, url, known) {
   for (const k in st.fired) if (keys.has(k)) fired[k] = st.fired[k];
   const upd = { items, url: url || st.url, lastSync: now, fired, cmds: [] };
   if (known) upd.known = { ids: known.ids, txs: known.txs, at: now }; // para que el botón del CRM sepa cuáles ya están
+  if (Array.isArray(msg.snips)) upd.snips = msg.snips; // los snippets que pega snip.js en cualquier página
+  if (msg.user) upd.me = msg.user;
+  if (Array.isArray(msg.leadIds)) { upd.leadIds = msg.leadIds; const have = new Set(msg.leadIds); upd.leadQ = st.leadQ.filter((c) => !have.has(leadKey(c))); }
   await chrome.storage.local.set(upd);
 
   const alive = new Set(items.map((x) => x.k));
@@ -184,7 +194,37 @@ async function sync(items, url, known) {
     if (it.due > now) { await chrome.alarms.create('p:' + it.k, { when: it.due }); scheduled++; }
     else if (now - it.due < MAX_LATE) await alertItem(it);
   }
-  return { scheduled, cmds: st.cmds, imports: st.importQ };
+  return { scheduled, cmds: st.cmds, imports: st.importQ, leads: upd.leadQ || st.leadQ };
+}
+
+/* ---------- clientes new del CRM → registro de Vitalis ---------- */
+async function crmLeads(clients) {
+  const st = await state(), have = new Set(st.leadIds), inQ = new Set(st.leadQ.map(leadKey)), today = ymdLocal(), fresh = [];
+  const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  for (const c of clients.slice(0, 300)) {
+    const k = leadKey(c);
+    if (!k || k === 'n:' || have.has(k) || inQ.has(k)) continue;
+    inQ.add(k); fresh.push({ id: cl(c.id, 60), name: cl(c.name, 120), country: cl(c.country, 60), date: today });
+  }
+  if (!fresh.length) return { fresh: 0 };
+  await chrome.storage.local.set({ leadQ: [...st.leadQ, ...fresh].slice(-500) });
+  await deliverLeads();
+  return { fresh: fresh.length };
+}
+async function deliverLeads() {
+  const st = await state();
+  if (!st.leadQ.length) return false;
+  for (const t of await vitalisTabs()) {
+    try {
+      const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'leads', rows: st.leadQ }), 10000);
+      if (r && !r.noPanel && !r.err) { await leadsDone(r.keys || []); return true; }
+    } catch (e) {}
+  }
+  return false; // Vitalis cerrado: quedan en cola hasta que se abra
+}
+async function leadsDone(keys) {
+  const st = await state(), ks = new Set(keys.map(String));
+  await chrome.storage.local.set({ leadQ: st.leadQ.filter((c) => !ks.has(leadKey(c))), leadIds: [...new Set([...st.leadIds, ...ks])].slice(-50000) });
 }
 
 /* ---------- ventas desde el CRM ---------- */
@@ -264,7 +304,7 @@ async function crmClients(tabId, m) {
   if (m.login) { // se cerró la sesión del CRM: aviso una vez por hora
     if (now - (w.loginAt || 0) > 3600e3) {
       await setWatchS({ ...w, loginAt: now });
-      await alertCard({ k: 'crm:login', kind: 'crm', title: '⚠ CRM SIN SESIÓN', id: 'Volvé a entrar al CRM', kw: 'Mientras tanto no puedo ver los clientes nuevos.', meta: hm(now), btns: [['crm', 'ir al CRM', 1], ['close', 'ok']] }, 'crm', '⚠ El CRM cerró la sesión', 'Volvé a entrar para seguir vigilando los clientes nuevos.');
+      await alertCard({ k: 'crm:login', kind: 'crm', title: 'El CRM cerró la sesión', id: 'Volvé a entrar al CRM', kw: 'Mientras tanto no puedo ver los clientes nuevos.', meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', '⚠ El CRM cerró la sesión', 'Volvé a entrar para seguir vigilando los clientes nuevos.');
     }
     return { watched: true };
   }
@@ -275,10 +315,10 @@ async function crmClients(tabId, m) {
   const keys = Object.keys(seen); if (keys.length > 3000) for (const k of keys.sort((a, b) => seen[a] - seen[b]).slice(0, keys.length - 3000)) delete seen[k];
   await setWatchS({ ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 });
   for (const c of fresh.slice(0, 5)) {
-    await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: '🆕 CLIENTE NUEVO EN EL CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
-      btns: [['crm', 'ver en el CRM', 1], ['close', 'ok']] }, 'crm', `🆕 Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
+    await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
+      btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `🆕 Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
   }
-  if (fresh.length > 5) await alertCard({ k: 'crm:mas' + now, kind: 'crm', title: '🆕 CLIENTES NUEVOS EN EL CRM', id: `+${fresh.length - 5} más`, kw: 'Hay más clientes en new.', meta: hm(now), btns: [['crm', 'ver en el CRM', 1], ['close', 'ok']] }, null);
+  if (fresh.length > 5) await alertCard({ k: 'crm:mas' + now, kind: 'crm', title: 'Clientes nuevos en el CRM', id: `+${fresh.length - 5} más`, kw: 'Hay más clientes en new.', meta: hm(now), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, null);
   return { watched: true, fresh: fresh.length };
 }
 async function alertCard(info, tone, sysTitle, sysMsg) {
@@ -314,13 +354,15 @@ async function sendCmd(cmd) { // "hecho" desde el aviso: se lo paso a Vitalis si
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (!msg || msg.target === 'offscreen') return false;
   if (msg.type === 'sync' && Array.isArray(msg.items)) {
-    sync(msg.items, msg.url, msg.known).then(reply).catch(() => reply({ scheduled: 0, cmds: [] }));
+    sync(msg).then(reply).catch(() => reply({ scheduled: 0, cmds: [] }));
     return true;
   }
   if (msg.type === 'crm-import' && Array.isArray(msg.rows)) {
     crmImport(msg.rows.slice(0, 500)).then(reply).catch((e) => reply({ err: String(e && e.message || e) }));
     return true;
   }
+  if (msg.type === 'crm-leads' && Array.isArray(msg.clients)) { crmLeads(msg.clients).then(reply).catch(() => reply(null)); return true; }
+  if (msg.type === 'leads-done' && msg.res && Array.isArray(msg.res.keys)) { leadsDone(msg.res.keys); return false; }
   if (msg.type === 'import-done') { // se cargaron las que estaban en espera
     chrome.storage.local.set({ importQ: [] }).then(() => tellCrm(msg.res));
     return false;

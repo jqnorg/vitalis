@@ -1,5 +1,5 @@
 // Prueba el esquema de Vitalis en un Postgres local (PGlite) imitando lo que hace Supabase:
-// auth.users, auth.uid() desde el JWT y el rol "authenticated" con RLS.
+// auth.users, auth.uid() desde el JWT y los roles "anon" / "authenticated" con RLS.
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 import fs from 'node:fs';
@@ -8,52 +8,110 @@ const db = new PGlite({ extensions: { pgcrypto } });
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  ✔ ' : '  ✖ ') + m); if (!c) fails++; };
 
-await db.exec(`
-  create schema auth;
-  create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb);
-  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  create role authenticated nologin; create role anon nologin;
-  grant usage on schema auth to authenticated, anon;
-  grant execute on function auth.uid() to authenticated, anon;
-  create publication supabase_realtime;
-`);
+await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8');
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 const code = (await db.query('select invite_code from public.teams')).rows[0].invite_code;
 console.log('código:', code);
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 6, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 8, 'tablas en tiempo real');
 
-async function signup(email, name, invite) {
-  try {
-    const r = await db.query('insert into auth.users (email, raw_user_meta_data) values ($1, $2) returning id', [email, JSON.stringify({ name, invite })]);
-    return r.rows[0].id;
-  } catch (e) { return 'ERR:' + e.message; }
-}
 async function as(uid, q, params = []) {
   await db.exec('reset role');
   await db.query("select set_config('request.jwt.claim.sub', $1, false)", [uid || '']);
   await db.exec(uid ? 'set role authenticated' : 'set role anon');
   try { return await db.query(q, params); } catch (e) { return { error: e.message }; } finally { await db.exec('reset role'); }
 }
+const J = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+const rpc = async (uid, q, params) => { const r = await as(uid, q, params); return r.error ? { error: r.error } : J(r.rows[0].j); };
 
-const A = await signup('yo@x.com', 'Yo', code.toLowerCase());
-const B = await signup('b@x.com', 'Agente B', ' ' + code + ' ');
-const C = await signup('c@x.com', 'Agente C', code);
-const bad = await signup('z@x.com', 'Intruso', 'NOPE');
-ok(String(bad).includes('INVITE_INVALID'), 'código inválido no deja registrarse');
-ok((await db.query('select count(*)::int c from auth.users')).rows[0].c === 3, 'el intruso no quedó en auth.users');
-const roles = Object.fromEntries((await db.query('select name, role from public.profiles')).rows.map((r) => [r.name, r.role]));
-ok(roles['Yo'] === 'admin' && roles['Agente B'] === 'agent', 'el primero es admin, el resto agentes');
+// ---------- la lista de la mesa ----------
+ok((await db.query('select count(*)::int c from public.profiles')).rows[0].c === 13, 'la mesa arranca con 13 personas (aunque se corra dos veces)');
+let R = await rpc(null, 'select public.team_roster($1) j', ['NOPE']);
+ok(R === null, 'con un código equivocado no se ve la lista');
+R = await rpc(null, 'select public.team_roster($1) j', [' ' + code.toLowerCase() + ' ']);
+ok(R && R.team === 'Team Matías' && R.people.length === 13, 'con el código se ve la lista de nombres');
+const P = Object.fromEntries(R.people.map((p) => [p.name, p]));
+ok(P['Matias Me'].role === 'leader' && P['Joaquín Or'].role === 'agent' && !R.people.some((p) => p.role === 'admin'), 'Matias es team leader; todavía no hay admin');
+ok(R.people.every((p) => !p.pin_set), 'nadie creó su PIN todavía');
+ok(!Object.keys(R.people[0]).some((k) => /pin_hash|secret|login/.test(k)), 'la lista no trae datos de la cuenta');
+const tok = (await db.query("select count(*)::int c from auth.users where confirmation_token is null or recovery_token is null or email_change is null or email_change_token_new is null")).rows[0].c;
+ok(tok === 0, 'las cuentas tienen los campos que espera Supabase (sin NULL)');
+ok((await db.query('select count(*)::int c from auth.identities')).rows[0].c === 13, 'cada cuenta tiene su identidad de email');
 
-// ventas compartidas
-let r = await as(A, "insert into public.sales (date, client_id, name, amount, tx, brand) values ('2026-11-17','68336','Maria',100,'51271','Novara Markets') returning id, team_id, user_id");
+let r = await as(null, 'select * from public.pins');
+ok(!!r.error || r.rows.length === 0, 'anon no puede leer los PIN');
+r = await as(null, "select public._new_seat((select id from public.teams), 'Intruso', 'admin')");
+ok(!!r.error, 'anon no puede crear cuentas');
+let e2 = null; try { await db.query("insert into auth.users (email, raw_user_meta_data, raw_app_meta_data) values ('z@x.com', $1, '{\"provider\":\"email\"}')", [JSON.stringify({ invite: code, vitalis_seat: true })]); } catch (e) { e2 = e.message; }
+ok(e2 && e2.includes('SIGNUP_DISABLED'), 'registrarse con email está cerrado (aunque se mande el código)');
+
+// ---------- ingreso con PIN ----------
+const login = (name, pin, c = code) => rpc(null, 'select public.pin_login($1, $2, $3) j', [c, P[name].id, pin]);
+R = await login('Alfonso Ro', '1234');
+ok(R.ok === false && R.error === 'wrong' && R.left === 4, 'PIN equivocado: quedan 4 intentos');
+R = await login('Alfonso Ro', '0000', 'NOPE');
+ok(R.ok === false && R.error === 'nouser', 'con otro código no entra');
+for (let i = 0; i < 3; i++) await login('Alfonso Ro', '9999');
+R = await login('Alfonso Ro', '1111');
+ok(R.ok === false && R.error === 'locked' && R.minutes === 15, 'al quinto error: bloqueado 15 minutos');
+R = await login('Alfonso Ro', '0000');
+ok(R.ok === false && R.error === 'locked', 'bloqueado: ni con el PIN correcto');
+await db.query("update public.pins set locked_until = now() - interval '1 minute' where user_id = $1", [P['Alfonso Ro'].id]);
+R = await login('Joaquín Or', '0000');
+ok(R.ok === true && R.email && R.password && R.pin_set === false, 'la primera vez entra con 0000');
+const pw1 = R.password;
+ok((await db.query('select (encrypted_password = crypt($2, encrypted_password)) m from auth.users where id = $1', [P['Joaquín Or'].id, pw1])).rows[0].m, 'la contraseña interna abre la cuenta de Supabase');
+R = await login('Joaquín Or', '0000');
+ok(R.password !== pw1 && !(await db.query('select (encrypted_password = crypt($2, encrypted_password)) m from auth.users where id = $1', [P['Joaquín Or'].id, pw1])).rows[0].m, 'en cada ingreso cambia la contraseña interna');
+
+const A = P['Joaquín Or'].id, B = P['Alfonso Ro'].id, C = P['Arlette Ga'].id, M = P['Matias Me'].id;
+const setPin = (uid, n, o) => rpc(uid, 'select public.set_pin($1, $2) j', [n, o ?? null]);
+R = await setPin(A, '0000');
+ok(!!R.error && /0000/.test(R.error), 'no se puede quedar con 0000');
+R = await setPin(A, '12a4');
+ok(!!R.error && /4 números/.test(R.error), 'el PIN son 4 números');
+R = await setPin(A, '4821');
+ok(R.ok && R.role === 'admin', 'el primero que crea su PIN queda como admin');
+R = await setPin(B, '1357');
+ok(R.ok && R.role === 'agent', 'el segundo queda como agente');
+R = await setPin(M, '2468');
+ok(R.ok && R.role === 'leader', 'el team leader sigue de team leader');
+R = await login('Joaquín Or', '0000');
+ok(R.ok === false, 'después de crear el PIN, 0000 ya no entra');
+R = await login('Joaquín Or', '4821');
+ok(R.ok === true && R.pin_set === true, 'entra con su PIN nuevo');
+R = await setPin(A, '1111', '0000');
+ok(!!R.error && /actual/.test(R.error), 'para cambiar el PIN hay que saber el actual');
+R = await setPin(A, '1111', '4821');
+ok(R.ok, 'cambia su PIN sabiendo el actual');
+R = await rpc(null, 'select public.set_pin($1, $2) j', ['5555', null]);
+ok(!!R.error, 'sin sesión no se cambia ningún PIN');
+r = await as(B, 'update public.profiles set pin_set = false where id = $1', [B]);
+ok(!!r.error, 'nadie se toca pin_set a mano');
+r = await as(A, "update public.profiles set login = 'x' where id = $1", [B]);
+ok(!!r.error, 'ni el admin cambia la cuenta interna de otro');
+R = await rpc(B, 'select public.reset_pin($1) j', [A]);
+ok(!!R.error, 'un agente no resetea PINs');
+R = await rpc(A, 'select public.reset_pin($1) j', [B]);
+ok(R.ok && (await login('Alfonso Ro', '0000')).ok, 'el admin vuelve el PIN de alguien a 0000');
+R = await rpc(B, "select public.add_member('Nuevo Ag', 'agent') j");
+ok(!!R.error, 'un agente no suma gente');
+R = await rpc(A, "select public.add_member('  Nuevo   Ag ', 'agent') j");
+ok(R.ok && (await rpc(null, 'select public.team_roster($1) j', [code])).people.some((p) => p.name === 'Nuevo Ag'), 'el admin suma a alguien y aparece en la lista');
+R = await rpc(A, "select public.add_member('nuevo ag') j");
+ok(!!R.error && /nombre/.test(R.error), 'no se repiten nombres');
+R = await rpc(null, "select public.add_member('Otro') j");
+ok(!!R.error, 'anon no suma gente');
+
+// ---------- ventas compartidas ----------
+r = await as(A, "insert into public.sales (date, client_id, name, amount, tx, brand) values ('2026-11-17','68336','Maria',100,'51271','Novara Markets') returning id, team_id, user_id");
 ok(!r.error && r.rows[0].user_id === A, 'A carga una venta (mesa y vendedor automáticos)');
 const saleA = r.rows[0].id;
 r = await as(B, 'select client_id, user_id from public.sales');
 ok(r.rows.length === 1 && r.rows[0].user_id === A, 'B ve la venta de A');
-r = await as(B, "update public.sales set amount = 1 where id = $1 returning id", [saleA]);
+r = await as(B, 'update public.sales set amount = 1 where id = $1 returning id', [saleA]);
 ok(!r.error && r.rows.length === 0, 'B no puede editar la venta de A');
 r = await as(B, 'delete from public.sales where id = $1 returning id', [saleA]);
 ok(!r.error && r.rows.length === 0, 'B no puede borrar la venta de A');
@@ -65,7 +123,7 @@ r = await as(B, "insert into public.sales (date, client_id, amount, tx, brand) v
 ok(!r.error, 'misma transacción en otra marca: permitida');
 const saleB = r.rows[0].id;
 
-// privados
+// ---------- privados ----------
 await as(A, "insert into public.agenda (client_id, kw, due) values ('4521','docs','2026-11-18T09:00')");
 await as(A, `insert into public.settings (cfg) values ('{"base":33500}')`);
 await as(A, "insert into public.shifts (date, data) values ('2026-11-17','{}')");
@@ -79,27 +137,65 @@ ok(r.rows.length === 1, 'A ve sus settings');
 r = await as(B, "insert into public.agenda (user_id, client_id, due) values ($1, 'x', '2026-11-18T09:00')", [A]);
 ok(!!r.error, 'B no puede escribir en la agenda de A');
 
-// roles
+// ---------- snippets ----------
+r = await as(A, "insert into public.snippets (shortcut, title, body) values ('kyc','KYC','Hola {yo}...') returning id");
+ok(!r.error, 'A crea un snippet privado');
+const snipA = r.rows[0].id;
+r = await as(A, "insert into public.snippets (shortcut, body) values ('kyc','otro')");
+ok(!!r.error, 'A no puede repetir su atajo');
+r = await as(A, "insert into public.snippets (shortcut, body) values ('KYC Doc','x')");
+ok(!!r.error, 'atajo con mayúsculas o espacios: rechazado');
+r = await as(B, 'select * from public.snippets');
+ok(r.rows.length === 0, 'B no ve el snippet privado de A');
+r = await as(A, "insert into public.snippets (shortcut, body, shared) values ('saludo','Buenas!', true) returning id");
+const snipShared = r.rows[0].id;
+r = await as(B, 'select shortcut from public.snippets');
+ok(r.rows.length === 1 && r.rows[0].shortcut === 'saludo', 'B ve el snippet compartido de A');
+r = await as(B, "insert into public.snippets (shortcut, body) values ('kyc','el mío') returning id");
+ok(!r.error, 'B puede tener su propio /kyc');
+r = await as(B, "update public.snippets set body = 'hackeado' where id = $1 returning id", [snipShared]);
+ok(!r.error && r.rows.length === 0, 'B (agente) no edita el compartido de A');
+r = await as(B, 'delete from public.snippets where id = $1 returning id', [snipA]);
+ok(!r.error && r.rows.length === 0, 'B no borra el privado de A');
+
+// ---------- clientes new ----------
+r = await as(A, "insert into public.leads (client_id, name, date) values ('80001','Ana','2026-11-17'),('80002','Beto','2026-11-17') returning id");
+ok(!r.error && r.rows.length === 2, 'A registra 2 clientes new');
+r = await as(B, "insert into public.leads (client_id, name) values ('80001','Ana') on conflict (team_id, client_id) do nothing returning id");
+ok(!r.error && r.rows.length === 0, 'el mismo cliente no se registra dos veces en la mesa');
+r = await as(B, 'select client_id from public.leads');
+ok(r.rows.length === 2, 'B ve los clientes de la mesa');
+r = await as(B, "delete from public.leads where client_id = '80001' returning id");
+ok(!r.error && r.rows.length === 0, 'B no borra clientes de A');
+r = await as(B, "insert into public.leads (user_id, client_id) values ($1, '1')", [A]);
+ok(!!r.error, 'B no registra clientes a nombre de A');
+
+// ---------- roles ----------
 r = await as(B, "update public.profiles set role = 'admin' where id = $1", [B]);
 ok(!!r.error, 'B no puede hacerse admin');
-r = await as(B, "update public.profiles set name = 'Bea' where id = $1 returning name", [B]);
-ok(!r.error && r.rows[0].name === 'Bea', 'B cambia su nombre');
+r = await as(B, "update public.profiles set name = 'Alfonso R.' where id = $1 returning name", [B]);
+ok(!r.error && r.rows[0].name === 'Alfonso R.', 'B cambia su nombre');
 r = await as(A, "update public.profiles set role = 'leader' where id = $1 returning role", [C]);
 ok(!r.error && r.rows[0].role === 'leader', 'A pone a C de team leader');
 r = await as(C, 'update public.sales set amount = 260 where id = $1 returning amount', [saleB]);
 ok(!r.error && r.rows.length === 1, 'el team leader corrige una venta de B');
+r = await as(C, "update public.snippets set body = 'Buenas tardes!' where id = $1 returning id", [snipShared]);
+ok(!r.error && r.rows.length === 1, 'el team leader corrige un snippet compartido');
 r = await as(A, "update public.profiles set role = 'agent' where id = $1", [A]);
 ok(!!r.error, 'el único admin no puede sacarse el rol');
 r = await as(B, "update public.teams set invite_code = 'X' returning id");
-ok(!r.error && r.rows.length === 0, 'B no cambia el código de invitación');
+ok(!r.error && r.rows.length === 0, 'B no cambia el código de la mesa');
 r = await as(A, "update public.teams set invite_code = 'MATIAS-NUEVO' returning invite_code");
-ok(!r.error && r.rows.length === 1, 'A cambia el código de invitación');
+ok(!r.error && r.rows.length === 1, 'A cambia el código de la mesa');
+ok((await rpc(null, 'select public.team_roster($1) j', [code])) === null, 'el código viejo ya no muestra la lista');
 
-// baja
+// ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');
 r = await as(B, 'select * from public.sales');
 ok(r.rows.length === 0, 'B dado de baja no ve más las ventas de la mesa');
+ok(!(await rpc(null, 'select public.team_roster($1) j', ['MATIAS-NUEVO'])).people.some((p) => p.id === B), 'B dado de baja no aparece en la lista');
+ok((await rpc(null, 'select public.pin_login($1, $2, $3) j', ['MATIAS-NUEVO', B, '0000'])).ok === false, 'B dado de baja no puede entrar');
 r = await as(null, 'select * from public.sales');
 ok(!!r.error || r.rows.length === 0, 'sin sesión no se ve nada');
 

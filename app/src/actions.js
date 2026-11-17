@@ -24,7 +24,7 @@ function ftdForm(f){
     <label class="fld"><span>Campaign</span><input name="camp" list="dlK" value="${v('camp')}"></label>
     <div class="fld"><span>Fecha FTD</span><div class="frow" style="flex-wrap:nowrap"><input type="date" name="date" max="${te}" value="${v('date')}" style="flex:1" aria-label="Fecha FTD"><input type="time" name="time" value="${v('time')}" aria-label="Hora FTD"></div></div>
     <div class="fld"><span>Registro</span><div class="frow" style="flex-wrap:nowrap"><input type="date" name="regD" max="${te}" value="${esc(regD)}" style="flex:1" aria-label="Fecha de registro"><input type="time" name="regT" value="${esc(regT)}" aria-label="Hora de registro"></div></div>
-    <div class="full frow" style="align-items:center"><span class="chips">${[['mismo día',0],['ayer',1],['-2 días',2],['-7 días',7]].map(([l,n])=>`<button type="button" class="chip" data-reg="${n}">${l}</button>`).join('')}</span><span style="flex:1"></span><span id="fTipo"></span></div>
+    <div class="full frow" style="align-items:center"><span class="chips">${[['Mismo día',0],['Ayer',1],['2 días antes',2],['7 días antes',7]].map(([l,n])=>`<button type="button" class="chip" data-reg="${n}">${l}</button>`).join('')}</span><span style="flex:1"></span><span id="fTipo"></span></div>
     <label class="fld full"><span>Transacción</span><input name="tx" value="${v('tx')}"></label>
   </div><div class="wbox" id="fDup" hidden></div><div class="ebox" id="fErr"></div>
   ${dlist('dlB',[...new Set([DEF_BRAND,'Trade24Seven',...uniq(x=>x.brand)])])}${dlist('dlC',uniq(x=>x.country))}${dlist('dlA',uniq(x=>x.aff))}${dlist('dlK',uniq(x=>x.camp))}`;
@@ -62,9 +62,9 @@ function ftdForm(f){
       api.q('#fDup').hidden=true;dupOk='';tipo(api);api.q('[name=id]').focus();return false;
     }
   };
-  const acts=isNew?[{l:'cancelar'},{l:'guardar y otra',fn:api=>save(api,true)},{l:'guardar',cls:'pri',fn:api=>save(api)}]
-    :[{l:'borrar',cls:'danger l',fn:async()=>{await borrarFtd(f)}},{l:'cancelar'},{l:'guardar',cls:'pri',fn:api=>save(api)}];
-  modal({title:isNew?`<span class="u">${esc(who())}@vitalis</span>:<span class="w">~</span>$ nuevo FTD`:`<span class="u">${esc(who())}@vitalis</span>:<span class="w">~</span>$ editar FTD #${f.n}${f.uid!==me?' · '+esc(memberName(f.uid)):''}`,body,actions:acts,wide:1,
+  const acts=isNew?[{l:'Cancelar'},{l:'Guardar y otra',fn:api=>save(api,true)},{l:'Guardar',cls:'pri',fn:api=>save(api)}]
+    :[{l:'Borrar',cls:'danger l',fn:async()=>{await borrarFtd(f)}},{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:api=>save(api)}];
+  modal({title:isNew?'Nueva venta':`Editar venta #${f.n}${f.uid!==me?' de '+esc(memberName(f.uid)):''}`,body,actions:acts,wide:1,
     onOpen(api){
       tipo(api);
       api.box.addEventListener('input',e=>{if(['date','regD'].includes(e.target.name))tipo(api);if(e.target.name==='id'||e.target.name==='brand'){api.q('#fDup').hidden=true;dupOk=''}});
@@ -106,7 +106,7 @@ function ajusteModal(ym){
     <div class="rw"><span class="k">Cargados</span><span class="d"></span><span class="v">${calc(ym).loaded}</span></div>
     <div class="rw"><span class="k">Sin detalle</span><span class="d"></span><span class="v"><span class="step"><button type="button" data-d="-1" aria-label="menos">−</button><input type="number" id="ajN" min="0" max="999" value="${cur}" aria-label="FTDs sin detalle"><button type="button" data-d="1" aria-label="más">+</button></span></span></div>
     <div class="rw tot hl"><span class="k">Total</span><span class="d"></span><span class="v" id="ajTot"></span></div></div>`;
-  modal({title:`FTDs sin detalle · ${esc(mLong(ym))}`,body,actions:[{l:'cancelar'},{l:'guardar',cls:'pri',fn:api=>setAjusteN(ym,api.q('#ajN').value).then(ok=>ok?undefined:false)}],
+  modal({title:`FTDs sin detalle · ${esc(mLong(ym))}`,body,actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:api=>setAjusteN(ym,api.q('#ajN').value).then(ok=>ok?undefined:false)}],
     onOpen(api){
       const inp=api.q('#ajN'),upd=()=>{const n=calc(ym).loaded+Math.max(0,+inp.value||0),s=porCantidad(n);api.q('#ajTot').textContent=`${plural(n,'FTD')} · ${money(s.usd)} USD`};
       api.box.addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;inp.value=Math.max(0,(+inp.value||0)+ +b.dataset.d);upd()});
@@ -129,8 +129,8 @@ function agFields(p){
     <label class="fld" style="flex:3 1 200px"><span>Palabra clave</span><input name="kw" value="${esc(p?p.kw:'')}"></label>
     <label class="fld" style="flex:0 1 150px"><span>Fecha</span><input type="date" name="pdate" value="${d}"></label>
     <label class="fld" style="flex:0 1 104px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label>
-    ${p?'':'<button type="submit" class="btn pri">agendar</button>'}</div>
-    <div class="chips" style="margin-top:8px">${[['hoy',0],['mañana',1],['pasado',2],['+1 semana',7]].map(([l,n])=>`<button type="button" class="chip" data-dd="${n}">${l}</button>`).join('')}</div>`;
+    ${p?'':'<button type="submit" class="btn pri">Agendar</button>'}</div>
+    <div class="chips" style="margin-top:8px">${[['Hoy',0],['Mañana',1],['Pasado',2],['En una semana',7]].map(([l,n])=>`<button type="button" class="chip" data-dd="${n}">${l}</button>`).join('')}</div>`;
 }
 function bindAgFields(root){
   const date=root.querySelector('[name=pdate]'),time=root.querySelector('[name=ptime]');
@@ -169,16 +169,16 @@ function bindAgForm(form){
 function pendItem(p,now,compact){
   const d=parseDue(p.due),venc=!p.done&&d<=now;
   const st=p.done?'hecho'+(p.doneAt?' '+dayLabel(new Date(p.doneAt)):''):venc?'vencido · '+rel(d):rel(d);
-  const acts=p.done?`<button type="button" class="ib" data-act="pDeshacer" title="volver a pendiente">↶</button><button type="button" class="ib del" data-act="pDel" title="borrar">✕</button>`
-    :`<button type="button" class="btn sm" data-act="pHecho">✔ hecho</button><button type="button" class="ib" data-act="pMas" data-m="60" title="posponer 1 hora">+1h</button>`+
-     (compact?'':`<button type="button" class="ib" data-act="pManana" title="pasar a mañana">mañana</button><button type="button" class="ib" data-act="pEdit" title="editar">✎</button><button type="button" class="ib del" data-act="pDel" title="borrar">✕</button>`);
+  const acts=p.done?`<button type="button" class="ib" data-act="pDeshacer" title="Volver a pendiente">Deshacer</button><button type="button" class="ib del" data-act="pDel" title="Borrar">Borrar</button>`
+    :`<button type="button" class="btn sm pri" data-act="pHecho">Hecho</button><button type="button" class="ib" data-act="pMas" data-m="60" title="Posponer 1 hora">+1 h</button>`+
+     (compact?'':`<button type="button" class="ib" data-act="pManana" title="Pasar a mañana">Mañana</button><button type="button" class="ib" data-act="pEdit" title="Editar">Editar</button><button type="button" class="ib del" data-act="pDel" title="Borrar">Borrar</button>`);
   return `<div class="ai${venc?' venc':''}${p.done?' done':''}" data-pid="${esc(p._id)}"><span class="wh ${venc?'warn':!p.done&&p.due.slice(0,10)===todayS()?'info':'dim'}">${esc(whenTxt(d))}</span><span class="id">${esc(p.id)}</span><span class="kw" title="${esc(p.kw)}">${esc(p.kw)}<small>${esc(st)}</small></span><span class="ac wr">${acts}</span></div>`;
 }
 const pendOf=el=>{const r=el.closest('[data-pid]');return r&&pend.find(p=>p._id===r.dataset.pid)};
 const clearAlert=p=>{const t=$(`#toasts [data-key="p${p._id}"]`);if(t)t.remove()};
 async function pendHecho(p){
   if(!p||!noRO())return;
-  if(await B.updPend(p,{done:true,doneAt:new Date().toISOString()})){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho`,'ok',{actions:[{l:'deshacer',fn:()=>B.updPend(p,{done:false,doneAt:null})}]})}
+  if(await B.updPend(p,{done:true,doneAt:new Date().toISOString()})){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho`,'ok',{actions:[{l:'Deshacer',fn:()=>B.updPend(p,{done:false,doneAt:null})}]})}
 }
 async function posponer(p,minutes,toDate){
   if(!p||!noRO())return;
@@ -190,7 +190,7 @@ async function posponer(p,minutes,toDate){
 function pendEdit(p){
   if(!p||!noRO())return;
   modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
-    actions:[{l:'cancelar'},{l:'guardar',cls:'pri',fn:async api=>{
+    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
       if(!await B.updPend(p,ch))return false;clearAlert(p);toast(`✔ #${p.n} actualizado`);
@@ -269,14 +269,14 @@ function editTurno(date){
   if(!noRO())return;
   const isNew=!date,t=date?turnos[date]:null,d0=date||todayS();
   const hm=ms=>ms?hhmm(ms):'';
-  const brow=b=>`<div class="brow"><select aria-label="Tipo de descanso"><option value="10"${b&&b.k===10?' selected':''}>10'</option><option value="30"${b&&b.k===30?' selected':''}>30'</option></select><input type="time" class="bs" value="${b?hm(b.s):''}" aria-label="Inicio"><input type="time" class="be" value="${b?hm(b.e):''}" aria-label="Fin"><button type="button" class="ib del" data-rm aria-label="Quitar">✕</button></div>`;
+  const brow=b=>`<div class="brow"><select aria-label="Tipo de descanso"><option value="10"${b&&b.k===10?' selected':''}>10'</option><option value="30"${b&&b.k===30?' selected':''}>30'</option></select><input type="time" class="bs" value="${b?hm(b.s):''}" aria-label="Inicio"><input type="time" class="be" value="${b?hm(b.e):''}" aria-label="Fin"><button type="button" class="ib del" data-rm aria-label="Quitar">Quitar</button></div>`;
   const body=`<div class="fgrid">
     ${isNew?`<label class="fld full"><span>Fecha</span><input type="date" name="tdate" max="${todayS()}" value="${d0}"></label>`:''}
     <label class="fld"><span>Entrada</span><input type="time" name="tin" value="${t?hm(t.in):''}"></label>
     <label class="fld"><span>Salida</span><input type="time" name="tout" value="${t?hm(t.out):''}"></label></div>
-    <div class="fld" style="margin-top:14px"><span>Descansos · tipo · inicio · fin</span></div>
+    <div class="fld" style="margin-top:14px"><span>Descansos: tipo, inicio y fin</span></div>
     <div id="tbRows" style="margin-top:6px">${(t?t.breaks:[]).map(brow).join('')}</div>
-    <button type="button" class="btn sm" id="tbAdd">+ descanso</button><div class="ebox" id="tErr"></div>`;
+    <button type="button" class="btn sm" id="tbAdd">Agregar descanso</button><div class="ebox" id="tErr"></div>`;
   const save=async api=>{
     const err=m=>{api.q('#tErr').textContent=m;return false};
     const date=isNew?api.q('[name=tdate]').value:date0;
@@ -306,8 +306,8 @@ function editTurno(date){
     turnoBar(true);toast(`✔ Jornada del ${dm(date)} guardada.`);
   };
   const date0=date;
-  const acts=[{l:'cancelar'},{l:'guardar',cls:'pri',fn:save}];
-  if(t)acts.unshift({l:'borrar jornada',cls:'danger l',fn:async()=>{if(!await confirmar('Borrar jornada',`¿Borrar la jornada del ${dm(date)}?`,'borrar',true))return false;if(await B.delTurno(date)){toast(`✔ Jornada del ${dm(date)} borrada.`);turnoBar(true)}}});
+  const acts=[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:save}];
+  if(t)acts.unshift({l:'Borrar jornada',cls:'danger l',fn:async()=>{if(!await confirmar('Borrar jornada',`¿Borrar la jornada del ${dm(date)}?`,'borrar',true))return false;if(await B.delTurno(date)){toast(`✔ Jornada del ${dm(date)} borrada.`);turnoBar(true)}}});
   modal({title:isNew?'Cargar jornada':`Jornada · ${DIAL[parseYMD(date).getDay()]} ${dm(date)}`,body,actions:acts,
     onOpen(api){
       api.q('#tbAdd').onclick=()=>{api.q('#tbRows').insertAdjacentHTML('beforeend',brow(null));const r=$$('.brow',api.box).pop();r.querySelector('.bs').focus()};
@@ -365,7 +365,7 @@ async function exportar(){
     toast(`✔ Descargado ${name}`);return;
   }
   let copied=false;try{await navigator.clipboard.writeText(csvText(false));copied=true}catch(e){}
-  modal({title:'CSV',body:`<p class="mp ${copied?'ok':'warn'}">${copied?'No se pudo descargar; quedó copiado al portapapeles.':'No se pudo descargar.'}</p><textarea class="csv" readonly>${esc(csvText(false))}</textarea>`,actions:[{l:'cerrar',cls:'pri'}],wide:1});
+  modal({title:'CSV',body:`<p class="mp ${copied?'ok':'warn'}">${copied?'No se pudo descargar; quedó copiado al portapapeles.':'No se pudo descargar.'}</p><textarea class="csv" readonly>${esc(csvText(false))}</textarea>`,actions:[{l:'Cerrar',cls:'pri'}],wide:1});
 }
 function importar(){
   if(!ready||!noRO())return;
@@ -381,7 +381,7 @@ function importar(){
     if(R.ok.some(x=>!x.brand)){
       brand=await new Promise(res=>{let v=null;
         modal({title:`Marca · ${esc(file.name)}`,body:`<label class="fld"><span>${plural(R.ok.length,'venta')} sin marca</span><input id="imB" list="dlB2" value="${esc(last.brand||DEF_BRAND)}"></label>${dlist('dlB2',[...new Set([DEF_BRAND,'Trade24Seven',...uniq(x=>x.brand)])])}`,
-          actions:[{l:'cancelar'},{l:'seguir',cls:'pri',fn:api=>{v=api.q('#imB').value.trim()||DEF_BRAND}}],onClose:()=>res(v)});
+          actions:[{l:'Cancelar'},{l:'Seguir',cls:'pri',fn:api=>{v=api.q('#imB').value.trim()||DEF_BRAND}}],onClose:()=>res(v)});
       });
       if(brand==null)return;
     }
@@ -411,22 +411,29 @@ function syncExt(){
   const items=pend.filter(p=>!p.done).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
   // ventas que ya están en la mesa: el botón del CRM ofrece solo las nuevas
   const known={ids:team.map(f=>norm(f.brand||'')+'|'+norm(f.id)),txs:team.filter(f=>f.tx).map(f=>norm(f.brand||'')+'|'+f.tx)};
-  const sig=JSON.stringify(items)+'#'+known.ids.length+'#'+known.ids.join(',').length+'#'+known.txs.length,beat=extOk&&Date.now()-extBeat>6e4;
+  const snips=activeSnips().map(s=>({s:s.shortcut,t:s.title||'',b:s.body}));
+  const leadIds=leads.map(l=>norm(l.id)); // clientes new que ya están en la mesa
+  const sig=JSON.stringify(items)+'#'+known.ids.length+'#'+known.ids.join(',').length+'#'+known.txs.length+'#'+JSON.stringify(snips)+'#'+leadIds.length,beat=extOk&&Date.now()-extBeat>6e4;
   if(sig===extSig&&!beat)return;
   extSig=sig;extBeat=Date.now();
-  postTop({type:'ftd-agenda',v:1,items,known,user:profile&&profile.name,sent:Date.now()});
+  postTop({type:'ftd-agenda',v:1,items,known,snips,leadIds,user:profile&&profile.name,sent:Date.now()});
 }
 window.addEventListener('message',e=>{
   const d=e.data;
   if(d&&d.type==='ftd-agenda-test-ack'&&d.v===1){
-    if(d.ok)toast('🔔 La extensión mostró el aviso (tarjeta + sonido).','ok',{ms:6000});
-    else toast('✖ La extensión no pudo avisar'+(d.err?': '+esc(d.err):'.'),'err');
+    if(d.ok)toast('La extensión mostró el aviso con tarjeta y sonido.','ok',{ms:6000});
+    else toast('La extensión no pudo avisar'+(d.err?': '+esc(d.err):'.'),'err');
     return;
   }
   if(e.source!==window||e.origin!==location.origin)return; // solo la extensión, desde esta misma pestaña
   if(d&&d.type==='ftd-agenda-import'&&d.v===1){ // ventas mandadas desde el botón del CRM
     const src=e.source;
     importFromExt(d.rows).catch(err=>({err:String(err&&err.message||err)})).then(res=>{try{src.postMessage({type:'ftd-agenda-import-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
+    return;
+  }
+  if(d&&d.type==='ftd-agenda-leads'&&d.v===1&&Array.isArray(d.rows)){ // clientes "new" que vio la extensión en el CRM
+    const src=e.source;
+    addLeadsFromExt(d.rows).then(res=>{try{src.postMessage({type:'ftd-agenda-leads-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
     return;
   }
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
@@ -439,11 +446,51 @@ window.addEventListener('message',e=>{
   if(!was){status();if(cur==='config'||cur==='agenda')V[cur].render({})}
 });
 
+async function addLeadsFromExt(rows){
+  if(!ready||readOnly)return {err:'Vitalis todavía está cargando'};
+  const s=v=>String(v??'').replace(/\s+/g,' ').trim(),te=todayS(),have=new Set(leads.map(l=>norm(l.id))),seen=new Set(),list=[];
+  for(const r of rows.slice(0,300)){
+    const id=s(r.id).slice(0,60),name=s(r.name).slice(0,120);if(!id&&!name)continue;
+    const key=id||('n:'+norm(name)),k=norm(key);
+    if(have.has(k)||seen.has(k)){seen.add(k);continue}
+    seen.add(k);list.push({id:key,name,country:s(r.country).slice(0,60),date:/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&r.date<=te?r.date:te});
+  }
+  const keys=[...seen];
+  if(!list.length)return {added:0,keys};
+  const n=await B.addLeads(list,'crm');if(n===false)return {err:'no se pudo guardar'};
+  if(n)toast(`${n===1?'Nuevo cliente':n+' clientes nuevos'} en el registro: ${list.slice(0,4).map(l=>`<b>${esc(l.id.startsWith('n:')?l.name:l.id)}</b>`).join(', ')}${list.length>4?'…':''}`,'ok',{key:'leads'});
+  return {added:n,keys};
+}
+function agendarModal(id,kw){
+  if(!noRO())return;
+  const p={id,kw:kw||'',due:`${addDays(todayS(),1)}T${cfg.hora}`};
+  modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
+    actions:[{l:'Cancelar'},{l:'Agendar',cls:'pri',fn:async api=>{
+      const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
+      if(parseDue(R.due)<new Date(Date.now()-6e4)){api.q('#pErr').textContent='Esa fecha y hora ya pasó.';return false}
+      const n=pend.reduce((a,x)=>Math.max(a,x.n||0),0)+1;
+      if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false}))return false;
+      toast(`Agendado <b>${esc(R.id)}</b> para ${esc(whenTxt(parseDue(R.due)))}.`);check();
+    }}],onOpen:api=>bindAgFields(api.box)});
+}
+function clienteModal(){
+  if(!noRO())return;
+  modal({title:'Registrar cliente new',body:`<div class="fgrid"><label class="fld"><span>ID <i>*</i></span><input id="ncI" autofocus></label><label class="fld"><span>Día</span><input type="date" id="ncD" max="${todayS()}" value="${todayS()}"></label>
+    <label class="fld full"><span>Nombre</span><input id="ncN"></label><label class="fld"><span>País</span><input id="ncP"></label></div><div class="ebox" id="ncE"></div>`,
+    actions:[{l:'Cancelar'},{l:'Registrar',cls:'pri',fn:async api=>{
+      const id=api.q('#ncI').value.trim(),d=api.q('#ncD').value||todayS();if(!id){api.q('#ncE').textContent='Falta el ID.';return false}
+      const ya=leads.find(l=>norm(l.id)===norm(id));if(ya){api.q('#ncE').textContent=`Ya está registrado (${ya.uid===me?'lo anotaste vos':'lo anotó '+memberName(ya.uid)} el ${dm(ya.date)}).`;return false}
+      const n=await B.addLeads([{id,name:api.q('#ncN').value.trim(),country:api.q('#ncP').value.trim(),date:d}],'manual');
+      if(n===false)return false;if(!n){api.q('#ncE').textContent='Ya estaba registrado en la mesa.';return false}
+      toast(`Cliente <b>${esc(id)}</b> registrado.`);
+    }}]});
+}
+
 /* ---------- avisos ---------- */
 function fire(p){
   const d=parseDue(p.due),late=Date.now()-d>5*6e4;
-  toast(`⏰ CONTACTAR <b>${esc(p.id)}</b> · ${esc(p.kw)}<br><span style="font-weight:400">#${p.n} · ${esc(whenTxt(d))}${late?' · atrasado':''}</span>`,'alert',
-    {sticky:1,key:'p'+p._id,actions:[{l:'✔ hecho',fn:()=>pendHecho(p)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
+  toast(`⏰ Contactar a <b>${esc(p.id)}</b>: ${esc(p.kw)}<br><span style="font-weight:500">${esc(whenTxt(d))}${late?', atrasado':''}</span>`,'alert',
+    {sticky:1,key:'p'+p._id,actions:[{l:'Hecho',fn:()=>pendHecho(p)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
   flash();
   if(extOn())return; // la extensión de Chrome ya avisa con sonido en la pestaña que estés
   beep(3);
@@ -467,39 +514,43 @@ function tick(){
   const key=t.date+':'+b.s;
   if(alerted[key]&&ms-alerted[key]<5*6e4)return;
   const first=!alerted[key];alerted[key]=ms;
-  toast(first?`⏰ Terminó el descanso de ${b.k}' (${hhmm(b.s)})`:`⏰ Descanso de ${b.k}': +${mins(ms-end)} min`,'alert',{sticky:1,key:'brk',actions:[{l:'↩ vuelta',fn:()=>marcar('vuelta')}]});
+  toast(first?`⏰ Terminó el descanso de ${b.k}' (${hhmm(b.s)})`:`⏰ Descanso de ${b.k}': +${mins(ms-end)} min`,'alert',{sticky:1,key:'brk',actions:[{l:'Volví',fn:()=>marcar('vuelta')}]});
   beep(3);flash();sysNotify(`☕ Terminó el descanso de ${b.k}'`,hhmm(b.s),'ftdc-break');
 }
 
 /* ---------- ayuda ---------- */
 function ayuda(){
   const fon=nf((FONASA_TASA[cfg.fonasa]||.045)*100,1).replace(',0','');
-  modal({title:`<span class="u">${esc(who())}@vitalis</span>:<span class="w">~</span>$ ayuda`,wide:1,actions:[{l:'cerrar',cls:'pri'}],body:`<div class="help">
-  <h4>VENTAS</h4><dl>
-    <dt>new / late</dt><dd>new = se registró y depositó el mismo día · late = el registro es de un día anterior al FTD</dd>
-    <dt>filtros</dt><dd>campaña y afiliado exactos (mayúsculas cuentan) · país sin importar tildes · click en un ranking filtra, otro click lo saca</dd>
-    <dt>buscar</dt><dd>nombre, ID o transacción</dd>
-    <dt>duplicados</dt><dd>mismo ID y misma marca: avisa antes de guardar</dd></dl>
-  <h4>SUELDO</h4><dl>
-    <dt>bonos</dt><dd>no acumulables: cobrás solo el escalón más alto que alcanzaste</dd>
-    <dt>sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas ni en el CSV</dd>
-    <dt>dólar</dt><dd>BROU compra · avisa cuando tiene más de 3 días</dd>
-    <dt>líquido</dt><dd>estimación con valores BPS 2026: jubilatorio 15% · FONASA ${fon}% (3% hasta 2,5 BPC) · FRL 0,1% · IRPF por franjas, +6% a la base arriba de 10 BPC, deducciones al 14% (8% arriba de 15 BPC) · sin aguinaldo ni vacacional</dd></dl>
-  <h4>TURNO</h4><dl>
-    <dt>jornada</dt><dd>${dur(jorMs())} desde la entrada · los descansos cuentan como trabajados</dd>
-    <dt>otra hora</dt><dd>completá "hora" en la tarjeta de turno antes de tocar el botón · ✎ editar corrige cualquier marca</dd>
-    <dt>alarma</dt><dd>al terminar el descanso, y cada 5 min si seguís</dd></dl>
-  <h4>AGENDA</h4><dl>
-    <dt>avisos</dt><dd>tarjeta + sonido + destello en esta pestaña · con la extensión Vitalis, también en la pestaña que estés y con la pestaña cerrada</dd></dl>
-  <h4>EXTENSIÓN DE CHROME</h4><dl>
-    <dt>qué hace</dt><dd>avisos de agenda con sonido en cualquier pestaña · botón en el CRM para pasar ventas · aviso de clientes nuevos en "new"</dd>
-    <dt>instalar</dt><dd>config → ⇩ extensión de Chrome · descomprimí el zip · chrome://extensions → Modo de desarrollador → Cargar descomprimida → elegí la carpeta · recargá Vitalis</dd></dl>
-  <h4>DATOS</h4><dl>
-    <dt>guardado</dt><dd>en la base de Vitalis · las ventas las ve toda la mesa (${esc(teamInfo?teamInfo.name:'')}) · sueldo, agenda, turnos y faltas son solo tuyos</dd>
-    <dt>editar</dt><dd>cada uno edita y borra sus ventas · el team leader y el admin pueden corregir cualquiera</dd>
-    <dt>CSV</dt><dd>exportar incluye registro, tipo y marca · importar acepta el export de tu plataforma y no duplica · si Excel lo muestra en una columna, usá separador ;</dd></dl>
-  <h4>ATAJOS</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>${isLeader()?7:6}</kbd></dt><dd>secciones</dd><dt><kbd>N</kbd></dt><dd>nueva venta</dd><dt><kbd>A</kbd></dt><dd>agendar</dd><dt><kbd>/</kbd></dt><dd>buscar ventas</dd><dt><kbd>?</kbd></dt><dd>ayuda</dd><dt><kbd>Esc</kbd></dt><dd>cerrar</dd></dl>
+  modal({title:'Cómo funciona Vitalis',wide:1,actions:[{l:'Listo',cls:'pri'}],body:`<div class="help">
+  <h4>Entrar</h4><dl>
+    <dt>Código de la mesa</dt><dd>Se pide una vez por computadora (o abrís el link que pasa el administrador).</dd>
+    <dt>PIN</dt><dd>La primera vez es 0000 y creás el tuyo. Si te lo olvidás, el administrador lo vuelve a 0000. Con 5 errores seguidos queda bloqueado 15 minutos.</dd></dl>
+  <h4>Ventas</h4><dl>
+    <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
+    <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
+    <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
+  <h4>Clientes</h4><dl>
+    <dt>Registro</dt><dd>Los clientes en "new" del CRM se anotan solos (con la extensión) el día que aparecen. También se cargan a mano.</dd>
+    <dt>Conversión</dt><dd>FTDs del período sobre clientes new del período. "Depositó" marca a los clientes del registro que ya tienen una venta en la mesa.</dd></dl>
+  <h4>Snippets</h4><dl>
+    <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
+    <dt>Variables</dt><dd>{fecha}, {hora}, {yo} (tu nombre) y {cursor} (dónde queda el cursor).</dd>
+    <dt>Compartidos</dt><dd>Los ve toda la mesa. Si tenés uno tuyo con el mismo atajo, se usa el tuyo.</dd></dl>
+  <h4>Sueldo</h4><dl>
+    <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
+    <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
+    <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
+  <h4>Turno y agenda</h4><dl>
+    <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
+    <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado.</dd></dl>
+  <h4>Extensión de Chrome</h4><dl>
+    <dt>Qué hace</dt><dd>Avisos de agenda, botón en el CRM para pasar ventas, registro y aviso de clientes new, y los snippets en cualquier página.</dd>
+    <dt>Instalar</dt><dd>Ajustes → Descargar extensión. Descomprimí el zip, abrí chrome://extensions, activá Modo de desarrollador, tocá Cargar descomprimida y elegí la carpeta. Recargá Vitalis.</dd></dl>
+  <h4>Datos</h4><dl>
+    <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>
+    <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
+  <h4>Atajos de teclado</h4><dl>
+    <dt><kbd>1</kbd>–<kbd>${isLeader()?9:8}</kbd></dt><dd>Secciones</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -512,15 +563,16 @@ const ACT={
   cargarJornada:()=>editTurno(null),editTurno:el=>editTurno(el.dataset.d),
   editFtd:el=>{const f=team.find(x=>x._id===el.dataset.id);if(f&&canEdit(f))ftdForm(f)},
   delFtd:el=>{const f=team.find(x=>x._id===el.dataset.id);if(f&&canEdit(f))borrarFtd(f)},
-  salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en este navegador?','salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
+  salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
+  nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
   ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),
   probarAviso:()=>{primeAudio();beep(1);flash();
-    if(extOn()&&postTop({type:'ftd-agenda-test',v:1}))toast('🔊 Aviso del panel · pidiendo la notificación a Chrome…');
-    else toast('🔊 Así suenan los avisos del panel · '+sp('hot','sin extensión de Chrome conectada'))},
+    if(extOn()&&postTop({type:'ftd-agenda-test',v:1}))toast('Así suena el aviso. Ahora le pido la tarjeta a Chrome…');
+    else toast('Así suenan los avisos. '+sp('hot','La extensión de Chrome no está conectada.'))},
 };
 document.addEventListener('click',e=>{
   const v=e.target.closest('#nav [data-v]');if(v){go(v.dataset.v);return}
@@ -535,7 +587,7 @@ document.addEventListener('keydown',e=>{
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
-  if(/^[1-7]$/.test(e.key)){e.preventDefault();go(VIEWS[+e.key-1]);return}
+  if(/^[1-9]$/.test(e.key)){e.preventDefault();go(VIEWS[+e.key-1]);return}
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}

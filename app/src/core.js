@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.0.0';
+const VERSION='1.1.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -12,7 +12,7 @@ const local={
   get(k,d){try{const v=localStorage.getItem('vitalis.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem('vitalis.'+k,JSON.stringify(v))}catch(e){}}
 };
-const DEF={base:33500,porftd:20,bonos:[[10,80],[16,150],[21,250],[26,350],[31,450]],tc:0,hora:'09:00',sep:',',tema:'verde',
+const DEF={base:33500,porftd:20,bonos:[[10,80],[16,150],[21,250],[26,350],[31,450]],tc:0,hora:'09:00',sep:',',tema:'auto',
   fonasa:'nadie',hijos:0,comRecibo:true,bpc:6864,fondoSol:0,tcFecha:'',jornada:450,
   laborables:[1,2,3,4,5],libres:['05-01','08-25'],faltas:[],inicio:'',sinFer:{no:true,lab:true}};
   // libres: 'MM-DD' todos los años · faltas: [{d:'YYYY-MM-DD',j:true}] · sinFer: feriados que no se cuentan (no laborables / laborables)
@@ -98,7 +98,7 @@ function rel(d){
 
 /* ---------- base de datos (Supabase) ---------- */
 // Ventas: compartidas en la mesa (team). "ftds" = las mías (sueldo, inicio, turnos); "team" = todas.
-let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null;
+let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[];
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
 const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
@@ -108,9 +108,12 @@ const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),
   amount:+f.amount,tx:f.tx||null,reg:f.reg||null,brand:f.brand||DEF_BRAND});
 const A2P=r=>({_id:r.id,n:r.n,id:r.client_id,kw:r.kw||'',due:r.due,notified:!!r.notified,done:!!r.done,doneAt:r.done_at||null});
 const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified:!!p.notified,done:!!p.done,done_at:p.doneAt||null});
+const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,updated:r.updated_at});
+const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 function mine(){ftds=team.filter(f=>f.uid===me)}
 function errMsg(e){
   const m=String(e&&(e.message||e.error_description||e.msg)||e||'');
+  const k=m.match(/^[A-Z_]+:\s*(.+)$/);if(k)return k[1];
   if(e&&e.code==='23505')return 'ya existe (misma transacción en la misma marca)';
   if(e&&e.code==='42501'||/row-level security|permission denied/i.test(m))return 'no tenés permiso para eso';
   if(/Failed to fetch|NetworkError|fetch failed/i.test(m))return 'sin conexión';
@@ -183,11 +186,33 @@ const B={ // todas las escrituras pasan por acá
   async saveCfg(){
     try{await Q(sb.from('settings').upsert({user_id:me,cfg:JSON.parse(JSON.stringify(cfg))}));refresh();return true}catch(e){dbErr(e);return false}
   },
+  async saveSnip(sn,fields){ // nuevo (sin _id) o edición
+    const row={shortcut:fields.shortcut,title:fields.title||null,body:fields.body,shared:!!fields.shared};
+    try{
+      const r=sn&&sn._id?await Q(sb.from('snippets').update(row).eq('id',sn._id).select().single()):await Q(sb.from('snippets').insert(row).select().single());
+      const s=N2S(r);snippets=snippets.filter(x=>x._id!==s._id);snippets.push(s);refresh();return s;
+    }catch(e){if(e.code==='23505'){toast(`Ya tenés un snippet /${esc(fields.shortcut)}.`,'err');return false}dbErr(e);return false}
+  },
+  async delSnip(sn){
+    try{await Q(sb.from('snippets').delete().eq('id',sn._id));snippets=snippets.filter(x=>x._id!==sn._id);refresh();return true}catch(e){dbErr(e);return false}
+  },
+  async addLeads(rows,source='crm'){ // clientes new; los que ya estaban en la mesa se ignoran
+    const te=todayS(),body=rows.map(r=>({client_id:String(r.id).slice(0,60),name:r.name?String(r.name).slice(0,120):null,country:r.country?String(r.country).slice(0,60):null,date:r.date||te,source}));
+    try{const out=await Q(sb.from('leads').upsert(body,{onConflict:'team_id,client_id',ignoreDuplicates:true}).select());
+      for(const r of out){const l=L2C(r);leads=leads.filter(x=>x._id!==l._id);leads.push(l)}refresh();return out.length}
+    catch(e){dbErr(e);return false}
+  },
+  async delLead(l){
+    try{await Q(sb.from('leads').delete().eq('id',l._id));leads=leads.filter(x=>x._id!==l._id);refresh();return true}catch(e){dbErr(e);return false}
+  },
   async saveName(name){
     try{await Q(sb.from('profiles').update({name}).eq('id',me));profile.name=name;const m=members.find(x=>x.id===me);if(m)m.name=name;refresh();return true}catch(e){dbErr(e);return false}
   },
   async setMember(id,fields){
     try{const row=await Q(sb.from('profiles').update(fields).eq('id',id).select().single());const i=members.findIndex(x=>x.id===id);if(i>=0)members[i]=row;refresh();return true}catch(e){dbErr(e);return false}
+  },
+  async rpc(fn,args){ // funciones de la base (PIN, gente de la mesa)
+    try{return await Q(sb.rpc(fn,args))}catch(e){toast(esc(errMsg(e)),'err');return null}
   },
   async newCode(){
     const code=(teamInfo.name.split(/\s+/).pop()||'TEAM').normalize('NFD').replace(/[^A-Za-z]/g,'').toUpperCase().slice(0,8)+'-'+Math.random().toString(36).slice(2,7).toUpperCase();
@@ -199,7 +224,7 @@ async function loadAll(){
   if(!prof)throw new Error('NO_PROFILE');
   profile=prof;
   if(!prof.active)throw new Error('INACTIVE');
-  const [tm,mem,sales,ag,adj,sh,st]=await Promise.all([
+  const [tm,mem,sales,ag,adj,sh,st,sn,ld]=await Promise.all([
     Q(sb.from('teams').select('*').eq('id',prof.team_id).single()),
     Q(sb.from('profiles').select('*').eq('team_id',prof.team_id).order('name')),
     fetchAll('sales','*','date'),
@@ -207,7 +232,10 @@ async function loadAll(){
     Q(sb.from('adjustments').select('*').eq('user_id',me)),
     Q(sb.from('shifts').select('*').eq('user_id',me)),
     Q(sb.from('settings').select('*').eq('user_id',me)),
+    Q(sb.from('snippets').select('*').order('shortcut')),
+    fetchAll('leads','*','date'),
   ]);
+  snippets=sn.map(N2S);leads=ld.map(L2C);
   teamInfo=tm;members=mem;team=sales.map(S2F);mine();
   pend=ag.map(A2P);
   ajustes=Object.fromEntries(adj.map(r=>[r.ym,+r.n||0]));
@@ -235,6 +263,15 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'settings',filter:'user_id=eq.'+me},p=>{
       if(p.new&&p.new.cfg){cfg={...DEF,...p.new.cfg};applyTheme();refresh()}
     })
+    .on('postgres_changes',{event:'*',schema:'public',table:'leads'},p=>{
+      if(p.eventType==='DELETE')leads=leads.filter(x=>x._id!==(p.old&&p.old.id));else if(p.new.team_id===profile.team_id)up(leads,L2C(p.new));refresh();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'snippets'},p=>{
+      if(p.eventType==='DELETE')snippets=snippets.filter(x=>x._id!==(p.old&&p.old.id));
+      else if(p.new.user_id===me||(p.new.shared&&p.new.team_id===profile.team_id))up(snippets,N2S(p.new));
+      else snippets=snippets.filter(x=>x._id!==p.new.id); // dejó de estar compartido
+      refresh();
+    })
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{
       if(p.eventType==='DELETE')return;
       if(p.new.team_id!==profile.team_id&&p.new.id!==me)return;
@@ -252,11 +289,38 @@ async function connect(){
     if(m==='NO_PROFILE')return authScreen('noprofile');
     return authScreen('error',errMsg(e));
   }
+  if(profile.login&&!profile.pin_set)return authScreen('newpin'); // primera vez: crear el PIN
+  enter();
+}
+function enter(){
   live();
   // al volver a la pestaña después de un rato, recargo por si se perdió algún cambio en vivo
   let hiddenAt=0;
   document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(hiddenAt&&Date.now()-hiddenAt>10*6e4)loadAll().then(()=>refresh()).catch(()=>{})});
   onReady();
+}
+
+/* ---------- conversión: FTDs / clientes new ---------- */
+function weekStart(d){const x=parseYMD(d);return addDays(d,-((x.getDay()+6)%7))}
+function convPeriod(from,to,uid){ // uid: me | null (toda la mesa) | otro
+  const inR=x=>x.date>=from&&x.date<=to,own=x=>uid==null||x.uid===uid;
+  const L=leads.filter(x=>inR(x)&&own(x)),F=team.filter(x=>inR(x)&&own(x));
+  const sold=new Set(team.filter(own).map(f=>norm(f.id)));
+  const conv=L.filter(l=>sold.has(norm(l.id))).length; // de los clientes del período, cuántos ya depositaron
+  return {leads:L.length,ftd:F.length,rate:L.length?F.length/L.length:null,conv,convRate:L.length?conv/L.length:null};
+}
+
+/* ---------- snippets ---------- */
+function activeSnips(){
+  const own=snippets.filter(s=>s.uid===me),mine_=new Set(own.map(s=>s.shortcut));
+  const others=snippets.filter(s=>s.uid!==me&&s.shared&&!mine_.has(s.shortcut)).sort((a,b)=>(a.updated||'')<(b.updated||'')?1:-1);
+  const seen=new Set(),out=[...own];for(const s of others)if(!seen.has(s.shortcut)){seen.add(s.shortcut);out.push(s)}
+  return out.sort((a,b)=>a.shortcut.localeCompare(b.shortcut));
+}
+function fillSnip(body){ // variables: {fecha} {hora} {yo} {cursor}
+  const d=new Date();
+  return body.replace(/\{fecha\}/g,`${z(d.getDate())}/${z(d.getMonth()+1)}/${d.getFullYear()}`).replace(/\{hora\}/g,`${z(d.getHours())}:${z(d.getMinutes())}`)
+    .replace(/\{yo\}/g,profile?profile.name:'').replace(/\{cursor\}/g,'');
 }
 
 /* ---------- sueldo ---------- */

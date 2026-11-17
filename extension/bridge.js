@@ -1,5 +1,5 @@
 // Vitalis · puente entre la página de Vitalis y la extensión.
-// La página manda la agenda (y recibe ventas del CRM) con window.postMessage en su misma ventana.
+// La página manda la agenda y los snippets (y recibe ventas y clientes new del CRM) con window.postMessage en su misma ventana.
 (() => {
   const isVitalis = () => !!document.querySelector('meta[name="vitalis"]');
   const post = (msg) => { try { window.postMessage(msg, location.origin); return true; } catch (e) { return false; } };
@@ -9,6 +9,14 @@
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (!isVitalis()) return false;
     if (msg && msg.type === 'cmds') { if (alive) { deliver(msg.cmds); reply({ ok: true }); } else reply({ ok: false }); return false; }
+    if (msg && msg.type === 'leads') { // clientes new del CRM → al registro de Vitalis
+      if (!alive) { reply({ noPanel: true }); return false; }
+      const reqId = 'L' + Date.now() + Math.random().toString(36).slice(2);
+      waiting[reqId] = reply;
+      post({ type: 'ftd-agenda-leads', v: 1, reqId, rows: msg.rows });
+      setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ noPanel: true }); delete waiting[reqId]; } }, 9000);
+      return true;
+    }
     if (msg && msg.type === 'import') { // ventas del botón del CRM → a Vitalis
       if (!alive) { reply({ noPanel: true }); return false; }
       const reqId = 'r' + Date.now() + Math.random().toString(36).slice(2);
@@ -38,19 +46,29 @@
       else if (String(d.reqId).startsWith('q')) { try { chrome.runtime.sendMessage({ type: 'import-done', res }); } catch (x) {} }
       return;
     }
+    if (d.type === 'ftd-agenda-leads-ack' && d.v === 1) {
+      const res = { added: d.added || 0, keys: Array.isArray(d.keys) ? d.keys.slice(0, 1000).map(String) : [], err: d.err || null };
+      if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }
+      else if (String(d.reqId).startsWith('Q')) { try { chrome.runtime.sendMessage({ type: 'leads-done', res }); } catch (x) {} }
+      return;
+    }
     if (d.type !== 'ftd-agenda' || d.v !== 1 || !Array.isArray(d.items)) return;
     const items = d.items
       .filter((x) => x && typeof x.k === 'string' && typeof x.due === 'number' && isFinite(x.due))
       .slice(0, 500)
       .map((x) => ({ k: x.k.slice(0, 100), n: Number(x.n) || 0, id: String(x.id ?? '').slice(0, 60), kw: String(x.kw ?? '').slice(0, 200), due: x.due }));
     const known = d.known && Array.isArray(d.known.ids) ? { ids: d.known.ids.slice(0, 50000).map(String), txs: (d.known.txs || []).slice(0, 50000).map(String) } : null;
+    const snips = Array.isArray(d.snips) ? d.snips.filter((x) => x && /^[a-z0-9_-]{1,30}$/.test(x.s) && typeof x.b === 'string').slice(0, 300)
+      .map((x) => ({ s: x.s, t: String(x.t || '').slice(0, 60), b: x.b.slice(0, 20000) })) : null;
+    const leadIds = Array.isArray(d.leadIds) ? d.leadIds.slice(0, 50000).map(String) : null;
     try {
-      chrome.runtime.sendMessage({ type: 'sync', items, known, url: location.origin + location.pathname, user: String(d.user || '').slice(0, 60) }, (res) => {
+      chrome.runtime.sendMessage({ type: 'sync', items, known, snips, leadIds, url: location.origin + location.pathname, user: String(d.user || '').slice(0, 60) }, (res) => {
         if (chrome.runtime.lastError) return;
         alive = true;
         post({ type: 'ftd-agenda-ack', v: 1, scheduled: (res && res.scheduled) || 0 });
         if (res && res.cmds && res.cmds.length) deliver(res.cmds);
         if (res && res.imports && res.imports.length) post({ type: 'ftd-agenda-import', v: 1, reqId: 'q' + Date.now(), rows: res.imports });
+        if (res && res.leads && res.leads.length) post({ type: 'ftd-agenda-leads', v: 1, reqId: 'Q' + Date.now(), rows: res.leads });
       });
     } catch (err) { /* la extensión se actualizó: hay que recargar la pestaña */ }
   });

@@ -11,18 +11,10 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 const PORT = +(process.argv[2] || 54321);
 const DIST = process.argv[3] || new URL('../site', import.meta.url).pathname;
 const db = new PGlite({ extensions: { pgcrypto } });
-await db.exec(`
-  create schema auth;
-  create table auth.users (id uuid primary key default gen_random_uuid(), email text unique, raw_user_meta_data jsonb, pass text);
-  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  create role authenticated nologin; create role anon nologin;
-  grant usage on schema auth to authenticated, anon;
-  grant execute on function auth.uid() to authenticated, anon;
-  create publication supabase_realtime;
-`);
+await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
 await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
-const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'] };
+const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'] };
 const TABLES = new Set(Object.keys(PK));
 
 // ---------- auth ----------
@@ -31,7 +23,6 @@ const jwt = (u) => { const exp = Math.floor(Date.now() / 1000) + 3600; return [b
 const refresh = new Map();
 function userObj(u) { return { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: new Date().toISOString(), user_metadata: u.raw_user_meta_data || {}, app_metadata: { provider: 'email' }, identities: [{ id: u.id, provider: 'email' }], created_at: new Date().toISOString() }; }
 function session(u) { const rt = crypto.randomUUID(); refresh.set(rt, u.id); return { access_token: jwt(u), token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: rt, user: userObj(u) }; }
-const hash = (p) => crypto.createHash('sha256').update(p).digest('hex');
 function uidFrom(req) { const a = req.headers.authorization || ''; const t = a.replace(/^Bearer /, '').split('.'); if (t.length !== 3) return null; try { const p = JSON.parse(Buffer.from(t[1], 'base64url').toString()); return p.role === 'authenticated' ? p.sub : null; } catch (e) { return null; } }
 
 // ---------- REST ----------
@@ -55,6 +46,20 @@ function filters(u, params) {
   }
   return w.length ? ' where ' + w.join(' and ') : '';
 }
+async function rpc(req, res, fn, body) {
+  const uid = uidFrom(req), args = body || {}, keys = Object.keys(args);
+  try {
+    if (!/^[a-z_][a-z0-9_]*$/.test(fn)) throw Object.assign(new Error('bad fn'), { code: 'PGRST202' });
+    const sql = `select (public.${fn}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')}))::text as j`;
+    const out = await asUser(uid, (tx) => tx.query(sql, keys.map((k) => (args[k] == null ? null : typeof args[k] === 'object' ? JSON.stringify(args[k]) : String(args[k])))));
+    const j = out.rows[0].j;
+    let data = null; if (j != null && j !== '') { try { data = JSON.parse(j); } catch (e) { data = j; } }
+    return send(res, 200, data);
+  } catch (e) {
+    const code = e.code || 'XX000';
+    return send(res, code === '42501' ? 403 : code === 'PGRST202' ? 404 : 400, { code, message: e.message, details: null, hint: null });
+  }
+}
 async function rest(req, res, table, body) {
   const u = new URL(req.url, 'http://x'), uid = uidFrom(req), single = /vnd\.pgrst\.object/.test(req.headers.accept || '');
   const prefer = req.headers.prefer || '', ret = /return=representation/.test(prefer);
@@ -76,10 +81,10 @@ async function rest(req, res, table, body) {
       const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
       params.push(JSON.stringify(rows));
       let q = `insert into public.${table} (${cols.map(ident).join(',')}) select ${cols.map(ident).join(',')} from json_populate_recordset(null::public.${table}, $1)`;
-      if (/resolution=merge-duplicates/.test(prefer)) {
+      if (/resolution=(merge|ignore)-duplicates/.test(prefer)) {
         const pk = (u.searchParams.get('on_conflict') || '').split(',').filter(Boolean);
         const key = pk.length ? pk : PK[table];
-        const upd = cols.filter((c) => !key.includes(c));
+        const upd = /ignore-duplicates/.test(prefer) ? [] : cols.filter((c) => !key.includes(c));
         q += ` on conflict (${key.map(ident).join(',')}) do ` + (upd.length ? 'update set ' + upd.map((c) => `${ident(c)} = excluded.${ident(c)}`).join(',') : 'nothing');
       }
       sql = `with r as (${q} returning *) select coalesce(json_agg(r), '[]'::json) j from r`;
@@ -114,18 +119,19 @@ function send(res, status, obj, extra = {}) {
   res.end(obj == null ? '' : JSON.stringify(obj));
 }
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS', 'access-control-expose-headers': 'content-range' };
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2', '.css': 'text/css', '.svg': 'image/svg+xml', '.zip': 'application/zip' };
 http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
   const u = new URL(req.url, 'http://x');
   let raw = ''; for await (const c of req) raw += c;
   const body = raw ? JSON.parse(raw) : null;
   try {
-    if (u.pathname === '/__sql' && req.method === 'POST') { const r = await db.query(body.sql, body.params || []); return send(res, 200, r.rows); } // solo para pruebas
+    if (u.pathname === '/__sql' && req.method === 'POST') { if (!body.params || !body.params.length) { const r = await db.exec(body.sql); return send(res, 200, r[r.length - 1].rows); } const r = await db.query(body.sql, body.params); return send(res, 200, r.rows); } // solo para pruebas
+    if (u.pathname.startsWith('/rest/v1/rpc/')) return rpc(req, res, u.pathname.slice(13), body);
     if (u.pathname.startsWith('/rest/v1/')) return rest(req, res, u.pathname.slice(9), body);
     if (u.pathname === '/auth/v1/signup') {
       try {
-        const r = await db.query('insert into auth.users (email, raw_user_meta_data, pass) values ($1,$2,$3) returning *', [String(body.email).toLowerCase(), JSON.stringify(body.data || {}), hash(body.password)]);
+        const r = await db.query("insert into auth.users (email, raw_user_meta_data, raw_app_meta_data, encrypted_password) values ($1,$2,'{\"provider\":\"email\"}',crypt($3, gen_salt('bf'))) returning *", [String(body.email).toLowerCase(), JSON.stringify(body.data || {}), String(body.password)]);
         return send(res, 200, session(r.rows[0]));
       } catch (e) {
         if (e.code === '23505') return send(res, 422, { code: 422, error_code: 'user_already_exists', msg: 'User already registered' });
@@ -134,7 +140,7 @@ http.createServer(async (req, res) => {
     }
     if (u.pathname === '/auth/v1/token') {
       if (u.searchParams.get('grant_type') === 'password') {
-        const r = await db.query('select * from auth.users where email = $1 and pass = $2', [String(body.email).toLowerCase(), hash(body.password)]);
+        const r = await db.query('select * from auth.users where email = $1 and encrypted_password = crypt($2, encrypted_password) and email_confirmed_at is not null', [String(body.email).toLowerCase(), String(body.password)]);
         if (!r.rows[0]) return send(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
         return send(res, 200, session(r.rows[0]));
       }
@@ -145,7 +151,7 @@ http.createServer(async (req, res) => {
     }
     if (u.pathname === '/auth/v1/user') {
       const id = uidFrom(req); if (!id) return send(res, 401, { msg: 'no session' });
-      if (req.method === 'PUT' && body.password) await db.query('update auth.users set pass = $2 where id = $1', [id, hash(body.password)]);
+      if (req.method === 'PUT' && body.password) await db.query("update auth.users set encrypted_password = crypt($2, gen_salt('bf')) where id = $1", [id, String(body.password)]);
       const r = await db.query('select * from auth.users where id = $1', [id]);
       return send(res, 200, userObj(r.rows[0]));
     }

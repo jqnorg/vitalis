@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Vitalis",
-  "version": "1.0.1",
-  "description": "Vitalis para Chrome: avisos de agenda con sonido en cualquier pestaña, botón en el CRM para pasar ventas a Vitalis y aviso de clientes nuevos.",
+  "version": "1.1.0",
+  "description": "Vitalis para Chrome: avisos de agenda con sonido en cualquier pestaña, botón en el CRM para pasar ventas, registro de clientes new y snippets con /atajo en cualquier página.",
   "permissions": [
     "alarms",
     "notifications",
@@ -37,6 +37,17 @@
       ],
       "run_at": "document_idle",
       "all_frames": true
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "snip.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_about_blank": true
     }
   ],
   "action": {
@@ -53,5 +64,15 @@
     "32": "icons/32.png",
     "48": "icons/48.png",
     "128": "icons/128.png"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/48.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
 }
