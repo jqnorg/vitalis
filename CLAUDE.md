@@ -6,7 +6,7 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 1. Editar `app/src/*` (app) o `extension/*` (extensión de Chrome). **Nunca** editar `site/` a mano.
 2. `python3 app/build.py` → regenera `site/` (incluye `site/vitalis-extension.zip`).
 3. Probar (ver abajo). Si se tocó la extensión, subir `version` en `extension/manifest.json`.
-4. Commit y `git push` a `main`: Netlify publica `site/` sola en menos de un minuto.
+4. Commit y `git push` a `main`: Netlify (proyecto `vitaliscrm`) publica `site/` en https://vitaliscrm.netlify.app en menos de un minuto.
 5. Si cambió `supabase/vitalis.sql`, el dueño lo tiene que pegar en Supabase → SQL Editor → Run (es re-ejecutable; no borra datos). Avisarle.
 
 ## Pruebas
@@ -21,6 +21,6 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 - `app/config.json` tiene la URL y la clave **publishable** (pública). Jamás commitear la clave secret/service_role.
 
 ## Extensión
-- Habla con la página por `window.postMessage` en la misma ventana (`bridge.js`, solo en páginas con `<meta name="vitalis">`).
+- Habla con la página por `window.postMessage` en la misma ventana (`bridge.js`, solo en https://vitaliscrm.netlify.app y con `<meta name="vitalis">`). Si cambia el dominio, actualizar `content_scripts` en el manifest.
 - CRM: `crm.js` (botón de ventas aprobadas + vigilar clientes en "new" tocando `.refresh-btn`/Search).
 - Avisos: `sw.js` (alarmas, tarjeta inyectada en la pestaña activa, sonido por documento offscreen).

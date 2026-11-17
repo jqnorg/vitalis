@@ -1,6 +1,6 @@
 # Vitalis
 
-Asistente de ventas de la mesa **Team Matías**: ventas (FTDs) compartidas en la mesa, y sueldo, agenda, turnos y faltas privados de cada agente. Viene con una extensión de Chrome para los avisos y el CRM.
+Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.app**: ventas (FTDs) compartidas en la mesa, y sueldo, agenda, turnos y faltas privados de cada agente. Viene con una extensión de Chrome para los avisos y el CRM.
 
 ## Cómo está armado
 

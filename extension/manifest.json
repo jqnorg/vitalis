@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vitalis",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Vitalis para Chrome: avisos de agenda con sonido en cualquier pestaña, botón en el CRM para pasar ventas a Vitalis y aviso de clientes nuevos.",
   "permissions": [
     "alarms",
@@ -20,9 +20,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.netlify.app/*",
-        "https://*.pages.dev/*",
-        "https://*.github.io/*"
+        "https://vitaliscrm.netlify.app/*"
       ],
       "js": [
         "bridge.js"
