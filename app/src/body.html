@@ -1,0 +1,178 @@
+<header id="bar">
+  <span class="tag">VITALIS</span>
+  <button type="button" class="lnk" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
+  <button type="button" class="lnk" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
+  <span id="sTurno"></span>
+  <button type="button" class="lnk" id="sPend" data-go="agenda" title="Agenda"></button>
+  <span id="sDb" class="hide"></span>
+  <button type="button" class="lnk" id="sMe" data-go="config" title="Mi cuenta"></button>
+  <span class="grow"></span>
+  <span class="cta wr"><button type="button" class="btn pri" data-act="nueva" title="Cargar una venta (N)">+ FTD</button></span>
+  <span id="sClock"></span>
+</header>
+<nav id="nav" aria-label="Secciones">
+  <button type="button" data-v="inicio"><span class="k">1</span><span class="nm">inicio</span></button>
+  <button type="button" data-v="ventas"><span class="k">2</span><span class="nm">ventas</span></button>
+  <button type="button" data-v="agenda"><span class="k">3</span><span class="nm">agenda</span><span class="nb" id="nbAg"></span></button>
+  <button type="button" data-v="turnos"><span class="k">4</span><span class="nm">turnos</span></button>
+  <button type="button" data-v="sueldo"><span class="k">5</span><span class="nm">sueldo</span></button>
+  <button type="button" data-v="config"><span class="k">6</span><span class="nm">config</span></button>
+  <button type="button" data-v="equipo" id="navEquipo" hidden><span class="k">7</span><span class="nm">equipo</span></button>
+  <span class="sp"></span>
+  <button type="button" data-act="ayuda"><span class="k">?</span><span class="nm">ayuda</span></button>
+  <button type="button" data-act="salir"><span class="k">⏻</span><span class="nm">salir</span></button>
+  <div class="ver" id="ver"></div>
+</nav>
+<main id="main">
+
+<section class="view" id="v-inicio">
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/inicio</span>$<span class="caret"></span></h1><span class="sub" id="iFecha"></span></div>
+  <div class="kpis" id="iKpis"></div>
+  <div class="g-wide">
+    <section class="card" id="iTurno">
+      <div class="card-h"><h3>TURNO</h3><span class="p-sub" id="itSub"></span><span class="grow"></span>
+        <label class="inl wr" title="Para marcar con otra hora; vacío = ahora">hora <input type="time" id="itHora"></label></div>
+      <div class="tstate" id="itState"></div>
+      <div class="btns wr" id="itBtns"></div>
+      <div id="itTl"></div>
+      <div class="marks" id="itMarks"></div>
+    </section>
+    <section class="card" id="iAgenda">
+      <div class="card-h"><h3>AGENDA</h3><span class="p-sub" id="iaSub"></span><span class="grow"></span><button type="button" class="btn sm" data-go="agenda">ver todo</button></div>
+      <form class="agform wr" id="iaForm" autocomplete="off"></form>
+      <div id="iaList" style="margin-top:12px"></div>
+    </section>
+  </div>
+  <div class="g-wide">
+    <section class="card">
+      <div class="card-h"><h3 id="idTitle">FTDs POR DÍA</h3><div class="legend"><span><i class="sw" style="background:var(--s1)"></i>new</span><span><i class="sw" style="background:var(--s2)"></i>late</span></div></div>
+      <div class="chart" id="iChart"></div>
+    </section>
+    <section class="card">
+      <div class="card-h"><h3>ÚLTIMAS VENTAS</h3><span class="grow"></span><button type="button" class="btn sm" data-go="ventas">ver todas</button></div>
+      <div id="iLast"></div>
+    </section>
+  </div>
+</section>
+
+<section class="view" id="v-ventas" hidden>
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/ventas</span>$<span class="caret"></span></h1><span class="sub" id="pSub"></span><span class="grow"></span>
+    <div class="tools"><button type="button" class="btn pri wr" data-act="nueva">+ FTD</button><button type="button" class="btn wr" data-act="importar">importar CSV</button><button type="button" class="btn" data-act="exportar">exportar CSV</button></div></div>
+  <div class="p-filters"><label>Vendedor<select id="pWho" aria-label="Vendedor"></select></label><label class="q">Buscar<input id="pQ" type="search" placeholder="nombre · ID · transacción" autocomplete="off"></label><span id="pFilters" style="display:contents"></span></div>
+  <div class="kpis" id="pKpis"></div>
+  <section class="card">
+    <div class="card-h"><h3>FTDs POR MES</h3><div class="legend"><span><i class="sw" style="background:var(--s1)"></i>new</span><span><i class="sw" style="background:var(--s2)"></i>late</span></div><span class="grow"></span><button class="btn sm" type="button" id="pChartTblBtn">ver tabla</button></div>
+    <div class="chart" id="pChart"></div>
+    <div id="pChartTbl" class="p-tablewrap" hidden></div>
+  </section>
+  <section class="card" id="dCard">
+    <div class="card-h"><h3>DÍAS POR CANTIDAD DE VENTAS</h3><span class="p-sub" id="dSub"></span></div>
+    <div class="g-wide" style="margin:0;align-items:start"><div class="chart" id="dChart"></div><div id="dTbl"></div></div>
+    <div class="note" id="dNote"></div>
+  </section>
+  <div class="grid2" id="pRanks"></div>
+  <section class="card">
+    <div class="card-h"><h3>VENTAS</h3><span class="p-sub" id="pCount"></span></div>
+    <div class="p-tablewrap" id="pTable"></div>
+    <button class="btn sm rk-more" type="button" id="pMore" hidden>ver más</button>
+  </section>
+</section>
+
+<section class="view" id="v-agenda" hidden>
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/agenda</span>$<span class="caret"></span></h1><span class="sub" id="agSub"></span></div>
+  <section class="card wr"><div class="card-h"><h3>AGENDAR CONTACTO</h3></div><form class="agform" id="agForm" autocomplete="off"></form></section>
+  <section class="card"><div id="agLists"></div></section>
+</section>
+
+<section class="view" id="v-turnos" hidden>
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/turnos</span>$<span class="caret"></span></h1><span class="sub" id="tuSub"></span><span class="grow"></span>
+    <div class="tools"><span class="chips" id="tuPer"></span><select id="tuMes" aria-label="Mes"></select><button type="button" class="btn wr" data-act="cargarJornada">+ cargar jornada</button></div></div>
+  <div class="kpis" id="tuKpis"></div>
+  <section class="card"><div class="card-h"><h3>HORAS POR DÍA</h3><div class="legend"><span><i class="sw" style="background:var(--s1)"></i>horas</span><span><i class="sw" style="background:transparent;border:1px dashed var(--fg)"></i>jornada</span></div></div><div class="chart" id="tuChart"></div></section>
+  <section class="card"><div class="card-h"><h3>JORNADAS</h3><span class="p-sub" id="tuCount"></span></div><div class="p-tablewrap" id="tuTable"></div></section>
+</section>
+
+<section class="view" id="v-sueldo" hidden>
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/sueldo</span>$<span class="caret"></span></h1><span class="grow"></span>
+    <div class="tools"><button type="button" class="btn sm" id="suPrev" aria-label="Mes anterior">‹</button><select id="suMes" aria-label="Mes"></select><button type="button" class="btn sm" id="suNext" aria-label="Mes siguiente">›</button></div></div>
+  <div class="grid2">
+    <section class="card"><div class="card-h"><h3>NOMINAL</h3><span class="p-sub" id="suNomSub"></span></div><div id="suNom"></div></section>
+    <section class="card"><div class="card-h"><h3>LÍQUIDO</h3><span class="p-sub" id="suLiqSub"></span></div><div id="suLiq"></div></section>
+  </div>
+  <div class="grid2">
+    <section class="card"><div class="card-h"><h3>BONOS</h3><span class="p-sub" id="suBonoSub"></span></div><div id="suBono"></div></section>
+    <section class="card"><div class="card-h"><h3>DÓLAR BROU COMPRA</h3><span class="grow"></span><a href="https://www.brou.com.uy/" target="_blank" rel="noopener" class="p-sub">brou.com.uy ↗</a></div>
+      <div class="frow wr"><label class="fld"><span>Cotización</span><input id="suTc" inputmode="decimal" placeholder="39,40"></label><button type="button" class="btn pri" id="suTcSave">guardar</button></div>
+      <div class="note" id="suTcInfo"></div></section>
+  </div>
+  <section class="card"><div class="card-h"><h3>SIMULADOR</h3><span class="p-sub">cuánto cobrás con N FTDs</span></div>
+    <div class="frow" style="align-items:center;gap:14px"><input type="range" id="siR" min="0" max="50" step="1" style="flex:1;min-width:180px" aria-label="FTDs"><span class="step"><button type="button" id="siMinus" aria-label="menos">−</button><input type="number" id="siN" min="0" max="999" aria-label="FTDs"><button type="button" id="siPlus" aria-label="más">+</button></span><span class="chips" id="siChips"></span></div>
+    <div class="grid2" style="margin:14px 0 0"><div id="siOut"></div><div id="siTbl"></div></div>
+  </section>
+</section>
+
+<section class="view cfg" id="v-config" hidden>
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/config</span>$<span class="caret"></span></h1><span class="saved" id="cfSaved">✔ guardado</span></div>
+  <div class="grid2">
+    <section class="card"><div class="card-h"><h3>MI CUENTA</h3><span class="p-sub" id="cfRole"></span></div>
+      <div class="frow"><label class="fld"><span>Nombre</span><input id="cfName" maxlength="40"></label><button type="button" class="btn sm" id="cfNameSave">guardar</button></div>
+      <div class="note" id="cfEmail"></div>
+      <div class="btns" style="margin-top:12px"><button type="button" class="btn sm" id="cfPass">cambiar contraseña</button><button type="button" class="btn sm danger" data-act="salir">salir</button></div>
+    </section>
+    <section class="card" id="cfTeamCard" hidden><div class="card-h"><h3>MESA</h3><span class="p-sub" id="cfTeamName"></span></div>
+      <div class="frow" style="align-items:center"><div class="fld"><span>Código de invitación</span><b id="cfCode" style="font-size:18px;letter-spacing:.06em"></b></div><button type="button" class="btn sm" id="cfCodeCopy">copiar</button><button type="button" class="btn sm" id="cfCodeNew">cambiar código</button></div>
+      <div class="fld" style="margin-top:14px"><span>Integrantes</span></div><div id="cfMembers" style="margin-top:6px"></div>
+    </section>
+    <section class="card"><div class="card-h"><h3>SUELDO</h3></div>
+      <div class="fgrid"><label class="fld"><span>Fijo nominal (UYU)</span><input data-c="base" inputmode="decimal"></label><label class="fld"><span>Por FTD (USD)</span><input data-c="porftd" inputmode="decimal"></label></div>
+      <div style="margin-top:12px"><div class="fld"><span>Bonos (no acumulables)</span></div><div id="cfBonos" style="margin-top:6px"></div>
+        <div class="btns wr"><button type="button" class="btn sm" id="cfBonoAdd">+ escalón</button><button type="button" class="btn sm pri" id="cfBonoSave">guardar bonos</button><span class="ebox" id="cfBonoErr" style="margin:0"></span></div></div>
+    </section>
+    <section class="card"><div class="card-h"><h3>LÍQUIDO</h3></div>
+      <div class="fgrid">
+        <label class="fld"><span>FONASA a cargo</span><select data-c="fonasa"><option value="nadie">nadie</option><option value="hijos">hijos</option><option value="conyuge">cónyuge</option><option value="ambos">hijos y cónyuge</option></select></label>
+        <label class="fld"><span>Hijos (IRPF)</span><input data-c="hijos" inputmode="decimal"></label>
+        <label class="fld"><span>Comisiones</span><select data-c="comRecibo"><option value="1">en el recibo</option><option value="0">aparte</option></select></label>
+        <label class="fld"><span>BPC</span><input data-c="bpc" inputmode="decimal"></label>
+        <label class="fld"><span>Fondo de Solidaridad</span><input data-c="fondoSol" inputmode="decimal"></label>
+      </div>
+    </section>
+    <section class="card"><div class="card-h"><h3>TURNO Y AGENDA</h3></div>
+      <div class="fgrid"><label class="fld"><span>Jornada (h:mm)</span><input data-c="jornada" placeholder="7:30"></label><label class="fld"><span>Hora de aviso por defecto</span><input data-c="hora" type="time"></label></div>
+      <div class="btns" style="margin-top:12px"><button type="button" class="btn sm" data-act="probarAviso">probar aviso</button><a class="btn sm" href="vitalis-extension.zip" download>⇩ extensión de Chrome</a><span class="p-sub" id="cfExt"></span></div>
+    </section>
+    <section class="card"><div class="card-h"><h3>DÍAS DE TRABAJO</h3><span class="p-sub" id="cfDiasSub"></span></div>
+      <label class="fld" style="margin-bottom:12px;max-width:200px"><span>Empezaste a trabajar</span><input type="date" id="cfInicio"></label>
+      <div class="fld"><span>Días laborables</span></div><div class="chips" id="cfDow" style="margin:6px 0 14px"></div>
+      <div class="fld"><span>Feriados que no se cuentan</span></div><div class="chips" id="cfFer" style="margin:6px 0 14px"></div>
+      <div class="fld"><span>Otros días que no se cuentan · todos los años</span></div><div class="chips" id="cfLibres" style="margin:6px 0"></div>
+      <div class="frow wr" style="margin-bottom:14px"><input type="date" id="cfLibD" aria-label="Feriado"><button type="button" class="btn sm" id="cfLibAdd">+ día</button></div>
+      <div class="fld"><span>Faltas</span></div><div id="cfFaltas" style="margin:6px 0"></div>
+      <div class="frow wr"><input type="date" id="cfFalD" aria-label="Fecha de la falta"><select id="cfFalJ" aria-label="Tipo de falta"><option value="1">justificada</option><option value="0">sin justificar</option></select><button type="button" class="btn sm" id="cfFalAdd">+ falta</button></div>
+    </section>
+    <section class="card"><div class="card-h"><h3>APARIENCIA</h3></div>
+      <div class="themes" id="cfTemas"></div>
+    </section>
+    <section class="card"><div class="card-h"><h3>DATOS</h3><span class="p-sub" id="cfDb"></span></div>
+      <div class="frow"><label class="fld" style="flex:0 0 auto"><span>Separador CSV</span><select data-c="sep"><option value=",">coma ,</option><option value=";">punto y coma ;</option></select></label>
+        <button type="button" class="btn" data-act="exportar">exportar CSV</button><button type="button" class="btn wr" data-act="importar">importar CSV</button><button type="button" class="btn wr" data-act="importarRespaldo">importar respaldo</button></div>
+      <div class="note" id="cfCount"></div>
+    </section>
+  </div>
+</section>
+
+<section class="view" id="v-equipo" hidden>
+  <div class="vh"><h1><span class="u who">vitalis</span>:<span class="w">~/equipo</span>$<span class="caret"></span></h1><span class="sub" id="eqSub"></span><span class="grow"></span>
+    <div class="tools"><button type="button" class="btn sm" id="eqPrev" aria-label="Mes anterior">‹</button><select id="eqMes" aria-label="Mes"></select><button type="button" class="btn sm" id="eqNext" aria-label="Mes siguiente">›</button></div></div>
+  <div class="kpis" id="eqKpis"></div>
+  <div class="g-wide">
+    <section class="card"><div class="card-h"><h3>FTDs POR AGENTE</h3><span class="p-sub">click → ver sus ventas</span></div><div id="eqRank"></div></section>
+    <section class="card"><div class="card-h"><h3>FTDs POR DÍA · MESA</h3><div class="legend"><span><i class="sw" style="background:var(--s1)"></i>new</span><span><i class="sw" style="background:var(--s2)"></i>late</span></div></div><div class="chart" id="eqChart"></div></section>
+  </div>
+  <section class="card"><div class="card-h"><h3>AGENTES</h3><span class="p-sub" id="eqCount"></span></div><div class="p-tablewrap" id="eqTable"></div></section>
+</section>
+
+</main>
+<div id="toasts" aria-live="polite"></div>
+<div id="tip" role="tooltip" hidden></div>
+<input type="file" id="file" accept=".csv,text/csv,text/plain" hidden>

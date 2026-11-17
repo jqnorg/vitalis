@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<style>
+  body{margin:0;width:320px;background:#060a07;color:#b9f3b4;font:12.5px/1.5 "JetBrains Mono","Cascadia Mono",Consolas,ui-monospace,monospace;text-shadow:0 0 5px rgba(125,255,138,.28)}
+  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0c140e;border-bottom:1px solid #2a3f2d}
+  .tag{background:#b9f3b4;color:#060a07;text-shadow:none;font-weight:700;letter-spacing:.1em;padding:0 6px;border-radius:2px}
+  .u{color:#7dff8a}.w{color:#79d4ff}.dim{color:#4f7754}.hot{color:#ffc266}
+  main{padding:10px 12px}
+  .st{margin-bottom:8px}
+  ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+  li{display:grid;grid-template-columns:auto auto 1fr;gap:8px;padding:4px 6px;border:1px solid #1b2a1d;border-radius:3px}
+  li .t{font-variant-numeric:tabular-nums}
+  li .i{font-weight:700}
+  li .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#4f7754}
+  .ok{color:#7dff8a}.bad{color:#ff6b5e}
+  #res{border:1px solid #2a3f2d;border-radius:3px;padding:6px 8px}
+  .empty{color:#4f7754;padding:10px 0;text-align:center}
+  footer{display:flex;gap:8px;padding:8px 12px;border-top:1px solid #2a3f2d}
+  button{font:inherit;font-size:11.5px;color:#b9f3b4;background:transparent;border:1px solid #4f7754;border-radius:3px;padding:3px 10px;cursor:pointer}
+  button:hover{background:#b9f3b4;color:#060a07}
+</style>
+</head>
+<body>
+<header><span class="tag">VITALIS</span><span><span class="u">agenda</span>:<span class="w">~</span>$ avisos</span></header>
+<main><div class="st" id="watch" hidden></div><div class="st dim" id="st"></div><div class="st" id="res" hidden></div><ul id="list"></ul></main>
+<footer><button id="open" type="button">abrir Vitalis</button><button id="test" type="button">probar aviso</button></footer>
+<script src="popup.js"></script>
+</body>
+</html>

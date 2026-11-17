@@ -1,0 +1,12 @@
+{
+  "name": "vitalis-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sql": "node sql.test.mjs",
+    "mock": "node server.mjs 54321"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.16"
+  }
+}

@@ -1,0 +1,162 @@
+// Supabase de mentira para probar Vitalis de punta a punta con el cliente real (supabase-js):
+// Postgres real (PGlite) con el mismo SQL y RLS + un mini PostgREST + un mini GoTrue (auth).
+// Uso: node server.mjs [puerto] [carpeta dist]
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { PGlite } from '@electric-sql/pglite';
+import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
+
+const PORT = +(process.argv[2] || 54321);
+const DIST = process.argv[3] || new URL('../site', import.meta.url).pathname;
+const db = new PGlite({ extensions: { pgcrypto } });
+await db.exec(`
+  create schema auth;
+  create table auth.users (id uuid primary key default gen_random_uuid(), email text unique, raw_user_meta_data jsonb, pass text);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+  create role authenticated nologin; create role anon nologin;
+  grant usage on schema auth to authenticated, anon;
+  grant execute on function auth.uid() to authenticated, anon;
+  create publication supabase_realtime;
+`);
+await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
+await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
+const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'] };
+const TABLES = new Set(Object.keys(PK));
+
+// ---------- auth ----------
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+const jwt = (u) => { const exp = Math.floor(Date.now() / 1000) + 3600; return [b64({ alg: 'HS256', typ: 'JWT' }), b64({ sub: u.id, email: u.email, role: 'authenticated', aud: 'authenticated', exp }), 'sig'].join('.'); };
+const refresh = new Map();
+function userObj(u) { return { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, email_confirmed_at: new Date().toISOString(), user_metadata: u.raw_user_meta_data || {}, app_metadata: { provider: 'email' }, identities: [{ id: u.id, provider: 'email' }], created_at: new Date().toISOString() }; }
+function session(u) { const rt = crypto.randomUUID(); refresh.set(rt, u.id); return { access_token: jwt(u), token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: rt, user: userObj(u) }; }
+const hash = (p) => crypto.createHash('sha256').update(p).digest('hex');
+function uidFrom(req) { const a = req.headers.authorization || ''; const t = a.replace(/^Bearer /, '').split('.'); if (t.length !== 3) return null; try { const p = JSON.parse(Buffer.from(t[1], 'base64url').toString()); return p.role === 'authenticated' ? p.sub : null; } catch (e) { return null; } }
+
+// ---------- REST ----------
+async function asUser(uid, fn) {
+  return db.transaction(async (tx) => {
+    await tx.exec(uid ? 'set local role authenticated' : 'set local role anon');
+    await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [uid || '']);
+    return fn(tx);
+  });
+}
+const ident = (c) => { if (!/^[a-z_][a-z0-9_]*$/.test(c)) throw Object.assign(new Error('bad column ' + c), { code: 'PGRST100' }); return '"' + c + '"'; };
+function filters(u, params) {
+  const w = [];
+  for (const [k, v] of u.searchParams) {
+    if (['select', 'order', 'limit', 'offset', 'on_conflict', 'columns'].includes(k)) continue;
+    const m = v.match(/^(eq|neq|gt|gte|lt|lte)\.(.*)$/);
+    if (!m) continue;
+    const op = { eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=' }[m[1]];
+    params.push(decodeURIComponent(m[2]));
+    w.push(`${ident(k)}::text ${op} $${params.length}`);
+  }
+  return w.length ? ' where ' + w.join(' and ') : '';
+}
+async function rest(req, res, table, body) {
+  const u = new URL(req.url, 'http://x'), uid = uidFrom(req), single = /vnd\.pgrst\.object/.test(req.headers.accept || '');
+  const prefer = req.headers.prefer || '', ret = /return=representation/.test(prefer);
+  if (!TABLES.has(table)) return send(res, 404, { code: 'PGRST205', message: 'no table' });
+  const params = [];
+  let sql;
+  try {
+    if (req.method === 'GET') {
+      let q = `select * from public.${table}` + filters(u, params);
+      const ord = u.searchParams.get('order');
+      if (ord) q += ' order by ' + ord.split(',').map((o) => { const [c, d] = o.split('.'); return ident(c) + (d === 'desc' ? ' desc' : ' asc'); }).join(', ');
+      const lim = u.searchParams.get('limit'), off = u.searchParams.get('offset');
+      const rng = (req.headers.range || '').match(/(\d+)-(\d+)/);
+      if (lim) q += ` limit ${+lim}`; else if (rng) q += ` limit ${+rng[2] - +rng[1] + 1}`;
+      if (off) q += ` offset ${+off}`; else if (rng) q += ` offset ${+rng[1]}`;
+      sql = `select coalesce(json_agg(t), '[]'::json) j from (${q}) t`;
+    } else if (req.method === 'POST') {
+      const rows = Array.isArray(body) ? body : [body];
+      const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+      params.push(JSON.stringify(rows));
+      let q = `insert into public.${table} (${cols.map(ident).join(',')}) select ${cols.map(ident).join(',')} from json_populate_recordset(null::public.${table}, $1)`;
+      if (/resolution=merge-duplicates/.test(prefer)) {
+        const pk = (u.searchParams.get('on_conflict') || '').split(',').filter(Boolean);
+        const key = pk.length ? pk : PK[table];
+        const upd = cols.filter((c) => !key.includes(c));
+        q += ` on conflict (${key.map(ident).join(',')}) do ` + (upd.length ? 'update set ' + upd.map((c) => `${ident(c)} = excluded.${ident(c)}`).join(',') : 'nothing');
+      }
+      sql = `with r as (${q} returning *) select coalesce(json_agg(r), '[]'::json) j from r`;
+    } else if (req.method === 'PATCH') {
+      const cols = Object.keys(body);
+      params.push(JSON.stringify(body));
+      const w = filters(u, params);
+      sql = `with r as (update public.${table} set (${cols.map(ident).join(',')}) = (select ${cols.map(ident).join(',')} from json_populate_record(null::public.${table}, $1))${w} returning *) select coalesce(json_agg(r), '[]'::json) j from r`;
+      if (cols.length === 1) sql = sql.replace(`set (${ident(cols[0])}) = (select ${ident(cols[0])} from`, `set ${ident(cols[0])} = (select ${ident(cols[0])} from`);
+    } else if (req.method === 'DELETE') {
+      sql = `with r as (delete from public.${table}${filters(u, params)} returning *) select coalesce(json_agg(r), '[]'::json) j from r`;
+    } else return send(res, 405, {});
+    const out = await asUser(uid, (tx) => tx.query(sql, params));
+    let data = out.rows[0].j;
+    if (typeof data === 'string') data = JSON.parse(data);
+    if (single) {
+      if (data.length !== 1) return send(res, 406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned', details: `The result contains ${data.length} rows` });
+      return send(res, req.method === 'POST' ? 201 : 200, data[0]);
+    }
+    if (req.method !== 'GET' && !ret) return send(res, req.method === 'POST' ? 201 : 204, null);
+    return send(res, req.method === 'POST' ? 201 : 200, data, { 'content-range': `0-${Math.max(0, data.length - 1)}/*` });
+  } catch (e) {
+    const code = e.code || 'XX000';
+    const st = code === '23505' ? 409 : code === '42501' ? 403 : code.startsWith('PGRST') ? 400 : 400;
+    return send(res, st, { code, message: e.message, details: null, hint: null });
+  }
+}
+
+// ---------- servidor ----------
+function send(res, status, obj, extra = {}) {
+  res.writeHead(status, { 'content-type': 'application/json', ...CORS, ...extra });
+  res.end(obj == null ? '' : JSON.stringify(obj));
+}
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS', 'access-control-expose-headers': 'content-range' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json' };
+http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
+  const u = new URL(req.url, 'http://x');
+  let raw = ''; for await (const c of req) raw += c;
+  const body = raw ? JSON.parse(raw) : null;
+  try {
+    if (u.pathname === '/__sql' && req.method === 'POST') { const r = await db.query(body.sql, body.params || []); return send(res, 200, r.rows); } // solo para pruebas
+    if (u.pathname.startsWith('/rest/v1/')) return rest(req, res, u.pathname.slice(9), body);
+    if (u.pathname === '/auth/v1/signup') {
+      try {
+        const r = await db.query('insert into auth.users (email, raw_user_meta_data, pass) values ($1,$2,$3) returning *', [String(body.email).toLowerCase(), JSON.stringify(body.data || {}), hash(body.password)]);
+        return send(res, 200, session(r.rows[0]));
+      } catch (e) {
+        if (e.code === '23505') return send(res, 422, { code: 422, error_code: 'user_already_exists', msg: 'User already registered' });
+        return send(res, 500, { code: 500, error_code: 'unexpected_failure', msg: 'Database error saving new user' });
+      }
+    }
+    if (u.pathname === '/auth/v1/token') {
+      if (u.searchParams.get('grant_type') === 'password') {
+        const r = await db.query('select * from auth.users where email = $1 and pass = $2', [String(body.email).toLowerCase(), hash(body.password)]);
+        if (!r.rows[0]) return send(res, 400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
+        return send(res, 200, session(r.rows[0]));
+      }
+      const id = refresh.get(body.refresh_token);
+      if (!id) return send(res, 400, { code: 400, error_code: 'refresh_token_not_found', msg: 'Invalid Refresh Token' });
+      const r = await db.query('select * from auth.users where id = $1', [id]);
+      return send(res, 200, session(r.rows[0]));
+    }
+    if (u.pathname === '/auth/v1/user') {
+      const id = uidFrom(req); if (!id) return send(res, 401, { msg: 'no session' });
+      if (req.method === 'PUT' && body.password) await db.query('update auth.users set pass = $2 where id = $1', [id, hash(body.password)]);
+      const r = await db.query('select * from auth.users where id = $1', [id]);
+      return send(res, 200, userObj(r.rows[0]));
+    }
+    if (u.pathname === '/auth/v1/recover') return send(res, 200, {});
+    if (u.pathname === '/auth/v1/logout') { res.writeHead(204, CORS); return res.end(); }
+    if (u.pathname.startsWith('/realtime/')) { res.writeHead(404, CORS); return res.end(); }
+    // archivos de la app
+    let f = path.join(DIST, decodeURIComponent(u.pathname === '/' ? '/index.html' : u.pathname));
+    if (u.pathname === '/config.js') { res.writeHead(200, { 'content-type': MIME['.js'] }); return res.end(`window.VITALIS_CONFIG={url:'http://localhost:${PORT}',key:'test-anon-key'};`); }
+    if (!f.startsWith(DIST) || !fs.existsSync(f)) { res.writeHead(404); return res.end('no'); }
+    res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' });
+    fs.createReadStream(f).pipe(res);
+  } catch (e) { send(res, 500, { message: String(e.message || e) }); }
+}).listen(PORT, () => console.log('mock supabase en http://localhost:' + PORT));

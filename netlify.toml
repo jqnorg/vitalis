@@ -1,0 +1,4 @@
+# Netlify publica la carpeta site/ tal cual (ya viene armada), en cada cambio que se sube a GitHub.
+[build]
+  publish = "site"
+  command = ""
