@@ -10,7 +10,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.teams (
   id          uuid primary key default gen_random_uuid(),
   name        text not null,
-  invite_code text not null unique,
+  invite_code text not null unique,      -- ya no se usa (Vitalis es para una sola mesa)
   created_at  timestamptz not null default now()
 );
 
@@ -34,6 +34,9 @@ create table if not exists public.pins (
   fails        integer not null default 0,
   locked_until timestamptz
 );
+alter table public.pins add column if not exists locks integer not null default 0; -- bloqueos seguidos: cada uno dura el doble
+alter table public.profiles add column if not exists crm_name text;          -- cómo figura en el CRM (para la carga del team leader)
+alter table public.profiles add column if not exists quiet_until timestamptz; -- avisos sociales silenciados hasta
 alter table public.pins enable row level security;
 revoke all on public.pins from anon, authenticated;
 
@@ -129,6 +132,21 @@ create table if not exists public.leads (
 );
 create index if not exists leads_team_date on public.leads (team_id, date);
 
+-- ---------- social: pedir un mate, salir a los 10 o a la media, mensajes ----------
+create table if not exists public.pings (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  from_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  to_id      uuid references public.profiles(id) on delete cascade,   -- vacío = toda la mesa
+  kind       text not null check (kind in ('mate','d10','d30','msg')),
+  body       text check (length(body) <= 140),
+  reply      text check (reply in ('si','no','luego')),
+  reply_by   uuid references public.profiles(id) on delete set null,
+  replied_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists pings_team_created on public.pings (team_id, created_at desc);
+
 -- ---------- fechas de modificación ----------
 create or replace function public.touch() returns trigger language plpgsql set search_path = public as $$
 begin new.updated_at := now(); return new; end $$;
@@ -180,24 +198,29 @@ begin
 end $$;
 revoke all on function public._new_seat(uuid, text, text) from public, anon, authenticated;
 
--- la lista de nombres para la pantalla de entrada (hace falta el código de la mesa)
-create or replace function public.team_roster(code text) returns json
+-- Vitalis es para una sola mesa: la lista de nombres y el PIN no piden código.
+drop function if exists public.team_roster(text);
+drop function if exists public.pin_login(text, uuid, text);
+
+-- la lista de nombres para la pantalla de entrada
+create or replace function public.roster() returns json
   language sql stable security definer set search_path = public as $$
   select json_build_object('team', t.name, 'people', coalesce((
     select json_agg(json_build_object('id', p.id, 'name', p.name, 'role', p.role, 'pin_set', p.pin_set) order by p.name)
       from public.profiles p where p.team_id = t.id and p.active and p.login is not null), '[]'::json))
-  from public.teams t where upper(t.invite_code) = upper(trim(coalesce(code, ''))) $$;
+  from (select * from public.teams order by created_at limit 1) t $$;
 
--- PIN correcto → datos para abrir la sesión. 5 errores seguidos → 15 minutos bloqueado.
-create or replace function public.pin_login(code text, uid uuid, pin text) returns json
+-- PIN correcto → datos para abrir la sesión.
+-- 5 errores seguidos → bloqueado 15 minutos; cada bloqueo seguido dura el doble (hasta 24 h). Entrar bien lo resetea.
+create or replace function public.pin_login(uid uuid, pin text) returns json
   language plpgsql security definer set search_path = public, extensions as $$
 declare
   p   record;
   s   record;
   sec text;
+  lk  interval;
 begin
-  select pr.id, pr.login, pr.pin_set into p from public.profiles pr join public.teams t on t.id = pr.team_id
-   where pr.id = uid and pr.active and pr.login is not null and upper(t.invite_code) = upper(trim(coalesce(code, '')));
+  select pr.id, pr.login, pr.pin_set into p from public.profiles pr where pr.id = uid and pr.active and pr.login is not null;
   if p.id is null then return json_build_object('ok', false, 'error', 'nouser'); end if;
   select * into s from public.pins where user_id = uid for update;
   if s.user_id is null then return json_build_object('ok', false, 'error', 'nouser'); end if;
@@ -205,14 +228,16 @@ begin
     return json_build_object('ok', false, 'error', 'locked', 'minutes', ceil(extract(epoch from s.locked_until - now()) / 60)::int);
   end if;
   if pin is null or pin !~ '^[0-9]{4}$' or s.pin_hash <> crypt(pin, s.pin_hash) then
-    update public.pins set fails = case when s.fails + 1 >= 5 then 0 else s.fails + 1 end,
-                           locked_until = case when s.fails + 1 >= 5 then now() + interval '15 minutes' else null end
-     where user_id = uid;
-    if s.fails + 1 >= 5 then return json_build_object('ok', false, 'error', 'locked', 'minutes', 15); end if;
+    if s.fails + 1 >= 5 then
+      lk := least(interval '24 hours', interval '15 minutes' * power(2, least(s.locks, 10)));
+      update public.pins set fails = 0, locks = s.locks + 1, locked_until = now() + lk where user_id = uid;
+      return json_build_object('ok', false, 'error', 'locked', 'minutes', ceil(extract(epoch from lk) / 60)::int);
+    end if;
+    update public.pins set fails = s.fails + 1 where user_id = uid;
     return json_build_object('ok', false, 'error', 'wrong', 'left', 4 - s.fails);
   end if;
   sec := encode(gen_random_bytes(24), 'hex');
-  update public.pins set fails = 0, locked_until = null, secret = sec where user_id = uid;
+  update public.pins set fails = 0, locks = 0, locked_until = null, secret = sec where user_id = uid;
   update auth.users set encrypted_password = crypt(sec, gen_salt('bf')), updated_at = now() where id = uid;
   return json_build_object('ok', true, 'email', p.login, 'password', sec, 'pin_set', p.pin_set);
 end $$;
@@ -249,7 +274,7 @@ begin
      or not exists (select 1 from public.profiles where id = uid and team_id = public.my_team()) then
     raise exception 'Solo el administrador puede resetear un PIN';
   end if;
-  update public.pins set pin_hash = crypt('0000', gen_salt('bf')), fails = 0, locked_until = null where user_id = uid;
+  update public.pins set pin_hash = crypt('0000', gen_salt('bf')), fails = 0, locks = 0, locked_until = null where user_id = uid;
   update public.profiles set pin_set = false where id = uid;
   return json_build_object('ok', true);
 end $$;
@@ -270,11 +295,76 @@ begin
   return json_build_object('ok', true, 'id', uid);
 end $$;
 
-revoke all on function public.team_roster(text), public.pin_login(text, uuid, text), public.set_pin(text, text),
-  public.reset_pin(uuid), public.add_member(text, text) from public;
-grant execute on function public.team_roster(text), public.pin_login(text, uuid, text) to anon, authenticated;
-grant execute on function public.set_pin(text, text), public.reset_pin(uuid), public.add_member(text, text) to authenticated;
-revoke execute on function public.set_pin(text, text), public.reset_pin(uuid), public.add_member(text, text) from anon;
+-- ¿esa persona es de mi mesa?
+create or replace function public.in_my_team(uid uuid) returns boolean
+  language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = uid and team_id = public.my_team()) $$;
+
+-- team leader / admin: cómo figura cada uno en el CRM (para pasar las ventas de toda la mesa)
+create or replace function public.set_crm_name(uid uuid, nm text) returns json
+  language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') or not public.in_my_team(uid) then
+    raise exception 'Solo el team leader o el administrador';
+  end if;
+  update public.profiles set crm_name = nullif(left(trim(coalesce(nm, '')), 80), '') where id = uid;
+  return json_build_object('ok', true);
+end $$;
+
+revoke all on function public.roster(), public.pin_login(uuid, text), public.set_pin(text, text),
+  public.reset_pin(uuid), public.add_member(text, text), public.in_my_team(uuid), public.set_crm_name(uuid, text) from public;
+grant execute on function public.roster(), public.pin_login(uuid, text) to anon, authenticated;
+grant execute on function public.set_pin(text, text), public.reset_pin(uuid), public.add_member(text, text),
+  public.in_my_team(uuid), public.set_crm_name(uuid, text) to authenticated;
+revoke execute on function public.set_pin(text, text), public.reset_pin(uuid), public.add_member(text, text),
+  public.in_my_team(uuid), public.set_crm_name(uuid, text) from anon;
+
+-- pedidos sociales: cada tipo tiene su espera (mate 20 min) y se borran solos a la semana
+create or replace function public.ping_guard() returns trigger
+  language plpgsql security definer set search_path = public as $$
+declare
+  last timestamptz;
+  wait interval;
+  left_s int;
+begin
+  new.reply := null; new.reply_by := null; new.replied_at := null; new.created_at := now();
+  if new.kind = 'msg' then
+    new.body := nullif(left(trim(coalesce(new.body, '')), 140), '');
+    if new.body is null then raise exception 'PING_EMPTY: escribí el mensaje'; end if;
+  else new.body := null; end if;
+  wait := case new.kind when 'mate' then interval '20 minutes' when 'msg' then interval '15 seconds' else interval '3 minutes' end;
+  select max(created_at) into last from public.pings
+   where from_id = new.from_id and kind = new.kind and (new.kind = 'mate' or to_id is not distinct from new.to_id);
+  if last is not null and last > now() - wait then
+    left_s := ceil(extract(epoch from last + wait - now()))::int;
+    raise exception 'COOLDOWN: %', case new.kind when 'mate' then 'ya pediste un mate, podés volver a pedir en ' else 'ya lo mandaste, esperá ' end
+      || case when left_s >= 60 then ceil(left_s / 60.0)::int || ' min' else left_s || ' segundos' end;
+  end if;
+  if (select count(*) from public.pings where from_id = new.from_id and created_at > now() - interval '1 hour') >= 40 then
+    raise exception 'COOLDOWN: muchos pedidos en la última hora, esperá un rato';
+  end if;
+  delete from public.pings where created_at < now() - interval '7 days';
+  return new;
+end $$;
+drop trigger if exists pings_guard on public.pings;
+create trigger pings_guard before insert on public.pings for each row execute function public.ping_guard();
+
+-- responder un pedido: el primero que contesta se lo lleva
+create or replace function public.reply_ping(pid uuid, r text) returns json
+  language plpgsql security definer set search_path = public as $$
+declare p record;
+begin
+  if coalesce(r, '') not in ('si', 'no', 'luego') then raise exception 'REPLY: respuesta inválida'; end if;
+  select * into p from public.pings where id = pid and team_id = public.my_team() for update;
+  if p.id is null then raise exception 'PING_GONE: ese pedido ya no está'; end if;
+  if p.from_id = auth.uid() then raise exception 'PING_OWN: el pedido es tuyo'; end if;
+  if p.to_id is not null and p.to_id <> auth.uid() then raise exception 'PING_NOT_YOURS: no es para vos'; end if;
+  if p.reply is not null then return json_build_object('ok', false, 'taken', true, 'by', p.reply_by, 'reply', p.reply); end if;
+  update public.pings set reply = r, reply_by = auth.uid(), replied_at = now() where id = pid;
+  return json_build_object('ok', true);
+end $$;
+revoke all on function public.reply_ping(uuid, text) from public, anon;
+grant execute on function public.reply_ping(uuid, text) to authenticated;
 
 -- Solo el administrador cambia roles, mesa o si alguien sigue activo. La cuenta y el PIN no se tocan desde la app.
 -- (Sin "security definer": así sabe si el cambio viene de la app o de las funciones de arriba.)
@@ -308,6 +398,7 @@ alter table public.agenda      enable row level security;
 alter table public.shifts      enable row level security;
 alter table public.snippets    enable row level security;
 alter table public.leads       enable row level security;
+alter table public.pings       enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -323,11 +414,12 @@ create policy prof_update on public.profiles for update to authenticated
 drop policy if exists sales_read on public.sales;
 create policy sales_read on public.sales for select to authenticated using (team_id = public.my_team());
 drop policy if exists sales_insert on public.sales;
-create policy sales_insert on public.sales for insert to authenticated with check (team_id = public.my_team() and user_id = auth.uid());
+create policy sales_insert on public.sales for insert to authenticated with check (team_id = public.my_team()
+  and (user_id = auth.uid() or (public.my_role() in ('admin','leader') and public.in_my_team(user_id)))); -- el team leader carga para la mesa
 drop policy if exists sales_update on public.sales;
 create policy sales_update on public.sales for update to authenticated
   using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')))
-  with check (team_id = public.my_team());
+  with check (team_id = public.my_team() and (user_id = auth.uid() or (public.my_role() in ('admin','leader') and public.in_my_team(user_id))));
 drop policy if exists sales_delete on public.sales;
 create policy sales_delete on public.sales for delete to authenticated
   using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')));
@@ -365,20 +457,31 @@ drop policy if exists leads_delete on public.leads;
 create policy leads_delete on public.leads for delete to authenticated
   using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')));
 
+drop policy if exists pings_read on public.pings;
+create policy pings_read on public.pings for select to authenticated
+  using (team_id = public.my_team() and (to_id is null or to_id = auth.uid() or from_id = auth.uid()));
+drop policy if exists pings_insert on public.pings;
+create policy pings_insert on public.pings for insert to authenticated
+  with check (team_id = public.my_team() and from_id = auth.uid() and (to_id is null or (to_id <> auth.uid() and public.in_my_team(to_id))));
+drop policy if exists pings_delete on public.pings;
+create policy pings_delete on public.pings for delete to authenticated using (from_id = auth.uid());
+
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.sales, public.settings, public.adjustments, public.agenda, public.shifts, public.snippets, public.leads to authenticated;
 grant select, update on public.teams, public.profiles to authenticated;
+grant select, insert, delete on public.pings to authenticated;
+revoke update on public.pings from authenticated;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
-revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch() from public, anon, authenticated;
+revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard() from public, anon, authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;
@@ -406,5 +509,4 @@ begin
   end loop;
 end $$;
 
--- Para ver el código de la mesa (se pide una vez en cada computadora):
-select name as mesa, invite_code as codigo_de_la_mesa from public.teams;
+select name as mesa, (select count(*) from public.profiles where team_id = teams.id and active) as personas from public.teams;

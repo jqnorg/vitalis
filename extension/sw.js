@@ -57,6 +57,7 @@ function ftdOverlay(items) {
       .stack{display:flex;flex-direction:column;gap:10px;width:min(370px,calc(100vw - 28px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
       .card{--c:#e08a1e;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px 13px;box-shadow:0 18px 48px rgba(0,0,0,.28);animation:in .25s ease-out,nudge .6s ease-in-out .3s 2}
       .card.crm{--c:#2f7fd0}
+      .card.social{--c:#1b874a}
       @keyframes in{from{opacity:0;transform:translateY(-10px)}}
       @keyframes nudge{50%{transform:rotate(-1.2deg) scale(1.02)}}
       .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -78,7 +79,7 @@ function ftdOverlay(items) {
   for (const d of items) {
     if (stack.querySelector(`[data-k="${CSS.escape(d.k)}"]`)) continue;
     const card = document.createElement('div');
-    card.className = 'card' + (d.kind === 'crm' ? ' crm' : ''); card.dataset.k = d.k; card.setAttribute('role', 'alert');
+    card.className = 'card' + (d.kind === 'crm' ? ' crm' : d.kind === 'social' ? ' social' : ''); card.dataset.k = d.k; card.setAttribute('role', 'alert');
     card.innerHTML = '<div class="h"><img class="mk" alt=""><span class="tag">vitalis</span><span class="t"></span><button class="x" data-a="close" title="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>';
     try { card.querySelector('.mk').src = chrome.runtime.getURL('icons/48.png'); } catch (e) { card.querySelector('.mk').remove(); }
     card.querySelector('.t').textContent = d.title || 'Contactar';
@@ -180,6 +181,7 @@ async function sync(msg) {
   if (known) upd.known = { ids: known.ids, txs: known.txs, at: now }; // para que el botón del CRM sepa cuáles ya están
   if (Array.isArray(msg.snips)) upd.snips = msg.snips; // los snippets que pega snip.js en cualquier página
   if (msg.user) upd.me = msg.user;
+  if (msg.desk) upd.desk = msg.desk; // para el botón del CRM del team leader
   if (Array.isArray(msg.leadIds)) { upd.leadIds = msg.leadIds; const have = new Set(msg.leadIds); upd.leadQ = st.leadQ.filter((c) => !have.has(leadKey(c))); }
   await chrome.storage.local.set(upd);
 
@@ -228,7 +230,18 @@ async function leadsDone(keys) {
 }
 
 /* ---------- ventas desde el CRM ---------- */
-const CRM_URLS = ['https://crmnovaramarkets.com/*', 'https://*.crmnovaramarkets.com/*'];
+const CRM_URLS = ['https://crmnovaramarkets.com/*', 'https://*.crmnovaramarkets.com/*', 'https://crmtrade24seven.com/*', 'https://*.crmtrade24seven.com/*'];
+async function crmUrls() { const s = (await chrome.storage.local.get('crmSites')).crmSites || {}; return [...CRM_URLS, ...Object.keys(s).map((h) => `https://${h}/*`)]; }
+// "Usar en este CRM" desde el ícono: registra crm.js para ese sitio y le asigna la marca
+async function crmSiteAdd(tab, brandName) {
+  const u = new URL(tab.url); if (u.protocol !== 'https:') throw new Error('El CRM tiene que ser https');
+  const sites = (await chrome.storage.local.get('crmSites')).crmSites || {};
+  sites[u.hostname] = brandName; await chrome.storage.local.set({ crmSites: sites });
+  const id = 'crm-' + u.hostname.replace(/[^a-z0-9]/gi, '-');
+  try { await chrome.scripting.unregisterContentScripts({ ids: [id] }); } catch (e) {}
+  await chrome.scripting.registerContentScripts([{ id, matches: [`https://${u.hostname}/*`], js: ['crm.js'], allFrames: true, runAt: 'document_idle', persistAcrossSessions: true }]);
+  await chrome.scripting.executeScript({ target: { tabId: tab.id, allFrames: true }, files: ['crm.js'] });
+}
 async function vitalisTabs() { // pestañas abiertas de Vitalis (la dirección la aprende al sincronizar)
   const { url } = await state(); let origin = null;
   try { origin = new URL(url).origin; } catch (e) {}
@@ -332,13 +345,13 @@ async function focusCrm() {
   const w = await getWatch();
   let tab = null;
   if (w) { try { tab = await chrome.tabs.get(w.tabId); } catch (e) {} }
-  if (!tab) [tab] = await chrome.tabs.query({ url: CRM_URLS });
+  if (!tab) [tab] = await chrome.tabs.query({ url: await crmUrls() });
   if (tab) { await chrome.tabs.update(tab.id, { active: true }); await chrome.windows.update(tab.windowId, { focused: true }); }
   else if (w) await chrome.tabs.create({ url: w.url });
 }
 
 async function tellCrm(res) {
-  for (const t of await chrome.tabs.query({ url: CRM_URLS })) { try { await chrome.tabs.sendMessage(t.id, { type: 'import-result', res }); } catch (e) {} }
+  for (const t of await chrome.tabs.query({ url: await crmUrls() })) { try { await chrome.tabs.sendMessage(t.id, { type: 'import-result', res }); } catch (e) {} }
 }
 
 async function sendCmd(cmd) { // "hecho" desde el aviso: se lo paso a Vitalis si está abierto; si no, queda en cola
@@ -368,6 +381,12 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return false;
   }
   if (msg.type === 'open-panel') { openPanel(); return false; }
+  if (msg.type === 'social' && msg.card) { alertCard(msg.card, 'social'); return false; }
+  if (msg.type === 'social-close' && msg.k) { dismiss(msg.k); return false; }
+  if (msg.type === 'crm-site-add' && msg.tabId) {
+    chrome.tabs.get(msg.tabId).then((tab) => crmSiteAdd(tab, String(msg.brand || 'Novara Markets'))).then(() => reply({ ok: true })).catch((e) => reply({ ok: false, err: String(e && e.message || e) }));
+    return true;
+  }
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab, Math.max(10, Math.min(1800, +msg.sec || 30))).then(() => reply({ ok: true })); return true; }
   if (msg.type === 'crm-watch-stop') { watchStop().then(() => reply({ ok: true })); return true; }
@@ -382,6 +401,12 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     (async () => {
       await dismiss(msg.k);
       if (msg.k.startsWith('crm:')) { if (msg.a === 'crm') await focusCrm(); return; }
+      if (msg.k.startsWith('so:')) { // tarjeta social: la respuesta va a Vitalis
+        const id = msg.k.slice(3);
+        if (msg.a.startsWith('r:')) await sendCmd({ cmd: 'reply', k: id, r: msg.a.slice(2), at: Date.now() });
+        else if (msg.a === 'quiet') await sendCmd({ cmd: 'quiet', k: id, at: Date.now() });
+        return;
+      }
       if (msg.k === 'test') { if (msg.a === 'open') await openPanel(); return; }
       if (msg.a === 'done') {
         const st = await state();

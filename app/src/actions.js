@@ -6,6 +6,9 @@ const uniq=fn=>[...new Set(ftds.map(fn).filter(Boolean).map(String))].sort((a,b)
 const dlist=(id,vals)=>`<datalist id="${id}">${vals.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`;
 const tipoBadge=f=>isLate(f)?`<span class="badge late">late ${lateDays(f)} d</span>`:'<span class="badge new">new</span>';
 const noRO=()=>{if(readOnly){toast('Solo lectura.','err');return false}return true};
+// el team leader carga ventas de toda la mesa: lista de vendedores
+const sellerOpts=sel=>members.filter(m=>m.active||m.id===sel).sort((a,b)=>(b.id===me)-(a.id===me)||a.name.localeCompare(b.name))
+  .map(m=>`<option value="${esc(m.id)}"${m.id===sel?' selected':''}>${m.id===me?'Yo ('+esc(m.name)+')':esc(m.name)}</option>`).join('');
 
 /* ---------- venta: nueva / editar ---------- */
 function ftdForm(f){
@@ -14,7 +17,9 @@ function ftdForm(f){
   const r=f?{...f}:{date:te,time:nowHM(),brand:last.brand||DEF_BRAND,country:last.country||'',aff:last.aff||'',camp:last.camp||'',reg:te};
   const reg=String(r.reg||r.date),regD=reg.slice(0,10),regT=reg.slice(11,16);
   const v=k=>esc(r[k]??'');
+  const seller=isLeader()?(f?f.uid:(local.get('lastSeller','')&&members.some(m=>m.id===local.get('lastSeller','')&&m.active)?local.get('lastSeller',''):me)):null;
   const body=`<div class="fgrid">
+    ${seller?`<label class="fld full"><span>Vendedor</span><select name="uid">${sellerOpts(seller)}</select></label>`:''}
     <label class="fld"><span>Marca</span><input name="brand" list="dlB" value="${v('brand')}"></label>
     <label class="fld"><span>ID <i>*</i></span><input name="id" value="${v('id')}" autofocus></label>
     <label class="fld full"><span>Full Name <i>*</i></span><input name="name" value="${v('name')}"></label>
@@ -43,6 +48,7 @@ function ftdForm(f){
     if(rd>rec.date)return {err:'El registro no puede ser posterior al FTD.',k:'regD'};
     rec.reg=rd+(g('regT')?' '+g('regT'):'');rec.amount=amt;
     if(!rec.camp)rec.camp='';
+    const u=api.q('[name=uid]');if(u)rec.uid=u.value;
     return {rec};
   };
   const tipo=api=>{const d=api.q('[name=date]').value,rd=api.q('[name=regD]').value||d;api.q('#fTipo').innerHTML=d?tipoBadge({date:d,reg:rd}):'';
@@ -55,7 +61,7 @@ function ftdForm(f){
     const dup=team.find(x=>x._id!==(f&&f._id)&&norm(x.id)===norm(rec.id)&&norm(x.brand||'')===norm(rec.brand||''));
     if(dup&&dupOk!==key){dupOk=key;const w=api.q('#fDup');w.hidden=false;w.innerHTML=`⚠ Ya existe un FTD de ${esc(rec.brand)} con ID <b>${esc(rec.id)}</b> (${dm(dup.date)} · ${esc(dup.name)}${dup.uid!==me?' · lo cargó '+esc(memberName(dup.uid)):''}). Guardá de nuevo para cargarlo igual.`;return false}
     if(isNew){if(!await commitNew(rec))return false}
-    else{if(!await B.updFtd(f,rec))return false;toast(`✔ FTD #${f.n} actualizado · <b>${esc(rec.id)}</b> · ${esc(rec.name)}`)}
+    else{if(rec.uid&&rec.uid!==f.uid)rec.n=nextNFor(rec.uid);if(!await B.updFtd(f,rec))return false;toast(`Venta #${rec.n||f.n} actualizada: <b>${esc(rec.id)}</b> ${esc(rec.name)}${rec.uid&&rec.uid!==me?' de '+esc(memberName(rec.uid)):''}`)}
     if(again){ // seguir cargando: limpia lo propio de la venta, mantiene marca/país/afiliado/campaña
       for(const n of ['id','name','amount','tx'])api.q(`[name=${n}]`).value='';
       api.q('[name=time]').value=nowHM();api.q('[name=regD]').value=api.q('[name=date]').value;api.q('[name=regT]').value='';
@@ -73,10 +79,13 @@ function ftdForm(f){
     }});
 }
 async function commitNew(rec){
-  rec.n=nextN();
+  const other=rec.uid&&rec.uid!==me;
+  if(rec.uid)local.set('lastSeller',rec.uid);
+  rec.n=other?nextNFor(rec.uid):nextN();
   last={brand:rec.brand,country:rec.country,aff:rec.aff,camp:rec.camp};local.set('last',last);
   const ym=rec.date.slice(0,7),before=calc(ym);
   if(!await B.addFtd(rec))return false;
+  if(other){toast(`Venta cargada a <b>${esc(memberName(rec.uid))}</b>: ${esc(rec.id)} ${esc(rec.name)}, ${money(rec.amount)} USD`);return true}
   const s=calc(ym);
   toast(`✔ FTD #${rec.n} · <b>${esc(rec.id)}</b> · ${esc(rec.name)} · ${money(rec.amount)} USD${isLate(rec)?' · '+sp('warn','late '+lateDays(rec)+' d'):''}<br><span class="dim">${esc(mLong(ym))}: ${plural(s.n,'FTD')} · ${money(s.usd)} USD${s.next?' · '+progressTxt(s):''}</span>`);
   if(s.tier>before.tier){toast(`🎉 ¡${s.n} FTDs! Bono de ${s.bono} USD desbloqueado.`,'alert',{ms:9000});beep(2)}
@@ -87,6 +96,39 @@ async function borrarFtd(f){
   if(!await confirmar('Borrar venta',`¿Borrar FTD #${f.n} · ${dm(f.date)}/${f.date.slice(0,4)} · <b>${esc(f.id)}</b> · ${esc(f.name)} · ${money(f.amount)} USD?`,'borrar',true))return false;
   if(!await B.delFtd(f))return false;
   toast(`✔ FTD #${f.n} borrado.`);return true;
+}
+
+/* ---------- team leader: cargar ventas de la mesa ---------- */
+// list: ventas con .uid (vendedor) o sin uid y con .agent (nombre en el CRM que no se pudo emparejar)
+async function addForSellers(list,src){
+  const sin=list.filter(x=>!x.uid);
+  const ok=list.filter(x=>x.uid);
+  let added=0;
+  if(ok.length){
+    const next={};const rows=ok.sort(byDate).map(f=>{next[f.uid]=next[f.uid]||nextNFor(f.uid);const o={...f,n:next[f.uid]++};delete o.agent;return o});
+    const T=toast('Guardando…','ok',{sticky:1});
+    const r=await B.addMany(rows,(i,t)=>T.set(`Guardando… ${i}/${t}`));T.close();
+    if(!r)return {err:'no se pudo guardar en la base'};
+    added=rows.length;
+    const per={};for(const x of rows)per[x.uid]=(per[x.uid]||0)+1;
+    toast(`${plural(added,'venta nueva','ventas nuevas')} ${esc(src||'')}: ${Object.entries(per).map(([u,n])=>`${esc(memberName(u).split(/\s+/)[0])} ${n}`).join(', ')}`);
+  }
+  if(sin.length){
+    const names=[...new Set(sin.map(x=>x.agent||''))];
+    toast(`${plural(sin.length,'venta')} sin vendedor${names.some(Boolean)?': '+names.filter(Boolean).map(n=>`<b>${esc(n)}</b>`).join(', '):''}.`,'warn',{sticky:1,key:'asignar',actions:[{l:'Asignar',fn:()=>assignModal(sin,src)}]});
+  }
+  return {added,unmatched:sin.length};
+}
+function assignModal(rows,src){ // "¿quién es «J. Ortega»?" → se guarda como nombre en el CRM y se cargan
+  const names=[...new Set(rows.map(x=>x.agent||''))];
+  const body=`<p class="mp">Elegí quién es cada uno. Queda guardado para la próxima.</p>`+names.map((n,i)=>`<label class="fld" style="margin-top:10px"><span>${n?`En el CRM: <b>${esc(n)}</b> (${rows.filter(x=>(x.agent||'')===n).length})`:`Sin nombre de agente (${rows.filter(x=>!x.agent).length})`}</span>
+    <select data-an="${i}"><option value="">No es de la mesa: no cargar</option>${sellerOpts('')}</select></label>`).join('');
+  modal({title:'Asignar ventas',body,actions:[{l:'Cancelar'},{l:'Cargar',cls:'pri',fn:async api=>{
+    const pick=names.map((n,i)=>api.q(`[data-an="${i}"]`).value);
+    for(let i=0;i<names.length;i++)if(pick[i]&&names[i]){const r=await B.rpc('set_crm_name',{uid:pick[i],nm:names[i]});if(r){const m=members.find(x=>x.id===pick[i]);if(m)m.crm_name=names[i]}}
+    const list=rows.map(x=>({...x,uid:pick[names.indexOf(x.agent||'')]||null})).filter(x=>x.uid);
+    if(list.length)await addForSellers(list,src);
+  }}]});
 }
 
 /* ---------- FTDs sin detalle ---------- */
@@ -323,11 +365,13 @@ const isDup=(x,K)=>!!((x.tx&&K.tx.has(norm(x.brand||'')+'|'+x.tx))||K.id.has(nor
 function cleanExtRow(r){
   if(!r||typeof r!=='object')return null;
   const s=(v,n=120)=>String(v??'').replace(/\s+/g,' ').trim().slice(0,n);
+  const ag=s(r.agent,80),u=s(r.uid,40);
   const date=s(r.date,10),reg=s(r.reg,16),amount=+r.amount;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>todayS()||!s(r.id)||!isFinite(amount))return null;
   const o={date,time:/^\d{2}:\d{2}$/.test(s(r.time,5))?s(r.time,5):'',id:s(r.id,40),name:s(r.name),country:s(r.country,60),aff:s(r.aff,60),camp:s(r.camp),amount:Math.round(amount*100)/100,brand:s(r.brand,40)||DEF_BRAND};
   const tx=s(r.tx,60);if(tx)o.tx=tx;
   o.reg=/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(reg)&&reg.slice(0,10)<=date?reg:date;
+  if(ag)o.agent=ag;if(u)o.uid=u;
   return o;
 }
 async function importFromExt(rows){
@@ -343,6 +387,13 @@ async function importFromExt(rows){
   }
   const mesOut=()=>{const s=calc(ymNow());return {n:s.n,usd:s.usd,next:s.next}};
   if(!nuevas.length)return {added:0,dup,bad,mes:mesOut()};
+  if(isLeader()&&nuevas.some(x=>(x.uid&&x.uid!==me)||x.agent)){ // team leader: cada venta a su vendedor
+    for(const x of nuevas)x.uid=x.uid&&members.some(m=>m.id===x.uid)?x.uid:x.agent?agentUid(x.agent):me;
+    const r=await addForSellers(nuevas,'desde el CRM');
+    if(r.err)return r;
+    return {added:r.added,dup,bad,unmatched:r.unmatched,ids:nuevas.filter(x=>x.uid).map(f=>f.id),mes:mesOut()};
+  }
+  for(const x of nuevas){delete x.agent;delete x.uid}
   const months=[...new Set(nuevas.map(x=>x.date.slice(0,7)))],before=Object.fromEntries(months.map(m=>[m,calc(m).tier]));
   let n=nextN()-1;const list=nuevas.sort(byDate).map(f=>({...f,n:++n}));
   if(!await B.addMany(list))return {err:'no se pudo guardar en la base'};
@@ -391,12 +442,23 @@ function importar(){
     const rep=R.ok.length-nuevas.length;
     if(!nuevas.length)return toast(`${esc(file.name)}: las ${R.ok.length} ventas ya estaban cargadas.`,'warn');
     const lat=nuevas.filter(isLate).length;
-    if(!await confirmar(`Importar ${esc(file.name)}`,`<b>${plural(nuevas.length,'venta nueva','ventas nuevas')}</b>${lat?` (${lat} late)`:''}${rep?` · ${rep} ya estaba${rep>1?'n':''}`:''}${R.bad?` · ${sp('warn',plural(R.bad,'fila')+' con errores')}`:''}`,'agregar'))return;
+    if(isLeader()){ // el team leader elige de quién son (o según la columna de agente del archivo)
+      const hasAg=nuevas.some(x=>x.agent);
+      const who=await new Promise(res=>{let v=null;
+        modal({title:`¿De quién son? · ${esc(file.name)}`,body:`<p class="mp"><b>${plural(nuevas.length,'venta nueva','ventas nuevas')}</b>${lat?` (${lat} late)`:''}${rep?`, ${rep} ya estaba${rep>1?'n':''}`:''}${R.bad?`, ${sp('warn',plural(R.bad,'fila')+' con errores')}`:''}</p>
+          <label class="fld"><span>Vendedor</span><select id="imW">${hasAg?'<option value="col">Según la columna de agente del archivo</option>':''}${sellerOpts(me)}</select></label>`,
+          actions:[{l:'Cancelar'},{l:'Agregar',cls:'pri',fn:api=>{v=api.q('#imW').value}}],onClose:()=>res(v)});
+      });
+      if(who==null)return;
+      for(const x of nuevas)x.uid=who==='col'?(agentUid(x.agent)||null):who;
+      return addForSellers(nuevas,`de ${file.name}`);
+    }
+    if(!await confirmar(`Importar ${esc(file.name)}`,`<b>${plural(nuevas.length,'venta nueva','ventas nuevas')}</b>${lat?` (${lat} late)`:''}${rep?` · ${rep} ya estaba${rep>1?'n':''}`:''}${R.bad?` · ${sp('warn',plural(R.bad,'fila')+' con errores')}`:''}`,'Agregar'))return;
     let n=nextN()-1;
-    const list=nuevas.sort(byDate).map(f=>({...f,n:++n}));
-    const T=toast('guardando…','ok',{sticky:1});
-    const ok=await B.addMany(list,(i,t)=>T.set(`guardando… ${i}/${t}`));
-    T.close();if(ok)toast(`✔ ${list.length===1?'Agregada 1 venta':'Agregadas '+list.length+' ventas'}.`);
+    const list=nuevas.sort(byDate).map(f=>{const o={...f,n:++n};delete o.agent;delete o.uid;return o});
+    const T=toast('Guardando…','ok',{sticky:1});
+    const ok=await B.addMany(list,(i,t)=>T.set(`Guardando… ${i}/${t}`));
+    T.close();if(ok)toast(`${list.length===1?'Agregada 1 venta':'Agregadas '+list.length+' ventas'}.`);
   };
   fi.click();
 }
@@ -413,10 +475,11 @@ function syncExt(){
   const known={ids:team.map(f=>norm(f.brand||'')+'|'+norm(f.id)),txs:team.filter(f=>f.tx).map(f=>norm(f.brand||'')+'|'+f.tx)};
   const snips=activeSnips().map(s=>({s:s.shortcut,t:s.title||'',b:s.body}));
   const leadIds=leads.map(l=>norm(l.id)); // clientes new que ya están en la mesa
-  const sig=JSON.stringify(items)+'#'+known.ids.length+'#'+known.ids.join(',').length+'#'+known.txs.length+'#'+JSON.stringify(snips)+'#'+leadIds.length,beat=extOk&&Date.now()-extBeat>6e4;
+  const sig=JSON.stringify(items)+'#'+known.ids.length+'#'+known.ids.join(',').length+'#'+known.txs.length+'#'+JSON.stringify(snips)+'#'+leadIds.length+'#'+profile.role+'#'+members.map(m=>m.id+(m.crm_name||'')+m.active).join(),beat=extOk&&Date.now()-extBeat>6e4;
   if(sig===extSig&&!beat)return;
   extSig=sig;extBeat=Date.now();
-  postTop({type:'ftd-agenda',v:1,items,known,snips,leadIds,user:profile&&profile.name,sent:Date.now()});
+  const desk={role:profile.role,me,members:members.filter(m=>m.active).map(m=>({id:m.id,name:m.name,crm:m.crm_name||''}))}; // para el botón del CRM del team leader
+  postTop({type:'ftd-agenda',v:1,items,known,snips,leadIds,desk,user:profile&&profile.name,sent:Date.now()});
 }
 window.addEventListener('message',e=>{
   const d=e.data;
@@ -436,6 +499,7 @@ window.addEventListener('message',e=>{
     addLeadsFromExt(d.rows).then(res=>{try{src.postMessage({type:'ftd-agenda-leads-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
     return;
   }
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='reply'||d.cmd==='quiet')){socialCmd(d);return} // desde la tarjeta social de la extensión
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -523,8 +587,8 @@ function ayuda(){
   const fon=nf((FONASA_TASA[cfg.fonasa]||.045)*100,1).replace(',0','');
   modal({title:'Cómo funciona Vitalis',wide:1,actions:[{l:'Listo',cls:'pri'}],body:`<div class="help">
   <h4>Entrar</h4><dl>
-    <dt>Código de la mesa</dt><dd>Se pide una vez por computadora (o abrís el link que pasa el administrador).</dd>
-    <dt>PIN</dt><dd>La primera vez es 0000 y creás el tuyo. Si te lo olvidás, el administrador lo vuelve a 0000. Con 5 errores seguidos queda bloqueado 15 minutos.</dd></dl>
+    <dt>Nombre y PIN</dt><dd>Elegís tu nombre. La primera vez el PIN es 0000 y creás el tuyo. Si te lo olvidás, el administrador lo vuelve a 0000.</dd>
+    <dt>Bloqueo</dt><dd>5 errores seguidos bloquean 15 minutos; si se repite, cada bloqueo dura el doble.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
@@ -536,6 +600,11 @@ function ayuda(){
     <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
     <dt>Variables</dt><dd>{fecha}, {hora}, {yo} (tu nombre) y {cursor} (dónde queda el cursor).</dd>
     <dt>Compartidos</dt><dd>Los ve toda la mesa. Si tenés uno tuyo con el mismo atajo, se usa el tuyo.</dd></dl>
+  <h4>Social</h4><dl>
+    <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min), salir a los 10 o a la media, o un mensaje corto. A toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
+    <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
+  <h4>Team leader</h4><dl>
+    <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, el botón pasa las ventas de todos: usa la columna de agente o el vendedor que elijas. En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
     <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
@@ -550,7 +619,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>${isLeader()?9:8}</kbd></dt><dd>Secciones</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>${isLeader()?0:9}</kbd></dt><dd>Secciones</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -587,7 +656,7 @@ document.addEventListener('keydown',e=>{
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
-  if(/^[1-9]$/.test(e.key)){e.preventDefault();go(VIEWS[+e.key-1]);return}
+  if(/^[0-9]$/.test(e.key)){e.preventDefault();go(VIEWS[e.key==='0'?9:+e.key-1]);return}
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}

@@ -27,6 +27,13 @@ CRM = '''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body
 <tr><td>555002</td><td>Jorge Díaz</td><td>Chile</td><td>New</td><td>17/11/2026 10:40</td></tr>
 <tr><td>555003</td><td>Ana Gómez</td><td>Mexico</td><td>No answer</td><td>16/11/2026 18:00</td></tr>
 </tbody></table></body>'''
+T24 = '''<!doctype html><meta charset="utf-8"><title>CRM · Bank transactions</title><body style="font:14px system-ui;padding:20px"><h3>Bank transactions</h3>
+<table border="1" cellpadding="6"><thead><tr><th>Status</th><th>Time of FTD</th><th>User ID</th><th>Full Name</th><th>Country</th><th>Amount</th><th>Transaction ID</th><th>Agent</th></tr></thead><tbody>
+<tr><td>Approved</td><td>17/11/2026 10:15</td><td>777001</td><td>Carla Núñez</td><td>Peru</td><td>250</td><td>TX777001</td><td>Sofia Arias</td></tr>
+<tr><td>Approved</td><td>17/11/2026 11:20</td><td>777002</td><td>Diego Soto</td><td>Chile</td><td>300</td><td>TX777002</td><td>Mateo Herrera</td></tr>
+<tr><td>Approved</td><td>17/11/2026 12:05</td><td>777003</td><td>Rosa Paz</td><td>Mexico</td><td>200</td><td>TX777003</td><td>Fulano Externo</td></tr>
+<tr><td>Declined</td><td>17/11/2026 12:30</td><td>777004</td><td>Luis Mora</td><td>Peru</td><td>100</td><td>TX777004</td><td>Sofia Arias</td></tr>
+</tbody></table></body>'''
 
 async def main():
     srv = subprocess.Popen(['node', 'server.mjs', str(PORT)], cwd=pathlib.Path(__file__).parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT); time.sleep(5)
@@ -49,12 +56,13 @@ async def main():
             await ctx.route(API + '/**', lambda route: to_local(route, route.request.url[len(API):]))
             await ctx.route('https://example.test/**', lambda r: r.fulfill(status=200, content_type='text/html', body=FORM))
             await ctx.route('https://crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=CRM))
+            await ctx.route('https://crmtrade24seven.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=T24))
             sw = ctx.service_workers[0] if ctx.service_workers else await ctx.wait_for_event('serviceworker')
             ok('chrome-extension://' in sw.url, 'la extensión cargó')
 
             A = await ctx.new_page()
             A.on('pageerror', lambda e: errs.append('A ' + str(e)))
-            await A.goto(APP + '#mesa=MATIAS-TEST'); await A.wait_for_timeout(1500)
+            await A.goto(APP); await A.wait_for_timeout(1500)
             await A.click('.person:has-text("Sofía Ar")'); await A.keyboard.type('0000'); await A.wait_for_timeout(1500)
             await A.keyboard.type('1357'); await A.wait_for_timeout(300); await A.keyboard.type('1357'); await A.wait_for_timeout(2500)
             ok(await A.evaluate('ready'), 'Sofía entra a Vitalis')
@@ -114,10 +122,50 @@ async def main():
             await A2.keyboard.press('3'); await A2.wait_for_timeout(600)
             await A2.screenshot(path=OUT / 'x3_clientes_desde_crm.png')
             # aviso de prueba (tarjeta en la pestaña)
-            await A2.keyboard.press('8'); await A2.wait_for_timeout(400)
+            await A2.keyboard.press('9'); await A2.wait_for_timeout(400)
             await A2.click('[data-act=probarAviso]'); await A2.wait_for_timeout(2500)
             await A2.screenshot(path=OUT / 'x4_aviso.png')
             ok(await A2.evaluate("!!document.getElementById('ftd-agenda-overlay')"), 'el aviso de prueba muestra la tarjeta')
+            await A2.evaluate("(()=>{const h=document.getElementById('ftd-agenda-overlay');if(h)h.remove()})()")
+
+            # el team leader pasa las ventas de toda la mesa desde el CRM de Trade24Seven
+            await A2.evaluate('sb.auth.signOut()'); await A2.wait_for_timeout(500)
+            await A2.reload(); await A2.wait_for_timeout(1800)
+            await A2.click('.person:has-text("Matias Me")'); await A2.keyboard.type('0000'); await A2.wait_for_timeout(1500)
+            await A2.keyboard.type('2468'); await A2.wait_for_timeout(300); await A2.keyboard.type('2468'); await A2.wait_for_timeout(3000)
+            ok(await A2.evaluate("ready&&profile.role==='leader'"), 'entra el team leader')
+            st = await sw.evaluate("chrome.storage.local.get('desk')")
+            ok(st.get('desk', {}).get('role') == 'leader' and len(st['desk'].get('members', [])) == 13, 'la extensión sabe que es team leader y conoce la mesa')
+            G = await ctx.new_page()
+            await G.goto('https://crmtrade24seven.com/#/bank-transactions'); await G.wait_for_timeout(3000)
+            panel = G.locator('#ftd-crm-button')
+            ok(await panel.locator('#whoRow').is_visible(), 'el panel del CRM muestra "De" para el team leader')
+            ok(await panel.locator('#who').input_value() == 'col', 'por defecto: cada venta según la columna de agente')
+            await G.screenshot(path=OUT / 'x5_crm_leader.png')
+            await panel.locator('#go').click(); await G.wait_for_timeout(3500)
+            r = sql("select client_id, brand, (select name from public.profiles where id=user_id) who from public.sales where client_id like '7770%' order by client_id")
+            ok([(x['client_id'], x['who'], x['brand']) for x in r] == [('777001', 'Sofía Ar', 'Trade24Seven'), ('777002', 'Mateo He', 'Trade24Seven')], f'cada venta a su vendedor, marca Trade24Seven ({r})')
+            m = await panel.locator('#msg').inner_text()
+            ok('sin vendedor' in m, f'avisa la que quedó sin vendedor ({m!r})')
+            await G.screenshot(path=OUT / 'x6_crm_leader_pasadas.png')
+            matias = sql("select id from public.profiles where name='Matias Me'")[0]['id']
+            await panel.locator('#who').select_option(matias); await G.wait_for_timeout(300)
+            await panel.locator('#go').click(); await G.wait_for_timeout(3000)
+            r = sql("select (select name from public.profiles where id=user_id) who from public.sales where client_id='777003'")
+            ok(len(r) == 1 and r[0]['who'] == 'Matias Me', f'eligiendo a alguien en "De" van a esa persona ({r})')
+            ok(sql("select count(*)::int c from public.sales where client_id='777004'")[0]['c'] == 0, 'las rechazadas no pasan')
+
+            # social: aviso en la pestaña activa y la respuesta vuelve a Vitalis
+            sql("insert into public.pings (team_id,from_id,to_id,kind) select p.team_id, p.id, (select id from public.profiles where name='Matias Me'), 'd10' from public.profiles p where p.name='Joaquín Or'")
+            await F.bring_to_front(); await F.wait_for_timeout(500)
+            await A2.evaluate('document.hasFocus=()=>false') # en headless todas las pestañas tienen foco: simulo que Vitalis quedó atrás
+            await A2.evaluate('socialPoll()'); await F.wait_for_timeout(2500)
+            card = F.locator('#ftd-agenda-overlay .card.social')
+            ok(await card.count() == 1, 'el pedido social aparece como tarjeta en la pestaña donde estás')
+            await F.screenshot(path=OUT / 'x7_social_tarjeta.png')
+            await card.locator('[data-a="r:si"]').click(); await F.wait_for_timeout(3000)
+            r = sql("select reply, (select name from public.profiles where id=reply_by) who from public.pings where kind='d10'")
+            ok(r and r[0]['reply'] == 'si' and r[0]['who'] == 'Matias Me', f'contestar desde la tarjeta responde en Vitalis ({r})')
             await ctx.close()
     finally:
         srv.terminate()

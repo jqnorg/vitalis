@@ -14,7 +14,7 @@ const db = new PGlite({ extensions: { pgcrypto } });
 await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
 await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
-const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'] };
+const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'] };
 const TABLES = new Set(Object.keys(PK));
 
 // ---------- auth ----------
@@ -42,7 +42,7 @@ function filters(u, params) {
     if (!m) continue;
     const op = { eq: '=', neq: '<>', gt: '>', gte: '>=', lt: '<', lte: '<=' }[m[1]];
     params.push(decodeURIComponent(m[2]));
-    w.push(`${ident(k)}::text ${op} $${params.length}`);
+    w.push(m[1] === 'eq' || m[1] === 'neq' ? `${ident(k)}::text ${op} $${params.length}` : `${ident(k)} ${op} $${params.length}`); // rangos con el tipo real (fechas)
   }
   return w.length ? ' where ' + w.join(' and ') : '';
 }

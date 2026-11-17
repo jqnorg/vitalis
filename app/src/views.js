@@ -527,16 +527,17 @@ V.equipo={
 
 /* ---------- mi cuenta y la mesa (en ajustes) ---------- */
 async function reloadMembers(){try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'));refresh()}catch(e){}}
-const inviteLink=()=>`${location.origin}${location.pathname}#mesa=${encodeURIComponent(teamInfo.invite_code)}`;
 V.cuenta={
   build(){
     $('#cfNameSave').onclick=async()=>{const v=$('#cfName').value.trim();if(!v)return toast('Escribí tu nombre.','err');if(v===profile.name)return;if(await B.saveName(v))toast('Nombre guardado.')};
     $('#cfName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#cfNameSave').click()}});
     $('#cfPin').onclick=()=>pinModal();
-    $('#cfLinkCopy').onclick=()=>navigator.clipboard.writeText(inviteLink()).then(()=>toast('Link copiado. Quien lo abra solo elige su nombre y pone su PIN.'),()=>toast('No pude copiar.','err'));
-    $('#cfCodeNew').onclick=async()=>{if(await confirmar('Cambiar el código','El código actual deja de servir en las computadoras que todavía no entraron. Los que ya tienen la sesión abierta siguen normal.','Cambiar'))if(await B.newCode())toast('Nuevo código: <b>'+esc(teamInfo.invite_code)+'</b>')};
     $('#cfAddM').onclick=()=>addMemberModal();
-    $('#cfMembers').addEventListener('change',async e=>{const s=e.target.closest('[data-role]');if(!s)return;const m=members.find(x=>x.id===s.dataset.role);
+    $('#cfMembers').addEventListener('change',async e=>{
+      const c=e.target.closest('[data-crm]');
+      if(c){const m=members.find(x=>x.id===c.dataset.crm);if(!m)return;const v=c.value.trim();if(v===(m.crm_name||''))return;
+        if(await B.rpc('set_crm_name',{uid:m.id,nm:v})){m.crm_name=v||null;toast(v?`${esc(m.name)} en el CRM: <b>${esc(v)}</b>`:`${esc(m.name)}: sin nombre en el CRM`)}return}
+      const s=e.target.closest('[data-role]');if(!s)return;const m=members.find(x=>x.id===s.dataset.role);
       if(m&&await B.setMember(m.id,{role:s.value}))toast(`${esc(m.name)}: ${roleTxt(s.value).toLowerCase()}`);else this.render()});
     $('#cfMembers').addEventListener('click',async e=>{const b=e.target.closest('[data-mact]');if(!b)return;const m=members.find(x=>x.id===b.dataset.id);if(!m)return;
       if(b.dataset.mact==='pin'){
@@ -553,16 +554,19 @@ V.cuenta={
     $('#cfEmail').textContent=profile.login?`Entrás eligiendo tu nombre y tu PIN${teamInfo?' en '+teamInfo.name:''}.`:(profile.email||'')+(teamInfo?' · '+teamInfo.name:'');
     $('#cfPin').hidden=!profile.login;
     $('#cfRole').textContent=roleTxt(profile.role);
-    $('#cfTeamCard').hidden=!isAdmin();
-    if(!isAdmin())return;
-    $('#cfTeamName').textContent=teamInfo.name;$('#cfCode').textContent=teamInfo.invite_code;
+    $('#cfTeamCard').hidden=!isLeader();
+    if(!isLeader())return;
+    const adm=isAdmin();$('#cfAddM').hidden=!adm;
+    $('#cfTeamName').textContent=teamInfo.name;
     const list=[...members].sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name));
-    $('#cfMembers').innerHTML=`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Nombre</th><th>Rol</th><th>PIN</th><th class="r">FTDs</th><th class="act"></th></tr></thead><tbody>`+
+    const crmIn=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.crm;if(crmIn)return; // no pisar lo que estás escribiendo
+    $('#cfMembers').innerHTML=`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Nombre</th><th>Nombre en el CRM</th><th>Rol</th><th>PIN</th><th class="r">FTDs</th>${adm?'<th class="act"></th>':''}</tr></thead><tbody>`+
       list.map(m=>`<tr${m.active?'':' class="warn"'}><td><span class="who-cell">${avatar(m.name)}${esc(m.name)}${m.id===me?' <span class="dim">(vos)</span>':''}</span></td>
-        <td>${m.id===me||!m.active?`<span class="d">${roleTxt(m.role)}</span>`:`<select data-role="${esc(m.id)}" aria-label="Rol de ${esc(m.name)}"><option value="agent"${m.role==='agent'?' selected':''}>Agente</option><option value="leader"${m.role==='leader'?' selected':''}>Team leader</option><option value="admin"${m.role==='admin'?' selected':''}>Administrador</option></select>`}</td>
+        <td><input data-crm="${esc(m.id)}" value="${esc(m.crm_name||'')}" placeholder="Se busca por «${esc(m.name)}»" aria-label="Nombre de ${esc(m.name)} en el CRM" style="width:190px;padding:4px 8px;font-size:13px"></td>
+        <td>${!adm||m.id===me||!m.active?`<span class="d">${roleTxt(m.role)}</span>`:`<select data-role="${esc(m.id)}" aria-label="Rol de ${esc(m.name)}"><option value="agent"${m.role==='agent'?' selected':''}>Agente</option><option value="leader"${m.role==='leader'?' selected':''}>Team leader</option><option value="admin"${m.role==='admin'?' selected':''}>Administrador</option></select>`}</td>
         <td>${!m.login?'<span class="d">Cuenta vieja (email)</span>':m.pin_set?'<span class="badge paid">Creado</span>':'<span class="badge">0000, sin entrar</span>'}</td>
         <td class="r">${team.filter(f=>f.uid===m.id).length}</td>
-        <td class="act">${m.login&&m.active&&m.id!==me&&m.pin_set?`<button type="button" class="ib" data-mact="pin" data-id="${esc(m.id)}">Resetear PIN</button>`:''}${m.id===me?'':`<button type="button" class="ib${m.active?' del':''}" data-mact="baja" data-id="${esc(m.id)}">${m.active?'Dar de baja':'Reactivar'}</button>`}</td></tr>`).join('')+'</tbody></table></div>';
+        ${adm?`<td class="act">${m.login&&m.active&&m.id!==me&&m.pin_set?`<button type="button" class="ib" data-mact="pin" data-id="${esc(m.id)}">Resetear PIN</button>`:''}${m.id===me?'':`<button type="button" class="ib${m.active?' del':''}" data-mact="baja" data-id="${esc(m.id)}">${m.active?'Dar de baja':'Reactivar'}</button>`}</td>`:''}</tr>`).join('')+'</tbody></table></div>';
   },
 };
 function pinModal(){

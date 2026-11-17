@@ -6,9 +6,19 @@
   if (window.__ftdCrm) return;
   window.__ftdCrm = true;
 
-  const BRANDS = { 'crmnovaramarkets.com': 'Novara Markets' };
+  const BRANDS = { 'crmnovaramarkets.com': 'Novara Markets', 'crmtrade24seven.com': 'Trade24Seven' };
   const host = location.hostname;
-  const brand = (Object.entries(BRANDS).find(([h]) => host === h || host.endsWith('.' + h)) || [, host])[1];
+  let brand = (Object.entries(BRANDS).find(([h]) => host === h || host.endsWith('.' + h)) || [, host])[1];
+  // CRMs agregados desde el ícono de la extensión ("Usar en este CRM") y datos de la mesa para el team leader
+  let desk = null;
+  const loadCfg = () => chrome.storage.local.get(['crmSites', 'desk']).then((st) => {
+    if (st.crmSites && st.crmSites[host]) brand = st.crmSites[host];
+    desk = st.desk || null;
+    if (typeof render === 'function') try { render(); } catch (e) {}
+  }).catch(() => {});
+  loadCfg();
+  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && (ch.desk || ch.crmSites)) loadCfg(); }); } catch (e) {}
+  const brandOf = (v) => (/novara/i.test(v) ? 'Novara Markets' : /trade\s*24|t24/i.test(v) ? 'Trade24Seven' : v);
   const z = (n) => String(n).padStart(2, '0');
   const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); // igual que en el panel
   const lab = (s) => norm(s).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -77,6 +87,8 @@
     amount: ['amount', 'monto'],
     tx: ['transaction id', 'transaction', 'tx id'],
     reg: ['registration time', 'registration date', 'registration', 'registered'],
+    agent: ['agent', 'agent name', 'sales agent', 'retention agent', 'conversion agent', 'assigned agent', 'assigned to', 'owner', 'account manager', 'employee', 'sales rep', 'rep', 'agente', 'asignado', 'vendedor', 'responsable'],
+    brand: ['brand', 'marca', 'platform', 'plataforma'],
   };
   function mapFtd(labels) { const m = {}; for (const k in COLS) m[k] = idxOf(labels, COLS[k]); return m; }
   const isFtdTable = (m) => m.date >= 0 && m.id >= 0 && m.amount >= 0;
@@ -112,7 +124,8 @@
     const r = m.reg >= 0 ? parseDT(g('reg')) : null;
     let reg = r ? r.date + (r.time ? ' ' + r.time : '') : dt.date;
     if (reg.slice(0, 10) > dt.date) reg = dt.date;
-    return { date: dt.date, time: dt.time, id, name: g('name'), country: g('country'), aff: g('aff'), camp: g('camp'), amount, tx: g('tx'), reg, brand };
+    const b = g('brand');
+    return { date: dt.date, time: dt.time, id, name: g('name'), country: g('country'), aff: g('aff'), camp: g('camp'), amount, tx: g('tx'), reg, brand: b ? brandOf(b) : brand, agent: g('agent') };
   }
   function scanSales(T) {
     const t = T.find((x) => isFtdTable(mapFtd(x.labels)));
@@ -212,7 +225,8 @@
   }
 
   /* ================= botón ================= */
-  let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null;
+  let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, whoSel = '';
+  const isLeader = () => !!(desk && (desk.role === 'leader' || desk.role === 'admin'));
   function build() {
     const h = document.createElement('div');
     h.id = 'ftd-crm-button';
@@ -244,9 +258,10 @@
       .lnk{all:unset;cursor:pointer;color:#2f7fd0;text-decoration:underline;margin-left:6px}
       .min .sec{display:none}
     </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
-      <div class="sec" id="sSales"><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
+      <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
       <div class="sec" id="sWatch"><div class="st" id="wst"></div><div class="row"><button class="go alt" id="wgo"></button><select id="wint" title="Cada cuánto se actualiza la lista"><option value="10">10 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option></select></div><div class="ids" id="wids"></div></div></div>`;
     root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales()));
+    root.getElementById('who').addEventListener('change', (e) => { whoSel = e.target.value; render(); });
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
     root.getElementById('msg').addEventListener('click', (e) => { if (e.target.closest('[data-open]')) send({ type: 'open-panel' }); });
     root.getElementById('wgo').addEventListener('click', toggleWatch);
@@ -270,7 +285,18 @@
       if (busy) { go.disabled = true; go.textContent = 'Enviando…'; }
       else if (!nuevas.length) { go.disabled = true; go.textContent = espera.length ? `${espera.length} esperando que abras Vitalis` : sales.length ? 'Ya están todas en Vitalis' : 'Sin ventas aprobadas'; }
       else { go.disabled = false; go.textContent = `Pasar ${plural(nuevas.length, 'venta nueva', 'ventas nuevas')} a Vitalis`; }
-      $('ids').innerHTML = nuevas.length ? 'Nuevas: ' + nuevas.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>`).join(', ') + (nuevas.length > 12 ? '…' : '') : '';
+      $('ids').innerHTML = nuevas.length ? 'Nuevas: ' + nuevas.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>${s.agent && whoSel === 'col' ? ' ' + escH(s.agent.split(/\s+/)[0]) : ''}`).join(', ') + (nuevas.length > 12 ? '…' : '') : '';
+      // team leader: de quién son (según la columna de agente del CRM, o alguien en particular)
+      const lead = isLeader();
+      $('whoRow').hidden = !lead;
+      if (lead) {
+        const hasCol = sales.some((s) => s.agent);
+        const opts = [...(hasCol ? [['col', 'Cada una según la columna de agente']] : []), [desk.me, 'Yo'], ...desk.members.filter((m) => m.id !== desk.me).map((m) => [m.id, m.name])];
+        if (!opts.some((o) => o[0] === whoSel)) whoSel = opts[0][0];
+        const sel = $('who'), sig = opts.map((o) => o[0]).join();
+        if (sel.dataset.sig !== sig) { sel.innerHTML = opts.map(([v, l]) => `<option value="${escH(v)}">${escH(l)}</option>`).join(''); sel.dataset.sig = sig; }
+        sel.value = whoSel;
+      }
     }
     $('msg').className = 'msg ' + (msg ? msg.cls : '');
     $('msg').innerHTML = msg ? msg.html : (sales && !known ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
@@ -305,15 +331,18 @@
     if (!res) return setMsg('La extensión no respondió. Recargá la página.', 'err');
     if (res.err) return setMsg(escH(res.err), 'err');
     if (res.queued) return setMsg(`${plural(res.queued, 'venta')} en espera: se cargan cuando abras Vitalis.<button class="lnk" data-open>Abrir Vitalis</button>`, 'warn');
-    const mes = res.mes ? ` Este mes: ${res.mes.n} FTDs, ${res.mes.usd} USD.` : '';
-    if (res.added) setMsg(`${res.added === 1 ? 'Pasé 1 venta' : 'Pasé ' + res.added + ' ventas'} a Vitalis.${mes}`, 'ok', 12000);
-    else setMsg(`No había nada nuevo.${mes}`, 'ok', 8000);
+    const mes = res.mes && !isLeader() ? ` Este mes: ${res.mes.n} FTDs, ${res.mes.usd} USD.` : '';
+    const sin = res.unmatched ? ` ${plural(res.unmatched, 'quedó sin vendedor', 'quedaron sin vendedor')}: asignalas en Vitalis.` : '';
+    if (res.added) setMsg(`${res.added === 1 ? 'Pasé 1 venta' : 'Pasé ' + res.added + ' ventas'} a Vitalis.${mes}${sin}`, sin ? 'warn' : 'ok', 12000);
+    else setMsg(sin ? sin.trim() : `No había nada nuevo.${mes}`, sin ? 'warn' : 'ok', 8000);
   }
   async function sendSales() {
     if (busy) return;
     const nuevas = (scanSales(tables()) || []).filter((s) => !isKnown(s) && !isQueued(s));
     if (!nuevas.length) return refresh();
     busy = true; msg = null; render();
+    if (isLeader() && whoSel && whoSel !== 'col') for (const s of nuevas) s.uid = whoSel; // todas a la persona elegida
+    if (!isLeader()) for (const s of nuevas) delete s.agent;
     const r = await send({ type: 'crm-import', rows: nuevas });
     result(r || { err: 'La extensión se actualizó: recargá la página.' });
   }

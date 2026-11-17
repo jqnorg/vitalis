@@ -58,5 +58,17 @@ async function renderWatch() {
   b.onclick = () => chrome.runtime.sendMessage({ type: 'crm-watch-stop' }, () => renderWatch());
   el.append(t, b);
 }
+async function renderCrm() { // en un sitio https que no es Vitalis: ofrecer usarlo como CRM
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab || !/^https:\/\//.test(tab.url || '') || /vitaliscrm\.netlify\.app/.test(tab.url)) return;
+  const host = new URL(tab.url).hostname, { crmSites = {} } = await chrome.storage.local.get('crmSites');
+  const known = /crmnovaramarkets\.com$|crmtrade24seven\.com$/.test(host) || crmSites[host];
+  const box = document.getElementById('crmBox'); box.hidden = false;
+  if (known) { box.querySelector('summary').textContent = `CRM de ${crmSites[host] || (/novara/.test(host) ? 'Novara Markets' : 'Trade24Seven')}: el botón de Vitalis está activo acá.`; box.querySelector('summary').style.cursor = 'default'; box.querySelector('details').onclick = (e) => e.preventDefault(); return; }
+  document.getElementById('crmAdd').onclick = () => chrome.runtime.sendMessage({ type: 'crm-site-add', tabId: tab.id, brand: document.getElementById('crmBrand').value }, (r) => {
+    document.getElementById('crmRes').textContent = r && r.ok ? 'Listo: el botón de Vitalis aparece en esta página.' : 'No se pudo: ' + ((r && r.err) || 'error');
+  });
+}
 render();
 renderWatch();
+renderCrm();

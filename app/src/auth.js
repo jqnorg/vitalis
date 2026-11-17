@@ -1,5 +1,5 @@
 /* ============================================================
-   Entrada: código de la mesa (una vez por computadora) → tu nombre → tu PIN.
+   Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.
    La primera vez el PIN es 0000 y después creás el tuyo.
    ============================================================ */
 function supaConfig() {
@@ -8,20 +8,18 @@ function supaConfig() {
   const l = local.get('supabase', null);
   return l && l.url && l.key ? l : null;
 }
-const deskCode = () => (local.get('desk', null) || {}).code || '';
 
 async function start() {
   const c = supaConfig();
   if (!c) return authScreen('setup');
   if (!window.supabase || !window.supabase.createClient) return authScreen('error', 'No se pudo cargar la librería de la base de datos. Revisá tu conexión y recargá.');
   sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'vitalis-auth' } });
-  // link de entrada: https://…/#mesa=CODIGO
-  const m = (location.hash || '').match(/mesa=([A-Za-z0-9-]{3,40})/);
-  if (m) { local.set('desk', { code: m[1].toUpperCase() }); try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+  if (/mesa=/.test(location.hash || '')) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } // links viejos
+  local.set('desk', null);
   sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && ready) location.reload(); });
   let session = null;
   try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
-  if (!session) return authScreen(deskCode() ? 'who' : 'code');
+  if (!session) return authScreen('who');
   me = session.user.id;
   authScreen('loading');
   connect();
@@ -37,23 +35,18 @@ function authErr(e) {
 }
 
 let authPerson = null, roster = null;
-async function loadRoster(code) {
-  const { data, error } = await sb.rpc('team_roster', { code });
+async function loadRoster() {
+  const { data, error } = await sb.rpc('roster');
   if (error) throw error;
-  return data; // null = código equivocado
+  return data;
 }
 
 function authScreen(mode, msg) {
   document.body.classList.add('auth');
   let A = $('#auth');
   if (!A) { A = document.createElement('div'); A.id = 'auth'; document.body.appendChild(A); }
-  const team = (local.get('desk', null) || {}).team || (roster && roster.team) || '';
-  A.innerHTML = `<div class="aside"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
-      <div class="slogan">Siempre con el mate listo.<small>El asistente de ventas de ${team ? esc(team) : 'la mesa'}: tus ventas, tu sueldo, tu agenda y tus snippets en un solo lugar.</small></div>
-      <svg class="big-mate" aria-hidden="true"><use href="#mate"/></svg></div>
-    <div class="main"><div class="abox" id="abox"></div></div>`;
-  const box = A.querySelector('#abox');
-  (AUTH[mode] || AUTH.error)(box, msg);
+  A.innerHTML = `<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"></div></div>`;
+  (AUTH[mode] || AUTH.error)(A.querySelector('#abox'), msg);
 }
 
 const AUTH = {
@@ -74,42 +67,19 @@ const AUTH = {
     focusFirst(box);
   },
 
-  code(box, msg) {
-    box.innerHTML = `<h2>¿De qué mesa sos?</h2><p class="lead">Escribí el código de la mesa. Se pide una sola vez en esta computadora.</p>
-      <form novalidate><label class="fld"><span>Código de la mesa</span><input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="MATIAS-XXXXX" style="text-transform:uppercase" autofocus></label>
-      <div class="ebox" id="aErr">${esc(msg || '')}</div><button class="btn pri big" type="submit">Seguir</button></form>`;
-    const f = box.querySelector('form'), err = (t) => (box.querySelector('#aErr').textContent = t);
-    f.onsubmit = async (e) => {
-      e.preventDefault();
-      const code = f.code.value.trim().toUpperCase();
-      if (!code) return err('Escribí el código.');
-      const b = f.querySelector('button'); b.disabled = true;
-      try {
-        const r = await loadRoster(code);
-        if (!r) return err('Ese código no es de ninguna mesa. Pedíselo al administrador.');
-        roster = r; local.set('desk', { code, team: r.team }); authScreen('who');
-      } catch (x) { err(authErr(x)); } finally { b.disabled = false; }
-    };
-    focusFirst(box);
-  },
-
-  async who(box) {
-    box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Buscando a la mesa…</div>`;
-    try { roster = await loadRoster(deskCode()); }
+  async who(box, msg) {
+    box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div>`;
+    try { roster = await loadRoster(); }
     catch (x) { box.innerHTML = `<h2>No se pudo conectar</h2><p class="lead">${esc(authErr(x))}</p><button class="btn pri big" type="button" id="aRe">Reintentar</button>`; box.querySelector('#aRe').onclick = () => authScreen('who'); return; }
-    if (!roster) { local.set('desk', null); return authScreen('code', 'El código de la mesa cambió. Pedile el nuevo al administrador.'); }
-    local.set('desk', { code: deskCode(), team: roster.team });
     const lastU = local.get('lastUser', '');
-    const people = roster.people || [];
-    box.innerHTML = `<h2>¿Quién sos?</h2><p class="lead">${esc(roster.team)} · elegí tu nombre.</p>
+    const people = (roster && roster.people) || [];
+    box.innerHTML = `<h2>¿Quién sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
       <div class="people">${people.map((p) => `<button type="button" class="person${p.id === lastU ? ' last' : ''}" data-id="${esc(p.id)}">${avatar(p.name)}<span class="nm">${esc(p.name)}${p.role === 'leader' ? '<small>Team leader</small>' : p.role === 'admin' ? '<small>Administrador</small>' : p.id === lastU ? '<small>La última vez</small>' : ''}</span></button>`).join('')}</div>
-      ${people.length ? '' : '<p class="p-empty">Todavía no hay nadie en la mesa.</p>'}
-      <div class="alinks"><button type="button" class="alink" id="aOtra">Es otra mesa</button></div>`;
+      ${people.length ? '' : '<p class="p-empty">Todavía no hay nadie en la mesa.</p>'}`;
     box.querySelector('.people').addEventListener('click', (e) => {
       const b = e.target.closest('[data-id]'); if (!b) return;
       authPerson = people.find((p) => p.id === b.dataset.id); authScreen('pin');
     });
-    box.querySelector('#aOtra').onclick = () => { local.set('desk', null); authScreen('code'); };
     const lb = box.querySelector('.person.last') || box.querySelector('.person'); if (lb) lb.focus();
   },
 
@@ -123,11 +93,11 @@ const AUTH = {
         ui.busy(true);
         try {
           for (let i = 0; i < 2; i++) {
-            const { data, error } = await sb.rpc('pin_login', { code: deskCode(), uid: p.id, pin });
+            const { data, error } = await sb.rpc('pin_login', { uid: p.id, pin });
             if (error) throw error;
             if (!data || !data.ok) {
               if (data && data.error === 'locked') return ui.fail(`Demasiados intentos. Probá de nuevo en ${plural(data.minutes, 'minuto')}.`, true);
-              if (data && data.error === 'nouser') { local.set('desk', null); return authScreen('code', 'Ya no estás en la lista de la mesa. Hablá con el administrador.'); }
+              if (data && data.error === 'nouser') return authScreen('who', 'Ese nombre ya no está en la lista. Hablá con el administrador.');
               return ui.fail(data && data.left <= 2 ? `PIN incorrecto. ${data.left === 1 ? 'Te queda 1 intento.' : `Te quedan ${data.left} intentos.`}` : 'PIN incorrecto.');
             }
             const r = await sb.auth.signInWithPassword({ email: data.email, password: data.password });

@@ -119,7 +119,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','config','equipo'];
+const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','social','config','equipo'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 function go(v,opts){
@@ -151,6 +151,7 @@ function status(){
   $('#sPend').innerHTML=`Agenda <b>${hoy}</b>`+(venc?` <span class="hot b">${plural(venc,'vencido')}</span>`:'');
   $('#nbAg').textContent=venc||'';
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
+  $('#nbSo').textContent=pendingForMe()||'';
   $('#sDb').hidden=navigator.onLine;
   $('#sMe').innerHTML=profile?`${avatar(profile.name)}<span style="min-width:0"><span class="nm">${esc(profile.name)}</span><span class="rl">${esc(roleTxt(profile.role))}</span></span>`:'';
   turnoBar();

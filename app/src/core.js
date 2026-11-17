@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.1.0';
+const VERSION='1.2.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -98,18 +98,20 @@ function rel(d){
 
 /* ---------- base de datos (Supabase) ---------- */
 // Ventas: compartidas en la mesa (team). "ftds" = las mías (sueldo, inicio, turnos); "team" = todas.
-let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[];
+let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[],pings=[];
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
 const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
 const S2F=r=>({_id:r.id,uid:r.user_id,n:r.n,date:r.date,time:r.time||'',id:r.client_id,country:r.country||'',name:r.name||'',aff:r.aff||'',camp:r.camp??'',
   amount:+r.amount,tx:r.tx||undefined,reg:r.reg||r.date,brand:r.brand||''});
 const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),country:f.country||null,name:f.name||null,aff:f.aff||null,camp:f.camp??null,
-  amount:+f.amount,tx:f.tx||null,reg:f.reg||null,brand:f.brand||DEF_BRAND});
+  amount:+f.amount,tx:f.tx||null,reg:f.reg||null,brand:f.brand||DEF_BRAND,...(f.uid?{user_id:f.uid}:{})}); // el team leader carga a nombre de otro
 const A2P=r=>({_id:r.id,n:r.n,id:r.client_id,kw:r.kw||'',due:r.due,notified:!!r.notified,done:!!r.done,doneAt:r.done_at||null});
 const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified:!!p.notified,done:!!p.done,done_at:p.doneAt||null});
 const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
+const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
+const quiet=(m=profile)=>!!(m&&m.quiet_until&&new Date(m.quiet_until)>new Date()); // avisos sociales silenciados
 function mine(){ftds=team.filter(f=>f.uid===me)}
 function errMsg(e){
   const m=String(e&&(e.message||e.error_description||e.msg)||e||'');
@@ -202,6 +204,20 @@ const B={ // todas las escrituras pasan por acá
       for(const r of out){const l=L2C(r);leads=leads.filter(x=>x._id!==l._id);leads.push(l)}refresh();return out.length}
     catch(e){dbErr(e);return false}
   },
+  async ping(kind,to,body){ // social: pedir un mate, salir a los 10 / a la media, mensaje
+    try{const row=await Q(sb.from('pings').insert({kind,to_id:to||null,body:body||null}).select().single());const g=G2P(row);pings=pings.filter(x=>x._id!==g._id);pings.unshift(g);refresh();return g}
+    catch(e){toast(esc(errMsg(e)),String(e.message||'').startsWith('COOLDOWN')?'warn':'err');return null}
+  },
+  async replyPing(id,r){
+    try{const res=await Q(sb.rpc('reply_ping',{pid:id,r}));const p=pings.find(x=>x._id===id);
+      if(res&&res.ok){if(p){p.reply=r;p.by=me;p.rat=new Date().toISOString()}refresh();return true}
+      if(res&&res.taken){if(p){p.reply=res.reply;p.by=res.by}toast(`Ya contestó ${esc(memberName(res.by).split(/\s+/)[0])}.`,'warn');refresh()}return false}
+    catch(e){toast(esc(errMsg(e)),'err');return false}
+  },
+  async delPing(id){try{await Q(sb.from('pings').delete().eq('id',id));pings=pings.filter(x=>x._id!==id);refresh();return true}catch(e){dbErr(e);return false}},
+  async setQuiet(until){
+    try{const row=await Q(sb.from('profiles').update({quiet_until:until}).eq('id',me).select().single());profile=row;const i=members.findIndex(x=>x.id===me);if(i>=0)members[i]=row;refresh();return true}catch(e){dbErr(e);return false}
+  },
   async delLead(l){
     try{await Q(sb.from('leads').delete().eq('id',l._id));leads=leads.filter(x=>x._id!==l._id);refresh();return true}catch(e){dbErr(e);return false}
   },
@@ -214,17 +230,13 @@ const B={ // todas las escrituras pasan por acá
   async rpc(fn,args){ // funciones de la base (PIN, gente de la mesa)
     try{return await Q(sb.rpc(fn,args))}catch(e){toast(esc(errMsg(e)),'err');return null}
   },
-  async newCode(){
-    const code=(teamInfo.name.split(/\s+/).pop()||'TEAM').normalize('NFD').replace(/[^A-Za-z]/g,'').toUpperCase().slice(0,8)+'-'+Math.random().toString(36).slice(2,7).toUpperCase();
-    try{const row=await Q(sb.from('teams').update({invite_code:code}).eq('id',teamInfo.id).select().single());teamInfo=row;refresh();return true}catch(e){dbErr(e);return false}
-  },
 };
 async function loadAll(){
   const [prof]=await Q(sb.from('profiles').select('*').eq('id',me));
   if(!prof)throw new Error('NO_PROFILE');
   profile=prof;
   if(!prof.active)throw new Error('INACTIVE');
-  const [tm,mem,sales,ag,adj,sh,st,sn,ld]=await Promise.all([
+  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg]=await Promise.all([
     Q(sb.from('teams').select('*').eq('id',prof.team_id).single()),
     Q(sb.from('profiles').select('*').eq('team_id',prof.team_id).order('name')),
     fetchAll('sales','*','date'),
@@ -234,8 +246,9 @@ async function loadAll(){
     Q(sb.from('settings').select('*').eq('user_id',me)),
     Q(sb.from('snippets').select('*').order('shortcut')),
     fetchAll('leads','*','date'),
+    Q(sb.from('pings').select('*').gte('created_at',new Date(Date.now()-36e5*24).toISOString()).order('created_at',{ascending:false}).limit(300)),
   ]);
-  snippets=sn.map(N2S);leads=ld.map(L2C);
+  snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
   teamInfo=tm;members=mem;team=sales.map(S2F);mine();
   pend=ag.map(A2P);
   ajustes=Object.fromEntries(adj.map(r=>[r.ym,+r.n||0]));
@@ -271,6 +284,13 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       else if(p.new.user_id===me||(p.new.shared&&p.new.team_id===profile.team_id))up(snippets,N2S(p.new));
       else snippets=snippets.filter(x=>x._id!==p.new.id); // dejó de estar compartido
       refresh();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'pings'},p=>{
+      if(p.eventType==='DELETE'){const id=p.old&&p.old.id;pings=pings.filter(x=>x._id!==id);socialGone(id);refresh();return}
+      if(p.new.team_id!==profile.team_id)return;
+      const g=G2P(p.new),old=pings.find(x=>x._id===g._id),prev=old?{...old}:null;
+      if(old)Object.assign(old,g);else pings.unshift(g);
+      socialEvent(old||g,p.eventType,prev);refresh();
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{
       if(p.eventType==='DELETE')return;
@@ -364,6 +384,20 @@ const isLate=f=>!!(f.reg&&String(f.reg).slice(0,10)<f.date);
 const lateDays=f=>isLate(f)?Math.round((parseYMD(f.date)-parseYMD(String(f.reg).slice(0,10)))/864e5):0;
 const byDate=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.time||'')<(b.time||'')?-1:(a.time||'')>(b.time||'')?1:(a.n||0)-(b.n||0);
 const nextN=()=>ftds.reduce((a,f)=>Math.max(a,f.n||0),0)+1;
+const nextNFor=uid=>team.reduce((a,f)=>f.uid===uid?Math.max(a,f.n||0):a,0)+1; // numeración de cada vendedor
+const nn=s=>norm(s).replace(/[^a-z0-9]+/g,' ').trim();
+function agentUid(txt){ // nombre del agente en el CRM → persona de la mesa
+  const t=nn(txt);if(!t)return null;
+  const act=members.filter(m=>m.active);
+  let m=act.find(x=>x.crm_name&&nn(x.crm_name)===t)||act.find(x=>nn(x.name)===t);if(m)return m.id;
+  const one=l=>l.length===1?l[0].id:null;
+  // "Joaquín Or" en la lista y "Joaquin Ortega" en el CRM (o al revés)
+  let r=one(act.filter(x=>{const n=nn(x.name);return t.startsWith(n)||n.startsWith(t)}));if(r)return r;
+  // mismo nombre e inicial del apellido
+  const [f,l]=t.split(' ');
+  r=one(act.filter(x=>{const [a,b]=nn(x.name).split(' ');return a===f&&(!l||!b||b[0]===l[0])}));if(r)return r;
+  return one(act.filter(x=>nn(x.name).split(' ')[0]===f)); // solo el nombre, si no se repite
+}
 
 /* ---------- filtros y estadísticas ---------- */
 function applyF(list,f){
@@ -504,7 +538,8 @@ function csvToRows(rows){ // filas del CSV (export de la plataforma o de este pa
   const map={date:ix('date','fecha','time of ftd','ftd time','fecha ftd'),time:ix('time','hora'),id:ix('id','user id','userid'),
     country:ix('country','pais'),name:ix('full name','fullname','name','nombre','nombre completo'),aff:ix('affiliate','afiliado'),
     camp:ix('campaign','campana','user source','source'),amount:ix('amount','monto'),tx:ix('transaction id','transaction','tx','transaccion'),
-    reg:ix('registration','registration time','registro','fecha de registro'),brand:ix('brand','marca')};
+    reg:ix('registration','registration time','registro','fecha de registro'),brand:ix('brand','marca'),
+    agent:ix('agent','agente','sales agent','retention agent','conversion agent','owner','assigned to','assigned agent','asignado','vendedor','employee','rep','sales rep')};
   if(map.date<0||map.id<0||map.amount<0)return null;
   const g=(r,k)=>map[k]>=0?(r[map[k]]||'').trim():'';
   const ok=[];let bad=0;
@@ -517,7 +552,7 @@ function csvToRows(rows){ // filas del CSV (export de la plataforma o de este pa
     const camp=g(r,'camp'); // tal cual viene de la plataforma (incluido "null")
     let name=g(r,'name'),deleted=false;if(/^deleted_/i.test(name)){name=name.replace(/^deleted_/i,'');deleted=true}
     const row={date,time:map.time>=0?(parseTime(g(r,'time'))||''):(tp&&parseTime(tp))||'',id:g(r,'id'),country:g(r,'country'),name,
-      aff:g(r,'aff'),camp,amount:amt,tx:g(r,'tx'),reg,brand:g(r,'brand')};
+      aff:g(r,'aff'),camp,amount:amt,tx:g(r,'tx'),reg,brand:g(r,'brand'),agent:g(r,'agent')};
     if(deleted)row.deleted=true;
     ok.push(row);
   }

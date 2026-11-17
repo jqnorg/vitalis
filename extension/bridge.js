@@ -3,7 +3,7 @@
 (() => {
   const isVitalis = () => !!document.querySelector('meta[name="vitalis"]');
   const post = (msg) => { try { window.postMessage(msg, location.origin); return true; } catch (e) { return false; } };
-  const deliver = (cmds) => { for (const c of cmds || []) post({ type: 'ftd-agenda-cmd', v: 1, cmd: c.cmd, k: c.k }); };
+  const deliver = (cmds) => { for (const c of cmds || []) post({ type: 'ftd-agenda-cmd', v: 1, cmd: c.cmd, k: c.k, r: c.r }); };
   const waiting = {}; // pedidos de importación esperando respuesta de la página
   let alive = false;  // la página ya habló con la extensión
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
@@ -41,7 +41,7 @@
       return;
     }
     if (d.type === 'ftd-agenda-import-ack' && d.v === 1) {
-      const res = { added: d.added || 0, dup: d.dup || 0, bad: d.bad || 0, ids: d.ids || [], mes: d.mes || null, err: d.err || null };
+      const res = { added: d.added || 0, dup: d.dup || 0, bad: d.bad || 0, unmatched: d.unmatched || 0, ids: d.ids || [], mes: d.mes || null, err: d.err || null };
       if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }
       else if (String(d.reqId).startsWith('q')) { try { chrome.runtime.sendMessage({ type: 'import-done', res }); } catch (x) {} }
       return;
@@ -52,6 +52,14 @@
       else if (String(d.reqId).startsWith('Q')) { try { chrome.runtime.sendMessage({ type: 'leads-done', res }); } catch (x) {} }
       return;
     }
+    if (d.type === 'ftd-agenda-social' && d.v === 1 && d.card && typeof d.card.k === 'string') { // aviso social: tarjeta en la pestaña que estés
+      const c = d.card, t = (v, n) => String(v ?? '').slice(0, n);
+      const card = { k: t(c.k, 80), kind: 'social', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
+        btns: (Array.isArray(c.btns) ? c.btns : []).slice(0, 4).map((b) => [t(b[0], 20), t(b[1], 30), b[2] ? 1 : 0]) };
+      try { chrome.runtime.sendMessage({ type: 'social', card }); } catch (x) {}
+      return;
+    }
+    if (d.type === 'ftd-agenda-social-close' && d.v === 1) { try { chrome.runtime.sendMessage({ type: 'social-close', k: String(d.k || '').slice(0, 80) }); } catch (x) {} return; }
     if (d.type !== 'ftd-agenda' || d.v !== 1 || !Array.isArray(d.items)) return;
     const items = d.items
       .filter((x) => x && typeof x.k === 'string' && typeof x.due === 'number' && isFinite(x.due))
@@ -61,8 +69,10 @@
     const snips = Array.isArray(d.snips) ? d.snips.filter((x) => x && /^[a-z0-9_-]{1,30}$/.test(x.s) && typeof x.b === 'string').slice(0, 300)
       .map((x) => ({ s: x.s, t: String(x.t || '').slice(0, 60), b: x.b.slice(0, 20000) })) : null;
     const leadIds = Array.isArray(d.leadIds) ? d.leadIds.slice(0, 50000).map(String) : null;
+    const desk = d.desk && typeof d.desk === 'object' ? { role: String(d.desk.role || '').slice(0, 10), me: String(d.desk.me || '').slice(0, 40),
+      members: (Array.isArray(d.desk.members) ? d.desk.members : []).slice(0, 100).map((m) => ({ id: String(m.id || '').slice(0, 40), name: String(m.name || '').slice(0, 60), crm: String(m.crm || '').slice(0, 80) })) } : null;
     try {
-      chrome.runtime.sendMessage({ type: 'sync', items, known, snips, leadIds, url: location.origin + location.pathname, user: String(d.user || '').slice(0, 60) }, (res) => {
+      chrome.runtime.sendMessage({ type: 'sync', items, known, snips, leadIds, desk, url: location.origin + location.pathname, user: String(d.user || '').slice(0, 60) }, (res) => {
         if (chrome.runtime.lastError) return;
         alive = true;
         post({ type: 'ftd-agenda-ack', v: 1, scheduled: (res && res.scheduled) || 0 });

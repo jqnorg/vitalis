@@ -12,10 +12,8 @@ await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8
 const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8');
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
-const code = (await db.query('select invite_code from public.teams')).rows[0].invite_code;
-console.log('código:', code);
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 8, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 9, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -28,10 +26,8 @@ const rpc = async (uid, q, params) => { const r = await as(uid, q, params); retu
 
 // ---------- la lista de la mesa ----------
 ok((await db.query('select count(*)::int c from public.profiles')).rows[0].c === 13, 'la mesa arranca con 13 personas (aunque se corra dos veces)');
-let R = await rpc(null, 'select public.team_roster($1) j', ['NOPE']);
-ok(R === null, 'con un código equivocado no se ve la lista');
-R = await rpc(null, 'select public.team_roster($1) j', [' ' + code.toLowerCase() + ' ']);
-ok(R && R.team === 'Team Matías' && R.people.length === 13, 'con el código se ve la lista de nombres');
+let R = await rpc(null, 'select public.roster() j');
+ok(R && R.team === 'Team Matías' && R.people.length === 13, 'se ve la lista de nombres sin código (una sola mesa)');
 const P = Object.fromEntries(R.people.map((p) => [p.name, p]));
 ok(P['Matias Me'].role === 'leader' && P['Joaquín Or'].role === 'agent' && !R.people.some((p) => p.role === 'admin'), 'Matias es team leader; todavía no hay admin');
 ok(R.people.every((p) => !p.pin_set), 'nadie creó su PIN todavía');
@@ -44,21 +40,26 @@ let r = await as(null, 'select * from public.pins');
 ok(!!r.error || r.rows.length === 0, 'anon no puede leer los PIN');
 r = await as(null, "select public._new_seat((select id from public.teams), 'Intruso', 'admin')");
 ok(!!r.error, 'anon no puede crear cuentas');
-let e2 = null; try { await db.query("insert into auth.users (email, raw_user_meta_data, raw_app_meta_data) values ('z@x.com', $1, '{\"provider\":\"email\"}')", [JSON.stringify({ invite: code, vitalis_seat: true })]); } catch (e) { e2 = e.message; }
-ok(e2 && e2.includes('SIGNUP_DISABLED'), 'registrarse con email está cerrado (aunque se mande el código)');
+let e2 = null; try { await db.query("insert into auth.users (email, raw_user_meta_data, raw_app_meta_data) values ('z@x.com', $1, '{\"provider\":\"email\"}')", [JSON.stringify({ vitalis_seat: true })]); } catch (e) { e2 = e.message; }
+ok(e2 && e2.includes('SIGNUP_DISABLED'), 'registrarse con email está cerrado (aunque se mande vitalis_seat en los datos)');
 
 // ---------- ingreso con PIN ----------
-const login = (name, pin, c = code) => rpc(null, 'select public.pin_login($1, $2, $3) j', [c, P[name].id, pin]);
+const login = (name, pin) => rpc(null, 'select public.pin_login($1, $2) j', [P[name].id, pin]);
 R = await login('Alfonso Ro', '1234');
 ok(R.ok === false && R.error === 'wrong' && R.left === 4, 'PIN equivocado: quedan 4 intentos');
-R = await login('Alfonso Ro', '0000', 'NOPE');
-ok(R.ok === false && R.error === 'nouser', 'con otro código no entra');
+R = await rpc(null, 'select public.pin_login($1, $2) j', ['00000000-0000-0000-0000-000000000000', '0000']);
+ok(R.ok === false && R.error === 'nouser', 'alguien que no está en la lista no entra');
 for (let i = 0; i < 3; i++) await login('Alfonso Ro', '9999');
 R = await login('Alfonso Ro', '1111');
 ok(R.ok === false && R.error === 'locked' && R.minutes === 15, 'al quinto error: bloqueado 15 minutos');
 R = await login('Alfonso Ro', '0000');
 ok(R.ok === false && R.error === 'locked', 'bloqueado: ni con el PIN correcto');
 await db.query("update public.pins set locked_until = now() - interval '1 minute' where user_id = $1", [P['Alfonso Ro'].id]);
+for (let i = 0; i < 5; i++) R = await login('Alfonso Ro', '9999');
+ok(R.error === 'locked' && R.minutes === 30, 'el segundo bloqueo seguido dura el doble (30 min)');
+await db.query("update public.pins set locked_until = now() - interval '1 minute' where user_id = $1", [P['Alfonso Ro'].id]);
+R = await login('Alfonso Ro', '0000');
+ok(R.ok === true && (await db.query('select locks from public.pins where user_id = $1', [P['Alfonso Ro'].id])).rows[0].locks === 0, 'entrar bien resetea los bloqueos');
 R = await login('Joaquín Or', '0000');
 ok(R.ok === true && R.email && R.password && R.pin_set === false, 'la primera vez entra con 0000');
 const pw1 = R.password;
@@ -99,7 +100,7 @@ ok(R.ok && (await login('Alfonso Ro', '0000')).ok, 'el admin vuelve el PIN de al
 R = await rpc(B, "select public.add_member('Nuevo Ag', 'agent') j");
 ok(!!R.error, 'un agente no suma gente');
 R = await rpc(A, "select public.add_member('  Nuevo   Ag ', 'agent') j");
-ok(R.ok && (await rpc(null, 'select public.team_roster($1) j', [code])).people.some((p) => p.name === 'Nuevo Ag'), 'el admin suma a alguien y aparece en la lista');
+ok(R.ok && (await rpc(null, 'select public.roster() j')).people.some((p) => p.name === 'Nuevo Ag'), 'el admin suma a alguien y aparece en la lista');
 R = await rpc(A, "select public.add_member('nuevo ag') j");
 ok(!!R.error && /nombre/.test(R.error), 'no se repiten nombres');
 R = await rpc(null, "select public.add_member('Otro') j");
@@ -122,6 +123,8 @@ ok(!!r.error && /duplicate|unique/i.test(r.error), 'misma transacción y marca e
 r = await as(B, "insert into public.sales (date, client_id, amount, tx, brand) values ('2026-11-17','70001',250,'51271','Trade24Seven') returning id");
 ok(!r.error, 'misma transacción en otra marca: permitida');
 const saleB = r.rows[0].id;
+r = await as(B, "insert into public.sales (user_id, date, client_id, amount, tx) values ($1,'2026-11-17','71000',100,'71000') returning id", [C]);
+ok(!!r.error, 'un agente no carga ventas a nombre de otro');
 
 // ---------- privados ----------
 await as(A, "insert into public.agenda (client_id, kw, due) values ('4521','docs','2026-11-18T09:00')");
@@ -179,23 +182,70 @@ r = await as(A, "update public.profiles set role = 'leader' where id = $1 return
 ok(!r.error && r.rows[0].role === 'leader', 'A pone a C de team leader');
 r = await as(C, 'update public.sales set amount = 260 where id = $1 returning amount', [saleB]);
 ok(!r.error && r.rows.length === 1, 'el team leader corrige una venta de B');
+r = await as(C, "insert into public.sales (user_id, date, client_id, amount, tx, brand) values ($1,'2026-11-17','72000',150,'72000','Trade24Seven'), ($2,'2026-11-17','72001',90,'72001','Novara Markets') returning user_id", [B, A]);
+ok(!r.error && r.rows.length === 2 && r.rows[0].user_id === B, 'el team leader carga ventas de la mesa a nombre de cada uno (las dos marcas)');
+r = await as(C, "insert into public.sales (user_id, date, client_id, amount) values ('00000000-0000-0000-0000-000000000000','2026-11-17','1',1)");
+ok(!!r.error, 'ni el team leader carga a nombre de alguien de afuera');
+r = await as(C, 'update public.sales set user_id = $2 where id = $1 returning user_id', [saleB, A]);
+ok(!r.error && r.rows[0].user_id === A, 'el team leader cambia el vendedor de una venta');
+R = await rpc(C, "select public.set_crm_name($1, ' Alfonso Rodriguez ') j", [B]);
+ok(R.ok && (await db.query('select crm_name from public.profiles where id = $1', [B])).rows[0].crm_name === 'Alfonso Rodriguez', 'el team leader guarda cómo figura alguien en el CRM');
+R = await rpc(B, "select public.set_crm_name($1, 'x') j", [B]);
+ok(!!R.error, 'un agente no cambia nombres del CRM');
 r = await as(C, "update public.snippets set body = 'Buenas tardes!' where id = $1 returning id", [snipShared]);
 ok(!r.error && r.rows.length === 1, 'el team leader corrige un snippet compartido');
 r = await as(A, "update public.profiles set role = 'agent' where id = $1", [A]);
 ok(!!r.error, 'el único admin no puede sacarse el rol');
 r = await as(B, "update public.teams set invite_code = 'X' returning id");
 ok(!r.error && r.rows.length === 0, 'B no cambia el código de la mesa');
-r = await as(A, "update public.teams set invite_code = 'MATIAS-NUEVO' returning invite_code");
-ok(!r.error && r.rows.length === 1, 'A cambia el código de la mesa');
-ok((await rpc(null, 'select public.team_roster($1) j', [code])) === null, 'el código viejo ya no muestra la lista');
+
+// ---------- social ----------
+const ping = (uid, kind, to = null, body = null) => as(uid, 'insert into public.pings (kind, to_id, body) values ($1, $2, $3) returning id, team_id', [kind, to, body]);
+r = await ping(B, 'mate');
+ok(!r.error && r.rows.length === 1, 'B pide un mate a toda la mesa');
+const mateB = r.rows[0].id;
+r = await ping(B, 'mate');
+ok(!!r.error && /mate.*min/.test(r.error), 'pedir otro mate enseguida: hay que esperar (' + (r.error || '').slice(0, 60) + ')');
+r = await ping(B, 'd10', C);
+ok(!r.error, 'B le pregunta a C si sale a los 10');
+const d10 = r.rows[0].id;
+r = await ping(B, 'd10', C);
+ok(!!r.error && /esperá/.test(r.error), 'la misma pregunta a la misma persona: hay que esperar');
+r = await ping(B, 'd30', B);
+ok(!!r.error, 'no se puede pedir algo a uno mismo');
+r = await ping(B, 'msg', C, '   ');
+ok(!!r.error, 'mensaje vacío: no');
+r = await as(C, 'select id from public.pings');
+ok(r.rows.length === 2, 'C ve el mate de la mesa y lo que le mandaron');
+r = await as(A, 'select id from public.pings');
+ok(r.rows.length === 1, 'A ve solo el mate de la mesa (no lo de B a C)');
+R = await rpc(A, 'select public.reply_ping($1, $2) j', [d10, 'si']);
+ok(!!R.error, 'A no contesta lo que era para C');
+R = await rpc(C, 'select public.reply_ping($1, $2) j', [d10, 'si']);
+ok(R.ok === true, 'C contesta que sí');
+R = await rpc(B, 'select public.reply_ping($1, $2) j', [mateB, 'si']);
+ok(!!R.error, 'nadie se contesta a sí mismo');
+R = await rpc(A, 'select public.reply_ping($1, $2) j', [mateB, 'si']);
+ok(R.ok === true, 'A le ceba el mate a B');
+R = await rpc(C, 'select public.reply_ping($1, $2) j', [mateB, 'si']);
+ok(R.ok === false && R.taken === true, 'el mate ya lo cebó otro');
+r = await as(A, "update public.pings set reply = 'no' where id = $1 returning id", [mateB]);
+ok(!!r.error || r.rows.length === 0, 'las respuestas solo por la función (nadie edita a mano)');
+r = await as(B, "update public.profiles set quiet_until = now() + interval '1 hour' where id = $1 returning quiet_until", [B]);
+ok(!r.error && r.rows.length === 1, 'B silencia los avisos sociales');
+await db.query("insert into public.pings (team_id, from_id, kind, created_at) select team_id, $1, 'mate', now() - interval '8 days' from public.profiles where id = $1", [M]);
+await db.query("update public.pings set created_at = now() - interval '8 days' where from_id = $1", [M]);
+r = await ping(C, 'd30');
+ok((await db.query('select count(*)::int c from public.pings where from_id = $1', [M])).rows[0].c === 0, 'los pedidos de hace más de una semana se borran solos');
+
 
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');
 r = await as(B, 'select * from public.sales');
 ok(r.rows.length === 0, 'B dado de baja no ve más las ventas de la mesa');
-ok(!(await rpc(null, 'select public.team_roster($1) j', ['MATIAS-NUEVO'])).people.some((p) => p.id === B), 'B dado de baja no aparece en la lista');
-ok((await rpc(null, 'select public.pin_login($1, $2, $3) j', ['MATIAS-NUEVO', B, '0000'])).ok === false, 'B dado de baja no puede entrar');
+ok(!(await rpc(null, 'select public.roster() j')).people.some((p) => p.id === B), 'B dado de baja no aparece en la lista');
+ok((await rpc(null, 'select public.pin_login($1, $2) j', [B, '0000'])).ok === false, 'B dado de baja no puede entrar');
 r = await as(null, 'select * from public.sales');
 ok(!!r.error || r.rows.length === 0, 'sin sesión no se ve nada');
 

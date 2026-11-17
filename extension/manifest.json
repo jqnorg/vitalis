@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Vitalis",
-  "version": "1.1.0",
-  "description": "Vitalis para Chrome: avisos de agenda con sonido en cualquier pestaña, botón en el CRM para pasar ventas, registro de clientes new y snippets con /atajo en cualquier página.",
+  "version": "1.2.0",
+  "description": "Vitalis para Chrome: avisos de agenda y sociales con sonido en cualquier pestaña, botón en el CRM (Trade24Seven y Novara Markets) para pasar ventas, registro de clientes new y snippets con /atajo.",
   "permissions": [
     "alarms",
     "notifications",
@@ -30,7 +30,9 @@
     {
       "matches": [
         "https://crmnovaramarkets.com/*",
-        "https://*.crmnovaramarkets.com/*"
+        "https://*.crmnovaramarkets.com/*",
+        "https://crmtrade24seven.com/*",
+        "https://*.crmtrade24seven.com/*"
       ],
       "js": [
         "crm.js"
