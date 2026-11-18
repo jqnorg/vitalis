@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.2.0';
+const VERSION='1.3.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -99,6 +99,7 @@ function rel(d){
 /* ---------- base de datos (Supabase) ---------- */
 // Ventas: compartidas en la mesa (team). "ftds" = las mías (sueldo, inicio, turnos); "team" = todas.
 let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[],pings=[];
+let chats=[],chatMem=[],msgs={},reads={}; // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
 const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
@@ -111,12 +112,14 @@ const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified
 const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
+const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',at:r.created_at,t:+new Date(r.created_at)});
 const quiet=(m=profile)=>!!(m&&m.quiet_until&&new Date(m.quiet_until)>new Date()); // avisos sociales silenciados
 function mine(){ftds=team.filter(f=>f.uid===me)}
 function errMsg(e){
   const m=String(e&&(e.message||e.error_description||e.msg)||e||'');
   const k=m.match(/^[A-Z_]+:\s*(.+)$/);if(k)return k[1];
   if(e&&e.code==='23505')return 'ya existe (misma transacción en la misma marca)';
+  if(/pings_kind_check/.test(m))return 'los toques se activan en un rato';
   if(e&&e.code==='42501'||/row-level security|permission denied/i.test(m))return 'no tenés permiso para eso';
   if(/Failed to fetch|NetworkError|fetch failed/i.test(m))return 'sin conexión';
   if(/JWT|session|refresh token/i.test(m))return 'tu sesión venció: volvé a entrar';
@@ -124,6 +127,7 @@ function errMsg(e){
 }
 function dbErr(e){toast('No se pudo guardar: '+esc(errMsg(e)),'err');refresh()}
 async function Q(p){const r=await p;if(r.error)throw r.error;return r.data}
+async function QO(p){try{return await Q(p)}catch(e){return []}} // opcional: si la tabla todavía no está en la base, sigo sin eso
 async function W(fn){try{await fn();return true}catch(e){dbErr(e);return false}}
 async function fetchAll(table,cols='*',order='created_at'){
   const out=[];
@@ -236,7 +240,7 @@ async function loadAll(){
   if(!prof)throw new Error('NO_PROFILE');
   profile=prof;
   if(!prof.active)throw new Error('INACTIVE');
-  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg]=await Promise.all([
+  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms]=await Promise.all([
     Q(sb.from('teams').select('*').eq('id',prof.team_id).single()),
     Q(sb.from('profiles').select('*').eq('team_id',prof.team_id).order('name')),
     fetchAll('sales','*','date'),
@@ -247,7 +251,12 @@ async function loadAll(){
     Q(sb.from('snippets').select('*').order('shortcut')),
     fetchAll('leads','*','date'),
     Q(sb.from('pings').select('*').gte('created_at',new Date(Date.now()-36e5*24).toISOString()).order('created_at',{ascending:false}).limit(300)),
+    QO(sb.from('chats').select('*')),
+    QO(sb.from('chat_members').select('*')),
+    QO(sb.from('chat_reads').select('*').eq('user_id',me)),
+    QO(sb.from('messages').select('*').gte('created_at',new Date(Date.now()-7*864e5).toISOString()).order('created_at',{ascending:false}).limit(1500)),
   ]);
+  chatsLoaded(ch,cm,rd,ms);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
   teamInfo=tm;members=mem;team=sales.map(S2F);mine();
   pend=ag.map(A2P);
@@ -255,8 +264,23 @@ async function loadAll(){
   turnos=Object.fromEntries(sh.map(r=>{const t={...r.data};t.date=t.date||r.date;t.breaks=t.breaks||[];return [r.date,t]}));
   cfg={...DEF,...((st[0]&&st[0].cfg)||{})};
 }
+// tiempo real: si el canal se cae, me pongo al día enseguida y sondeo cada 5 s hasta que vuelva
+let rtOk=false,rtGen=0,rtWd=null,rtEver=false,lastCatch=0,catching=null;
+async function catchUp(force){
+  if(!ready||!sb)return;
+  if(catching)return catching;
+  if(!force&&Date.now()-lastCatch<4e3)return;
+  lastCatch=Date.now();
+  catching=Promise.all([socialPoll(),chatPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  return catching;
+}
+setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
+addEventListener('online',()=>catchUp(true));
+addEventListener('focus',()=>catchUp());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)catchUp(true)});
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
+  const gen=++rtGen;rtOk=false;
   const up=(arr,item,key='_id')=>{const i=arr.findIndex(x=>x[key]===item[key]);if(i>=0)arr[i]=item;else arr.push(item)};
   chan=sb.channel('vitalis-'+me)
     .on('postgres_changes',{event:'*',schema:'public',table:'sales'},p=>{
@@ -299,7 +323,26 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       if(p.new.id===me){profile=p.new;if(!p.new.active)return location.reload()}
       refresh();
     })
-    .subscribe();
+    .on('postgres_changes',{event:'*',schema:'public',table:'messages'},p=>{
+      if(p.eventType==='DELETE'){msgGone(p.old&&p.old.id);return}
+      if(p.eventType==='INSERT')msgIn(M2X(p.new),true);
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'chats'},p=>{
+      if(p.eventType==='DELETE'){chatGone(p.old&&p.old.id);return}
+      if(p.new.team_id!==profile.team_id)return;
+      up(chats,p.new,'id');refresh();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'chat_members'},p=>{
+      if(p.eventType==='DELETE'){const o=p.old||{};chatMem=chatMem.filter(x=>!(x.chat_id===o.chat_id&&x.user_id===o.user_id));if(o.user_id===me)chatGone(o.chat_id);else refresh();return}
+      const r=p.new;if(!chatMem.some(x=>x.chat_id===r.chat_id&&x.user_id===r.user_id))chatMem.push(r);
+      if(r.user_id===me||!chats.some(c=>c.id===r.chat_id))catchUp(true);else refresh(); // me sumaron a un grupo: lo traigo
+    })
+    .subscribe(st=>{
+      if(gen!==rtGen)return;
+      if(st==='SUBSCRIBED'){clearTimeout(rtWd);const again=rtEver;rtOk=true;rtEver=true;if(again)catchUp(true);return}
+      rtOk=false;catchUp(true); // CHANNEL_ERROR, TIMED_OUT, CLOSED: me pongo al día y, si no vuelve solo, me vuelvo a suscribir
+      clearTimeout(rtWd);rtWd=setTimeout(()=>{if(gen===rtGen&&!rtOk)live()},12e3);
+    });
 }
 async function connect(){
   try{await loadAll()}

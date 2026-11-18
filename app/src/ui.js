@@ -83,7 +83,7 @@ function colChart(el,data,o={}){
   el.textContent='';hideTip();
   if(!data.length||!data.some(d=>d.a+d.b>0)){el.innerHTML=`<div class="p-empty">${esc(o.empty||'Sin datos.')}</div>`;return}
   const W=Math.max(300,el.clientWidth||800),H=o.h||220,m={t:24,r:8,b:30,l:38},iw=W-m.l-m.r,ih=H-m.t-m.b;
-  const max=Math.max(1e-9,...data.map(d=>d.a+d.b),o.ref||0),st=niceStep(max/4),top=Math.ceil(max/st-1e-9)*st;
+  const max=Math.max(1e-9,...data.map(d=>d.a+d.b),o.ref||0,o.minTop||0),st=o.int?Math.max(1,niceStep(max/4)):niceStep(max/4),top=Math.ceil(max/st-1e-9)*st;
   const y=v=>m.t+ih-(v/top)*ih,band=iw/data.length,bw=Math.max(3,Math.min(26,band*.62));
   const fmt=o.fmt||(v=>String(v));
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -119,12 +119,12 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','social','config','equipo'];
+const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 function go(v,opts){
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
-  cur=v;hideTip();
+  cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
   $$('#nav [data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
@@ -151,7 +151,8 @@ function status(){
   $('#sPend').innerHTML=`Agenda <b>${hoy}</b>`+(venc?` <span class="hot b">${plural(venc,'vencido')}</span>`:'');
   $('#nbAg').textContent=venc||'';
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
-  $('#nbSo').textContent=pendingForMe()||'';
+  const so=pendingForMe(),ch=unreadAll();$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
+  document.title=(so+ch?`(${so+ch}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
   $('#sMe').innerHTML=profile?`${avatar(profile.name)}<span style="min-width:0"><span class="nm">${esc(profile.name)}</span><span class="rl">${esc(roleTxt(profile.role))}</span></span>`:'';
   turnoBar();

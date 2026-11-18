@@ -13,7 +13,7 @@ async function start() {
   const c = supaConfig();
   if (!c) return authScreen('setup');
   if (!window.supabase || !window.supabase.createClient) return authScreen('error', 'No se pudo cargar la librería de la base de datos. Revisá tu conexión y recargá.');
-  sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'vitalis-auth' } });
+  sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'vitalis-auth' }, realtime: { worker: true } }); // worker: el latido del tiempo real no se frena con la pestaña en segundo plano
   if (/mesa=/.test(location.hash || '')) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } // links viejos
   local.set('desk', null);
   sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && ready) location.reload(); });
@@ -129,7 +129,7 @@ const AUTH = {
           profile.pin_set = true; if (data && data.role) profile.role = data.role;
           const m = members.find((x) => x.id === me); if (m) Object.assign(m, { pin_set: true, role: profile.role });
           enter();
-          toast(`PIN creado. Desde ahora entrás con tu nombre y ese PIN.${!wasAdmin && profile.role === 'admin' ? '<br>Sos el administrador de la mesa: en Ajustes manejás la gente y el código.' : ''}`, 'ok', { ms: 9000 });
+          toast(`PIN creado. Desde ahora entrás con tu nombre y ese PIN.${!wasAdmin && profile.role === 'admin' ? '<br>Sos el administrador de la mesa: en Ajustes manejás la gente de la mesa.' : ''}`, 'ok', { ms: 9000 });
         } catch (x) { first = ''; draw(); setTimeout(() => { const mm = box.querySelector('.amsg'); mm.className = 'amsg err'; mm.textContent = authErr(x); }, 0); }
         finally { ui.busy(false); }
       },

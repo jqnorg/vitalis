@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 9, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 12, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -238,6 +238,108 @@ await db.query("update public.pings set created_at = now() - interval '8 days' w
 r = await ping(C, 'd30');
 ok((await db.query('select count(*)::int c from public.pings where from_id = $1', [M])).rows[0].c === 0, 'los pedidos de hace más de una semana se borran solos');
 
+// toques
+r = await ping(B, 'toque');
+ok(!!r.error && /toque/.test(r.error), 'el toque es para alguien');
+r = await ping(B, 'toque', C);
+ok(!r.error, 'B le da un toque a C');
+const toqueB = r.rows[0].id;
+r = await ping(B, 'toque', C);
+ok(!!r.error && /COOLDOWN/.test(r.error), 'otro toque a C enseguida: cooldown');
+r = await ping(B, 'toque', M);
+ok(!r.error, 'a otra persona sí puede darle un toque');
+R = await rpc(C, 'select public.reply_ping($1, $2) j', [toqueB, 'si']);
+ok(R.ok === true, 'C le devuelve el toque');
+
+// ---------- chat ----------
+const team = (await db.query('select id from public.chats where kind = $1', ['team'])).rows;
+ok(team.length === 1, 'hay un chat de toda la mesa (aunque el SQL se corra dos veces)');
+const TC = team[0].id;
+const rid = async (uid, q, params) => { const r = await as(uid, q, params); return r.error ? { error: r.error } : r.rows[0].j; };
+const say = (uid, cid, body) => as(uid, 'insert into public.messages (chat_id, body) values ($1, $2) returning id, user_id, body', [cid, body]);
+r = await say(A, TC, '  Buen día, mesa!  ');
+ok(!r.error && r.rows[0].body === 'Buen día, mesa!' && r.rows[0].user_id === A, 'A escribe en el chat de la mesa (sin espacios de más)');
+r = await as(B, 'select body from public.messages where chat_id = $1', [TC]);
+ok(r.rows.length === 1, 'B lo ve');
+r = await say(B, TC, '   ');
+ok(!!r.error, 'no se mandan mensajes vacíos');
+r = await as(B, 'insert into public.messages (chat_id, user_id, body) values ($1, $2, $3)', [TC, A, 'soy A']);
+ok(!!r.error, 'B no escribe a nombre de A');
+R = await rid(A, 'select public.chat_create($1, $2::uuid[])::text j', ['Los del fondo', [B, M, '00000000-0000-0000-0000-000000000000']]);
+ok(!R.error && typeof R === 'string', 'A crea un grupo con B y Matias');
+const G = R;
+r = await as(A, 'select user_id from public.chat_members where chat_id = $1', [G]);
+ok(r.rows.length === 3, 'el grupo tiene a A, B y Matias (nadie de afuera)');
+r = await say(B, G, 'hola grupo');
+ok(!r.error, 'B escribe en el grupo');
+r = await as(C, 'select id from public.messages where chat_id = $1', [G]);
+ok(r.rows.length === 0, 'C (fuera del grupo) no lo lee');
+r = await say(C, G, 'me meto');
+ok(!!r.error, 'C no escribe en el grupo');
+r = await as(C, 'select id from public.chats');
+ok(r.rows.length === 1, 'C solo ve el chat de la mesa');
+r = await as(B, 'insert into public.chats (kind, name) values ($1, $2)', ['group', 'trucho']);
+ok(!!r.error, 'los grupos no se crean a mano (solo con la función)');
+r = await as(B, 'insert into public.chat_members (chat_id, user_id) values ($1, $2)', [G, C]);
+ok(!!r.error, 'no se suma gente a mano');
+R = await rpc(C, 'select public.chat_add($1, $2::uuid[]) j', [G, [C]]);
+ok(!!R.error, 'C no se puede sumar solo a un grupo');
+R = await rpc(B, 'select public.chat_add($1, $2::uuid[]) j', [G, [C]]);
+ok(R.ok && R.added === 1, 'B (que está adentro) suma a C');
+r = await as(C, 'select body from public.messages where chat_id = $1', [G]);
+ok(r.rows.length === 1, 'ahora C lee el grupo');
+R = await rpc(B, 'select public.chat_rename($1, $2) j', [G, 'Fondo ☕']);
+ok(R.ok && (await db.query('select name from public.chats where id = $1', [G])).rows[0].name === 'Fondo ☕', 'B le cambia el nombre');
+R = await rpc(B, 'select public.chat_leave($1, $2) j', [G, C]);
+ok(!!R.error, 'B no puede sacar a C (no creó el grupo)');
+R = await rpc(A, 'select public.chat_leave($1, $2) j', [G, C]);
+ok(R.ok, 'A (que lo creó) saca a C');
+R = await rpc(B, 'select public.chat_leave($1) j', [G]);
+ok(R.ok, 'B sale del grupo');
+r = await as(B, 'select id from public.messages where chat_id = $1', [G]);
+ok(r.rows.length === 0, 'B ya no lo lee');
+R = await rpc(B, 'select public.chat_leave($1) j', [TC]);
+ok(!!R.error, 'del chat de la mesa no se sale');
+// privados
+R = await rid(A, 'select public.chat_dm($1)::text j', [C]);
+const D1 = R;
+R = await rid(C, 'select public.chat_dm($1)::text j', [A]);
+ok(typeof D1 === 'string' && R === D1, 'el privado entre A y C es uno solo, lo abra quien lo abra');
+R = await rid(A, 'select public.chat_dm($1)::text j', [A]);
+ok(!!R.error, 'no hay privado con uno mismo');
+r = await say(C, D1, 'che, ¿salís a los 10?');
+ok(!r.error, 'C escribe por privado');
+r = await as(B, 'select id from public.messages where chat_id = $1', [D1]);
+ok(r.rows.length === 0, 'B no lee el privado de A y C');
+r = await as(A, 'delete from public.messages where chat_id = $1 returning id', [D1]);
+ok(!r.error && r.rows.length === 0, 'A no borra mensajes de C');
+r = await as(C, 'delete from public.messages where chat_id = $1 returning id', [D1]);
+ok(!r.error && r.rows.length === 1, 'C borra su mensaje');
+r = await as(A, 'update public.messages set body = $2 where chat_id = $1', [TC, 'editado']);
+ok(!!r.error, 'los mensajes no se editan');
+// leídos y silenciar
+r = await as(B, 'insert into public.chat_reads (chat_id, read_at, muted) values ($1, now(), true) returning muted', [TC]);
+ok(!r.error && r.rows[0].muted === true, 'B marca leído y silencia el chat de la mesa');
+r = await as(A, 'select * from public.chat_reads');
+ok(r.rows.length === 0, 'A no ve lo que leyó B');
+r = await as(B, 'insert into public.chat_reads (chat_id) values ($1)', [D1]);
+ok(!!r.error, 'no se marca un chat ajeno');
+// otra mesa
+const t2 = (await db.query("insert into public.teams (name, invite_code) values ('Otra', 'OTRA-1') returning id")).rows[0].id;
+const X = (await db.query("select public._new_seat($1, 'Xavier Ot', 'agent') id", [t2])).rows[0].id;
+await db.query("insert into public.chats (team_id, kind, name) values ($1, 'team', 'Otra mesa')", [t2]);
+r = await as(X, 'select id from public.messages');
+ok(r.rows.length === 0, 'alguien de otra mesa no lee nada');
+r = await say(X, TC, 'hola');
+ok(!!r.error, 'ni escribe en el chat de Team Matías');
+R = await rid(X, 'select public.chat_dm($1)::text j', [A]);
+ok(!!R.error, 'ni abre un privado con alguien de la mesa');
+R = await rid(A, 'select public.chat_create($1, $2::uuid[])::text j', ['Con X', [X]]);
+ok((await db.query('select count(*)::int c from public.chat_members where chat_id = $1', [R])).rows[0].c === 1, 'no se puede meter a alguien de otra mesa en un grupo');
+// sin inundar
+for (let i = 0; i < 15; i++) await say(M, TC, 'spam ' + i);
+r = await say(M, TC, 'uno más');
+ok(!!r.error && /SLOW/.test(r.error), 'más de 15 mensajes en 30 s: frena');
 
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);

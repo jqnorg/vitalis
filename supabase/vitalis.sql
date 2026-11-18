@@ -146,6 +146,45 @@ create table if not exists public.pings (
   created_at timestamptz not null default now()
 );
 create index if not exists pings_team_created on public.pings (team_id, created_at desc);
+alter table public.pings drop constraint if exists pings_kind_check;  -- 'toque': un toque a alguien desde su perfil
+alter table public.pings add constraint pings_kind_check check (kind in ('mate','d10','d30','msg','toque'));
+
+-- ---------- chat: toda la mesa, grupos y privados ----------
+create table if not exists public.chats (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  kind       text not null default 'group' check (kind in ('team','group','dm')),
+  name       text check (name is null or length(name) between 1 and 40),
+  created_by uuid references public.profiles(id) on delete set null,
+  dm_key     text,                       -- privados: 'idA:idB' ordenado, para no repetirlos
+  created_at timestamptz not null default now()
+);
+create unique index if not exists chats_team_one on public.chats (team_id) where kind = 'team';
+create unique index if not exists chats_dm_key on public.chats (team_id, dm_key) where dm_key is not null;
+create table if not exists public.chat_members (  -- grupos y privados (el de toda la mesa no necesita)
+  chat_id  uuid not null references public.chats(id) on delete cascade,
+  user_id  uuid not null references public.profiles(id) on delete cascade,
+  added_by uuid references public.profiles(id) on delete set null,
+  added_at timestamptz not null default now(),
+  primary key (chat_id, user_id)
+);
+create index if not exists chat_members_user on public.chat_members (user_id);
+create table if not exists public.messages (
+  id         uuid primary key default gen_random_uuid(),
+  chat_id    uuid not null references public.chats(id) on delete cascade,
+  user_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  body       text not null check (length(body) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists messages_chat_created on public.messages (chat_id, created_at desc);
+create index if not exists messages_created on public.messages (created_at desc);
+create table if not exists public.chat_reads (    -- hasta dónde leí cada chat y si lo silencié (privado de cada uno)
+  user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  chat_id uuid not null references public.chats(id) on delete cascade,
+  read_at timestamptz not null default now(),
+  muted   boolean not null default false,
+  primary key (user_id, chat_id)
+);
 
 -- ---------- fechas de modificación ----------
 create or replace function public.touch() returns trigger language plpgsql set search_path = public as $$
@@ -332,12 +371,13 @@ begin
     new.body := nullif(left(trim(coalesce(new.body, '')), 140), '');
     if new.body is null then raise exception 'PING_EMPTY: escribí el mensaje'; end if;
   else new.body := null; end if;
-  wait := case new.kind when 'mate' then interval '20 minutes' when 'msg' then interval '15 seconds' else interval '3 minutes' end;
+  if new.kind = 'toque' and new.to_id is null then raise exception 'PING_TO: el toque es para alguien'; end if;
+  wait := case new.kind when 'mate' then interval '20 minutes' when 'msg' then interval '15 seconds' when 'toque' then interval '2 minutes' else interval '3 minutes' end;
   select max(created_at) into last from public.pings
    where from_id = new.from_id and kind = new.kind and (new.kind = 'mate' or to_id is not distinct from new.to_id);
   if last is not null and last > now() - wait then
     left_s := ceil(extract(epoch from last + wait - now()))::int;
-    raise exception 'COOLDOWN: %', case new.kind when 'mate' then 'ya pediste un mate, podés volver a pedir en ' else 'ya lo mandaste, esperá ' end
+    raise exception 'COOLDOWN: %', case new.kind when 'mate' then 'ya pediste un mate, podés volver a pedir en ' when 'toque' then 'ya le diste un toque, podés de nuevo en ' else 'ya lo mandaste, esperá ' end
       || case when left_s >= 60 then ceil(left_s / 60.0)::int || ' min' else left_s || ' segundos' end;
   end if;
   if (select count(*) from public.pings where from_id = new.from_id and created_at > now() - interval '1 hour') >= 40 then
@@ -365,6 +405,121 @@ begin
 end $$;
 revoke all on function public.reply_ping(uuid, text) from public, anon;
 grant execute on function public.reply_ping(uuid, text) to authenticated;
+
+-- ---------- chat ----------
+-- ¿puedo ver/escribir en este chat? (el de la mesa: todos; grupos y privados: sus integrantes)
+create or replace function public.in_chat(cid uuid) returns boolean
+  language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.chats c where c.id = cid and c.team_id = public.my_team()
+    and (c.kind = 'team' or exists (select 1 from public.chat_members m where m.chat_id = c.id and m.user_id = auth.uid()))) $$;
+
+-- cada mensaje: sin espacios de más, con la hora del servidor y sin inundar el chat
+create or replace function public.msg_guard() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  new.body := left(btrim(coalesce(new.body, ''), E' \t\r\n'), 2000);
+  if new.body = '' then raise exception 'MSG_EMPTY: escribí algo'; end if;
+  new.created_at := now();
+  if (select count(*) from public.messages where user_id = new.user_id and created_at > now() - interval '30 seconds') >= 15 then
+    raise exception 'SLOW: vas muy rápido, esperá unos segundos';
+  end if;
+  return new;
+end $$;
+drop trigger if exists messages_guard on public.messages;
+create trigger messages_guard before insert on public.messages for each row execute function public.msg_guard();
+
+-- crear un grupo con gente de la mesa (quien lo crea queda adentro)
+create or replace function public.chat_create(nm text, people uuid[]) returns uuid
+  language plpgsql security definer set search_path = public as $$
+declare cid uuid; t uuid := public.my_team();
+begin
+  if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  nm := regexp_replace(btrim(coalesce(nm, '')), '\s+', ' ', 'g');
+  if nm = '' or length(nm) > 40 then raise exception 'NAME: ponele un nombre al grupo (hasta 40 letras)'; end if;
+  if (select count(*) from public.chats where created_by = auth.uid() and created_at > now() - interval '1 hour') >= 20 then
+    raise exception 'SLOW: muchos grupos nuevos, esperá un rato';
+  end if;
+  insert into public.chats (team_id, kind, name, created_by) values (t, 'group', nm, auth.uid()) returning id into cid;
+  insert into public.chat_members (chat_id, user_id, added_by) values (cid, auth.uid(), auth.uid());
+  insert into public.chat_members (chat_id, user_id, added_by)
+    select cid, p.id, auth.uid() from public.profiles p
+     where p.id = any(coalesce(people, '{}'::uuid[])) and p.team_id = t and p.active and p.id <> auth.uid()
+    on conflict do nothing;
+  return cid;
+end $$;
+
+-- sumar gente a un grupo (cualquiera que esté adentro)
+create or replace function public.chat_add(cid uuid, people uuid[]) returns json
+  language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if not exists (select 1 from public.chats c where c.id = cid and c.kind = 'group' and c.team_id = public.my_team())
+     or not exists (select 1 from public.chat_members where chat_id = cid and user_id = auth.uid()) then
+    raise exception 'CHAT: no estás en ese grupo';
+  end if;
+  insert into public.chat_members (chat_id, user_id, added_by)
+    select cid, p.id, auth.uid() from public.profiles p
+     where p.id = any(coalesce(people, '{}'::uuid[])) and p.team_id = public.my_team() and p.active
+    on conflict do nothing;
+  get diagnostics n = row_count;
+  return json_build_object('ok', true, 'added', n);
+end $$;
+
+-- salir de un grupo, o sacar a alguien (solo quien lo creó). Si queda vacío, se borra.
+create or replace function public.chat_leave(cid uuid, uid uuid default null) returns json
+  language plpgsql security definer set search_path = public as $$
+declare c record; target uuid := coalesce(uid, auth.uid());
+begin
+  select * into c from public.chats where id = cid and team_id = public.my_team();
+  if c.id is null or c.kind <> 'group' then raise exception 'CHAT: solo se puede salir de un grupo'; end if;
+  if not exists (select 1 from public.chat_members where chat_id = cid and user_id = auth.uid()) then raise exception 'CHAT: no estás en ese grupo'; end if;
+  if target <> auth.uid() and c.created_by is distinct from auth.uid() then raise exception 'CHAT: solo quien creó el grupo puede sacar gente'; end if;
+  delete from public.chat_members where chat_id = cid and user_id = target;
+  if not exists (select 1 from public.chat_members where chat_id = cid) then delete from public.chats where id = cid; end if;
+  return json_build_object('ok', true);
+end $$;
+
+-- cambiarle el nombre a un grupo (cualquiera que esté adentro)
+create or replace function public.chat_rename(cid uuid, nm text) returns json
+  language plpgsql security definer set search_path = public as $$
+begin
+  nm := regexp_replace(btrim(coalesce(nm, '')), '\s+', ' ', 'g');
+  if nm = '' or length(nm) > 40 then raise exception 'NAME: ponele un nombre al grupo (hasta 40 letras)'; end if;
+  if not exists (select 1 from public.chats c join public.chat_members m on m.chat_id = c.id and m.user_id = auth.uid()
+                  where c.id = cid and c.kind = 'group' and c.team_id = public.my_team()) then
+    raise exception 'CHAT: no estás en ese grupo';
+  end if;
+  update public.chats set name = nm where id = cid;
+  return json_build_object('ok', true);
+end $$;
+
+-- chat privado con alguien de la mesa (lo crea la primera vez)
+create or replace function public.chat_dm(uid uuid) returns uuid
+  language plpgsql security definer set search_path = public as $$
+declare cid uuid; t uuid := public.my_team(); k text;
+begin
+  if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  if uid is null or uid = auth.uid() or not exists (select 1 from public.profiles where id = uid and team_id = t and active) then
+    raise exception 'CHAT: esa persona no está en la mesa';
+  end if;
+  k := least(auth.uid()::text, uid::text) || ':' || greatest(auth.uid()::text, uid::text);
+  select id into cid from public.chats where team_id = t and dm_key = k;
+  if cid is null then
+    begin
+      insert into public.chats (team_id, kind, created_by, dm_key) values (t, 'dm', auth.uid(), k) returning id into cid;
+    exception when unique_violation then
+      select id into cid from public.chats where team_id = t and dm_key = k;
+    end;
+  end if;
+  insert into public.chat_members (chat_id, user_id, added_by) values (cid, auth.uid(), auth.uid()), (cid, uid, auth.uid())
+    on conflict do nothing;
+  return cid;
+end $$;
+
+revoke all on function public.in_chat(uuid), public.chat_create(text, uuid[]), public.chat_add(uuid, uuid[]),
+  public.chat_leave(uuid, uuid), public.chat_rename(uuid, text), public.chat_dm(uuid) from public, anon;
+grant execute on function public.in_chat(uuid), public.chat_create(text, uuid[]), public.chat_add(uuid, uuid[]),
+  public.chat_leave(uuid, uuid), public.chat_rename(uuid, text), public.chat_dm(uuid) to authenticated;
 
 -- Solo el administrador cambia roles, mesa o si alguien sigue activo. La cuenta y el PIN no se tocan desde la app.
 -- (Sin "security definer": así sabe si el cambio viene de la app o de las funciones de arriba.)
@@ -399,6 +554,10 @@ alter table public.shifts      enable row level security;
 alter table public.snippets    enable row level security;
 alter table public.leads       enable row level security;
 alter table public.pings       enable row level security;
+alter table public.chats        enable row level security;
+alter table public.chat_members enable row level security;
+alter table public.messages     enable row level security;
+alter table public.chat_reads   enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -466,22 +625,43 @@ create policy pings_insert on public.pings for insert to authenticated
 drop policy if exists pings_delete on public.pings;
 create policy pings_delete on public.pings for delete to authenticated using (from_id = auth.uid());
 
+-- chat: se lee y se escribe donde estás; grupos y privados se arman con las funciones de arriba
+drop policy if exists chats_read on public.chats;
+create policy chats_read on public.chats for select to authenticated using (team_id = public.my_team() and public.in_chat(id));
+drop policy if exists chat_members_read on public.chat_members;
+create policy chat_members_read on public.chat_members for select to authenticated using (public.in_chat(chat_id));
+drop policy if exists messages_read on public.messages;
+create policy messages_read on public.messages for select to authenticated using (public.in_chat(chat_id));
+drop policy if exists messages_insert on public.messages;
+create policy messages_insert on public.messages for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists messages_delete on public.messages;
+create policy messages_delete on public.messages for delete to authenticated using (user_id = auth.uid());
+drop policy if exists chat_reads_own on public.chat_reads;
+create policy chat_reads_own on public.chat_reads for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid() and public.in_chat(chat_id));
+
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.sales, public.settings, public.adjustments, public.agenda, public.shifts, public.snippets, public.leads to authenticated;
 grant select, update on public.teams, public.profiles to authenticated;
 grant select, insert, delete on public.pings to authenticated;
 revoke update on public.pings from authenticated;
+grant select on public.chats, public.chat_members to authenticated;
+revoke insert, update, delete on public.chats, public.chat_members from authenticated;
+grant select, insert, delete on public.messages to authenticated;
+revoke update on public.messages from authenticated;
+grant select, insert, update, delete on public.chat_reads to authenticated;
+revoke all on public.chats, public.chat_members, public.messages, public.chat_reads from anon;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
-revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard() from public, anon, authenticated;
+revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard() from public, anon, authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;
@@ -508,5 +688,10 @@ begin
     perform public._new_seat(t, n, case when n = 'Matias Me' then 'leader' else 'agent' end);
   end loop;
 end $$;
+
+-- el chat de toda la mesa
+insert into public.chats (team_id, kind, name)
+select t.id, 'team', 'Toda la mesa' from public.teams t
+ where not exists (select 1 from public.chats c where c.team_id = t.id and c.kind = 'team');
 
 select name as mesa, (select count(*) from public.profiles where team_id = teams.id and active) as personas from public.teams;

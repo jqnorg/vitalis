@@ -500,6 +500,8 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='reply'||d.cmd==='quiet')){socialCmd(d);return} // desde la tarjeta social de la extensión
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){catchUp();return} // la extensión despierta a la pestaña: me pongo al día
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -600,9 +602,14 @@ function ayuda(){
     <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
     <dt>Variables</dt><dd>{fecha}, {hora}, {yo} (tu nombre) y {cursor} (dónde queda el cursor).</dd>
     <dt>Compartidos</dt><dd>Los ve toda la mesa. Si tenés uno tuyo con el mismo atajo, se usa el tuyo.</dd></dl>
+  <h4>Chat</h4><dl>
+    <dt>Chats</dt><dd>Uno de toda la mesa, grupos (Nuevo → varias personas y un nombre) y privados (Nuevo → una persona, o Mensaje en su perfil).</dd>
+    <dt>Grupos</dt><dd>Cualquiera de adentro suma gente y le cambia el nombre. Quien lo creó puede sacar a alguien. Si se van todos, se borra.</dd>
+    <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciá un chat desde su encabezado; si te nombran con @tunombre, el aviso llega igual.</dd></dl>
   <h4>Social</h4><dl>
-    <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min), salir a los 10 o a la media, o un mensaje corto. A toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
-    <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
+    <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min) o salir a los 10 o a la media, a toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
+    <dt>Perfiles</dt><dd>Tocá a alguien (en Social, en el chat o en Equipo) para ver sus números y darle un toque 👉 (uno cada 2 min por persona).</dd>
+    <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Vale también para el chat. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
   <h4>Team leader</h4><dl>
     <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, el botón pasa las ventas de todos: usa la columna de agente o el vendedor que elijas. En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
   <h4>Sueldo</h4><dl>
@@ -619,7 +626,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>${isLeader()?0:9}</kbd></dt><dd>Secciones</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Secciones (<kbd>8</kbd> chat, <kbd>9</kbd> social, <kbd>0</kbd> ajustes)</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -656,7 +663,7 @@ document.addEventListener('keydown',e=>{
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
-  if(/^[0-9]$/.test(e.key)){e.preventDefault();go(VIEWS[e.key==='0'?9:+e.key-1]);return}
+  if(/^[0-9]$/.test(e.key)){e.preventDefault();go(VIEWS[e.key==='0'?9:+e.key-1]);return} // 1-7 secciones, 8 chat, 9 social, 0 ajustes
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}

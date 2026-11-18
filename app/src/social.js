@@ -7,9 +7,10 @@ const KIND={
   d10:{label:'Salir a los 10',ask:'¿alguien sale a los 10?',askTo:'¿salimos a los 10?',replies:[['si','Dale'],['luego','En 5'],['no','Ahora no']],wait:3*6e4},
   d30:{label:'Salir a la media',ask:'¿alguien sale a la media?',askTo:'¿salimos a la media?',replies:[['si','Dale'],['luego','En 5'],['no','Ahora no']],wait:3*6e4},
   msg:{label:'Mensaje',ask:'',askTo:'',replies:[['si','👍']],wait:15e3},
+  toque:{label:'Dar un toque',ask:'te dio un toque 👉',askTo:'te dio un toque 👉',replies:[['si','Devolver el toque']],wait:2*6e4},
 };
 const first=uid=>memberName(uid).split(/\s+/)[0];
-const replyTxt=(p,r=p.reply)=>{const k=KIND[p.kind]||KIND.msg;const x=k.replies.find(y=>y[0]===r);return x?x[1]:r};
+const replyTxt=(p,r=p.reply)=>{if(p.kind==='toque')return 'te devolvió el toque 👈';const k=KIND[p.kind]||KIND.msg;const x=k.replies.find(y=>y[0]===r);return x?x[1]:r};
 const askTxt=p=>p.kind==='msg'?p.body:(p.to?KIND[p.kind].askTo:KIND[p.kind].ask);
 const forMe=p=>p.from!==me&&(p.to===me||p.to===null);
 const agoTxt=iso=>{const m=Math.round((Date.now()-new Date(iso))/6e4);return m<1?'recién':m<60?`hace ${m} min`:`hace ${Math.floor(m/60)} h`};
@@ -23,6 +24,7 @@ function pop(){ // sonido corto y amable para lo social (distinto a la agenda)
 const pageAway=()=>document.hidden||!document.hasFocus();
 function feedTxt(p){ // "Matias pide un mate", "Le pediste un mate a Sofía", "Sofía → vos: ¿salimos a los 10?"
   const mine=p.from===me,X=`<b>${esc(first(p.from))}</b>`,Y=p.to===me?'vos':`<b>${esc(first(p.to||''))}</b>`;
+  if(p.kind==='toque')return mine?`Le diste un toque a ${Y} 👉`:`${X} te dio un toque 👉`;
   if(p.kind==='mate'){
     if(!p.to)return mine?'<b>Vos</b> pediste un mate':`${X} pide un mate`;
     return mine?`Le pediste un mate a ${Y}`:p.to===me?`${X} te pide un mate`:`${X} le pide un mate a ${Y}`;
@@ -43,7 +45,7 @@ function socialEvent(p,type,prev){
   if(type==='UPDATE'&&p.reply&&!(prev&&prev.reply)){
     closeToast('so'+p._id);extSocialClose(p._id);
     if(p.from===me&&p.by!==me){ // me contestaron
-      const txt=`<b>${esc(first(p.by))}</b>: ${esc(replyTxt(p))}${p.kind==='msg'?'':' · '+esc(KIND[p.kind].label.toLowerCase())}`;
+      const txt=p.kind==='toque'?`<b>${esc(first(p.by))}</b> te devolvió el toque 👈`:`<b>${esc(first(p.by))}</b>: ${esc(replyTxt(p))}${p.kind==='msg'?'':' · '+esc(KIND[p.kind].label.toLowerCase())}`;
       toast(txt,'ok',{ms:9000,key:'sor'+p._id});
       if(!quiet()){pop();if(pageAway())extSocial({k:'so:'+p._id,title:'Te contestaron',id:first(p.by)+': '+replyTxt(p),kw:p.kind==='msg'?p.body:KIND[p.kind].label,meta:'',btns:[['close','Ok',1]]})}
     }
@@ -53,6 +55,11 @@ function socialGone(id){closeToast('so'+id);extSocialClose(id)}
 function socialAlert(p){
   const who=first(p.from),q=askTxt(p),k=KIND[p.kind]||KIND.msg;
   pop();
+  if(p.kind==='toque'){ // liviano: no queda fijo
+    toast(`<b>${esc(who)}</b> te dio un toque 👉`,'ok',{ms:12000,key:'so'+p._id,actions:[{l:'Devolver el toque',fn:()=>B.replyPing(p._id,'si')},{l:'Ver perfil',fn:()=>openProfile(p.from)}]});
+    if(pageAway())extSocial({k:'so:'+p._id,title:'Toque',id:who+' te dio un toque 👉',kw:'',meta:'',btns:[['r:si','Devolver el toque',1],['close','Ok']]});
+    return;
+  }
   toast(`<b>${esc(who)}</b> ${p.kind==='msg'?'te escribe: '+esc(q):esc(q)}`,'alert',{sticky:1,key:'so'+p._id,
     actions:[...k.replies.map(([r,l])=>({l,fn:()=>B.replyPing(p._id,r)})),{l:'Silenciar 1 h',fn:()=>setQuiet(36e5)}]});
   if(pageAway())extSocial({k:'so:'+p._id,title:p.kind==='mate'?'Piden un mate':p.kind==='msg'?'Mensaje':'Descanso',id:who+(p.kind==='msg'?'':' '+q),kw:p.kind==='msg'?q:'',meta:p.to?'Para vos':'Para toda la mesa',
@@ -72,7 +79,7 @@ function socialCmd(d){
   if(d.cmd==='reply'&&['si','no','luego'].includes(d.r))B.replyPing(id,d.r);
   else if(d.cmd==='quiet')setQuiet(36e5);
 }
-const pendingForMe=()=>pings.filter(p=>forMe(p)&&!p.reply&&Date.now()-new Date(p.at)<60*6e4).length;
+const pendingForMe=()=>pings.filter(p=>p.kind!=='toque'&&forMe(p)&&!p.reply&&Date.now()-new Date(p.at)<60*6e4).length;
 function cooldownLeft(kind,to){
   const k=KIND[kind];const last=pings.filter(p=>p.from===me&&p.kind===kind&&(kind==='mate'||p.to===(to||null))).reduce((a,p)=>Math.max(a,+new Date(p.at)),0);
   return Math.max(0,last+k.wait-Date.now());
@@ -88,9 +95,7 @@ V.social={
     $('#soActs').addEventListener('click',async e=>{const b=e.target.closest('[data-ping]');if(!b||b.disabled)return;
       primeAudio();const g=await B.ping(b.dataset.ping,soTo||null);
       if(g)toast(`${b.dataset.ping==='mate'?'Pediste un mate':'Preguntaste'} ${soTo?'a '+esc(first(soTo)):'a toda la mesa'}.${soTo&&quiet(members.find(m=>m.id===soTo))?' '+sp('hot','Tiene los avisos silenciados.'):''}`)});
-    $('#soMsgF').addEventListener('submit',async e=>{e.preventDefault();const i=$('#soMsg'),v=i.value.trim();if(!v)return;
-      if(await B.ping('msg',soTo||null,v)){i.value='';toast(`Mensaje enviado ${soTo?'a '+esc(first(soTo)):'a toda la mesa'}.`)}});
-    $('#soPeople').addEventListener('click',e=>{const b=e.target.closest('[data-to]');if(!b)return;soTo=soTo===b.dataset.to?'':b.dataset.to;this.render({})});
+    $('#soChat').addEventListener('click',()=>go('chat',{chat:teamChat()&&teamChat().id}));
     $('#soFeed').addEventListener('click',async e=>{const b=e.target.closest('[data-pr]');if(!b)return;
       if(b.dataset.pr==='del'){if(await B.delPing(b.dataset.id))toast('Pedido cancelado.');return}
       B.replyPing(b.dataset.id,b.dataset.pr)});
@@ -106,7 +111,7 @@ V.social={
     const sel=$('#soTo');if(sel!==document.activeElement){sel.innerHTML=`<option value="">Toda la mesa</option>`+act.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');sel.value=soTo}
     $('#soActs').innerHTML=['mate','d10','d30'].map(k=>{const left=cooldownLeft(k,soTo);
       return `<button type="button" class="so-act" data-ping="${k}"${left?' disabled':''}><span class="ic">${k==='mate'?'<svg aria-hidden="true"><use href="#mate"/></svg>':k==='d10'?'10\'':'30\''}</span><span><b>${KIND[k].label}</b><small>${left?`Podés de nuevo en ${left>=6e4?Math.ceil(left/6e4)+' min':Math.ceil(left/1e3)+' s'}`:soTo?'A '+esc(first(soTo)):'A toda la mesa'}</small></span></button>`}).join('');
-    $('#soPeople').innerHTML=`<div class="so-people">${act.map(m=>`<button type="button" class="so-p${m.id===soTo?' on':''}" data-to="${esc(m.id)}" title="${m.id===soTo?'Volver a toda la mesa':'Pedirle a '+esc(m.name)}">${avatar(m.name)}<span class="nm">${esc(m.name)}</span>${quiet(m)?'<span class="q" title="Avisos silenciados">🔕</span>':''}</button>`).join('')}</div>`;
+    $('#soPeople').innerHTML=`<div class="so-people">${act.map(m=>`<button type="button" class="so-p" data-prof="${esc(m.id)}" title="Ver el perfil de ${esc(m.name)}">${avatar(m.name)}<span class="nm">${esc(m.name)}</span>${quiet(m)?'<span class="q" title="Avisos silenciados">🔕</span>':''}</button>`).join('')}</div>`;
     const list=pings.filter(p=>Date.now()-new Date(p.at)<24*36e5);
     $('#soCount').textContent=list.length?plural(list.length,'pedido'):'';
     $('#soFeed').innerHTML=list.length?`<div class="so-feed">${list.map(p=>{
@@ -114,12 +119,12 @@ V.social={
       const st=p.reply?`<span class="badge${p.reply==='si'?' paid':''}">${p.by===me?'Vos':esc(first(p.by))}: ${esc(replyTxt(p))}</span>`
         :mine?`<span class="d">Esperando</span><button type="button" class="ib del" data-pr="del" data-id="${esc(p._id)}">Cancelar</button>`
         :forMe(p)?k.replies.map(([r,l],i)=>`<button type="button" class="${i===0?'btn sm pri':'ib'}" data-pr="${r}" data-id="${esc(p._id)}">${esc(l)}</button>`).join(''):'';
-      return `<div class="so-it${forMe(p)&&!p.reply?' new':''}">${avatar(memberName(p.from))}<span class="tx">${feedTxt(p)}<small>${agoTxt(p.at)}</small></span><span class="st">${st}</span></div>`}).join('')}</div>`
+      return `<div class="so-it${forMe(p)&&!p.reply&&p.kind!=='toque'?' new':''}"><button type="button" class="avb" data-prof="${esc(p.from)}" title="Ver el perfil de ${esc(memberName(p.from))}">${avatar(memberName(p.from))}</button><span class="tx">${feedTxt(p)}<small>${agoTxt(p.at)}</small></span><span class="st">${st}</span></div>`}).join('')}</div>`
       :'<div class="p-empty">Nada por hoy. ¿Arrancás la ronda?</div>';
   },
 };
 
-// respaldo del tiempo real: cada 20 s traigo lo social de los últimos 15 min (si el tiempo real anda, no cambia nada)
+// puesta al día de lo social (si el tiempo real se cortó): lo de los últimos 15 min
 async function socialPoll(){
   if(!ready||!sb||document.hidden&&!extOn())return;
   try{
@@ -134,4 +139,48 @@ async function socialPoll(){
     if(ch){pings.sort((a,b)=>a.at<b.at?1:-1);refresh()}
   }catch(e){}
 }
-setInterval(socialPoll,20e3);
+
+/* ---------- perfil de cada uno: estadísticas y toques ---------- */
+function profStats(uid){
+  const L=team.filter(f=>f.uid===uid),te=todayS(),ym=ymNow(),ws=weekStart(te);
+  const mes=L.filter(f=>f.date.slice(0,7)===ym);
+  const act=members.filter(m=>m.active),cnt=act.map(m=>team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym).length);
+  const last=L.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
+  const days=[];for(let i=13;i>=0;i--){const d=addDays(te,-i),l=L.filter(f=>f.date===d),x=parseYMD(d);days.push({lab:String(x.getDate()),d:x.getDate(),m0:x.getMonth()+1,dw:x.getDay(),a:l.filter(f=>!isLate(f)).length,b:l.filter(isLate).length,m:l.reduce((s,f)=>s+(+f.amount||0),0),labC:x.getDay()===0||x.getDay()===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
+  return {hoy:L.filter(f=>f.date===te).length,sem:L.filter(f=>f.date>=ws&&f.date<=te).length,mes:mes.length,usd:mes.reduce((s,f)=>s+(+f.amount||0),0),
+    pos:mes.length?1+cnt.filter(n=>n>mes.length).length:null,of:act.length,cv:convPeriod(ym+'-01',te,uid),last,total:L.length,days};
+}
+function openProfile(uid){
+  const m=members.find(x=>x.id===uid);if(!m)return;
+  const own=uid===me,S=profStats(uid);
+  const lastTxt=S.last?(()=>{const n=Math.round((parseYMD(todayS())-parseYMD(S.last.date))/864e5);return n===0?'hoy':n===1?'ayer':`hace ${n} días`})():'—';
+  const k=(lb,v,s2)=>`<div class="kpi"><div class="lb">${esc(lb)}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`;
+  const body=`<div class="pf">
+    <div class="pf-h">${avatar(m.name,'xl')}<div><h2>${esc(m.name)}</h2><p>${esc(roleTxt(m.role))}${own?' · vos':''}${quiet(m)?' · <span class="hot">🔕 avisos silenciados</span>':''}${m.active?'':' · de baja'}</p></div></div>
+    <div class="pf-k">${k('Hoy',S.hoy,'FTDs')}${k('Esta semana',S.sem,'FTDs')}${k(MES[new Date().getMonth()][0].toUpperCase()+MES[new Date().getMonth()].slice(1),S.mes,`FTDs · ${esc(money(S.usd))} USD`)}
+      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('Conversión del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
+    <div class="pf-ch"><div class="lb">FTDs de los últimos 14 días <span class="pf-lg"><span class="sw"></span>new <span class="sw s2"></span>late</span></div><div id="pfChart"></div></div>
+    ${own?'':`<div class="pf-acts" id="pfActs"></div>`}
+  </div>`;
+  let tm=null;
+  const acts=api=>{const el=api.q('#pfActs');if(!el)return;
+    const lt=cooldownLeft('toque',uid),lm=cooldownLeft('mate',uid),t=ms=>ms>=6e4?Math.ceil(ms/6e4)+' min':Math.ceil(ms/1e3)+' s';
+    el.innerHTML=`<button type="button" class="btn pri" data-pa="toque"${lt?' disabled':''}>👉 ${lt?'Toque en '+t(lt):'Dar un toque'}</button>
+      <button type="button" class="btn" data-pa="mate"${lm?' disabled':''}>${lm?'Mate en '+t(lm):'Pedirle un mate'}</button>
+      <button type="button" class="btn" data-pa="d10"${cooldownLeft('d10',uid)?' disabled':''}>¿Salimos a los 10?</button>
+      <button type="button" class="btn" data-pa="d30"${cooldownLeft('d30',uid)?' disabled':''}>¿A la media?</button>
+      <button type="button" class="btn" data-pa="chat">Mensaje</button>`};
+  modal({title:'Perfil',wide:true,body,onOpen:api=>{
+      const ch=api.q('#pfChart');
+      colChart(ch,S.days,{h:150,capMin:14,int:true,minTop:3,label:'FTDs por día, últimos 14 días',empty:'Sin FTDs en estos 14 días.',
+        tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(d.m0)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
+      acts(api);tm=setInterval(()=>acts(api),1000);
+      const el=api.q('#pfActs');if(el)el.addEventListener('click',async e=>{const b=e.target.closest('[data-pa]');if(!b||b.disabled)return;primeAudio();
+        const a=b.dataset.pa,who=esc(first(uid));
+        if(a==='chat'){const id=await B.chatDm(uid);if(id){api.close();go('chat',{chat:id})}return}
+        b.disabled=true;const g=await B.ping(a,uid);acts(api);
+        if(g)toast((a==='toque'?`Le diste un toque a ${who} 👉`:a==='mate'?`Le pediste un mate a ${who}.`:`Le preguntaste a ${who}.`)+(quiet(m)?' '+sp('hot','Tiene los avisos silenciados.'):''));
+      });
+    },onClose:()=>clearInterval(tm)});
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-prof]');if(!b||!ready)return;e.preventDefault();openProfile(b.dataset.prof)});

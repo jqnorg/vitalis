@@ -1,13 +1,13 @@
 # Vitalis
 
-Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.app**: ventas (FTDs) y clientes new compartidos en la mesa, conversión del día, la semana y el mes, snippets con `/atajo`, una sección social (pedir un mate, salir a los 10 o a la media) y sueldo, agenda, turnos y faltas privados de cada agente. Viene con una extensión de Chrome para los avisos, el CRM y los snippets. Se llama así por Vitalis, excompañero de la mesa que siempre cebaba mates (de ahí el logo: un mate torpedo de cuero).
+Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.app**: ventas (FTDs) y clientes new compartidos en la mesa, conversión del día, la semana y el mes, snippets con `/atajo`, un chat (toda la mesa, grupos y privados), una sección social (pedir un mate, salir a los 10 o a la media, perfiles con toques) y sueldo, agenda, turnos y faltas privados de cada agente. Viene con una extensión de Chrome para los avisos, el CRM y los snippets. Se llama así por Vitalis, excompañero de la mesa que siempre cebaba mates (de ahí el logo: un mate torpedo de cuero).
 
 ## Cómo está armado
 
 | Carpeta | Qué hay |
 |---|---|
 | `site/` | Lo que se publica (Netlify la sirve tal cual). **No se edita a mano**: se arma con `python3 app/build.py`. |
-| `app/src/` | El código de la app: `core.js` (datos, sueldo, estadísticas), `ui.js`, `actions.js`, `views.js`, `social.js` (pedidos y avisos sociales), `auth.js` (entrada con nombre + PIN), `style.css`, `body.html` (incluye el logo del mate en SVG). |
+| `app/src/` | El código de la app: `core.js` (datos, sueldo, estadísticas), `ui.js`, `actions.js`, `views.js`, `social.js` (pedidos, avisos sociales y perfiles), `chat.js` (chat), `auth.js` (entrada con nombre + PIN), `style.css`, `body.html` (incluye el logo del mate en SVG). |
 | `app/fonts/` | Bricolage Grotesque y Figtree (licencia OFL), servidas desde el sitio. |
 | `app/config.json` | URL y clave **publishable** de Supabase (son públicas; los datos los protegen las reglas RLS). |
 | `extension/` | Extensión de Chrome (Manifest V3). Se empaqueta sola en `site/vitalis-extension.zip`. |
@@ -25,7 +25,9 @@ Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.
 
 - **Compartido en la mesa:** `sales` y `leads` (todos leen; cada uno edita lo suyo; team leader y admin cargan y corrigen las de cualquiera), `snippets` marcados como compartidos.
 - **Team leader:** carga ventas a nombre de cualquiera de la mesa (Trade24Seven y Novara Markets): a mano eligiendo el vendedor, por CSV o desde el CRM con la extensión, según la columna de agente o eligiendo a alguien en "De". "Nombre en el CRM" (`profiles.crm_name`) ayuda a reconocer a cada uno.
-- **Social:** `pings` (mate, salir a los 10, a la media, mensaje corto), para toda la mesa o para alguien. Cooldown en la base (mate 20 min, salidas 3 min, mensajes 15 s), la primera respuesta gana, se borran a los 7 días. Silenciar: `profiles.quiet_until`.
+- **Social:** `pings` (mate, salir a los 10, a la media, toque), para toda la mesa o para alguien. Cooldown en la base (mate 20 min, salidas 3 min, toque 2 min por persona), la primera respuesta gana, se borran a los 7 días. Silenciar: `profiles.quiet_until` (vale también para el chat).
+- **Chat:** `chats` (uno `team` por mesa, `group`, `dm`), `chat_members`, `messages` y `chat_reads` (hasta dónde leí y si lo silencié). Grupos y privados solo con funciones (`chat_create`, `chat_add`, `chat_leave`, `chat_rename`, `chat_dm`); cada uno lee solo los chats donde está (`in_chat`). Máximo 15 mensajes cada 30 s.
+- **Tiempo real:** todo llega por Supabase Realtime (con el latido en un worker para que no se frene en segundo plano). Si el canal se corta, la app se pone al día enseguida, sondea cada 5 s hasta que vuelve y se resuscribe; con la extensión, además, se despierta cada 30 s.
 - **Privado:** `settings`, `adjustments`, `agenda`, `shifts`, snippets propios.
 - **Entrada:** es para una sola mesa: nombre → PIN. La primera vez el PIN es 0000 y se crea uno propio. Los PIN están en `pins` (nadie los lee desde la app); `pin_login` da una contraseña interna que cambia en cada ingreso. 5 errores seguidos bloquean 15 minutos, y cada bloqueo siguiente dura el doble (hasta 24 h). Registrarse con email está cerrado.
 - **Roles:** `admin` (el primero que crea su PIN), `leader`, `agent`. Solo el admin cambia roles, suma gente, resetea PINs y da de baja.

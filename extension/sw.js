@@ -77,9 +77,11 @@ function ftdOverlay(items) {
   }
   const stack = host.shadowRoot.querySelector('.stack');
   for (const d of items) {
-    if (stack.querySelector(`[data-k="${CSS.escape(d.k)}"]`)) continue;
+    const had = stack.querySelector(`[data-k="${CSS.escape(d.k)}"]`);
+    if (had && (had.dataset.v || '') === (d.v || '')) continue;
+    if (had) had.remove(); // misma tarjeta con algo nuevo (otro mensaje del mismo chat)
     const card = document.createElement('div');
-    card.className = 'card' + (d.kind === 'crm' ? ' crm' : d.kind === 'social' ? ' social' : ''); card.dataset.k = d.k; card.setAttribute('role', 'alert');
+    card.className = 'card' + (d.kind === 'crm' ? ' crm' : d.kind === 'social' ? ' social' : ''); card.dataset.k = d.k; card.dataset.v = d.v || ''; card.setAttribute('role', 'alert');
     card.innerHTML = '<div class="h"><img class="mk" alt=""><span class="tag">vitalis</span><span class="t"></span><button class="x" data-a="close" title="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>';
     try { card.querySelector('.mk').src = chrome.runtime.getURL('icons/48.png'); } catch (e) { card.querySelector('.mk').remove(); }
     card.querySelector('.t').textContent = d.title || 'Contactar';
@@ -401,6 +403,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     (async () => {
       await dismiss(msg.k);
       if (msg.k.startsWith('crm:')) { if (msg.a === 'crm') await focusCrm(); return; }
+      if (msg.k.startsWith('so:c:')) { // mensaje del chat: abrir Vitalis en ese chat
+        if (msg.a === 'open') { await openPanel(); await sendCmd({ cmd: 'chat', k: msg.k.slice(5), at: Date.now() }); }
+        return;
+      }
       if (msg.k.startsWith('so:')) { // tarjeta social: la respuesta va a Vitalis
         const id = msg.k.slice(3);
         if (msg.a.startsWith('r:')) await sendCmd({ cmd: 'reply', k: id, r: msg.a.slice(2), at: Date.now() });
@@ -422,7 +428,11 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   return false;
 });
 
+// cada 30 s despierto a Vitalis si está en segundo plano (Chrome frena sus relojes): se pone al día con lo social y el chat
+async function tickVitalis() { for (const t of await vitalisTabs()) { try { await chrome.tabs.sendMessage(t.id, { type: 'tick' }); } catch (e) {} } }
+chrome.alarms.get('vt').then((a) => { if (!a) chrome.alarms.create('vt', { periodInMinutes: 0.5 }); });
 chrome.alarms.onAlarm.addListener(async (a) => {
+  if (a.name === 'vt') return tickVitalis();
   if (a.name === 'crm-watch') { const w = await getWatch(); if (secOf(w) < 30) return ensureLoop(false); return watchTick(); }
   const snooze = a.name.startsWith('s:');
   if (!snooze && !a.name.startsWith('p:')) return;

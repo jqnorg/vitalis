@@ -53,7 +53,7 @@ V.inicio={
     for(const f of s.list){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
     const data=[];for(let d=1;d<=days;d++){const o=bd[d]||{a:0,b:0,m:0},dw=new Date(Y,M-1,d).getDay();data.push({lab:String(d),a:o.a,b:o.b,m:o.m,d,dw,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
     $('#idTitle').textContent=`FTDs por día en ${mes}`;
-    colChart($('#iChart'),data,{h:200,capMin:18,label:'FTDs por día',empty:'Sin FTDs este mes.',
+    colChart($('#iChart'),data,{h:200,capMin:18,int:true,label:'FTDs por día',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${cap(DIAL[d.dw])} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     // últimas ventas
     const lastF=[...ftds].sort((a,b)=>-byDate(a,b)).slice(0,7);
@@ -517,11 +517,11 @@ V.equipo={
     const [Y,M]=eqYm.split('-').map(Number),days=eqYm===now?+todayS().slice(8,10):new Date(Y,M,0).getDate(),bd={};
     for(const f of list){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
     const data=[];for(let d=1;d<=new Date(Y,M,0).getDate();d++){const o=bd[d]||{a:0,b:0,m:0},dw=new Date(Y,M-1,d).getDay();data.push({lab:String(d),a:o.a,b:o.b,m:o.m,d,dw,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
-    colChart($('#eqChart'),data,{h:210,capMin:18,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
+    colChart($('#eqChart'),data,{h:210,capMin:18,int:true,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     $('#eqCount').textContent=`${plural(conV,'agente')} con ventas · ${nf(days?R.n/days:0,2)} FTDs por día`;
     $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Rol</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th>Último FTD</th></tr></thead><tbody>`+
-      per.map(p=>`<tr${p.m.id===me?' class="cur"':''}><td><span class="who-cell">${avatar(p.m.name)}${esc(p.m.name)}</span></td><td class="d">${p.m.role?roleTxt(p.m.role):''}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td></tr>`).join('')+'</tbody></table>';
+      per.map(p=>`<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="d">${p.m.role?roleTxt(p.m.role):''}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td></tr>`).join('')+'</tbody></table>';
   },
 };
 

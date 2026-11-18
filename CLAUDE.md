@@ -20,7 +20,8 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 - `leads` (clientes new, compartidos en la mesa) y `snippets` (propios o compartidos).
 - Una sola mesa. Entrada: nombre → PIN (0000 la primera vez); sin código ni invitación. Sin email. Las cuentas las crea el SQL (lista de la mesa) o el admin (`add_member`). Nunca habilitar el registro con email.
 - Roles: `admin` (el primero que crea su PIN), `leader`, `agent`. Solo el admin cambia roles, suma/baja gente y resetea PINs. Team leader y admin cargan ventas a nombre de cualquiera de la mesa (`crm_name` para reconocerlos en el CRM).
-- Social: `pings` (mate/d10/d30/msg) con cooldown en `ping_guard`, respuestas por `reply_ping`, silenciar con `profiles.quiet_until`. Avisos por realtime + sondeo cada 20 s; con la extensión, tarjeta en la pestaña activa.
+- Social: `pings` (mate/d10/d30/toque; msg ya no se usa en la UI) con cooldown en `ping_guard`, respuestas por `reply_ping`, silenciar con `profiles.quiet_until`. Perfiles (`openProfile`, cualquier `[data-prof]`) con estadísticas y toques.
+- Chat: `chats`/`chat_members`/`messages`/`chat_reads`, grupos y privados solo por funciones `chat_*`, lectura con `in_chat`. Avisos instantáneos: realtime (worker) + `catchUp()` al reconectar/volver/foco, sondeo de 5 s solo si el canal está caído, y la extensión despierta la pestaña cada 30 s (`tick`). Con la extensión, tarjeta en la pestaña activa (una por chat, se actualiza).
 - En la app: `team` = todas las ventas de la mesa, `ftds` = las mías (sueldo, inicio, turnos usan `ftds`).
 - `app/config.json` tiene la URL y la clave **publishable** (pública). Jamás commitear la clave secret/service_role.
 

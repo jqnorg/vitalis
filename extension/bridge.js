@@ -9,6 +9,7 @@
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (!isVitalis()) return false;
     if (msg && msg.type === 'cmds') { if (alive) { deliver(msg.cmds); reply({ ok: true }); } else reply({ ok: false }); return false; }
+    if (msg && msg.type === 'tick') { if (alive) post({ type: 'ftd-agenda-tick', v: 1 }); return false; } // despierta a Vitalis en segundo plano
     if (msg && msg.type === 'leads') { // clientes new del CRM → al registro de Vitalis
       if (!alive) { reply({ noPanel: true }); return false; }
       const reqId = 'L' + Date.now() + Math.random().toString(36).slice(2);
@@ -54,7 +55,7 @@
     }
     if (d.type === 'ftd-agenda-social' && d.v === 1 && d.card && typeof d.card.k === 'string') { // aviso social: tarjeta en la pestaña que estés
       const c = d.card, t = (v, n) => String(v ?? '').slice(0, n);
-      const card = { k: t(c.k, 80), kind: 'social', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
+      const card = { k: t(c.k, 80), v: t(c.v, 60), kind: 'social', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
         btns: (Array.isArray(c.btns) ? c.btns : []).slice(0, 4).map((b) => [t(b[0], 20), t(b[1], 30), b[2] ? 1 : 0]) };
       try { chrome.runtime.sendMessage({ type: 'social', card }); } catch (x) {}
       return;
