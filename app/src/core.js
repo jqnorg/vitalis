@@ -99,7 +99,8 @@ function rel(d){
 /* ---------- base de datos (Supabase) ---------- */
 // Ventas: compartidas en la mesa (team). "ftds" = las mías (sueldo, inicio, turnos); "team" = todas.
 let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[],pings=[];
-let chats=[],chatMem=[],msgs={},reads={}; // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
+let chats=[],chatMem=[],msgs={},reads={};
+let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
 const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
@@ -109,7 +110,7 @@ const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),
   amount:+f.amount,tx:f.tx||null,reg:f.reg||null,brand:f.brand||DEF_BRAND,...(f.uid?{user_id:f.uid}:{})}); // el team leader carga a nombre de otro
 const A2P=r=>({_id:r.id,n:r.n,id:r.client_id,kw:r.kw||'',due:r.due,notified:!!r.notified,done:!!r.done,doneAt:r.done_at||null});
 const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified:!!p.notified,done:!!p.done,done_at:p.doneAt||null});
-const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,updated:r.updated_at});
+const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,global:!!r.global,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
 const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',at:r.created_at,t:+new Date(r.created_at)});
@@ -120,6 +121,7 @@ function errMsg(e){
   const k=m.match(/^[A-Z_]+:\s*(.+)$/);if(k)return k[1];
   if(e&&e.code==='23505')return 'ya existe (misma transacción en la misma marca)';
   if(/pings_kind_check/.test(m))return 'los toques se activan en un rato';
+  if(/task_create|relation "public.tasks"/.test(m))return 'las tareas se activan en un rato';
   if(e&&e.code==='42501'||/row-level security|permission denied/i.test(m))return 'no tenés permiso para eso';
   if(/Failed to fetch|NetworkError|fetch failed/i.test(m))return 'sin conexión';
   if(/JWT|session|refresh token/i.test(m))return 'tu sesión venció: volvé a entrar';
@@ -193,7 +195,8 @@ const B={ // todas las escrituras pasan por acá
     try{await Q(sb.from('settings').upsert({user_id:me,cfg:JSON.parse(JSON.stringify(cfg))}));refresh();return true}catch(e){dbErr(e);return false}
   },
   async saveSnip(sn,fields){ // nuevo (sin _id) o edición
-    const row={shortcut:fields.shortcut,title:fields.title||null,body:fields.body,shared:!!fields.shared};
+    const row={shortcut:fields.shortcut,title:fields.title||null,body:fields.body,shared:!!fields.shared||!!fields.global};
+    if(fields.global||(sn&&sn.global))row.global=!!fields.global; // solo si hace falta (así anda aunque la base no tenga la columna)
     try{
       const r=sn&&sn._id?await Q(sb.from('snippets').update(row).eq('id',sn._id).select().single()):await Q(sb.from('snippets').insert(row).select().single());
       const s=N2S(r);snippets=snippets.filter(x=>x._id!==s._id);snippets.push(s);refresh();return s;
@@ -240,7 +243,7 @@ async function loadAll(){
   if(!prof)throw new Error('NO_PROFILE');
   profile=prof;
   if(!prof.active)throw new Error('INACTIVE');
-  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms]=await Promise.all([
+  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp]=await Promise.all([
     Q(sb.from('teams').select('*').eq('id',prof.team_id).single()),
     Q(sb.from('profiles').select('*').eq('team_id',prof.team_id).order('name')),
     fetchAll('sales','*','date'),
@@ -255,8 +258,10 @@ async function loadAll(){
     QO(sb.from('chat_members').select('*')),
     QO(sb.from('chat_reads').select('*').eq('user_id',me)),
     QO(sb.from('messages').select('*').gte('created_at',new Date(Date.now()-7*864e5).toISOString()).order('created_at',{ascending:false}).limit(1500)),
+    QO(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),
+    QO(sb.from('task_people').select('*').limit(5000)),
   ]);
-  chatsLoaded(ch,cm,rd,ms);
+  chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
   teamInfo=tm;members=mem;team=sales.map(S2F);mine();
   pend=ag.map(A2P);
@@ -271,7 +276,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -305,7 +310,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'snippets'},p=>{
       if(p.eventType==='DELETE')snippets=snippets.filter(x=>x._id!==(p.old&&p.old.id));
-      else if(p.new.user_id===me||(p.new.shared&&p.new.team_id===profile.team_id))up(snippets,N2S(p.new));
+      else if(p.new.user_id===me||((p.new.shared||p.new.global)&&p.new.team_id===profile.team_id))up(snippets,N2S(p.new));
       else snippets=snippets.filter(x=>x._id!==p.new.id); // dejó de estar compartido
       refresh();
     })
@@ -337,6 +342,12 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       const r=p.new;if(!chatMem.some(x=>x.chat_id===r.chat_id&&x.user_id===r.user_id))chatMem.push(r);
       if(r.user_id===me||!chats.some(c=>c.id===r.chat_id))catchUp(true);else refresh(); // me sumaron a un grupo: lo traigo
     })
+    .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},p=>{
+      if(p.eventType==='DELETE'){taskGone(p.old&&p.old.id);return}
+      if(p.new.team_id!==profile.team_id)return;
+      const t=T2X(p.new),ex=taskOf(t._id);if(ex)Object.assign(ex,t);else tasks.unshift(t);refresh();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})})
     .subscribe(st=>{
       if(gen!==rtGen)return;
       if(st==='SUBSCRIBED'){clearTimeout(rtWd);const again=rtEver;rtOk=true;rtEver=true;if(again)catchUp(true);return}
@@ -374,9 +385,11 @@ function convPeriod(from,to,uid){ // uid: me | null (toda la mesa) | otro
 }
 
 /* ---------- snippets ---------- */
+async function snipPoll(){if(!ready||!sb)return;try{const r=await Q(sb.from('snippets').select('*'));const n=r.map(N2S),sig=a=>a.map(s=>s._id+s.updated).sort().join();if(sig(n)!==sig(snippets)){snippets=n;refresh()}}catch(e){}}
 function activeSnips(){
   const own=snippets.filter(s=>s.uid===me),mine_=new Set(own.map(s=>s.shortcut));
-  const others=snippets.filter(s=>s.uid!==me&&s.shared&&!mine_.has(s.shortcut)).sort((a,b)=>(a.updated||'')<(b.updated||'')?1:-1);
+  // el tuyo gana; después el global de la mesa; después el compartido más nuevo de un compañero
+  const others=snippets.filter(s=>s.uid!==me&&(s.shared||s.global)&&!mine_.has(s.shortcut)).sort((a,b)=>(b.global-a.global)||((a.updated||'')<(b.updated||'')?1:-1));
   const seen=new Set(),out=[...own];for(const s of others)if(!seen.has(s.shortcut)){seen.add(s.shortcut);out.push(s)}
   return out.sort((a,b)=>a.shortcut.localeCompare(b.shortcut));
 }

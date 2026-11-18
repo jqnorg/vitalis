@@ -178,6 +178,33 @@ create table if not exists public.messages (
 );
 create index if not exists messages_chat_created on public.messages (chat_id, created_at desc);
 create index if not exists messages_created on public.messages (created_at desc);
+-- snippets globales: los crea y edita solo el admin, a todos les funcionan solos
+alter table public.snippets add column if not exists global boolean not null default false;
+
+-- ---------- tareas: el team leader (o el admin) las manda, cada uno la marca como hecha ----------
+create table if not exists public.tasks (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  created_by uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  what       text not null check (length(what) between 1 and 120),   -- qué hacer: "Repasar"
+  campaigns  text[] not null default '{}',
+  affiliates text[] not null default '{}',
+  date_from  date,
+  date_to    date,
+  status     text check (status is null or length(status) <= 60),  -- status en el CRM
+  notes      text check (notes is null or length(notes) <= 2000),
+  due        date,
+  created_at timestamptz not null default now()
+);
+create index if not exists tasks_team_created on public.tasks (team_id, created_at desc);
+create table if not exists public.task_people (
+  task_id uuid not null references public.tasks(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  done_at timestamptz,
+  primary key (task_id, user_id)
+);
+create index if not exists task_people_user on public.task_people (user_id);
+
 create table if not exists public.chat_reads (    -- hasta dónde leí cada chat y si lo silencié (privado de cada uno)
   user_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
   chat_id uuid not null references public.chats(id) on delete cascade,
@@ -521,6 +548,65 @@ revoke all on function public.in_chat(uuid), public.chat_create(text, uuid[]), p
 grant execute on function public.in_chat(uuid), public.chat_create(text, uuid[]), public.chat_add(uuid, uuid[]),
   public.chat_leave(uuid, uuid), public.chat_rename(uuid, text), public.chat_dm(uuid) to authenticated;
 
+-- ---------- tareas ----------
+-- ¿puedo ver esta tarea? (team leader y admin: todas; los demás: las que les mandaron o mandaron)
+create or replace function public.can_see_task(tid uuid) returns boolean
+  language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.tasks t where t.id = tid and t.team_id = public.my_team()
+    and (public.my_role() in ('admin', 'leader') or t.created_by = auth.uid()
+         or exists (select 1 from public.task_people p where p.task_id = t.id and p.user_id = auth.uid()))) $$;
+
+-- limpia una lista: sin vacíos ni repetidos, hasta 30 de 80 letras
+create or replace function public._clean_list(a text[]) returns text[]
+  language sql immutable set search_path = public as $$
+  select coalesce(array_agg(v order by o), '{}') from (
+    select distinct on (lower(v)) v, o from (
+      select left(regexp_replace(btrim(x), '\s+', ' ', 'g'), 80) v, o from unnest(coalesce(a, '{}')) with ordinality u(x, o)) q
+     where v <> '' order by lower(v), o) d $$;
+
+-- mandar una tarea (team leader o admin). Sin gente elegida: a toda la mesa menos quien la manda.
+create or replace function public.task_create(what text, campaigns text[] default '{}', affiliates text[] default '{}',
+    dfrom date default null, dto date default null, st text default null, notes text default null, due date default null,
+    people uuid[] default null) returns uuid
+  language plpgsql security definer set search_path = public as $$
+declare tid uuid; t uuid := public.my_team(); c text[] := public._clean_list(campaigns); a text[] := public._clean_list(affiliates); n int;
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'TASK: solo el team leader manda tareas'; end if;
+  what := regexp_replace(btrim(coalesce(what, '')), '\s+', ' ', 'g');
+  if what = '' or length(what) > 120 then raise exception 'TASK: escribí qué hay que hacer (hasta 120 letras)'; end if;
+  if array_length(c, 1) > 30 or array_length(a, 1) > 30 then raise exception 'TASK: hasta 30 campañas y 30 afiliadores'; end if;
+  if dfrom is not null and dto is not null and dfrom > dto then raise exception 'TASK: la fecha desde es después de la fecha hasta'; end if;
+  if (select count(*) from public.tasks where created_by = auth.uid() and created_at > now() - interval '1 hour') >= 30 then
+    raise exception 'SLOW: muchas tareas en la última hora, esperá un rato';
+  end if;
+  insert into public.tasks (team_id, created_by, what, campaigns, affiliates, date_from, date_to, status, notes, due)
+  values (t, auth.uid(), what, c, a, dfrom, dto, nullif(left(btrim(coalesce(st, '')), 60), ''), nullif(left(btrim(coalesce(notes, '')), 2000), ''), due)
+  returning id into tid;
+  insert into public.task_people (task_id, user_id)
+    select tid, p.id from public.profiles p
+     where p.team_id = t and p.active and p.login is not null
+       and (case when people is null or cardinality(people) = 0 then p.id <> auth.uid() else p.id = any(people) end);
+  get diagnostics n = row_count;
+  if n = 0 then raise exception 'TASK: elegí al menos a una persona de la mesa'; end if;
+  return tid;
+end $$;
+
+-- marcar (o desmarcar) como hecha una tarea mía
+create or replace function public.task_done(tid uuid, done boolean default true) returns json
+  language plpgsql security definer set search_path = public as $$
+begin
+  update public.task_people p set done_at = case when done then coalesce(p.done_at, now()) else null end
+   where p.task_id = tid and p.user_id = auth.uid()
+     and exists (select 1 from public.tasks t where t.id = tid and t.team_id = public.my_team());
+  if not found then raise exception 'TASK: esa tarea no es para vos'; end if;
+  return json_build_object('ok', true);
+end $$;
+
+revoke all on function public.can_see_task(uuid), public._clean_list(text[]),
+  public.task_create(text, text[], text[], date, date, text, text, date, uuid[]), public.task_done(uuid, boolean) from public, anon;
+grant execute on function public.can_see_task(uuid), public.task_create(text, text[], text[], date, date, text, text, date, uuid[]),
+  public.task_done(uuid, boolean) to authenticated;
+
 -- Solo el administrador cambia roles, mesa o si alguien sigue activo. La cuenta y el PIN no se tocan desde la app.
 -- (Sin "security definer": así sabe si el cambio viene de la app o de las funciones de arriba.)
 create or replace function public.guard_profile() returns trigger
@@ -558,6 +644,8 @@ alter table public.chats        enable row level security;
 alter table public.chat_members enable row level security;
 alter table public.messages     enable row level security;
 alter table public.chat_reads   enable row level security;
+alter table public.tasks        enable row level security;
+alter table public.task_people  enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -593,16 +681,28 @@ drop policy if exists own_shifts on public.shifts;
 create policy own_shifts on public.shifts for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 drop policy if exists snip_read on public.snippets;
-create policy snip_read on public.snippets for select to authenticated using (user_id = auth.uid() or (shared and team_id = public.my_team()));
+create policy snip_read on public.snippets for select to authenticated using (user_id = auth.uid() or ((shared or global) and team_id = public.my_team()));
 drop policy if exists snip_insert on public.snippets;
-create policy snip_insert on public.snippets for insert to authenticated with check (user_id = auth.uid() and team_id = public.my_team());
+create policy snip_insert on public.snippets for insert to authenticated
+  with check (user_id = auth.uid() and team_id = public.my_team() and (not global or public.my_role() = 'admin'));
 drop policy if exists snip_update on public.snippets;
-create policy snip_update on public.snippets for update to authenticated
-  using (user_id = auth.uid() or (shared and team_id = public.my_team() and public.my_role() in ('admin','leader')))
-  with check (team_id = public.my_team());
+create policy snip_update on public.snippets for update to authenticated   -- los globales, solo el admin
+  using ((user_id = auth.uid() and not global) or (team_id = public.my_team() and public.my_role() = 'admin' and (global or shared))
+         or (shared and not global and team_id = public.my_team() and public.my_role() = 'leader'))
+  with check (team_id = public.my_team() and (not global or public.my_role() = 'admin'));
 drop policy if exists snip_delete on public.snippets;
 create policy snip_delete on public.snippets for delete to authenticated
-  using (user_id = auth.uid() or (shared and team_id = public.my_team() and public.my_role() in ('admin','leader')));
+  using ((user_id = auth.uid() and not global) or (team_id = public.my_team() and public.my_role() = 'admin' and (global or shared))
+         or (shared and not global and team_id = public.my_team() and public.my_role() = 'leader'));
+
+-- tareas: se ven si te las mandaron (team leader y admin ven todas); se crean y marcan con las funciones
+drop policy if exists tasks_read on public.tasks;
+create policy tasks_read on public.tasks for select to authenticated using (team_id = public.my_team() and public.can_see_task(id));
+drop policy if exists tasks_delete on public.tasks;
+create policy tasks_delete on public.tasks for delete to authenticated
+  using (team_id = public.my_team() and (created_by = auth.uid() or public.my_role() = 'admin'));
+drop policy if exists task_people_read on public.task_people;
+create policy task_people_read on public.task_people for select to authenticated using (public.can_see_task(task_id));
 
 drop policy if exists leads_read on public.leads;
 create policy leads_read on public.leads for select to authenticated using (team_id = public.my_team());
@@ -651,6 +751,11 @@ grant select, insert, delete on public.messages to authenticated;
 revoke update on public.messages from authenticated;
 grant select, insert, update, delete on public.chat_reads to authenticated;
 revoke all on public.chats, public.chat_members, public.messages, public.chat_reads from anon;
+grant select, delete on public.tasks to authenticated;
+revoke insert, update on public.tasks from authenticated;
+grant select on public.task_people to authenticated;
+revoke insert, update, delete on public.task_people from authenticated;
+revoke all on public.tasks, public.task_people from anon;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
@@ -661,7 +766,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

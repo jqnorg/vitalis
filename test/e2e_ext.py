@@ -180,6 +180,17 @@ async def main():
             await F.screenshot(path=OUT / 'x8_chat_tarjeta.png')
             await cards.locator('[data-a=open]').click(); await F.wait_for_timeout(2500)
             ok(await A2.evaluate("cur") == 'chat' and 'Es urgente' in await A2.inner_text('#chMsgs'), '"Abrir chat" abre Vitalis en ese chat')
+            # tarea nueva: tarjeta en la pestaña activa y "Ya la hice" la marca en Vitalis
+            sql("insert into public.tasks (team_id, created_by, what, campaigns, status) select team_id, id, 'Repasar', array['Google ES'], 'No answer' from public.profiles where name='Sofía Ar'")
+            sql("insert into public.task_people (task_id, user_id) select t.id, p.id from public.tasks t, public.profiles p where p.name='Matias Me'")
+            await F.bring_to_front(); await A2.evaluate("go('inicio')")
+            await A2.evaluate('catchUp(true)'); await F.wait_for_timeout(2500)
+            card = F.locator('#ftd-agenda-overlay .card.social:has-text("Tarea nueva")')
+            ok(await card.count() == 1 and 'Google ES' in await card.inner_text(), 'una tarea nueva aparece como tarjeta donde estés')
+            await F.screenshot(path=OUT / 'x9_tarea_tarjeta.png')
+            await card.locator('[data-a="r:done"]').click(); await F.wait_for_timeout(2500)
+            ok(sql("select done_at is not null d from public.task_people")[0]['d'], '"Ya la hice" desde la tarjeta la marca hecha en Vitalis')
+
             # la extensión despierta a Vitalis en segundo plano para ponerse al día
             await A2.evaluate("window.__ticks=0;addEventListener('message',e=>{if(e.data&&e.data.type==='ftd-agenda-tick')window.__ticks++})")
             await sw.evaluate('tickVitalis()'); await A2.wait_for_timeout(800)

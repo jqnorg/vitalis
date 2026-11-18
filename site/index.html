@@ -611,6 +611,49 @@ body.dark .ch-at{color:var(--pri-h)}
 .pf-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 @media (max-width:600px){.pf-k{grid-template-columns:repeat(2,minmax(0,1fr))}}
 body[data-view=chat] #toasts{bottom:92px} /* en el chat, los avisos no tapan el campo de escribir */
+
+/* ---------- snippets globales ---------- */
+.badge.glob{background:var(--cuero-soft);color:#7a4520}
+body.dark .badge.glob{color:#e8c9a8}
+.sn.glob{border-color:color-mix(in srgb,var(--cuero,#8a5a3b) 35%,var(--line))}
+
+/* ---------- tareas ---------- */
+.tk-sec{margin-bottom:26px}
+.tk-sec>h2,.tk-sec>summary{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.02em;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.tk-sec>summary{cursor:pointer;list-style:none}
+.tk-sec>summary::-webkit-details-marker{display:none}
+.tk-sec>summary::before{content:'›';display:inline-block;transition:transform .15s;color:var(--dim)}
+.tk-donel[open]>summary::before{transform:rotate(90deg)}
+.tk-sec .nb{font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--pri);color:var(--pri-ink)}
+.tk{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:12px;border-left:4px solid var(--pri)}
+.tk.late{border-left-color:var(--err)}
+.tk.done{border-left-color:var(--line);opacity:.85}
+.tk-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tk-what{font-family:var(--display);font-size:20px;letter-spacing:-.015em}
+.tk-meta{color:var(--dim);font-size:13px}
+.tk-h .badge{margin-left:auto}
+.badge.bad{background:color-mix(in srgb,var(--err) 14%,transparent);color:var(--err)}
+.tk-fs{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.tk-f{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:baseline}
+.tk-f .lb{color:var(--dim);font-size:13px;font-weight:600}
+.tk-vals{display:flex;flex-wrap:wrap;gap:6px}
+.tk-c{cursor:copy}
+.tk-v{font-weight:600;font-variant-numeric:tabular-nums}
+.tk-n{margin:12px 0 0;padding:9px 12px;border-radius:12px;background:var(--raised);white-space:pre-wrap}
+.tk-ft{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.tk-prog{display:flex;align-items:center;gap:10px;flex:1 1 220px}
+.tk-bar{flex:1;height:8px;border-radius:999px;background:var(--soft);overflow:hidden}
+.tk-bar i{display:block;height:100%;background:var(--pri);border-radius:999px}
+.tk-ppl{display:flex;flex-wrap:wrap;gap:5px;flex-basis:100%}
+.tk-p{border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:2px 9px;font:inherit;font-size:12.5px;color:var(--dim);cursor:pointer}
+.tk-p.ok{background:var(--pri-soft);border-color:transparent;color:var(--fg);font-weight:600}
+.tk-act{margin-left:auto}
+.tk-sug{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.tk-sug .chip{font-size:12px}
+.tk-prev{margin-top:14px;padding:10px 12px;border-radius:12px;background:var(--raised)}
+.tk-prev .lb{color:var(--dim);font-size:12.5px;font-weight:600}
+.tk-prev p{margin:2px 0 0;font-weight:600}
+@media (max-width:600px){.tk-f{grid-template-columns:1fr;gap:2px}.tk-h .badge{margin-left:0}}
 </style>
 </head>
 <body>
@@ -635,6 +678,7 @@ body[data-view=chat] #toasts{bottom:92px} /* en el chat, los avisos no tapan el 
     <symbol id="i-turnos" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v4.8l3 1.8M9.5 2.5h5"/></symbol>
     <symbol id="i-sueldo" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12.5" rx="3"/><circle cx="12" cy="12.25" r="2.6"/><path d="M6 9.5v.01M18 15v.01"/></symbol>
     <symbol id="i-snippets" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M13.8 8.2 10.2 15.8"/></symbol>
+    <symbol id="i-tareas" viewBox="0 0 24 24"><path d="M9 4.5H7.5A2.5 2.5 0 0 0 5 7v11.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V7a2.5 2.5 0 0 0-2.5-2.5H15"/><rect x="9" y="3" width="6" height="3.2" rx="1.2"/><path d="m9 13.5 2.2 2.2L15.5 11"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h8a2.5 2.5 0 0 1 2.5 2.5v5A2.5 2.5 0 0 1 14 14H9.5L6 17v-3a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M19.6 8.6a2.4 2.4 0 0 1 .9 1.9v5a2.5 2.5 0 0 1-2.5 2.5v3l-3.5-3h-3.2a2.5 2.5 0 0 1-2-1"/></symbol>
     <symbol id="i-social" viewBox="0 0 24 24"><path d="M6.6 9.5h10.8c.3 4.6-.7 8.5-2.6 10.4-.7.7-1.6 1.1-2.8 1.1s-2.1-.4-2.8-1.1C7.3 18 6.3 14.1 6.6 9.5z"/><path d="M6 9.5h12M13.5 9.2 15.6 4c.3-.6.7-.9 1.4-.9h1"/></symbol>
     <symbol id="i-equipo" viewBox="0 0 24 24"><path d="M8 4h8v5.5a4 4 0 0 1-8 0z"/><path d="M8 6H5.2c0 2.4 1.2 3.8 3 4.2M16 6h2.8c0 2.4-1.2 3.8-3 4.2M12 13.5v3.5M8.5 20.5h7M10 17h4"/></symbol>
@@ -657,6 +701,7 @@ body[data-view=chat] #toasts{bottom:92px} /* en el chat, los avisos no tapan el 
     <button type="button" data-v="snippets"><svg><use href="#i-snippets"/></svg><span class="nm">Snippets</span><kbd>7</kbd></button>
     <button type="button" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbCh"></span><kbd>8</kbd></button>
     <button type="button" data-v="social"><svg><use href="#i-social"/></svg><span class="nm">Social</span><span class="nb hot" id="nbSo"></span><kbd>9</kbd></button>
+    <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>T</kbd></button>
     <button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span></button>
     <button type="button" data-v="config"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span><kbd>0</kbd></button>
   </nav>
@@ -676,6 +721,7 @@ body[data-view=chat] #toasts{bottom:92px} /* en el chat, los avisos no tapan el 
   <button type="button" class="pill" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
   <div class="pill turno" id="sTurno"></div>
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
+  <button type="button" class="pill" id="sTask" data-go="tareas" title="Tareas pendientes" hidden></button>
   <span class="pill bad" id="sDb" hidden>Sin conexión</span>
   <span class="grow"></span>
   <span id="sClock"></span>
@@ -796,6 +842,12 @@ body[data-view=chat] #toasts{bottom:92px} /* en el chat, los avisos no tapan el 
   <div class="vh"><div><h1>Snippets</h1><p class="sub">Escribí <kbd>/atajo</kbd> en cualquier página y se pega el texto (con la extensión de Chrome).</p></div><span class="grow"></span>
     <div class="tools"><input id="snQ" type="search" placeholder="Buscar" autocomplete="off" aria-label="Buscar snippet"><button type="button" class="btn pri wr" data-act="nuevoSnip"><svg><use href="#i-plus"/></svg>Snippet</button></div></div>
   <div class="snips" id="snList"></div>
+</section>
+
+<section class="view" id="v-tareas" hidden>
+  <div class="vh"><div><h1>Tareas</h1><p class="sub" id="tkSub"></p></div><span class="grow"></span>
+    <div class="tools"><button type="button" class="btn pri wr" id="tkNew" hidden><svg><use href="#i-plus"/></svg>Tarea</button></div></div>
+  <div id="tkList"></div>
 </section>
 
 <section class="view" id="v-chat" hidden>
@@ -996,7 +1048,8 @@ function rel(d){
 /* ---------- base de datos (Supabase) ---------- */
 // Ventas: compartidas en la mesa (team). "ftds" = las mías (sueldo, inicio, turnos); "team" = todas.
 let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[],pings=[];
-let chats=[],chatMem=[],msgs={},reads={}; // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
+let chats=[],chatMem=[],msgs={},reads={};
+let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
 const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
@@ -1006,7 +1059,7 @@ const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),
   amount:+f.amount,tx:f.tx||null,reg:f.reg||null,brand:f.brand||DEF_BRAND,...(f.uid?{user_id:f.uid}:{})}); // el team leader carga a nombre de otro
 const A2P=r=>({_id:r.id,n:r.n,id:r.client_id,kw:r.kw||'',due:r.due,notified:!!r.notified,done:!!r.done,doneAt:r.done_at||null});
 const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified:!!p.notified,done:!!p.done,done_at:p.doneAt||null});
-const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,updated:r.updated_at});
+const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,global:!!r.global,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
 const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',at:r.created_at,t:+new Date(r.created_at)});
@@ -1017,6 +1070,7 @@ function errMsg(e){
   const k=m.match(/^[A-Z_]+:\s*(.+)$/);if(k)return k[1];
   if(e&&e.code==='23505')return 'ya existe (misma transacción en la misma marca)';
   if(/pings_kind_check/.test(m))return 'los toques se activan en un rato';
+  if(/task_create|relation "public.tasks"/.test(m))return 'las tareas se activan en un rato';
   if(e&&e.code==='42501'||/row-level security|permission denied/i.test(m))return 'no tenés permiso para eso';
   if(/Failed to fetch|NetworkError|fetch failed/i.test(m))return 'sin conexión';
   if(/JWT|session|refresh token/i.test(m))return 'tu sesión venció: volvé a entrar';
@@ -1090,7 +1144,8 @@ const B={ // todas las escrituras pasan por acá
     try{await Q(sb.from('settings').upsert({user_id:me,cfg:JSON.parse(JSON.stringify(cfg))}));refresh();return true}catch(e){dbErr(e);return false}
   },
   async saveSnip(sn,fields){ // nuevo (sin _id) o edición
-    const row={shortcut:fields.shortcut,title:fields.title||null,body:fields.body,shared:!!fields.shared};
+    const row={shortcut:fields.shortcut,title:fields.title||null,body:fields.body,shared:!!fields.shared||!!fields.global};
+    if(fields.global||(sn&&sn.global))row.global=!!fields.global; // solo si hace falta (así anda aunque la base no tenga la columna)
     try{
       const r=sn&&sn._id?await Q(sb.from('snippets').update(row).eq('id',sn._id).select().single()):await Q(sb.from('snippets').insert(row).select().single());
       const s=N2S(r);snippets=snippets.filter(x=>x._id!==s._id);snippets.push(s);refresh();return s;
@@ -1137,7 +1192,7 @@ async function loadAll(){
   if(!prof)throw new Error('NO_PROFILE');
   profile=prof;
   if(!prof.active)throw new Error('INACTIVE');
-  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms]=await Promise.all([
+  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp]=await Promise.all([
     Q(sb.from('teams').select('*').eq('id',prof.team_id).single()),
     Q(sb.from('profiles').select('*').eq('team_id',prof.team_id).order('name')),
     fetchAll('sales','*','date'),
@@ -1152,8 +1207,10 @@ async function loadAll(){
     QO(sb.from('chat_members').select('*')),
     QO(sb.from('chat_reads').select('*').eq('user_id',me)),
     QO(sb.from('messages').select('*').gte('created_at',new Date(Date.now()-7*864e5).toISOString()).order('created_at',{ascending:false}).limit(1500)),
+    QO(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),
+    QO(sb.from('task_people').select('*').limit(5000)),
   ]);
-  chatsLoaded(ch,cm,rd,ms);
+  chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
   teamInfo=tm;members=mem;team=sales.map(S2F);mine();
   pend=ag.map(A2P);
@@ -1168,7 +1225,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -1202,7 +1259,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'snippets'},p=>{
       if(p.eventType==='DELETE')snippets=snippets.filter(x=>x._id!==(p.old&&p.old.id));
-      else if(p.new.user_id===me||(p.new.shared&&p.new.team_id===profile.team_id))up(snippets,N2S(p.new));
+      else if(p.new.user_id===me||((p.new.shared||p.new.global)&&p.new.team_id===profile.team_id))up(snippets,N2S(p.new));
       else snippets=snippets.filter(x=>x._id!==p.new.id); // dejó de estar compartido
       refresh();
     })
@@ -1234,6 +1291,12 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       const r=p.new;if(!chatMem.some(x=>x.chat_id===r.chat_id&&x.user_id===r.user_id))chatMem.push(r);
       if(r.user_id===me||!chats.some(c=>c.id===r.chat_id))catchUp(true);else refresh(); // me sumaron a un grupo: lo traigo
     })
+    .on('postgres_changes',{event:'*',schema:'public',table:'tasks'},p=>{
+      if(p.eventType==='DELETE'){taskGone(p.old&&p.old.id);return}
+      if(p.new.team_id!==profile.team_id)return;
+      const t=T2X(p.new),ex=taskOf(t._id);if(ex)Object.assign(ex,t);else tasks.unshift(t);refresh();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})})
     .subscribe(st=>{
       if(gen!==rtGen)return;
       if(st==='SUBSCRIBED'){clearTimeout(rtWd);const again=rtEver;rtOk=true;rtEver=true;if(again)catchUp(true);return}
@@ -1271,9 +1334,11 @@ function convPeriod(from,to,uid){ // uid: me | null (toda la mesa) | otro
 }
 
 /* ---------- snippets ---------- */
+async function snipPoll(){if(!ready||!sb)return;try{const r=await Q(sb.from('snippets').select('*'));const n=r.map(N2S),sig=a=>a.map(s=>s._id+s.updated).sort().join();if(sig(n)!==sig(snippets)){snippets=n;refresh()}}catch(e){}}
 function activeSnips(){
   const own=snippets.filter(s=>s.uid===me),mine_=new Set(own.map(s=>s.shortcut));
-  const others=snippets.filter(s=>s.uid!==me&&s.shared&&!mine_.has(s.shortcut)).sort((a,b)=>(a.updated||'')<(b.updated||'')?1:-1);
+  // el tuyo gana; después el global de la mesa; después el compartido más nuevo de un compañero
+  const others=snippets.filter(s=>s.uid!==me&&(s.shared||s.global)&&!mine_.has(s.shortcut)).sort((a,b)=>(b.global-a.global)||((a.updated||'')<(b.updated||'')?1:-1));
   const seen=new Set(),out=[...own];for(const s of others)if(!seen.has(s.shortcut)){seen.add(s.shortcut);out.push(s)}
   return out.sort((a,b)=>a.shortcut.localeCompare(b.shortcut));
 }
@@ -1664,7 +1729,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo'];
+const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 function go(v,opts){
@@ -1696,8 +1761,10 @@ function status(){
   $('#sPend').innerHTML=`Agenda <b>${hoy}</b>`+(venc?` <span class="hot b">${plural(venc,'vencido')}</span>`:'');
   $('#nbAg').textContent=venc||'';
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
-  const so=pendingForMe(),ch=unreadAll();$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
-  document.title=(so+ch?`(${so+ch}) `:'')+'Vitalis';
+  const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
+  $('#nbTa').textContent=tk.length||'';
+  $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
+  document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
   $('#sMe').innerHTML=profile?`${avatar(profile.name)}<span style="min-width:0"><span class="nm">${esc(profile.name)}</span><span class="rl">${esc(roleTxt(profile.role))}</span></span>`:'';
   turnoBar();
@@ -2327,6 +2394,9 @@ function ayuda(){
     <dt>Chats</dt><dd>Uno de toda la mesa, grupos (Nuevo → varias personas y un nombre) y privados (Nuevo → una persona, o Mensaje en su perfil).</dd>
     <dt>Grupos</dt><dd>Cualquiera de adentro suma gente y le cambia el nombre. Quien lo creó puede sacar a alguien. Si se van todos, se borra.</dd>
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciá un chat desde su encabezado; si te nombran con @tunombre, el aviso llega igual.</dd></dl>
+  <h4>Tareas</h4><dl>
+    <dt>Para hacer</dt><dd>Las que te manda el team leader (campañas, afiliadores, fechas y status). Tocá un valor para copiarlo y pegarlo en el filtro del CRM. Cuando la termines, <b>Marcar hecha</b>.</dd>
+    <dt>Team leader</dt><dd><b>Tarea</b> manda una a toda la mesa o a quienes elijas. En <b>Mandadas</b> ves quién ya la hizo.</dd></dl>
   <h4>Social</h4><dl>
     <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min) o salir a los 10 o a la media, a toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
     <dt>Perfiles</dt><dd>Tocá a alguien (en Social, en el chat o en Equipo) para ver sus números y darle un toque 👉 (uno cada 2 min por persona).</dd>
@@ -2347,7 +2417,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Secciones (<kbd>8</kbd> chat, <kbd>9</kbd> social, <kbd>0</kbd> ajustes)</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Secciones (<kbd>8</kbd> chat, <kbd>9</kbd> social, <kbd>0</kbd> ajustes)</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -2387,6 +2457,7 @@ document.addEventListener('keydown',e=>{
   if(/^[0-9]$/.test(e.key)){e.preventDefault();go(VIEWS[e.key==='0'?9:+e.key-1]);return} // 1-7 secciones, 8 chat, 9 social, 0 ajustes
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
+  if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}
   if(e.key==='/'){e.preventDefault();go('ventas');setTimeout(()=>$('#pQ').focus(),0);return}
   if(e.key==='?'){e.preventDefault();ayuda();return}
@@ -3034,7 +3105,7 @@ V.clientes={
 
 /* ---------- snippets ---------- */
 let snQ='';
-const canEditSnip=s=>s.uid===me||(s.shared&&isLeader());
+const canEditSnip=s=>s.global?isAdmin():(s.uid===me||(s.shared&&isLeader())); // los globales, solo el admin
 V.snippets={
   build(){
     $('#snQ').addEventListener('input',e=>{snQ=e.target.value.trim();this.render({})});
@@ -3050,13 +3121,13 @@ V.snippets={
   render(){
     const q=norm(snQ),mine_=new Set(snippets.filter(x=>x.uid===me).map(x=>x.shortcut));
     const list=snippets.filter(x=>!q||norm(x.shortcut+' '+x.title+' '+x.body).includes(q))
-      .sort((a,b)=>(a.uid===me?0:1)-(b.uid===me?0:1)||a.shortcut.localeCompare(b.shortcut));
+      .sort((a,b)=>(b.global-a.global)||(a.uid===me?0:1)-(b.uid===me?0:1)||a.shortcut.localeCompare(b.shortcut));
     if(!snippets.length){$('#snList').innerHTML=`<div class="sn-empty"><b>Tu primer snippet</b>Guardá el texto del KYC, el saludo o lo que escribas siempre, y pegalo escribiendo /atajo.<div style="margin-top:14px"><button type="button" class="btn pri wr" data-sn="new">Crear snippet</button></div></div>`;return}
     $('#snList').innerHTML=list.length?list.map(x=>{
       const other=x.uid!==me,shadow=other&&mine_.has(x.shortcut);
-      return `<article class="sn"><div class="h"><span class="sc">/${esc(x.shortcut)}</span><span class="tt">${esc(x.title)}</span>${x.shared&&!other?'<span class="badge">Compartido</span>':''}</div>
+      return `<article class="sn${x.global?' glob':''}"><div class="h"><span class="sc">/${esc(x.shortcut)}</span><span class="tt">${esc(x.title)}</span>${x.global?'<span class="badge glob" title="Le funciona a toda la mesa. Solo el admin lo edita.">Global</span>':x.shared&&!other?'<span class="badge">Compartido</span>':''}</div>
         <div class="bd">${esc(x.body).replace(/\{(fecha|hora|yo|cursor)\}/g,'<span class="var">{$1}</span>')}</div>
-        <div class="ft">${other?`<span class="who-cell p-sub">${avatar(memberName(x.uid))}De ${esc(memberName(x.uid).split(/\s+/)[0])}${shadow?', usás el tuyo':''}</span>`:''}<span class="grow"></span>
+        <div class="ft">${x.global?`<span class="p-sub">De toda la mesa${shadow?' · usás el tuyo':''}</span>`:other?`<span class="who-cell p-sub">${avatar(memberName(x.uid))}De ${esc(memberName(x.uid).split(/\s+/)[0])}${shadow?', usás el tuyo':''}</span>`:''}<span class="grow"></span>
           <button type="button" class="ib" data-sn="copy" data-id="${esc(x._id)}">Copiar</button>${canEditSnip(x)?`<button type="button" class="ib wr" data-sn="edit" data-id="${esc(x._id)}">Editar</button><button type="button" class="ib del wr" data-sn="del" data-id="${esc(x._id)}">Borrar</button>`:''}</div></article>`}).join('')
       :'<div class="sn-empty">Ningún snippet con esa búsqueda.</div>';
   },
@@ -3069,19 +3140,22 @@ function snipModal(sn){
       <label class="fld"><span>Título (opcional)</span><input id="snT" maxlength="60" value="${esc(sn?sn.title:'')}" data-vitalis-nosnip></label>
       <label class="fld full"><span>Texto</span><textarea id="snB" rows="8" maxlength="20000" data-vitalis-nosnip>${esc(sn?sn.body:'')}</textarea></label></div>
     <div class="vars"><span class="p-sub">Insertar:</span>${VARS.map(([v,l])=>`<button type="button" class="chip" data-var="${v}" title="${l}">${v}</button>`).join('')}</div>
-    <label class="tog" style="margin-top:14px"><input type="checkbox" id="snSh"${sn&&sn.shared?' checked':''}${sn&&sn.uid!==me?' disabled':''}>Compartir con la mesa</label>
+    <label class="tog" style="margin-top:14px"><input type="checkbox" id="snSh"${sn&&(sn.shared||sn.global)?' checked':''}${sn&&(sn.uid!==me||sn.global)?' disabled':''}>Compartir con la mesa</label>
+    ${isAdmin()?`<label class="tog" style="margin-top:8px"><input type="checkbox" id="snGl"${sn&&sn.global?' checked':''}>Global: le funciona a toda la mesa y solo el admin lo edita</label>`:''}
     <div class="fld" style="margin-top:14px"><span>Así se pega</span><div class="prev" id="snP"></div></div><div class="ebox" id="snE"></div>`;
   const acts=[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
     const sc=api.q('#snS').value.trim().replace(/^\/+/,'').toLowerCase(),b=api.q('#snB').value,err=t=>{api.q('#snE').textContent=t;return false};
     if(!/^[a-z0-9_-]{1,30}$/.test(sc))return err('El atajo va sin espacios ni tildes: letras, números, - o _.');
     if(!b.trim())return err('Falta el texto.');
-    const r=await B.saveSnip(sn,{shortcut:sc,title:api.q('#snT').value.trim(),body:b,shared:sn&&sn.uid!==me?sn.shared:api.q('#snSh').checked});
-    if(!r)return false;toast(`/${esc(sc)} guardado.${extOn()?' Ya lo podés usar en cualquier página.':''}`);
+    const gl=api.q('#snGl')?api.q('#snGl').checked:!!(sn&&sn.global);
+    const r=await B.saveSnip(sn,{shortcut:sc,title:api.q('#snT').value.trim(),body:b,global:gl,shared:gl||(sn&&sn.uid!==me?sn.shared:api.q('#snSh').checked)});
+    if(!r)return false;toast(gl?`/${esc(sc)} guardado como global: ya le funciona a toda la mesa.`:`/${esc(sc)} guardado.${extOn()?' Ya lo podés usar en cualquier página.':''}`);
   }}];
   if(sn&&canEditSnip(sn))acts.unshift({l:'Borrar',cls:'danger l',fn:async()=>{if(!await confirmar('Borrar snippet',`¿Borrar <b>/${esc(sn.shortcut)}</b>?`,'Borrar',true))return false;await B.delSnip(sn)}});
   modal({title:sn?`Editar /${esc(sn.shortcut)}`:'Nuevo snippet',body,actions:acts,wide:1,onOpen(api){
     const ta=api.q('#snB'),prev=()=>{api.q('#snP').textContent=fillSnip(ta.value)||' '};
     api.box.addEventListener('input',prev);prev();
+    const gl=api.q('#snGl'),sh=api.q('#snSh');if(gl)gl.addEventListener('change',()=>{if(gl.checked){sh.checked=true;sh.disabled=true}else sh.disabled=!!(sn&&sn.uid!==me)});
     api.box.addEventListener('click',e=>{const c=e.target.closest('[data-var]');if(!c)return;const v=c.dataset.var,a=ta.selectionStart,z_=ta.selectionEnd;
       ta.setRangeText(v,a,z_,'end');ta.focus();prev()});
     api.q('#snS').addEventListener('input',e=>{const v=e.target.value.replace(/^\/+/,'').toLowerCase().replace(/\s+/g,'-');if(v!==e.target.value)e.target.value=v});
@@ -3218,6 +3292,7 @@ async function setQuiet(ms){
 // comandos que vienen de la tarjeta de la extensión
 function socialCmd(d){
   const id=String(d.k||'');
+  if(id.startsWith('t:'))return taskCmd(d); // "Ya la hice" desde la tarjeta de la extensión
   if(d.cmd==='reply'&&['si','no','luego'].includes(d.r))B.replyPing(id,d.r);
   else if(d.cmd==='quiet')setQuiet(36e5);
 }
@@ -3562,6 +3637,181 @@ V.chat={
       if(atBottom)el.scrollTop=el.scrollHeight;
     }
     if(chatViewing(c.id)&&el.scrollHeight-el.scrollTop-el.clientHeight<90)markRead(c.id);
+  },
+};
+
+/* ============================================================
+   Tareas: el team leader (o el admin) las manda a toda la mesa o a algunos;
+   cada uno la marca como hecha. Avisos al instante (acá y en la extensión).
+   ============================================================ */
+let tkPickMode='all';
+const T2X=r=>({_id:r.id,by:r.created_by,what:r.what||'',camps:r.campaigns||[],affs:r.affiliates||[],from:r.date_from||'',to:r.date_to||'',st:r.status||'',notes:r.notes||'',due:r.due||'',at:r.created_at,t:+new Date(r.created_at)});
+function tkRows(id){return taskPeople.filter(p=>p.task_id===id)}
+function myTk(t){return taskPeople.find(p=>p.task_id===t._id&&p.user_id===me)}
+function taskOf(id){return tasks.find(t=>t._id===id)}
+function pendingTasks(){return tasks.filter(t=>{const r=myTk(t);return r&&!r.done_at})}
+const listTxt=a=>a.length<=1?a.join(''):a.slice(0,-1).join(', ')+' y '+a[a.length-1];
+function taskTxt(t){
+  const p=[t.what];
+  if(t.camps.length)p.push((t.camps.length>1?'las campañas ':'la campaña ')+listTxt(t.camps));
+  if(t.affs.length)p.push((t.camps.length?(t.affs.length>1?'de los afiliadores ':'del afiliador '):(t.affs.length>1?'los afiliadores ':'el afiliador '))+listTxt(t.affs));
+  if(t.from&&t.to)p.push(t.from===t.to?`del ${dm(t.from)}`:`del ${dm(t.from)} al ${dm(t.to)}`);else if(t.from)p.push(`desde el ${dm(t.from)}`);else if(t.to)p.push(`hasta el ${dm(t.to)}`);
+  if(t.st)p.push(`en ${t.st}`);
+  return p.join(' ');
+}
+function dueTxt(d){const t=todayS();return d===t?'hoy':d===addDays(t,1)?'mañana':d<t?`el ${dm(d)}`:`el ${DIAL[parseYMD(d).getDay()]} ${dm(d)}`}
+function tkWhen(iso){const m=Math.round((Date.now()-new Date(iso))/6e4);return m<1?'recién':m<60?`hace ${m} min`:m<24*60?`hace ${Math.floor(m/60)} h`:m<48*60?'ayer':`hace ${Math.floor(m/1440)} días`}
+
+function tasksLoaded(tk,tp){tasks=tk.filter(r=>r.team_id===profile.team_id).map(T2X).sort((a,b)=>b.t-a.t);taskPeople=tp}
+// aviso de tarea nueva (no lo frena el silencio social: es trabajo)
+function taskAlert(t){
+  if(Date.now()-t.t>30*6e4)return;
+  const who=first(t.by);pop();
+  toast(`📋 <b>${esc(who)}</b> te mandó una tarea: ${esc(clip(taskTxt(t),180))}${t.due?` <span class="dim">· para ${esc(dueTxt(t.due))}</span>`:''}`,'alert',{sticky:true,key:'tk'+t._id,actions:[{l:'Ver',fn:()=>go('tareas')},{l:'Ya la hice',fn:()=>B.taskDone(t._id,true)}]});
+  if(pageAway())extSocial({k:'so:t:'+t._id,title:'Tarea nueva',id:'De '+who,kw:clip(taskTxt(t),200),meta:t.due?`Para ${dueTxt(t.due)}`:'',btns:[['close','Entendido',1],['r:done','Ya la hice']]});
+}
+// a quien la mandó: cómo viene (sin sonido, una sola tarjeta por tarea)
+function taskProgress(t,uid){
+  if(t.by!==me||uid===me)return;
+  const rows=tkRows(t._id),n=rows.filter(p=>p.done_at).length;
+  if(cur==='tareas'&&!document.hidden)return;
+  toast(n===rows.length?`✓ Todos hicieron <b>${esc(clip(taskTxt(t),90))}</b>`:`<b>${esc(first(uid))}</b> hizo <b>${esc(clip(taskTxt(t),90))}</b> <span class="dim">· ${n} de ${rows.length}</span>`,'ok',{ms:7000,key:'tkp'+t._id,actions:[{l:'Ver',fn:()=>go('tareas')}]});
+}
+function taskGone(id){tasks=tasks.filter(t=>t._id!==id);taskPeople=taskPeople.filter(p=>p.task_id!==id);closeToast('tk'+id);extSocialClose('t:'+id);refresh()}
+// en vivo
+async function taskRow(ev,r,old){
+  if(ev==='DELETE'){taskPeople=taskPeople.filter(p=>!(p.task_id===old.task_id&&p.user_id===old.user_id));refresh();return}
+  const ex=taskPeople.find(p=>p.task_id===r.task_id&&p.user_id===r.user_id),was=ex&&ex.done_at;
+  if(ex)Object.assign(ex,r);else taskPeople.push(r);
+  let t=taskOf(r.task_id);
+  if(!t){try{const row=await Q(sb.from('tasks').select('*').eq('id',r.task_id).maybeSingle());if(row){t=T2X(row);if(!taskOf(t._id))tasks.unshift(t)}}catch(e){}}
+  if(t&&ev==='INSERT'&&r.user_id===me&&!ex)taskAlert(t);
+  if(t&&r.done_at&&!was)taskProgress(t,r.user_id);
+  refresh();
+}
+// puesta al día (si el tiempo real se cortó)
+async function taskPoll(){
+  if(!ready||!sb)return;
+  try{
+    const [tk,tp]=await Promise.all([Q(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),Q(sb.from('task_people').select('*').limit(5000))]);
+    const prev=new Map(taskPeople.map(p=>[p.task_id+'|'+p.user_id,p])),ids=new Set(tk.map(r=>r.id));
+    for(const t of tasks.filter(t=>!ids.has(t._id)))taskGone(t._id);
+    tasksLoaded(tk,tp);
+    for(const r of tp){const o=prev.get(r.task_id+'|'+r.user_id),t=taskOf(r.task_id);if(!t)continue;
+      if(!o&&r.user_id===me)taskAlert(t);
+      else if(o&&r.done_at&&!o.done_at)taskProgress(t,r.user_id);}
+    refresh();
+  }catch(e){}
+}
+
+Object.assign(B,{
+  async taskCreate(f){
+    try{const id=await Q(sb.rpc('task_create',{what:f.what,campaigns:f.camps,affiliates:f.affs,dfrom:f.from||null,dto:f.to||null,st:f.st||null,notes:f.notes||null,due:f.due||null,people:f.people||null}));await taskPoll();return id}
+    catch(e){toast(esc(errMsg(e)),'err');return null}
+  },
+  async taskDone(id,done=true){
+    try{await Q(sb.rpc('task_done',{tid:id,done}));
+      const r=taskPeople.find(p=>p.task_id===id&&p.user_id===me);if(r)r.done_at=done?new Date().toISOString():null;
+      closeToast('tk'+id);extSocialClose('t:'+id);refresh();
+      if(done)toast('Tarea hecha ✓','ok',{key:'tkd'+id,actions:[{l:'Deshacer',fn:()=>B.taskDone(id,false)}]});
+      return true}
+    catch(e){toast(esc(errMsg(e)),'err');return false}
+  },
+  async taskDel(id){try{await Q(sb.from('tasks').delete().eq('id',id));taskGone(id);return true}catch(e){dbErr(e);return false}},
+});
+function taskCmd(d){const id=String(d.k||'').replace(/^t:/,'');if(d.r==='done')B.taskDone(id,true)}
+
+/* ---------- pantalla ---------- */
+function tkField(lb,vals){
+  if(!vals.length)return '';
+  return `<div class="tk-f"><span class="lb">${esc(lb)}</span><span class="tk-vals">${vals.map(v=>`<button type="button" class="chip tk-c" data-copy="${esc(v)}" title="Copiar">${esc(v)}</button>`).join('')}</span></div>`;
+}
+function taskCard(t,mode){ // mine | done | sent
+  const rows=tkRows(t._id),n=rows.filter(p=>p.done_at).length,r=myTk(t),te=todayS();
+  const late=t.due&&t.due<te&&mode!=='done'&&(mode==='mine'||n<rows.length);
+  const fechas=t.from||t.to?[t.from&&t.to?(t.from===t.to?dm(t.from):`${dm(t.from)} → ${dm(t.to)}`):t.from?`desde ${dm(t.from)}`:`hasta ${dm(t.to)}`]:[];
+  const head=`<div class="tk-h"><b class="tk-what">${esc(t.what)}</b><span class="tk-meta">${mode==='sent'&&t.by===me?'Mandada':'De '+esc(first(t.by))} ${esc(tkWhen(t.at))}</span>${t.due?`<span class="badge${late?' bad':''}">${late?'Vencida':'Para'} ${esc(dueTxt(t.due))}</span>`:''}</div>`;
+  const body=`<div class="tk-fs">${tkField(t.camps.length>1?'Campañas':'Campaña',t.camps)}${tkField(t.affs.length>1?'Afiliadores':'Afiliador',t.affs)}${fechas.length?`<div class="tk-f"><span class="lb">Fechas</span><span class="tk-vals"><span class="tk-v">${esc(fechas[0])}</span></span></div>`:''}${tkField('Status',t.st?[t.st]:[])}</div>${t.notes?`<p class="tk-n">${esc(t.notes)}</p>`:''}`;
+  let ft='';
+  if(mode==='mine')ft=`<span class="p-sub">${rows.length>1?`${n} de ${rows.length} ya la hicieron`:''}</span><span class="grow"></span><button type="button" class="btn pri" data-ta="done" data-id="${esc(t._id)}">✓ Marcar hecha</button>`;
+  else if(mode==='done')ft=`<span class="p-sub">Hecha ${esc(tkWhen(r.done_at))}</span><span class="grow"></span><button type="button" class="ib" data-ta="undo" data-id="${esc(t._id)}">Desmarcar</button>`;
+  else{
+    const ppl=[...rows].sort((a,b)=>(!!b.done_at-!!a.done_at)||memberName(a.user_id).localeCompare(memberName(b.user_id)));
+    ft=`<div class="tk-prog"><div class="tk-bar" role="progressbar" aria-valuemin="0" aria-valuemax="${rows.length}" aria-valuenow="${n}"><i style="width:${rows.length?Math.round(n/rows.length*100):0}%"></i></div><b>${n} de ${rows.length}</b></div>
+      <div class="tk-ppl">${ppl.map(p=>`<button type="button" class="tk-p${p.done_at?' ok':''}" data-prof="${esc(p.user_id)}" title="${esc(memberName(p.user_id))}${p.done_at?' · hecha '+tkWhen(p.done_at):' · pendiente'}">${p.done_at?'✓':'·'} ${esc(first(p.user_id))}</button>`).join('')}</div>
+      <div class="tk-act">${t.by===me||isAdmin()?`<button type="button" class="ib del" data-ta="del" data-id="${esc(t._id)}">Borrar</button>`:''}</div>`;
+  }
+  return `<article class="tk${mode==='done'?' done':''}${late?' late':''}">${head}${body}<div class="tk-ft">${ft}</div></article>`;
+}
+function topVals(key,n=8){const c={};for(const f of team){const v=String(f[key]??'').trim();if(v&&!/^(null|undefined|-|0)$/i.test(v))c[v]=(c[v]||0)+1}return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0])}
+function splitList(v){const seen=new Set();return String(v||'').split(/[,;\n]/).map(x=>x.trim().replace(/\s+/g,' ')).filter(x=>x&&!seen.has(x.toLowerCase())&&seen.add(x.toLowerCase()))}
+function taskNew(){
+  if(!isLeader())return;
+  const act=members.filter(m=>m.active&&m.id!==me),camps=topVals('camp'),affs=topVals('aff');
+  const sts=[...new Set(tasks.map(t=>t.st).filter(Boolean))].slice(0,12);
+  const sug=(name,vals)=>vals.length?`<div class="tk-sug">${vals.map(v=>`<button type="button" class="chip" data-add="${name}" data-v="${esc(v)}">+ ${esc(v)}</button>`).join('')}</div>`:'';
+  const body=`<div class="fgrid">
+      <label class="fld"><span>Qué hay que hacer</span><input name="what" maxlength="120" value="Repasar" list="tkWhatL" autocomplete="off"></label>
+      <label class="fld"><span>Status en el CRM</span><input name="st" maxlength="60" placeholder="Ej.: No answer" list="tkStL" autocomplete="off"></label>
+      <label class="fld full"><span>Campañas <small class="dim">(separadas por coma)</small></span><input name="camps" autocomplete="off">${sug('camps',camps)}</label>
+      <label class="fld full"><span>Afiliadores <small class="dim">(separados por coma)</small></span><input name="affs" autocomplete="off">${sug('affs',affs)}</label>
+      <label class="fld"><span>Desde</span><input type="date" name="from"></label>
+      <label class="fld"><span>Hasta</span><input type="date" name="to"></label>
+      <label class="fld full"><span>Notas <small class="dim">(opcional)</small></span><textarea name="notes" rows="2" maxlength="2000"></textarea></label>
+      <label class="fld"><span>Para cuándo <small class="dim">(opcional)</small></span><input type="date" name="due" min="${todayS()}"></label>
+      <div class="fld"><span>Para</span><span class="seg" id="tkTo"><button type="button" data-to="all" class="on">Toda la mesa</button><button type="button" data-to="pick">Elegir</button></span></div>
+    </div>
+    <datalist id="tkWhatL"><option value="Repasar"><option value="Llamar"><option value="Recontactar"><option value="Revisar"></datalist>
+    <datalist id="tkStL">${sts.map(v=>`<option value="${esc(v)}">`).join('')}</datalist>
+    <div class="ch-pick" id="tkPick" hidden>${act.map(m=>`<label class="ch-pk"><input type="checkbox" value="${esc(m.id)}">${avatar(m.name)}<span>${esc(m.name)}</span></label>`).join('')}</div>
+    <div class="tk-prev"><span class="lb">Así le llega</span><p id="tkPrev"></p></div><div class="ebox" id="tkE"></div>`;
+  const read=api=>({what:api.q('[name=what]').value.trim(),st:api.q('[name=st]').value.trim(),camps:splitList(api.q('[name=camps]').value),affs:splitList(api.q('[name=affs]').value),
+    from:api.q('[name=from]').value,to:api.q('[name=to]').value,notes:api.q('[name=notes]').value.trim(),due:api.q('[name=due]').value});
+  tkPickMode='all';
+  modal({title:'Nueva tarea',wide:true,body,actions:[{l:'Cancelar'},{l:'Mandar',cls:'pri',fn:async api=>{
+      const f=read(api),err=t=>{api.q('#tkE').textContent=t;return false};
+      if(!f.what)return err('Escribí qué hay que hacer.');
+      if(f.from&&f.to&&f.from>f.to)return err('La fecha "desde" es después de "hasta".');
+      if(tkPickMode==='pick'){f.people=[...api.box.querySelectorAll('#tkPick input:checked')].map(x=>x.value);if(!f.people.length)return err('Elegí al menos a una persona.')}
+      const id=await B.taskCreate(f);if(!id)return false;
+      const n=tkRows(id).length;toast(`Tarea mandada a ${tkPickMode==='all'?'toda la mesa':plural(n,'persona')}.`);go('tareas');
+    }}],
+    onOpen:api=>{
+      const prev=()=>{api.q('#tkPrev').textContent=taskTxt({...read(api),what:read(api).what||'…'})};
+      api.box.addEventListener('input',prev);prev();
+      api.box.addEventListener('click',e=>{
+        const a=e.target.closest('[data-add]');
+        if(a){const i=api.q(`[name=${a.dataset.add}]`),l=splitList(i.value);if(!l.some(x=>x.toLowerCase()===a.dataset.v.toLowerCase()))l.push(a.dataset.v);i.value=l.join(', ');prev();return}
+        const s=e.target.closest('#tkTo [data-to]');
+        if(s){tkPickMode=s.dataset.to;api.box.querySelectorAll('#tkTo button').forEach(b=>b.classList.toggle('on',b===s));api.q('#tkPick').hidden=tkPickMode!=='pick'}
+      });
+      setTimeout(()=>api.q('[name=camps]').focus(),0);
+    }});
+}
+
+V.tareas={
+  build(){
+    $('#tkNew').addEventListener('click',taskNew);
+    $('#v-tareas').addEventListener('click',async e=>{
+      const c=e.target.closest('[data-copy]');
+      if(c){try{await navigator.clipboard.writeText(c.dataset.copy);toast(`<b>${esc(c.dataset.copy)}</b> copiado.`)}catch(x){toast('No pude copiar.','err')}return}
+      const b=e.target.closest('[data-ta]');if(!b)return;const id=b.dataset.id,a=b.dataset.ta;
+      if(a==='done'){b.disabled=true;await B.taskDone(id,true)}
+      else if(a==='undo')await B.taskDone(id,false);
+      else if(a==='del'){const t=taskOf(id);if(t&&await confirmar('Borrar tarea',`¿Borrar <b>${esc(clip(taskTxt(t),100))}</b> para todos?`,'Borrar',true)&&await B.taskDel(id))toast('Tarea borrada.')}
+    });
+  },
+  render(){
+    const lead=isLeader();
+    $('#tkNew').hidden=!lead;
+    const te=todayS(),mine=pendingTasks().sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:(a.due||'9')>(b.due||'9')?1:b.t-a.t);
+    const done=tasks.filter(t=>{const r=myTk(t);return r&&r.done_at}).sort((a,b)=>+new Date(myTk(b).done_at)-+new Date(myTk(a).done_at)).slice(0,20);
+    const sent=lead?tasks.filter(t=>t.by===me||!myTk(t)):[];
+    $('#tkSub').textContent=lead?'Mandá tareas a la mesa y mirá quién ya las hizo.':'Lo que te pide el team leader. Marcala cuando la termines.';
+    let h=`<section class="tk-sec"><h2>Para hacer${mine.length?` <span class="nb hot">${mine.length}</span>`:''}</h2>${mine.length?mine.map(t=>taskCard(t,'mine')).join(''):`<div class="p-empty">${tasks.some(myTk)?'Nada pendiente. 🧉':'Todavía no te mandaron tareas.'}</div>`}</section>`;
+    if(done.length)h+=`<details class="tk-sec tk-donel"><summary>Hechas <span class="dim">(${done.length})</span></summary>${done.map(t=>taskCard(t,'done')).join('')}</details>`;
+    if(lead)h+=`<section class="tk-sec"><h2>Mandadas</h2>${sent.length?sent.map(t=>taskCard(t,'sent')).join(''):'<div class="p-empty">Todavía no mandaste tareas. Tocá <b>Tarea</b> para mandar la primera.</div>'}</section>`;
+    $('#tkList').innerHTML=h;
   },
 };
 

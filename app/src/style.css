@@ -601,3 +601,46 @@ body.dark .ch-at{color:var(--pri-h)}
 .pf-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
 @media (max-width:600px){.pf-k{grid-template-columns:repeat(2,minmax(0,1fr))}}
 body[data-view=chat] #toasts{bottom:92px} /* en el chat, los avisos no tapan el campo de escribir */
+
+/* ---------- snippets globales ---------- */
+.badge.glob{background:var(--cuero-soft);color:#7a4520}
+body.dark .badge.glob{color:#e8c9a8}
+.sn.glob{border-color:color-mix(in srgb,var(--cuero,#8a5a3b) 35%,var(--line))}
+
+/* ---------- tareas ---------- */
+.tk-sec{margin-bottom:26px}
+.tk-sec>h2,.tk-sec>summary{font-family:var(--display);font-weight:800;font-size:21px;letter-spacing:-.02em;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.tk-sec>summary{cursor:pointer;list-style:none}
+.tk-sec>summary::-webkit-details-marker{display:none}
+.tk-sec>summary::before{content:'›';display:inline-block;transition:transform .15s;color:var(--dim)}
+.tk-donel[open]>summary::before{transform:rotate(90deg)}
+.tk-sec .nb{font-size:12px;font-weight:700;border-radius:999px;padding:1px 8px;background:var(--pri);color:var(--pri-ink)}
+.tk{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;margin-bottom:12px;border-left:4px solid var(--pri)}
+.tk.late{border-left-color:var(--err)}
+.tk.done{border-left-color:var(--line);opacity:.85}
+.tk-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.tk-what{font-family:var(--display);font-size:20px;letter-spacing:-.015em}
+.tk-meta{color:var(--dim);font-size:13px}
+.tk-h .badge{margin-left:auto}
+.badge.bad{background:color-mix(in srgb,var(--err) 14%,transparent);color:var(--err)}
+.tk-fs{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+.tk-f{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:baseline}
+.tk-f .lb{color:var(--dim);font-size:13px;font-weight:600}
+.tk-vals{display:flex;flex-wrap:wrap;gap:6px}
+.tk-c{cursor:copy}
+.tk-v{font-weight:600;font-variant-numeric:tabular-nums}
+.tk-n{margin:12px 0 0;padding:9px 12px;border-radius:12px;background:var(--raised);white-space:pre-wrap}
+.tk-ft{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.tk-prog{display:flex;align-items:center;gap:10px;flex:1 1 220px}
+.tk-bar{flex:1;height:8px;border-radius:999px;background:var(--soft);overflow:hidden}
+.tk-bar i{display:block;height:100%;background:var(--pri);border-radius:999px}
+.tk-ppl{display:flex;flex-wrap:wrap;gap:5px;flex-basis:100%}
+.tk-p{border:1px solid var(--line);background:var(--raised);border-radius:999px;padding:2px 9px;font:inherit;font-size:12.5px;color:var(--dim);cursor:pointer}
+.tk-p.ok{background:var(--pri-soft);border-color:transparent;color:var(--fg);font-weight:600}
+.tk-act{margin-left:auto}
+.tk-sug{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.tk-sug .chip{font-size:12px}
+.tk-prev{margin-top:14px;padding:10px 12px;border-radius:12px;background:var(--raised)}
+.tk-prev .lb{color:var(--dim);font-size:12.5px;font-weight:600}
+.tk-prev p{margin:2px 0 0;font-weight:600}
+@media (max-width:600px){.tk-f{grid-template-columns:1fr;gap:2px}.tk-h .badge{margin-left:0}}

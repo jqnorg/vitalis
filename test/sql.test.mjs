@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 12, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 14, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -340,6 +340,71 @@ ok((await db.query('select count(*)::int c from public.chat_members where chat_i
 for (let i = 0; i < 15; i++) await say(M, TC, 'spam ' + i);
 r = await say(M, TC, 'uno más');
 ok(!!r.error && /SLOW/.test(r.error), 'más de 15 mensajes en 30 s: frena');
+
+// ---------- snippets globales ----------
+r = await as(B, "insert into public.snippets (shortcut, body, global) values ('glob', 'x', true)");
+ok(!!r.error, 'un agente no crea snippets globales');
+r = await as(M, "insert into public.snippets (shortcut, body, global) values ('glob', 'x', true)");
+ok(!!r.error, 'el team leader tampoco');
+r = await as(A, "insert into public.snippets (shortcut, body, global) values ('bienvenida', 'Hola {yo}', true) returning id");
+ok(!r.error, 'el admin crea un snippet global');
+const GS = r.rows[0].id;
+r = await as(C, 'select shortcut from public.snippets where id = $1', [GS]);
+ok(r.rows.length === 1, 'todos lo ven (sin marcarlo como compartido)');
+r = await as(M, "update public.snippets set body = 'cambiado' where id = $1 returning id", [GS]);
+ok(!r.error && r.rows.length === 0, 'el team leader no edita un global');
+r = await as(M, 'delete from public.snippets where id = $1 returning id', [GS]);
+ok(!r.error && r.rows.length === 0, 'ni lo borra');
+r = await as(B, "insert into public.snippets (shortcut, body) values ('mio', 'x') returning id");
+r = await as(B, 'update public.snippets set global = true where id = $1', [r.rows[0].id]);
+ok(!!r.error, 'un agente no convierte su snippet en global');
+r = await as(A, "update public.snippets set body = 'Hola, soy {yo}' where id = $1 returning id", [GS]);
+ok(!r.error && r.rows.length === 1, 'el admin lo edita');
+r = await as(X, 'select id from public.snippets where id = $1', [GS]);
+ok(r.rows.length === 0, 'alguien de otra mesa no lo ve');
+
+// ---------- tareas ----------
+const task = (uid, args) => rid(uid, 'select public.task_create($1, $2::text[], $3::text[], $4::date, $5::date, $6, $7, $8::date, $9::uuid[])::text j', args);
+R = await task(B, ['Repasar', [], [], null, null, null, null, null, null]);
+ok(!!R.error, 'un agente no manda tareas');
+R = await task(M, ['  Repasar  ', ['Camp A', ' camp a ', '', 'Camp B'], ['Aff 1'], '2026-11-01', '2026-11-15', 'No answer', 'Ojo con los de Perú', '2026-11-20', null]);
+ok(typeof R === 'string', 'el team leader manda una tarea a toda la mesa');
+const T1 = R;
+r = (await db.query('select what, campaigns, affiliates, status from public.tasks where id = $1', [T1])).rows[0];
+ok(r.what === 'Repasar' && JSON.stringify(r.campaigns) === '["Camp A","Camp B"]' && r.status === 'No answer', 'limpia el texto y las listas (sin repetidos ni vacíos)');
+const nPeople = (await db.query("select count(*)::int c from public.profiles where team_id = (select team_id from public.profiles where id = $1) and active and login is not null and id <> $1", [M])).rows[0].c;
+ok((await db.query('select count(*)::int c from public.task_people where task_id = $1', [T1])).rows[0].c === nPeople, 'le llega a toda la mesa menos a quien la manda');
+r = await as(B, 'select id from public.tasks where id = $1', [T1]);
+ok(r.rows.length === 1, 'B la ve');
+R = await task(M, ['Llamar', [], [], null, null, null, null, null, [B]]);
+const T2 = R;
+const Dh = P['Dahiana Le'].id;
+r = await as(Dh, 'select id from public.tasks where id = $1', [T2]);
+ok(r.rows.length === 0, 'una tarea solo para B: otra agente no la ve');
+r = await as(C, 'select id from public.tasks where id = $1', [T2]);
+ok(r.rows.length === 1, 'otro team leader sí');
+r = await as(A, 'select id from public.tasks where id = $1', [T2]);
+ok(r.rows.length === 1, 'el admin ve todas');
+R = await rpc(B, 'select public.task_done($1) j', [T2]);
+ok(R.ok && (await db.query('select done_at from public.task_people where task_id = $1 and user_id = $2', [T2, B])).rows[0].done_at, 'B la marca como hecha');
+R = await rpc(Dh, 'select public.task_done($1) j', [T2]);
+ok(!!R.error, 'nadie marca una tarea que no es suya');
+R = await rpc(B, 'select public.task_done($1, false) j', [T2]);
+ok(R.ok && !(await db.query('select done_at from public.task_people where task_id = $1 and user_id = $2', [T2, B])).rows[0].done_at, 'y la puede desmarcar');
+r = await as(B, 'update public.task_people set done_at = now() where task_id = $1', [T1]);
+ok(!!r.error, 'no se marca a mano (solo con la función)');
+r = await as(B, "update public.tasks set what = 'nada' where id = $1", [T1]);
+ok(!!r.error, 'un agente no edita la tarea');
+r = await as(B, 'delete from public.tasks where id = $1 returning id', [T1]);
+ok(!r.error && r.rows.length === 0, 'ni la borra');
+R = await task(M, ['Repasar', [], [], '2026-11-15', '2026-11-01', null, null, null, null]);
+ok(!!R.error, 'fechas al revés: avisa');
+R = await task(M, ['Repasar', [], [], null, null, null, null, null, [X]]);
+ok(!!R.error, 'no se manda a alguien de otra mesa');
+r = await as(X, 'select id from public.tasks');
+ok(r.rows.length === 0, 'alguien de otra mesa no ve las tareas');
+r = await as(M, 'delete from public.tasks where id = $1 returning id', [T2]);
+ok(!r.error && r.rows.length === 1 && (await db.query('select count(*)::int c from public.task_people where task_id = $1', [T2])).rows[0].c === 0, 'quien la mandó la borra (y se va de todos)');
 
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);

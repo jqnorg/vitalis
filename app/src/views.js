@@ -640,7 +640,7 @@ V.clientes={
 
 /* ---------- snippets ---------- */
 let snQ='';
-const canEditSnip=s=>s.uid===me||(s.shared&&isLeader());
+const canEditSnip=s=>s.global?isAdmin():(s.uid===me||(s.shared&&isLeader())); // los globales, solo el admin
 V.snippets={
   build(){
     $('#snQ').addEventListener('input',e=>{snQ=e.target.value.trim();this.render({})});
@@ -656,13 +656,13 @@ V.snippets={
   render(){
     const q=norm(snQ),mine_=new Set(snippets.filter(x=>x.uid===me).map(x=>x.shortcut));
     const list=snippets.filter(x=>!q||norm(x.shortcut+' '+x.title+' '+x.body).includes(q))
-      .sort((a,b)=>(a.uid===me?0:1)-(b.uid===me?0:1)||a.shortcut.localeCompare(b.shortcut));
+      .sort((a,b)=>(b.global-a.global)||(a.uid===me?0:1)-(b.uid===me?0:1)||a.shortcut.localeCompare(b.shortcut));
     if(!snippets.length){$('#snList').innerHTML=`<div class="sn-empty"><b>Tu primer snippet</b>Guardá el texto del KYC, el saludo o lo que escribas siempre, y pegalo escribiendo /atajo.<div style="margin-top:14px"><button type="button" class="btn pri wr" data-sn="new">Crear snippet</button></div></div>`;return}
     $('#snList').innerHTML=list.length?list.map(x=>{
       const other=x.uid!==me,shadow=other&&mine_.has(x.shortcut);
-      return `<article class="sn"><div class="h"><span class="sc">/${esc(x.shortcut)}</span><span class="tt">${esc(x.title)}</span>${x.shared&&!other?'<span class="badge">Compartido</span>':''}</div>
+      return `<article class="sn${x.global?' glob':''}"><div class="h"><span class="sc">/${esc(x.shortcut)}</span><span class="tt">${esc(x.title)}</span>${x.global?'<span class="badge glob" title="Le funciona a toda la mesa. Solo el admin lo edita.">Global</span>':x.shared&&!other?'<span class="badge">Compartido</span>':''}</div>
         <div class="bd">${esc(x.body).replace(/\{(fecha|hora|yo|cursor)\}/g,'<span class="var">{$1}</span>')}</div>
-        <div class="ft">${other?`<span class="who-cell p-sub">${avatar(memberName(x.uid))}De ${esc(memberName(x.uid).split(/\s+/)[0])}${shadow?', usás el tuyo':''}</span>`:''}<span class="grow"></span>
+        <div class="ft">${x.global?`<span class="p-sub">De toda la mesa${shadow?' · usás el tuyo':''}</span>`:other?`<span class="who-cell p-sub">${avatar(memberName(x.uid))}De ${esc(memberName(x.uid).split(/\s+/)[0])}${shadow?', usás el tuyo':''}</span>`:''}<span class="grow"></span>
           <button type="button" class="ib" data-sn="copy" data-id="${esc(x._id)}">Copiar</button>${canEditSnip(x)?`<button type="button" class="ib wr" data-sn="edit" data-id="${esc(x._id)}">Editar</button><button type="button" class="ib del wr" data-sn="del" data-id="${esc(x._id)}">Borrar</button>`:''}</div></article>`}).join('')
       :'<div class="sn-empty">Ningún snippet con esa búsqueda.</div>';
   },
@@ -675,19 +675,22 @@ function snipModal(sn){
       <label class="fld"><span>Título (opcional)</span><input id="snT" maxlength="60" value="${esc(sn?sn.title:'')}" data-vitalis-nosnip></label>
       <label class="fld full"><span>Texto</span><textarea id="snB" rows="8" maxlength="20000" data-vitalis-nosnip>${esc(sn?sn.body:'')}</textarea></label></div>
     <div class="vars"><span class="p-sub">Insertar:</span>${VARS.map(([v,l])=>`<button type="button" class="chip" data-var="${v}" title="${l}">${v}</button>`).join('')}</div>
-    <label class="tog" style="margin-top:14px"><input type="checkbox" id="snSh"${sn&&sn.shared?' checked':''}${sn&&sn.uid!==me?' disabled':''}>Compartir con la mesa</label>
+    <label class="tog" style="margin-top:14px"><input type="checkbox" id="snSh"${sn&&(sn.shared||sn.global)?' checked':''}${sn&&(sn.uid!==me||sn.global)?' disabled':''}>Compartir con la mesa</label>
+    ${isAdmin()?`<label class="tog" style="margin-top:8px"><input type="checkbox" id="snGl"${sn&&sn.global?' checked':''}>Global: le funciona a toda la mesa y solo el admin lo edita</label>`:''}
     <div class="fld" style="margin-top:14px"><span>Así se pega</span><div class="prev" id="snP"></div></div><div class="ebox" id="snE"></div>`;
   const acts=[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
     const sc=api.q('#snS').value.trim().replace(/^\/+/,'').toLowerCase(),b=api.q('#snB').value,err=t=>{api.q('#snE').textContent=t;return false};
     if(!/^[a-z0-9_-]{1,30}$/.test(sc))return err('El atajo va sin espacios ni tildes: letras, números, - o _.');
     if(!b.trim())return err('Falta el texto.');
-    const r=await B.saveSnip(sn,{shortcut:sc,title:api.q('#snT').value.trim(),body:b,shared:sn&&sn.uid!==me?sn.shared:api.q('#snSh').checked});
-    if(!r)return false;toast(`/${esc(sc)} guardado.${extOn()?' Ya lo podés usar en cualquier página.':''}`);
+    const gl=api.q('#snGl')?api.q('#snGl').checked:!!(sn&&sn.global);
+    const r=await B.saveSnip(sn,{shortcut:sc,title:api.q('#snT').value.trim(),body:b,global:gl,shared:gl||(sn&&sn.uid!==me?sn.shared:api.q('#snSh').checked)});
+    if(!r)return false;toast(gl?`/${esc(sc)} guardado como global: ya le funciona a toda la mesa.`:`/${esc(sc)} guardado.${extOn()?' Ya lo podés usar en cualquier página.':''}`);
   }}];
   if(sn&&canEditSnip(sn))acts.unshift({l:'Borrar',cls:'danger l',fn:async()=>{if(!await confirmar('Borrar snippet',`¿Borrar <b>/${esc(sn.shortcut)}</b>?`,'Borrar',true))return false;await B.delSnip(sn)}});
   modal({title:sn?`Editar /${esc(sn.shortcut)}`:'Nuevo snippet',body,actions:acts,wide:1,onOpen(api){
     const ta=api.q('#snB'),prev=()=>{api.q('#snP').textContent=fillSnip(ta.value)||' '};
     api.box.addEventListener('input',prev);prev();
+    const gl=api.q('#snGl'),sh=api.q('#snSh');if(gl)gl.addEventListener('change',()=>{if(gl.checked){sh.checked=true;sh.disabled=true}else sh.disabled=!!(sn&&sn.uid!==me)});
     api.box.addEventListener('click',e=>{const c=e.target.closest('[data-var]');if(!c)return;const v=c.dataset.var,a=ta.selectionStart,z_=ta.selectionEnd;
       ta.setRangeText(v,a,z_,'end');ta.focus();prev()});
     api.q('#snS').addEventListener('input',e=>{const v=e.target.value.replace(/^\/+/,'').toLowerCase().replace(/\s+/g,'-');if(v!==e.target.value)e.target.value=v});

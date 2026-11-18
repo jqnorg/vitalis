@@ -76,6 +76,7 @@ async function setQuiet(ms){
 // comandos que vienen de la tarjeta de la extensión
 function socialCmd(d){
   const id=String(d.k||'');
+  if(id.startsWith('t:'))return taskCmd(d); // "Ya la hice" desde la tarjeta de la extensión
   if(d.cmd==='reply'&&['si','no','luego'].includes(d.r))B.replyPing(id,d.r);
   else if(d.cmd==='quiet')setQuiet(36e5);
 }

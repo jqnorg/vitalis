@@ -606,6 +606,9 @@ function ayuda(){
     <dt>Chats</dt><dd>Uno de toda la mesa, grupos (Nuevo → varias personas y un nombre) y privados (Nuevo → una persona, o Mensaje en su perfil).</dd>
     <dt>Grupos</dt><dd>Cualquiera de adentro suma gente y le cambia el nombre. Quien lo creó puede sacar a alguien. Si se van todos, se borra.</dd>
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciá un chat desde su encabezado; si te nombran con @tunombre, el aviso llega igual.</dd></dl>
+  <h4>Tareas</h4><dl>
+    <dt>Para hacer</dt><dd>Las que te manda el team leader (campañas, afiliadores, fechas y status). Tocá un valor para copiarlo y pegarlo en el filtro del CRM. Cuando la termines, <b>Marcar hecha</b>.</dd>
+    <dt>Team leader</dt><dd><b>Tarea</b> manda una a toda la mesa o a quienes elijas. En <b>Mandadas</b> ves quién ya la hizo.</dd></dl>
   <h4>Social</h4><dl>
     <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min) o salir a los 10 o a la media, a toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
     <dt>Perfiles</dt><dd>Tocá a alguien (en Social, en el chat o en Equipo) para ver sus números y darle un toque 👉 (uno cada 2 min por persona).</dd>
@@ -626,7 +629,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Secciones (<kbd>8</kbd> chat, <kbd>9</kbd> social, <kbd>0</kbd> ajustes)</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Secciones (<kbd>8</kbd> chat, <kbd>9</kbd> social, <kbd>0</kbd> ajustes)</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -666,6 +669,7 @@ document.addEventListener('keydown',e=>{
   if(/^[0-9]$/.test(e.key)){e.preventDefault();go(VIEWS[e.key==='0'?9:+e.key-1]);return} // 1-7 secciones, 8 chat, 9 social, 0 ajustes
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
+  if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}
   if(e.key==='/'){e.preventDefault();go('ventas');setTimeout(()=>$('#pQ').focus(),0);return}
   if(e.key==='?'){e.preventDefault();ayuda();return}
