@@ -2181,6 +2181,9 @@ async function importFromExt(rows){
     if(r.err)return r;
     return {added:r.added,dup,bad,unmatched:r.unmatched,ids:nuevas.filter(x=>x.uid).map(f=>f.id),mes:mesOut()};
   }
+  let ajenas=0;
+  if(nuevas.some(x=>x.agent)){const mias=nuevas.filter(x=>!x.agent||agentUid(x.agent)===me);ajenas=nuevas.length-mias.length;nuevas.length=0;nuevas.push(...mias)} // un agente: solo las suyas
+  if(!nuevas.length)return {added:0,dup,bad,ajenas,mes:mesOut()};
   for(const x of nuevas){delete x.agent;delete x.uid}
   const months=[...new Set(nuevas.map(x=>x.date.slice(0,7)))],before=Object.fromEntries(months.map(m=>[m,calc(m).tier]));
   let n=nextN()-1;const list=nuevas.sort(byDate).map(f=>({...f,n:++n}));
@@ -2188,7 +2191,7 @@ async function importFromExt(rows){
   const l=list[list.length-1];last={brand:l.brand,country:l.country,aff:l.aff,camp:l.camp};local.set('last',last);
   toast(`⇪ ${list.length===1?'1 venta nueva':list.length+' ventas nuevas'} desde el CRM: ${list.map(f=>`<b>${esc(f.id)}</b>`).join(', ')}${dup?` · ${dup} ya estaba${dup>1?'n':''}`:''}`);
   for(const m of months){const s=calc(m);if(s.tier>before[m]){toast(`🎉 ¡${s.n} FTDs! Bono de ${s.bono} USD desbloqueado.`,'alert',{ms:9000});beep(2)}}
-  return {added:list.length,dup,bad,ids:list.map(f=>f.id),mes:mesOut()};
+  return {added:list.length,dup,bad,ajenas,ids:list.map(f=>f.id),mes:mesOut()};
 }
 
 /* ---------- CSV ---------- */
@@ -2402,7 +2405,7 @@ function ayuda(){
     <dt>Perfiles</dt><dd>Tocá a alguien (en Social, en el chat o en Equipo) para ver sus números y darle un toque 👉 (uno cada 2 min por persona).</dd>
     <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Vale también para el chat. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
   <h4>Team leader</h4><dl>
-    <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, el botón pasa las ventas de todos: usa la columna de agente o el vendedor que elijas. En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
+    <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que no está en la mesa quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
     <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
@@ -2411,7 +2414,8 @@ function ayuda(){
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
     <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado.</dd></dl>
   <h4>Extensión de Chrome</h4><dl>
-    <dt>Qué hace</dt><dd>Avisos de agenda, botón en el CRM para pasar ventas, registro y aviso de clientes new, y los snippets en cualquier página.</dd>
+    <dt>Qué hace</dt><dd>Avisos de agenda, botón en el CRM para pasar ventas, registro y aviso de clientes new, y los snippets en cualquier página. Las páginas del CRM con tabla se actualizan solas cada 10 s (si la estás usando, espera).</dd>
+    <dt>Actualizar</dt><dd>Bajá el zip nuevo, descomprimilo en la misma carpeta y tocá ↻ en chrome://extensions.</dd>
     <dt>Instalar</dt><dd>Ajustes → Descargar extensión. Descomprimí el zip, abrí chrome://extensions, activá Modo de desarrollador, tocá Cargar descomprimida y elegí la carpeta. Recargá Vitalis.</dd></dl>
   <h4>Datos</h4><dl>
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>

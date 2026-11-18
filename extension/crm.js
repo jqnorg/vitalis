@@ -1,7 +1,7 @@
 // Vitalis · en el CRM:
 //   1) botón para pasar a Vitalis las ventas aprobadas que todavía no están
 //   2) los clientes en "new" se anotan en el registro de Vitalis (conversión del día)
-//   3) vigilar una página (la de clientes): se refresca sola y avisa cuando aparece un cliente en "new"
+//   3) toda página del CRM con tabla se actualiza sola cada 10 s; en la de clientes avisa cuando aparece uno en "new"
 (() => {
   if (window.__ftdCrm) return;
   window.__ftdCrm = true;
@@ -127,10 +127,12 @@
     const b = g('brand');
     return { date: dt.date, time: dt.time, id, name: g('name'), country: g('country'), aff: g('aff'), camp: g('camp'), amount, tx: g('tx'), reg, brand: b ? brandOf(b) : brand, agent: g('agent') };
   }
+  let agentHead = '';
   function scanSales(T) {
     const t = T.find((x) => isFtdTable(mapFtd(x.labels)));
     if (!t) return null;
     const m = mapFtd(t.labels);
+    agentHead = m.agent >= 0 ? String(t.labels[m.agent] || '').replace(/\b\w/g, (c) => c.toUpperCase()) : '';
     let best = [];
     for (const off of [0, 1, -1]) { // por si las filas tienen una columna de más o de menos que el encabezado
       const sales = t.rows.map((c) => toSale(c, m, off)).filter(Boolean);
@@ -171,21 +173,29 @@
   let known = null, queued = new Set();
   const qset = (q) => new Set((q || []).map((x) => norm(x.brand) + '|' + norm(x.id)));
   const prep = () => { if (known && !known.idSet) { known.idSet = new Set(known.ids || []); known.txSet = new Set(known.txs || []); } };
-  chrome.storage.local.get(['known', 'importQ', 'watch']).then((s) => { known = s.known || null; queued = qset(s.importQ); setWatch(s.watch); refresh(); }).catch(() => {});
+  chrome.storage.local.get(['known', 'importQ', 'watches']).then((s) => { known = s.known || null; queued = qset(s.importQ); setWatch(s.watches); refresh(); }).catch(() => {});
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area !== 'local') return;
     if (ch.known) known = ch.known.newValue || null;
     if (ch.importQ) queued = qset(ch.importQ.newValue);
-    if (ch.watch) setWatch(ch.watch.newValue);
-    if (ch.known || ch.importQ || ch.watch) refresh();
+    if (ch.watches) setWatch(ch.watches.newValue);
+    if (ch.known || ch.importQ || ch.watches) refresh();
   });
   const isKnown = (s) => { if (!known) return false; prep(); const b = norm(s.brand); return (s.tx && known.txSet.has(b + '|' + s.tx)) || known.idSet.has(b + '|' + norm(s.id)); };
   const isQueued = (s) => queued.has(norm(s.brand) + '|' + norm(s.id));
 
   /* ================= vigilancia de esta pestaña ================= */
-  let myTab = null, watch = null, watched = false;
-  send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; setWatch(watch); refresh(); });
-  function setWatch(w) { watch = w || null; watched = !!(watch && myTab != null && watch.tabId === myTab); }
+  // toda página del CRM con una tabla (ventas o clientes) se actualiza sola cada 10 s, sin opciones
+  let myTab = null, watches = {}, watch = null, watched = false, asked = false, noTableSince = 0;
+  send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; setWatch(watches); refresh(); });
+  function setWatch(all) { watches = all || {}; watch = myTab != null ? watches[myTab] || null : null; watched = !!watch; if (!watched) asked = false; }
+  function autoWatch(hasTable) {
+    if (myTab == null) return;
+    if (hasTable) { noTableSince = 0; if (!watched && !asked) { asked = true; send({ type: 'crm-watch-start' }); } return; }
+    if (!watched) return;
+    if (!noTableSince) noTableSince = Date.now();
+    else if (Date.now() - noTableSince > 20000) { noTableSince = 0; send({ type: 'crm-watch-stop' }); } // te fuiste a otra página del CRM sin tabla
+  }
   let lastInput = 0;
   for (const ev of ['keydown', 'pointerdown', 'wheel']) addEventListener(ev, () => { lastInput = Date.now(); }, { capture: true, passive: true });
   chrome.runtime.onMessage.addListener((m, sender, reply) => {
@@ -224,6 +234,23 @@
     send({ type: 'crm-leads', clients: rows.slice(0, 300) });
   }
 
+  /* ================= de quién es cada venta (columna "Sales Rep" o similar) ================= */
+  const nn = (x) => norm(x).replace(/[^a-z0-9]+/g, ' ').trim();
+  function repUid(txt) { // igual que en Vitalis: nombre en el CRM, nombre exacto, comienzo, nombre + inicial, solo nombre
+    const t = nn(txt), act = (desk && desk.members) || [];
+    if (!t || !act.length) return null;
+    const m = act.find((x) => x.crm && nn(x.crm) === t) || act.find((x) => nn(x.name) === t); if (m) return m.id;
+    const one = (l) => (l.length === 1 ? l[0].id : null);
+    let r = one(act.filter((x) => { const n = nn(x.name); return t.startsWith(n) || n.startsWith(t); })); if (r) return r;
+    const [f, l] = t.split(' ');
+    r = one(act.filter((x) => { const [a, b] = nn(x.name).split(' '); return a === f && (!l || !b || b[0] === l[0]); })); if (r) return r;
+    return one(act.filter((x) => nn(x.name).split(' ')[0] === f));
+  }
+  const firstName = (uid) => { const m = desk && desk.members.find((x) => x.id === uid); return m ? m.name.split(/\s+/)[0] : ''; };
+  // las que ya mandé solas en esta pestaña (para no repetir si Vitalis no las tomó)
+  const tried = new Set((() => { try { return JSON.parse(sessionStorage.getItem('vitalis-auto') || '[]'); } catch (e) { return []; } })());
+  const markTried = (list) => { for (const x of list) tried.add(norm(x.brand) + '|' + norm(x.id)); try { sessionStorage.setItem('vitalis-auto', JSON.stringify([...tried].slice(-2000))); } catch (e) {} };
+
   /* ================= botón ================= */
   let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, whoSel = '';
   const isLeader = () => !!(desk && (desk.role === 'leader' || desk.role === 'admin'));
@@ -239,7 +266,7 @@
       .tag{font-weight:800;font-size:16px;letter-spacing:-.03em}
       .t{flex:1;color:#5b685f;font-size:12px;text-align:right}
       .x{all:unset;cursor:pointer;color:#5b685f;padding:0 6px;border-radius:6px;font-size:15px}.x:hover{background:#ecf0e9;color:#15201a}
-      .sec{margin-top:9px}.sec[hidden]{display:none}
+      .sec{margin-top:9px}[hidden]{display:none!important}
       .sec+.sec{border-top:1px solid #ecf0e9;padding-top:9px}
       .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#1b874a;color:#fff;font-weight:700;border-radius:999px;padding:7px 12px}
       .go:hover{background:#156f3c}
@@ -259,13 +286,11 @@
       .min .sec{display:none}
     </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
       <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
-      <div class="sec" id="sWatch"><div class="st" id="wst"></div><div class="row"><button class="go alt" id="wgo"></button><select id="wint" title="Cada cuánto se actualiza la lista"><option value="10">10 s</option><option value="15">15 s</option><option value="30">30 s</option><option value="60">1 min</option><option value="120">2 min</option><option value="300">5 min</option></select></div><div class="ids" id="wids"></div></div></div>`;
-    root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales()));
+      <div class="sec" id="sWatch"><div class="st" id="wst"></div><div class="ids" id="wids"></div></div></div>`;
+    root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales(false)));
     root.getElementById('who').addEventListener('change', (e) => { whoSel = e.target.value; render(); });
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
     root.getElementById('msg').addEventListener('click', (e) => { if (e.target.closest('[data-open]')) send({ type: 'open-panel' }); });
-    root.getElementById('wgo').addEventListener('click', toggleWatch);
-    root.getElementById('wint').addEventListener('change', (e) => { if (watched) send({ type: 'crm-watch-start', sec: +e.target.value }); });
     document.documentElement.appendChild(h);
     return { h, root, $: (id) => root.getElementById(id), diag: false };
   }
@@ -279,19 +304,27 @@
     $('sSales').hidden = !sales && !looksFtd;
     if (looksFtd) { head.push('no encuentro la tabla de FTDs'); $('go').disabled = false; $('go').textContent = 'Copiar diagnóstico'; $('ids').textContent = ''; }
     else if (sales) {
-      const n0 = sales.filter((s) => !isKnown(s)), espera = n0.filter(isQueued), nuevas = n0.filter((s) => !isQueued(s)), ya = sales.length - n0.length;
-      head.push(`${plural(sales.length, 'aprobada')}${known ? ` · ${ya} ya en Vitalis` : ''}`);
+      const lead = isLeader(), hasCol = sales.some((s) => s.agent), mineOnly = !lead && hasCol && desk; // un agente que ve ventas de otros: solo las suyas
+      const pool = mineOnly ? sales.filter((s) => repUid(s.agent) === desk.me) : sales;
+      const n0 = pool.filter((s) => !isKnown(s)), espera = n0.filter(isQueued), nuevas = n0.filter((s) => !isQueued(s)), ya = pool.length - n0.length;
+      const sinV = lead && hasCol ? nuevas.filter((s) => !repUid(s.agent)) : [];
+      head.push(`${plural(pool.length, mineOnly ? 'tuya' : 'aprobada', mineOnly ? 'tuyas' : 'aprobadas')}${known ? ` · ${ya} ya en Vitalis` : ''}`);
       const go = $('go');
       if (busy) { go.disabled = true; go.textContent = 'Enviando…'; }
-      else if (!nuevas.length) { go.disabled = true; go.textContent = espera.length ? `${espera.length} esperando que abras Vitalis` : sales.length ? 'Ya están todas en Vitalis' : 'Sin ventas aprobadas'; }
+      else if (lead && hasCol) { // team leader con "Sales Rep": se pasan solas a cada vendedor
+        go.disabled = !sinV.length;
+        go.textContent = sinV.length ? `Asignar ${plural(sinV.length, 'venta sin vendedor', 'ventas sin vendedor')}` : espera.length ? `${espera.length} esperando que abras Vitalis` : nuevas.length ? 'Pasando a Vitalis…' : 'Ya están todas en Vitalis';
+      }
+      else if (!nuevas.length) { go.disabled = true; go.textContent = espera.length ? `${espera.length} esperando que abras Vitalis` : pool.length ? 'Ya están todas en Vitalis' : 'Sin ventas aprobadas'; }
       else { go.disabled = false; go.textContent = `Pasar ${plural(nuevas.length, 'venta nueva', 'ventas nuevas')} a Vitalis`; }
-      $('ids').innerHTML = nuevas.length ? 'Nuevas: ' + nuevas.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>${s.agent && whoSel === 'col' ? ' ' + escH(s.agent.split(/\s+/)[0]) : ''}`).join(', ') + (nuevas.length > 12 ? '…' : '') : '';
-      // team leader: de quién son (según la columna de agente del CRM, o alguien en particular)
-      const lead = isLeader();
-      $('whoRow').hidden = !lead;
-      if (lead) {
-        const hasCol = sales.some((s) => s.agent);
-        const opts = [...(hasCol ? [['col', 'Cada una según la columna de agente']] : []), [desk.me, 'Yo'], ...desk.members.filter((m) => m.id !== desk.me).map((m) => [m.id, m.name])];
+      const show = lead && hasCol ? sinV : nuevas;
+      $('ids').innerHTML = lead && hasCol
+        ? `<span class="on">Se pasan solas a cada vendedor (columna ${escH(agentHead || 'Sales Rep')}).</span>` + (sinV.length ? `<br><span class="warn">No están en la mesa: ${[...new Set(sinV.map((s) => s.agent || 'sin nombre'))].slice(0, 6).map(escH).join(', ')}</span>` : '')
+        : show.length ? 'Nuevas: ' + show.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>`).join(', ') + (show.length > 12 ? '…' : '') : '';
+      // team leader sin columna de vendedor: elige de quién son (por defecto, de quien usa Vitalis)
+      $('whoRow').hidden = !lead || hasCol;
+      if (lead && !hasCol) {
+        const opts = [[desk.me, 'Yo'], ...desk.members.filter((m) => m.id !== desk.me).map((m) => [m.id, m.name])];
         if (!opts.some((o) => o[0] === whoSel)) whoSel = opts[0][0];
         const sel = $('who'), sig = opts.map((o) => o[0]).join();
         if (sel.dataset.sig !== sig) { sel.innerHTML = opts.map(([v, l]) => `<option value="${escH(v)}">${escH(l)}</option>`).join(''); sel.dataset.sig = sig; }
@@ -301,16 +334,11 @@
     $('msg').className = 'msg ' + (msg ? msg.cls : '');
     $('msg').innerHTML = msg ? msg.html : (sales && !known ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
     // vigilancia
-    const showW = watched || (clients && !sales);
-    $('sWatch').hidden = !showW;
-    if (showW) {
+    $('sWatch').hidden = !(sales || clients);
+    if (sales || clients) {
       const n = clients ? clients.length : 0;
       if (clients && !sales) head.push(`${n} en new`);
-      $('wst').innerHTML = watched
-        ? `<span class="on">Vigilando esta página</span> · ${clients ? plural(n, 'cliente') + ' en new' : 'esperando la tabla'}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 5) : ''}`
-        : 'Te aviso con sonido cuando aparezca un cliente en new, estés en la pestaña que estés. Los new se anotan solos en Vitalis.';
-      $('wgo').textContent = watched ? 'Dejar de vigilar' : 'Vigilar esta página';
-      $('wint').value = String(watch && watched ? (watch.sec || 60) : 30);
+      $('wst').innerHTML = `<span class="on">Se actualiza sola cada 10 s</span>${clients ? ' · ' + plural(n, 'cliente') + ' en new' : ''}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 8) : ''}`;
       $('wids').innerHTML = clients && clients.length ? 'En new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
     }
     $('t').textContent = head.join(' · ');
@@ -320,11 +348,23 @@
     sales = scanSales(T);
     clients = scanClients(T);
     const looksFtd = !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
+    autoWatch(!!(sales || clients));
     if (watched) report(clients, force);
     reportLeads(clients);
-    if (!sales && !clients && !looksFtd && !watched) { if (ui) { ui.h.remove(); ui = null; } return; }
+    if (!sales && !clients && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
     render();
+    autoSales();
+  }
+  // team leader con columna de vendedor: las ventas nuevas se pasan solas a cada uno (las que no son de nadie de la mesa, no)
+  let autoT = null;
+  function autoSales() {
+    clearTimeout(autoT);
+    if (!sales || !isLeader() || !known || busy || !sales.some((s) => s.agent)) return;
+    autoT = setTimeout(() => {
+      const rows = (scanSales(tables()) || []).filter((s) => s.agent && !isKnown(s) && !isQueued(s) && !tried.has(norm(s.brand) + '|' + norm(s.id)) && repUid(s.agent));
+      if (rows.length && !busy) sendSales(rows);
+    }, 1500); // espero a que la tabla termine de cargar
   }
   function result(res) {
     busy = false;
@@ -336,19 +376,18 @@
     if (res.added) setMsg(`${res.added === 1 ? 'Pasé 1 venta' : 'Pasé ' + res.added + ' ventas'} a Vitalis.${mes}${sin}`, sin ? 'warn' : 'ok', 12000);
     else setMsg(sin ? sin.trim() : `No había nada nuevo.${mes}`, sin ? 'warn' : 'ok', 8000);
   }
-  async function sendSales() {
+  async function sendSales(auto) {
     if (busy) return;
-    const nuevas = (scanSales(tables()) || []).filter((s) => !isKnown(s) && !isQueued(s));
+    const all = (scanSales(tables()) || []).filter((s) => !isKnown(s) && !isQueued(s)), hasCol = all.some((s) => s.agent) || (sales || []).some((s) => s.agent);
+    let nuevas = Array.isArray(auto) ? auto : all;
+    if (!Array.isArray(auto) && isLeader() && hasCol) nuevas = all.filter((s) => !repUid(s.agent)); // el botón del team leader: las que no son de nadie de la mesa (las asigna en Vitalis)
+    if (!isLeader() && hasCol && desk) nuevas = nuevas.filter((s) => repUid(s.agent) === desk.me); // un agente: solo las suyas
     if (!nuevas.length) return refresh();
-    busy = true; msg = null; render();
-    if (isLeader() && whoSel && whoSel !== 'col') for (const s of nuevas) s.uid = whoSel; // todas a la persona elegida
-    if (!isLeader()) for (const s of nuevas) delete s.agent;
+    busy = true; if (!Array.isArray(auto)) msg = null; render();
+    if (isLeader() && !hasCol && whoSel) for (const s of nuevas) s.uid = whoSel; // sin columna de vendedor: a quien eligió
+    if (Array.isArray(auto)) markTried(nuevas);
     const r = await send({ type: 'crm-import', rows: nuevas });
     result(r || { err: 'La extensión se actualizó: recargá la página.' });
-  }
-  async function toggleWatch() {
-    if (watched) await send({ type: 'crm-watch-stop' });
-    else { await send({ type: 'crm-watch-start', sec: +ui.$('wint').value || 30 }); lastReport = ''; setTimeout(() => refresh(true), 300); }
   }
   function diagnostic() { // si el CRM cambia y no encuentro la tabla: copia el HTML del encabezado para poder ajustarlo
     const el = [...document.querySelectorAll('th,td,div,span')].find((e) => /^transaction id$/i.test(cellText(e)));

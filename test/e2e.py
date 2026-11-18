@@ -267,12 +267,15 @@ async def main():
             await A.click('#toasts .toast.alert:has-text("te mandó una tarea") .btn:has-text("Ver")'); await A.wait_for_timeout(600)
             ok(await A.is_visible('#v-tareas') and 'FB Perú' in await A.inner_text('#tkList'), '"Ver" lleva a Tareas con los datos')
             await A.screenshot(path=OUT / 'm2_tareas_agente.png')
+            await D.evaluate("window.__tk=[];{const o=toast;toast=(...a)=>{__tk.push(String(a[0]));return o(...a)}}") # registro los avisos (el sondeo automático puede mostrarlo antes)
             await A.click('#tkList [data-ta=done]'); await A.wait_for_timeout(900)
             ok(sql(f"select done_at is not null d from public.task_people p join public.profiles u on u.id=p.user_id where u.name='Joaquín Or'")[0]['d'], 'Joaquín la marca hecha')
             ok(await A.inner_text('#nbTa') == '' and not await A.is_visible('#sTask'), 'y deja de figurar como pendiente')
             await D.keyboard.press('1'); await D.wait_for_timeout(300)
-            await D.evaluate('catchUp(true)'); await D.wait_for_timeout(700)
-            ok(await D.locator('#toasts .toast:has-text("Joaquín")').filter(has_text='hizo').count() == 1, 'a Matias le avisa que Joaquín la hizo')
+            for _ in range(4): # si justo había una puesta al día en curso, espero la siguiente
+                await D.evaluate('catchUp(true)'); await D.wait_for_timeout(1500)
+                if await D.locator('#toasts .toast:has-text("Joaquín")').filter(has_text='hizo').count(): break
+            ok(await D.evaluate("__tk.some(t=>t.includes('Joaquín')&&t.includes('hizo'))"), 'a Matias le avisa que Joaquín la hizo')
             await D.keyboard.press('t'); await D.wait_for_timeout(500)
             ok(f'1 de {n}' in await D.inner_text('#tkList'), 'en Mandadas ve el avance')
             await D.screenshot(path=OUT / 'm3_tareas_leader.png')
@@ -293,6 +296,19 @@ async def main():
             await A.click('.mbox .mf .btn:has-text("Salir del grupo")'); await A.wait_for_timeout(400)
             await A.locator('.mbox').last.locator('.mf .pri').click(); await A.wait_for_timeout(1000)
             ok(sql(f"select count(*)::int c from public.chat_members where chat_id='{g[0]['id']}'")[0]['c'] == 2 and 'Los del fondo' not in await A.inner_text('#chList'), 'Joaquín sale del grupo')
+            # un agente que ve en el CRM ventas de otros (columna Sales Rep): solo se cargan las suyas
+            E = await newpage('E')
+            await E.goto(URL); await E.wait_for_timeout(1200)
+            await E.click('.person:has-text("Elias Me")'); await E.keyboard.type('0000'); await E.wait_for_timeout(1500)
+            await E.keyboard.type('1357'); await E.wait_for_timeout(300); await E.keyboard.type('1357'); await E.wait_for_timeout(2200)
+            ok(await E.evaluate("ready&&profile.role==='agent'"), 'entra un agente (Elias)')
+            res = await E.evaluate('''()=>importFromExt([
+              {date:'2026-11-17',time:'10:00',id:'99001',name:'Uno',amount:100,tx:'TX99001',brand:'Trade24Seven',agent:'Elias Me'},
+              {date:'2026-11-17',time:'11:00',id:'99002',name:'Dos',amount:120,tx:'TX99002',brand:'Trade24Seven',agent:'Mateo He'}])''')
+            r = sql("select client_id, (select name from public.profiles where id=user_id) who from public.sales where client_id in ('99001','99002')")
+            ok(res.get('added') == 1 and res.get('ajenas') == 1 and [(x['client_id'], x['who']) for x in r] == [('99001', 'Elias Me')], f'un agente solo carga las suyas, aunque vea las de otros ({res}, {r})')
+            await E.close()
+
             M = await newpage('M', 390, 844)
             await M.goto(URL); await M.wait_for_timeout(1200)
             await M.screenshot(path=OUT / 'f0_celular_nombres.png')

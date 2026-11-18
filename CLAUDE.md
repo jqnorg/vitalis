@@ -28,6 +28,6 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 
 ## Extensión
 - Habla con la página por `window.postMessage` en la misma ventana (`bridge.js`, solo en https://vitaliscrm.netlify.app y con `<meta name="vitalis">`). Si cambia el dominio, actualizar `content_scripts` en el manifest.
-- CRM: `crm.js` (botón de ventas aprobadas + clientes en "new" al registro + vigilar la página tocando `.refresh-btn`/Search).
+- CRM: `crm.js` (ventas aprobadas: con columna de vendedor tipo "Sales Rep" el team leader no elige nada y se pasan solas a cada uno; sin columna, botón con "De" = Yo por defecto; un agente solo carga las suyas. Clientes en "new" al registro. Toda página del CRM con tabla se actualiza sola cada 10 s, sin opciones, tocando `.refresh-btn`/Search; `watches` por pestaña en `sw.js`).
 - Snippets: `snip.js` en todas las páginas expande `/atajo` (input, textarea y contenteditable).
 - Avisos: `sw.js` (alarmas, tarjeta inyectada en la pestaña activa, sonido por documento offscreen).

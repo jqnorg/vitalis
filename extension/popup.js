@@ -47,16 +47,13 @@ document.getElementById('open').addEventListener('click', async () => {
   chrome.runtime.sendMessage({ type: 'open-panel' });
   window.close();
 });
-async function renderWatch() {
-  const { watch } = await chrome.storage.local.get('watch');
-  const el = document.getElementById('watch');
-  if (!watch) { el.hidden = true; return; }
-  el.hidden = false; el.textContent = '';
-  const t = document.createElement('div'); t.className = 'ok';
-  t.textContent = `Vigilando el CRM cada ${(watch.sec || 60) < 60 ? (watch.sec || 60) + ' s' : (watch.sec || 60) / 60 + ' min'}${watch.inNew != null ? ' · ' + watch.inNew + ' en new' : ''}${watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 5) : ''}`;
-  const b = document.createElement('button'); b.textContent = 'Dejar de vigilar'; b.style.marginTop = '6px';
-  b.onclick = () => chrome.runtime.sendMessage({ type: 'crm-watch-stop' }, () => renderWatch());
-  el.append(t, b);
+async function renderWatch() { // páginas del CRM que se actualizan solas
+  const { watches = {} } = await chrome.storage.local.get('watches');
+  const ws = Object.values(watches), el = document.getElementById('watch');
+  if (!ws.length) { el.hidden = true; return; }
+  const last = Math.max(0, ...ws.map((w) => w.lastRefresh || 0)), inNew = ws.reduce((a, w) => a + (w.inNew || 0), 0);
+  el.hidden = false; el.className = 'st ok';
+  el.textContent = `${ws.length === 1 ? 'Una página' : ws.length + ' páginas'} del CRM se actualizan solas cada 10 s${inNew ? ' · ' + inNew + ' en new' : ''}${last ? ' · ' + new Date(last).toTimeString().slice(0, 8) : ''}`;
 }
 async function renderCrm() { // en un sitio https que no es Vitalis: ofrecer usarlo como CRM
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });

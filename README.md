@@ -24,7 +24,7 @@ Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.
 ## Datos
 
 - **Compartido en la mesa:** `sales` y `leads` (todos leen; cada uno edita lo suyo; team leader y admin cargan y corrigen las de cualquiera), `snippets` marcados como compartidos.
-- **Team leader:** carga ventas a nombre de cualquiera de la mesa (Trade24Seven y Novara Markets): a mano eligiendo el vendedor, por CSV o desde el CRM con la extensión, según la columna de agente o eligiendo a alguien en "De". "Nombre en el CRM" (`profiles.crm_name`) ayuda a reconocer a cada uno.
+- **Team leader:** carga ventas a nombre de cualquiera de la mesa (Trade24Seven y Novara Markets): a mano eligiendo el vendedor, por CSV o desde el CRM con la extensión. Si la tabla del CRM tiene la columna Sales Rep, se pasan solas a cada vendedor; si no, a quien elija en "De" (por defecto, él). "Nombre en el CRM" (`profiles.crm_name`) ayuda a reconocer a cada uno.
 - **Social:** `pings` (mate, salir a los 10, a la media, toque), para toda la mesa o para alguien. Cooldown en la base (mate 20 min, salidas 3 min, toque 2 min por persona), la primera respuesta gana, se borran a los 7 días. Silenciar: `profiles.quiet_until` (vale también para el chat).
 - **Snippets globales:** `snippets.global`; solo el admin los crea y edita, a todos les funcionan solos. Gana el propio de cada uno, después el global, después el compartido de un compañero.
 - **Tareas:** `tasks` (qué hacer, campañas, afiliadores, desde/hasta, status, notas, para cuándo) y `task_people` (a quién y cuándo la hizo). Las manda team leader o admin con `task_create` (sin gente elegida: toda la mesa menos quien la manda); cada uno la marca con `task_done`. Ven la tarea quienes la recibieron; team leader y admin ven todas.

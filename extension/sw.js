@@ -1,6 +1,6 @@
 // Vitalis — service worker
 // · Agenda: recibe los contactos de Vitalis y, a la hora, avisa.
-// · CRM: pasa a Vitalis las ventas del botón y vigila una página para avisar cuando entra un cliente en "new".
+// · CRM: pasa a Vitalis las ventas (solas, por Sales Rep, para el team leader) y actualiza cada 10 s las páginas con tabla; avisa cuando entra un cliente en "new".
 // Los avisos son:
 //   · tarjeta en la pestaña que estés mirando (o una ventanita si esa pestaña no se puede usar)
 //   · sonido
@@ -265,60 +265,57 @@ async function crmImport(rows) {
   await chrome.storage.local.set({ importQ: q.slice(-500) });
   return { queued: rows.length };
 }
-/* ---------- vigilar una página del CRM: clientes en "new" ---------- */
-async function getWatch() { return (await chrome.storage.local.get('watch')).watch || null; }
-const setWatchS = (w) => chrome.storage.local.set({ watch: w });
-async function watchStart(tab, sec) {
-  const old = await getWatch();
-  const same = old && old.tabId === tab.id;
-  const w = { tabId: tab.id, url: tab.url, title: tab.title, sec: sec || 30, seen: same ? old.seen : {}, base: same ? old.base : false, since: same ? old.since : Date.now(), lastRefresh: same ? old.lastRefresh : 0, loginAt: 0 };
-  await setWatchS(w);
-  try { await chrome.tabs.update(tab.id, { pinned: true }); } catch (e) {}
-  await ensureLoop(true);
-  return w;
+/* ---------- páginas del CRM con tabla: se actualizan solas cada 10 s (todas las pestañas) ---------- */
+const EVERY = 10; // segundos, fijo
+async function allW() { return (await chrome.storage.local.get('watches')).watches || {}; }
+async function getW(tabId) { return (await allW())[tabId] || null; }
+async function setW(tabId, w) { const all = await allW(); if (w) all[tabId] = w; else delete all[tabId]; await chrome.storage.local.set({ watches: all }); }
+async function watchStart(tab) {
+  const old = await getW(tab.id);
+  await setW(tab.id, { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null });
+  try { await chrome.tabs.update(tab.id, { autoDiscardable: false }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria
+  await ensureLoop();
 }
-async function watchStop() { loopOn = false; clearTimeout(loopT); await chrome.storage.local.remove('watch'); await chrome.alarms.clear('crm-watch'); }
-async function watchTick() {
-  const w = await getWatch();
-  if (!w) return chrome.alarms.clear('crm-watch');
+async function watchStop(tabId) { await setW(tabId, null); if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); await chrome.alarms.clear('crm-watch'); } }
+async function tickOne(w) {
   let tab = null; try { tab = await chrome.tabs.get(w.tabId); } catch (e) {}
-  if (!tab) return watchStop();
+  if (!tab) return watchStop(w.tabId);
+  if (tab.discarded) { try { await chrome.tabs.reload(w.tabId); } catch (e) {} return; }
   let r = null;
   try { r = await withTimeout(chrome.tabs.sendMessage(w.tabId, { type: 'crm-refresh' }), 5000); } catch (e) {}
   if (!r && tab.status === 'complete') { try { await chrome.tabs.reload(w.tabId); } catch (e) {} } // la página no responde: la recargo
-  if (!r || !r.skipped) await setWatchS({ ...(await getWatch() || w), lastRefresh: Date.now() });
+  if (!r || !r.skipped) { const cur = await getW(w.tabId); if (cur) await setW(w.tabId, { ...cur, lastRefresh: Date.now() }); }
 }
-// Las alarmas de Chrome no bajan de 30 s: para 10 o 15 s uso un temporizador propio, y la alarma de 30 s lo revive si Chrome lo frena.
+let ticking = false;
+async function watchTick() {
+  if (ticking) return; ticking = true;
+  try { for (const w of Object.values(await allW())) await tickOne(w); } finally { ticking = false; }
+}
+// Las alarmas de Chrome no bajan de 30 s: para 10 s uso un temporizador propio, y la alarma de 30 s lo revive si Chrome lo frena.
 let loopT = null, loopOn = false;
-const secOf = (w) => (w && (w.sec || (w.every ? w.every * 60 : 30))) || 30;
-async function ensureLoop(restart) {
-  const w = await getWatch();
-  if (!w) { loopOn = false; clearTimeout(loopT); return chrome.alarms.clear('crm-watch'); }
-  const sec = secOf(w);
-  const a = await chrome.alarms.get('crm-watch'), period = Math.max(0.5, sec / 60);
-  if (restart || !a || Math.abs(a.periodInMinutes - period) > 0.01) await chrome.alarms.create('crm-watch', { periodInMinutes: period, delayInMinutes: period });
-  if (sec >= 30) { loopOn = false; clearTimeout(loopT); return; }
-  if (loopOn && !restart) return;
+async function ensureLoop() {
+  if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); return chrome.alarms.clear('crm-watch'); }
+  if (!(await chrome.alarms.get('crm-watch'))) await chrome.alarms.create('crm-watch', { periodInMinutes: 0.5, delayInMinutes: 0.5 });
+  if (loopOn) return;
   loopOn = true; clearTimeout(loopT);
   const step = async () => {
     if (!loopOn) return;
-    const w2 = await getWatch();
-    if (!w2 || secOf(w2) >= 30) { loopOn = false; return; }
+    if (!Object.keys(await allW()).length) { loopOn = false; return; }
     await watchTick();
-    loopT = setTimeout(step, secOf(w2) * 1000);
+    loopT = setTimeout(step, EVERY * 1000);
   };
-  loopT = setTimeout(step, sec * 1000);
+  loopT = setTimeout(step, EVERY * 1000);
 }
-chrome.runtime.onStartup.addListener(() => ensureLoop(false));
-ensureLoop(false);
-chrome.tabs.onRemoved.addListener(async (tabId) => { const w = await getWatch(); if (w && w.tabId === tabId) await watchStop(); });
+chrome.runtime.onStartup.addListener(() => ensureLoop());
+chrome.storage.local.remove('watch'); // la vigilancia vieja (una sola pestaña, con opciones)
+chrome.tabs.onRemoved.addListener(async (tabId) => { if (await getW(tabId)) await watchStop(tabId); });
 async function crmClients(tabId, m) {
-  const w = await getWatch();
-  if (!w || w.tabId !== tabId) return { watched: false };
+  const w = await getW(tabId);
+  if (!w) return { watched: false };
   const now = Date.now();
   if (m.login) { // se cerró la sesión del CRM: aviso una vez por hora
     if (now - (w.loginAt || 0) > 3600e3) {
-      await setWatchS({ ...w, loginAt: now });
+      await setW(tabId, { ...w, loginAt: now });
       await alertCard({ k: 'crm:login', kind: 'crm', title: 'El CRM cerró la sesión', id: 'Volvé a entrar al CRM', kw: 'Mientras tanto no puedo ver los clientes nuevos.', meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', '⚠ El CRM cerró la sesión', 'Volvé a entrar para seguir vigilando los clientes nuevos.');
     }
     return { watched: true };
@@ -328,7 +325,7 @@ async function crmClients(tabId, m) {
   const seen = { ...w.seen }, fresh = [];
   for (const c of m.clients) { if (!seen[c.key]) { if (w.base) fresh.push(c); seen[c.key] = now; } }
   const keys = Object.keys(seen); if (keys.length > 3000) for (const k of keys.sort((a, b) => seen[a] - seen[b]).slice(0, keys.length - 3000)) delete seen[k];
-  await setWatchS({ ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 });
+  await setW(tabId, { ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 });
   for (const c of fresh.slice(0, 5)) {
     await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
       btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `🆕 Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
@@ -343,8 +340,8 @@ async function alertCard(info, tone, sysTitle, sysMsg) {
   await showNow();
   if (sysTitle) await createN('n|' + Date.now() + '|' + info.k, { type: 'basic', iconUrl: 'icons/128.png', title: sysTitle, message: sysMsg || '', priority: 2, requireInteraction: true, buttons: [{ title: 'Ver en el CRM' }] });
 }
-async function focusCrm() {
-  const w = await getWatch();
+async function focusCrm() { // la pestaña de clientes (la que tiene clientes en new), si no cualquiera del CRM
+  const ws = Object.values(await allW()), w = ws.find((x) => x.inNew != null) || ws[0] || null;
   let tab = null;
   if (w) { try { tab = await chrome.tabs.get(w.tabId); } catch (e) {} }
   if (!tab) [tab] = await chrome.tabs.query({ url: await crmUrls() });
@@ -390,8 +387,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true;
   }
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
-  if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab, Math.max(10, Math.min(1800, +msg.sec || 30))).then(() => reply({ ok: true })); return true; }
-  if (msg.type === 'crm-watch-stop') { watchStop().then(() => reply({ ok: true })); return true; }
+  if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(() => reply({ ok: true })); return true; }
+  if (msg.type === 'crm-watch-stop' && sender.tab) { watchStop(sender.tab.id).then(() => reply({ ok: true })); return true; }
   if (msg.type === 'crm-clients' && sender.tab && Array.isArray(msg.clients)) { crmClients(sender.tab.id, msg).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'test') {
     alertItem({ k: 'test', n: 0, id: 'PRUEBA', kw: 'Así te van a llegar los avisos', due: Date.now() })
@@ -433,7 +430,7 @@ async function tickVitalis() { for (const t of await vitalisTabs()) { try { awai
 chrome.alarms.get('vt').then((a) => { if (!a) chrome.alarms.create('vt', { periodInMinutes: 0.5 }); });
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === 'vt') return tickVitalis();
-  if (a.name === 'crm-watch') { const w = await getWatch(); if (secOf(w) < 30) return ensureLoop(false); return watchTick(); }
+  if (a.name === 'crm-watch') return ensureLoop(); // revive el temporizador de 10 s si Chrome lo frenó
   const snooze = a.name.startsWith('s:');
   if (!snooze && !a.name.startsWith('p:')) return;
   const k = a.name.slice(2);

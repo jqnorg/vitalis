@@ -21,18 +21,23 @@ FORM = '''<!doctype html><meta charset="utf-8"><title>Formulario</title><body st
 <input id="i" style="width:600px"><br><br><textarea id="t" rows="6" cols="70"></textarea><br><br>
 <div id="ce" contenteditable="true" style="border:1px solid #999;min-height:80px;width:600px;padding:6px"></div>
 <input id="pw" type="password"><input id="no" data-vitalis-nosnip></body>'''
-CRM = '''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body style="font:14px system-ui;padding:20px"><h3>Clients</h3>
+CRM = '''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body style="font:14px system-ui;padding:20px"><h3>Clients</h3><button class="refresh-btn" onclick="window.__clicks=(window.__clicks||0)+1">⟳</button>
 <table border="1" cellpadding="6"><thead><tr><th>Client ID</th><th>Full Name</th><th>Country</th><th>Status</th><th>Registration Time</th></tr></thead><tbody>
 <tr><td>555001</td><td>Lucía Pérez</td><td>Peru</td><td>New</td><td>17/11/2026 10:02</td></tr>
 <tr><td>555002</td><td>Jorge Díaz</td><td>Chile</td><td>New</td><td>17/11/2026 10:40</td></tr>
 <tr><td>555003</td><td>Ana Gómez</td><td>Mexico</td><td>No answer</td><td>16/11/2026 18:00</td></tr>
 </tbody></table></body>'''
-T24 = '''<!doctype html><meta charset="utf-8"><title>CRM · Bank transactions</title><body style="font:14px system-ui;padding:20px"><h3>Bank transactions</h3>
-<table border="1" cellpadding="6"><thead><tr><th>Status</th><th>Time of FTD</th><th>User ID</th><th>Full Name</th><th>Country</th><th>Amount</th><th>Transaction ID</th><th>Agent</th></tr></thead><tbody>
+T24 = '''<!doctype html><meta charset="utf-8"><title>CRM · Bank transactions</title><body style="font:14px system-ui;padding:20px"><h3>Bank transactions</h3><button class="refresh-btn" onclick="window.__clicks=(window.__clicks||0)+1">⟳</button>
+<table border="1" cellpadding="6"><thead><tr><th>Status</th><th>Time of FTD</th><th>User ID</th><th>Full Name</th><th>Country</th><th>Amount</th><th>Transaction ID</th><th>Sales Rep</th></tr></thead><tbody>
 <tr><td>Approved</td><td>17/11/2026 10:15</td><td>777001</td><td>Carla Núñez</td><td>Peru</td><td>250</td><td>TX777001</td><td>Sofia Arias</td></tr>
 <tr><td>Approved</td><td>17/11/2026 11:20</td><td>777002</td><td>Diego Soto</td><td>Chile</td><td>300</td><td>TX777002</td><td>Mateo Herrera</td></tr>
 <tr><td>Approved</td><td>17/11/2026 12:05</td><td>777003</td><td>Rosa Paz</td><td>Mexico</td><td>200</td><td>TX777003</td><td>Fulano Externo</td></tr>
 <tr><td>Declined</td><td>17/11/2026 12:30</td><td>777004</td><td>Luis Mora</td><td>Peru</td><td>100</td><td>TX777004</td><td>Sofia Arias</td></tr>
+</tbody></table></body>'''
+
+T24_SINREP = '''<!doctype html><meta charset="utf-8"><title>CRM · FTDs</title><body style="font:14px system-ui;padding:20px"><h3>FTDs</h3><button class="refresh-btn">⟳</button>
+<table border="1" cellpadding="6"><thead><tr><th>Status</th><th>Time of FTD</th><th>User ID</th><th>Full Name</th><th>Country</th><th>Amount</th><th>Transaction ID</th></tr></thead><tbody>
+<tr><td>Success</td><td>17/11/2026 14:15</td><td>777101</td><td>Marta Gil</td><td>Peru</td><td>180</td><td>TX777101</td></tr>
 </tbody></table></body>'''
 
 async def main():
@@ -57,6 +62,7 @@ async def main():
             await ctx.route('https://example.test/**', lambda r: r.fulfill(status=200, content_type='text/html', body=FORM))
             await ctx.route('https://crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=CRM))
             await ctx.route('https://crmtrade24seven.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=T24))
+            await ctx.route('https://crmtrade24seven.com/sinrep', lambda r: r.fulfill(status=200, content_type='text/html', body=T24_SINREP))
             sw = ctx.service_workers[0] if ctx.service_workers else await ctx.wait_for_event('serviceworker')
             ok('chrome-extension://' in sw.url, 'la extensión cargó')
 
@@ -139,21 +145,33 @@ async def main():
             G = await ctx.new_page()
             await G.goto('https://crmtrade24seven.com/#/bank-transactions'); await G.wait_for_timeout(3000)
             panel = G.locator('#ftd-crm-button')
-            ok(await panel.locator('#whoRow').is_visible(), 'el panel del CRM muestra "De" para el team leader')
-            ok(await panel.locator('#who').input_value() == 'col', 'por defecto: cada venta según la columna de agente')
-            await G.screenshot(path=OUT / 'x5_crm_leader.png')
-            await panel.locator('#go').click(); await G.wait_for_timeout(3500)
             r = sql("select client_id, brand, (select name from public.profiles where id=user_id) who from public.sales where client_id like '7770%' order by client_id")
-            ok([(x['client_id'], x['who'], x['brand']) for x in r] == [('777001', 'Sofía Ar', 'Trade24Seven'), ('777002', 'Mateo He', 'Trade24Seven')], f'cada venta a su vendedor, marca Trade24Seven ({r})')
-            m = await panel.locator('#msg').inner_text()
-            ok('sin vendedor' in m, f'avisa la que quedó sin vendedor ({m!r})')
-            await G.screenshot(path=OUT / 'x6_crm_leader_pasadas.png')
-            matias = sql("select id from public.profiles where name='Matias Me'")[0]['id']
-            await panel.locator('#who').select_option(matias); await G.wait_for_timeout(300)
-            await panel.locator('#go').click(); await G.wait_for_timeout(3000)
-            r = sql("select (select name from public.profiles where id=user_id) who from public.sales where client_id='777003'")
-            ok(len(r) == 1 and r[0]['who'] == 'Matias Me', f'eligiendo a alguien en "De" van a esa persona ({r})')
+            ok([(x['client_id'], x['who'], x['brand']) for x in r] == [('777001', 'Sofía Ar', 'Trade24Seven'), ('777002', 'Mateo He', 'Trade24Seven')], f'con la columna Sales Rep se pasan solas, cada una a su vendedor, sin tocar nada ({r})')
+            ok(not await panel.locator('#whoRow').is_visible(), 'con Sales Rep no hay "De" para elegir')
+            t = await panel.locator('.box').inner_text()
+            ok('Se pasan solas' in t and 'Sales Rep' in t and 'Fulano Externo' in t, f'el panel lo dice y muestra quién no está en la mesa ({t!r})')
+            ok('Asignar 1 venta sin vendedor' in await panel.locator('#go').inner_text(), 'la que no es de nadie de la mesa queda para asignar')
+            await G.screenshot(path=OUT / 'x5_crm_leader.png')
             ok(sql("select count(*)::int c from public.sales where client_id='777004'")[0]['c'] == 0, 'las rechazadas no pasan')
+            # "Asignar": va a Vitalis y ahí se elige a quién
+            await panel.locator('#go').click(); await G.wait_for_timeout(2500)
+            await A2.bring_to_front(); await A2.wait_for_timeout(300)
+            ok(await A2.locator('#toasts [data-key=asignar]').count() == 1, 'en Vitalis queda para asignar')
+            matias = sql("select id from public.profiles where name='Matias Me'")[0]['id']
+            await A2.click('#toasts [data-key=asignar] .btn'); await A2.wait_for_timeout(400)
+            await A2.select_option('.mbox [data-an="0"]', matias); await A2.click('.mbox .mf .pri'); await A2.wait_for_timeout(1500)
+            r = sql("select (select name from public.profiles where id=user_id) who from public.sales where client_id='777003'")
+            ok(len(r) == 1 and r[0]['who'] == 'Matias Me', f'asignada a mano desde Vitalis ({r})')
+            # una tabla sin columna de vendedor: "De" aparece y por defecto es "Yo"
+            G2 = await ctx.new_page()
+            await G2.goto('https://crmtrade24seven.com/sinrep'); await G2.wait_for_timeout(3500)
+            p2 = G2.locator('#ftd-crm-button')
+            ok(await p2.locator('#whoRow').is_visible() and await p2.locator('#who').input_value() == matias, 'sin columna de vendedor: "De" con "Yo" por defecto')
+            ok(sql("select count(*)::int c from public.sales where client_id='777101'")[0]['c'] == 0, 'y no se pasan solas')
+            await p2.locator('#go').click(); await G2.wait_for_timeout(3000)
+            r = sql("select (select name from public.profiles where id=user_id) who from public.sales where client_id='777101'")
+            ok(len(r) == 1 and r[0]['who'] == 'Matias Me', f'el botón las pasa a quien está en "De" ({r})')
+            await G2.close()
 
             # social: aviso en la pestaña activa y la respuesta vuelve a Vitalis
             sql("insert into public.pings (team_id,from_id,to_id,kind) select p.team_id, p.id, (select id from public.profiles where name='Matias Me'), 'd10' from public.profiles p where p.name='Joaquín Or'")
@@ -190,6 +208,20 @@ async def main():
             await F.screenshot(path=OUT / 'x9_tarea_tarjeta.png')
             await card.locator('[data-a="r:done"]').click(); await F.wait_for_timeout(2500)
             ok(sql("select done_at is not null d from public.task_people")[0]['d'], '"Ya la hice" desde la tarjeta la marca hecha en Vitalis')
+
+            # toda página del CRM con tabla se actualiza sola cada 10 s, sin opciones
+            Wp = await ctx.new_page()
+            await Wp.goto('https://crmnovaramarkets.com/clients'); await Wp.wait_for_timeout(2500)
+            wpn = Wp.locator('#ftd-crm-button')
+            ok(await wpn.locator('#wgo').count() == 0 and await wpn.locator('#wint').count() == 0, 'sin botón de vigilar ni intervalo')
+            await F.bring_to_front(); await F.wait_for_timeout(12500)
+            ok(await Wp.evaluate('window.__clicks||0') >= 1, 'se actualiza sola (toca el botón de actualizar del CRM)')
+            ok('cada 10 s' in await wpn.locator('#wst').inner_text(), 'y el panel lo dice')
+            ws = await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.keys(s.watches||{}).length)")
+            ok(ws >= 2, f'funciona en varias pestañas del CRM a la vez ({ws})')
+            ok(await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.values(s.watches)[0].tabId).then(id=>chrome.tabs.get(id)).then(t=>t.autoDiscardable===false)"), 'y Chrome no las duerme')
+            await Wp.screenshot(path=OUT / 'x10_crm_sola.png')
+            await Wp.close(); await F.wait_for_timeout(500)
 
             # la extensión despierta a Vitalis en segundo plano para ponerse al día
             await A2.evaluate("window.__ticks=0;addEventListener('message',e=>{if(e.data&&e.data.type==='ftd-agenda-tick')window.__ticks++})")
