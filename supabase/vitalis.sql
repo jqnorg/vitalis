@@ -460,7 +460,8 @@ begin
   get diagnostics moved = row_count;
   select crm_name into c from public.profiles where id = src;
   update public.profiles set crm_name = coalesce(crm_name, c) where id = dst;
-  delete from auth.users where id = src; -- la cuenta vacía (y su perfil)
+  begin delete from auth.users where id = src; -- la cuenta vacía (y su perfil)
+  exception when others then delete from public.profiles where id = src; end;
   return json_build_object('ok', true, 'moved', moved);
 end $$;
 
