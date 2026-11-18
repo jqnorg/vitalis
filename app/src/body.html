@@ -19,6 +19,7 @@
     <symbol id="i-turnos" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v4.8l3 1.8M9.5 2.5h5"/></symbol>
     <symbol id="i-sueldo" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12.5" rx="3"/><circle cx="12" cy="12.25" r="2.6"/><path d="M6 9.5v.01M18 15v.01"/></symbol>
     <symbol id="i-snippets" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M13.8 8.2 10.2 15.8"/></symbol>
+    <symbol id="i-filtros" viewBox="0 0 24 24"><path d="M4 5h16l-6.2 7.4v5.4l-3.6 2V12.4z"/></symbol>
     <symbol id="i-tareas" viewBox="0 0 24 24"><path d="M9 4.5H7.5A2.5 2.5 0 0 0 5 7v11.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V7a2.5 2.5 0 0 0-2.5-2.5H15"/><rect x="9" y="3" width="6" height="3.2" rx="1.2"/><path d="m9 13.5 2.2 2.2L15.5 11"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h8a2.5 2.5 0 0 1 2.5 2.5v5A2.5 2.5 0 0 1 14 14H9.5L6 17v-3a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M19.6 8.6a2.4 2.4 0 0 1 .9 1.9v5a2.5 2.5 0 0 1-2.5 2.5v3l-3.5-3h-3.2a2.5 2.5 0 0 1-2-1"/></symbol>
     <symbol id="i-social" viewBox="0 0 24 24"><path d="M6.6 9.5h10.8c.3 4.6-.7 8.5-2.6 10.4-.7.7-1.6 1.1-2.8 1.1s-2.1-.4-2.8-1.1C7.3 18 6.3 14.1 6.6 9.5z"/><path d="M6 9.5h12M13.5 9.2 15.6 4c.3-.6.7-.9 1.4-.9h1"/></symbol>
@@ -34,6 +35,7 @@
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
+    <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>F</kbd></button>
     <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>2</kbd></button>
     <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>3</kbd></button>
     <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>4</kbd></button>
@@ -183,6 +185,12 @@
   <div class="vh"><div><h1>Snippets</h1><p class="sub">Escribí <kbd>/atajo</kbd> en cualquier página y se pega el texto (con la extensión de Chrome).</p></div><span class="grow"></span>
     <div class="tools"><input id="snQ" type="search" placeholder="Buscar" autocomplete="off" aria-label="Buscar snippet"><button type="button" class="btn pri wr" data-act="nuevoSnip"><svg><use href="#i-plus"/></svg>Snippet</button></div></div>
   <div class="snips" id="snList"></div>
+</section>
+
+<section class="view" id="v-filtros" hidden>
+  <div class="vh"><div><h1>Filtros</h1><p class="sub">Qué se está vendiendo en la mesa, para saber qué filtrar en el CRM. Tocá un valor para copiarlo.</p></div><span class="grow"></span>
+    <div class="tools"><span class="seg" id="flPer" aria-label="Período"></span><span class="seg" id="flBr" aria-label="Marca"></span></div></div>
+  <div id="flBody"></div>
 </section>
 
 <section class="view" id="v-tareas" hidden>

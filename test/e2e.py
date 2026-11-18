@@ -289,6 +289,34 @@ async def main():
             await A.evaluate('catchUp(true)'); await A.wait_for_timeout(600)
             ok(await A.locator('#toasts .toast.alert:has-text("Llamar")').count() == 0 and await A.inner_text('#nbTa') == '', 'a Joaquín no le llega')
 
+            # Filtros: qué se está vendiendo en la mesa (campañas, afiliadores, registro, hora)
+            sql("""insert into public.sales (team_id, user_id, n, date, time, client_id, country, name, aff, camp, amount, tx, reg, brand)
+              select p.team_id, p.id, 900+g, (now() at time zone 'America/Montevideo')::date - (g % 2), lpad((10+g)::text, 2, '0') || ':15', 'F' || g, case when g % 3 = 0 then 'Chile' else 'Peru' end, 'Filtro ' || g,
+                     case when g <= 4 then '88843' else '77120' end, case when g <= 3 then 'QuboTradeAI' when g <= 5 then 'PrudentePorteca' else 'GG-UY' end,
+                     150 + g, 'TXF' || g, ((now() at time zone 'America/Montevideo')::date - (g % 2) - (2 + g % 4))::text, 'Trade24Seven'
+                from public.profiles p, generate_series(1, 6) g where p.name = 'Sofía Ar'""")
+            await A.reload(); await A.wait_for_timeout(2500)
+            await A.keyboard.press('f'); await A.wait_for_timeout(700)
+            ok(await A.is_visible('#v-filtros'), 'la tecla F abre Filtros')
+            await A.click('#flPer [data-d="3"]'); await A.wait_for_timeout(500)
+            first = (await A.inner_text('#flBody .fl-card:has-text("Campañas") .fl-row >> nth=0')).split('\n')[0]
+            ok(first == 'QuboTradeAI', f'la campaña que más vende va primera ({first!r})')
+            rec = await A.inner_text('#flBody .fl-rec')
+            ok('QuboTradeAI' in rec and '88843' in rec and 'Registro' in rec and 'Peru' in rec, f'"Para filtrar ahora" arma campañas, afiliadores, fechas de registro y países ({rec[:160]!r})')
+            ok('después de registrarse' in rec, 'explica la franja de registro')
+            ok(await A.locator('#flLagC svg').count() == 1 and await A.locator('#flHrC svg').count() == 1, 'gráficos de días desde el registro y de hora')
+            await A.click('#flBr [data-b="Novara Markets"]'); await A.wait_for_timeout(400)
+            ok('QuboTradeAI' not in await A.inner_text('#flBody'), 'filtra por marca')
+            await A.click('#flBr [data-b="all"]'); await A.wait_for_timeout(400)
+            await A.screenshot(path=OUT / 'n1_filtros.png', full_page=True)
+            await A.locator('#flLagC').scroll_into_view_if_needed(); await A.wait_for_timeout(200); await A.screenshot(path=OUT / 'n1b_filtros_graficos.png')
+            await A.click('#flTask'); await A.wait_for_timeout(500)
+            ok('QuboTradeAI' in await A.input_value('.mbox [name=camps]') and await A.input_value('.mbox [name=from]') != '', '"Mandar como tarea" abre la tarea ya armada')
+            await A.keyboard.press('Escape'); await A.wait_for_timeout(300)
+            await D.reload(); await D.wait_for_timeout(2500); await D.keyboard.press('f'); await D.wait_for_timeout(700)
+            await D.click('#flPer [data-d="3"]'); await D.wait_for_timeout(500)
+            await D.screenshot(path=OUT / 'n2_filtros_oscuro.png', full_page=True)
+
             # salir del grupo
             await A.keyboard.press('Escape'); await A.keyboard.press('8'); await A.wait_for_timeout(400)
             await A.click('#chList .ch-it:has-text("Los del fondo")'); await A.wait_for_timeout(400)

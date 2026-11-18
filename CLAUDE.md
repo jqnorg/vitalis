@@ -23,6 +23,7 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 - Social: `pings` (mate/d10/d30/toque; msg ya no se usa en la UI) con cooldown en `ping_guard`, respuestas por `reply_ping`, silenciar con `profiles.quiet_until`. Perfiles (`openProfile`, cualquier `[data-prof]`) con estadísticas y toques.
 - Chat: `chats`/`chat_members`/`messages`/`chat_reads`, grupos y privados solo por funciones `chat_*`, lectura con `in_chat`. Avisos instantáneos: realtime (worker) + `catchUp()` al reconectar/volver/foco, sondeo de 5 s solo si el canal está caído, y la extensión despierta la pestaña cada 30 s (`tick`). Con la extensión, tarjeta en la pestaña activa (una por chat, se actualiza).
 - Snippets globales (`snippets.global`): solo el admin. Tareas (`tasks`/`task_people`): las manda team leader o admin (`task_create`), cada uno `task_done`; avisan al instante y, con la extensión, con tarjeta ("Ya la hice" usa `r:done` con la clave `so:t:`, así anda con la extensión 1.3.0).
+- Filtros (`filtros.js`, tecla F, segundo en el menú): todo sale de `team` (ventas de la mesa), sin tablas nuevas.
 - En la app: `team` = todas las ventas de la mesa, `ftds` = las mías (sueldo, inicio, turnos usan `ftds`).
 - `app/config.json` tiene la URL y la clave **publishable** (pública). Jamás commitear la clave secret/service_role.
 

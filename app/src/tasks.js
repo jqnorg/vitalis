@@ -103,7 +103,7 @@ function taskCard(t,mode){ // mine | done | sent
 }
 function topVals(key,n=8){const c={};for(const f of team){const v=String(f[key]??'').trim();if(v&&!/^(null|undefined|-|0)$/i.test(v))c[v]=(c[v]||0)+1}return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0])}
 function splitList(v){const seen=new Set();return String(v||'').split(/[,;\n]/).map(x=>x.trim().replace(/\s+/g,' ')).filter(x=>x&&!seen.has(x.toLowerCase())&&seen.add(x.toLowerCase()))}
-function taskNew(){
+function taskNew(pre){ // pre: valores para arrancar (desde Filtros)
   if(!isLeader())return;
   const act=members.filter(m=>m.active&&m.id!==me),camps=topVals('camp'),affs=topVals('aff');
   const sts=[...new Set(tasks.map(t=>t.st).filter(Boolean))].slice(0,12);
@@ -143,6 +143,7 @@ function taskNew(){
         const s=e.target.closest('#tkTo [data-to]');
         if(s){tkPickMode=s.dataset.to;api.box.querySelectorAll('#tkTo button').forEach(b=>b.classList.toggle('on',b===s));api.q('#tkPick').hidden=tkPickMode!=='pick'}
       });
+      if(pre){const set=(n,v)=>{if(v!=null&&v!=='')api.q(`[name=${n}]`).value=Array.isArray(v)?v.join(', '):v};set('what',pre.what);set('camps',pre.camps);set('affs',pre.affs);set('from',pre.from);set('to',pre.to);set('st',pre.st);prev()}
       setTimeout(()=>api.q('[name=camps]').focus(),0);
     }});
 }
