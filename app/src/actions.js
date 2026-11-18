@@ -630,6 +630,7 @@ function ayuda(){
   <h4>Inicio</h4><dl>
     <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono, el líquido, tu turno y tu agenda de hoy.</dd>
     <dt>La mesa</dt><dd>Cuántos FTDs lleva la mesa, cuánto falta para el target, cuántos por día hábil y a qué ritmo vamos. La marca en la barra es dónde hay que cerrar hoy para ir al día.</dd>
+    <dt>Ventas de hoy</dt><dd>Todas las de la mesa, en vivo: hora, quién, cliente, campaña y monto. <b>Ver en Ventas</b> las abre con los filtros.</dd>
     <dt>Team leader</dt><dd>Su inicio es el de toda la mesa: el target en la pista, quién está en turno y cada agente con sus FTDs de hoy y del mes. El team leader no cuenta como agente.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
@@ -700,7 +701,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),

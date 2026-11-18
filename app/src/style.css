@@ -826,3 +826,18 @@ button.fl-k:hover{color:var(--pri)}
 .ch-m.flash .ch-tx{animation:chflash 1.3s ease-out}
 @keyframes chflash{0%,30%{box-shadow:0 0 0 3px color-mix(in srgb,var(--info) 45%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
 @media (prefers-reduced-motion:reduce){.ch-m.flash .ch-tx{animation:none;outline:2px solid var(--info)}}
+/* inicio: ventas de hoy de la mesa */
+.hv{display:flex;flex-direction:column}
+.hv-r{display:grid;grid-template-columns:46px minmax(96px,150px) minmax(0,1fr) auto 84px;gap:12px;align-items:center;padding:7px 4px;border-top:1px solid var(--soft)}
+.hv-r:first-child{border-top:0}
+.hv-r.mine{background:color-mix(in srgb,var(--pri-soft) 70%,transparent);border-radius:10px}
+.hv-r .t{color:var(--dim);font-variant-numeric:tabular-nums;font-size:12.5px}
+.hv-r .who-cell{min-width:0}
+.hv-r .who-cell .av{width:26px;height:26px;font-size:11px}
+.hv-r .who-cell span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.hv-r .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hv-r .n small{color:var(--dim);margin-left:6px}
+.hv-r .m{font-variant-numeric:tabular-nums;text-align:right;font-weight:700}
+.hv-r .b{text-align:right}
+.hv-more{margin-top:10px}
+@media (max-width:700px){.hv-r{grid-template-columns:40px minmax(0,1fr) auto;row-gap:2px}.hv-r .n{grid-column:2/4;grid-row:2}.hv-r .b{display:none}}

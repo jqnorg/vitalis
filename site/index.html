@@ -836,6 +836,21 @@ button.fl-k:hover{color:var(--pri)}
 .ch-m.flash .ch-tx{animation:chflash 1.3s ease-out}
 @keyframes chflash{0%,30%{box-shadow:0 0 0 3px color-mix(in srgb,var(--info) 45%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
 @media (prefers-reduced-motion:reduce){.ch-m.flash .ch-tx{animation:none;outline:2px solid var(--info)}}
+/* inicio: ventas de hoy de la mesa */
+.hv{display:flex;flex-direction:column}
+.hv-r{display:grid;grid-template-columns:46px minmax(96px,150px) minmax(0,1fr) auto 84px;gap:12px;align-items:center;padding:7px 4px;border-top:1px solid var(--soft)}
+.hv-r:first-child{border-top:0}
+.hv-r.mine{background:color-mix(in srgb,var(--pri-soft) 70%,transparent);border-radius:10px}
+.hv-r .t{color:var(--dim);font-variant-numeric:tabular-nums;font-size:12.5px}
+.hv-r .who-cell{min-width:0}
+.hv-r .who-cell .av{width:26px;height:26px;font-size:11px}
+.hv-r .who-cell span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.hv-r .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hv-r .n small{color:var(--dim);margin-left:6px}
+.hv-r .m{font-variant-numeric:tabular-nums;text-align:right;font-weight:700}
+.hv-r .b{text-align:right}
+.hv-more{margin-top:10px}
+@media (max-width:700px){.hv-r{grid-template-columns:40px minmax(0,1fr) auto;row-gap:2px}.hv-r .n{grid-column:2/4;grid-row:2}.hv-r .b{display:none}}
 </style>
 </head>
 <body>
@@ -923,6 +938,7 @@ button.fl-k:hover{color:var(--pri)}
     <div class="side-kpis" id="iKpis"></div>
   </div>
   <section class="card ms" id="iMesa" aria-label="La mesa"></section>
+  <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
   <div class="g2">
     <section class="card" id="iTurno">
       <div class="card-h"><h3>Turno</h3><span class="p-sub" id="itSub"></span><span class="grow"></span>
@@ -2654,6 +2670,7 @@ function ayuda(){
   <h4>Inicio</h4><dl>
     <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono, el líquido, tu turno y tu agenda de hoy.</dd>
     <dt>La mesa</dt><dd>Cuántos FTDs lleva la mesa, cuánto falta para el target, cuántos por día hábil y a qué ritmo vamos. La marca en la barra es dónde hay que cerrar hoy para ir al día.</dd>
+    <dt>Ventas de hoy</dt><dd>Todas las de la mesa, en vivo: hora, quién, cliente, campaña y monto. <b>Ver en Ventas</b> las abre con los filtros.</dd>
     <dt>Team leader</dt><dd>Su inicio es el de toda la mesa: el target en la pista, quién está en turno y cada agente con sus FTDs de hoy y del mes. El team leader no cuenta como agente.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
@@ -2724,7 +2741,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),
@@ -2800,6 +2817,7 @@ V.inicio={
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
     $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
+    $('#iHoy').innerHTML=hoyMesaCard();
     this.turno(true);
     // agenda
     const open=pend.filter(p=>!p.done&&p.due.slice(0,10)<=te).sort(byDue),next=pend.filter(p=>!p.done&&p.due.slice(0,10)>te).sort(byDue)[0];
@@ -4683,6 +4701,21 @@ function mesaBoard(){ // la mesa hoy: cada agente con su turno, sus FTDs y su ag
       <span class="c"><b>${h}</b><small>hoy</small></span><span class="c"><b>${p.n}</b><small>mes</small></span></button>`}).join('');
   return `<div class="card-h"><h3>La mesa hoy</h3><span class="p-sub">${plural(S.per.length,'agente')} · tocá uno para ver su ficha</span><span class="grow"></span><button type="button" class="btn sm" data-go="equipo">Equipo</button></div>`+
     (rows?`<div class="mboard">${rows}</div>`:'<div class="p-empty">Todavía no hay agentes en la mesa.</div>');
+}
+
+/* ---------- inicio: las ventas de hoy de toda la mesa (en vivo) ---------- */
+let hoyAll=false;
+function hoyMesaCard(){
+  const te=todayS(),L=team.filter(f=>f.date===te).sort((a,b)=>-byDate(a,b)),usd=L.reduce((a,f)=>a+(+f.amount||0),0),ag=new Set(L.map(f=>f.uid)).size;
+  const per={};for(const f of L)per[f.uid]=(per[f.uid]||0)+1;
+  const lead=Object.entries(per).sort((a,b)=>b[1]-a[1])[0];
+  const head=`<div class="card-h"><h3>Ventas de hoy</h3><span class="p-sub">${L.length?`toda la mesa · ${plural(L.length,'FTD')} · ${esc(money(usd))} USD · ${plural(ag,'agente')}${lead&&lead[1]>1?` · ${esc(first(lead[0]))} va primero con ${lead[1]}`:''}`:'toda la mesa'}</span><span class="grow"></span>${L.length?`<button type="button" class="btn sm" data-act="hoyVentas">Ver en Ventas</button>`:''}</div>`;
+  if(!L.length)return head+'<div class="p-empty">Todavía no hay ventas hoy. La primera pone el mate en marcha 🧉</div>';
+  const show=hoyAll?L:L.slice(0,12);
+  return head+`<div class="hv">${show.map(f=>{const nm=memberName(f.uid),mine=f.uid===me;
+    return `<div class="hv-r${mine?' mine':''}"><span class="t">${esc(f.time||'—')}</span><button type="button" class="who-cell lnkp" data-prof="${esc(f.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}<span>${esc(mine?'Vos':nm.split(/\s+/)[0])}</span></button>
+      <span class="n" title="${esc(f.name)}${f.camp?' · '+esc(f.camp):''}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)}${f.camp?' · '+esc(f.camp):''}</small></span><span class="m">${esc(money(f.amount))}</span><span class="b">${tipoBadge(f)}</span></div>`}).join('')}</div>`+
+    (L.length>12?`<button type="button" class="btn sm hv-more" data-act="hoyMas">${hoyAll?'Ver menos':`Ver las ${L.length}`}</button>`:'');
 }
 
 /* ============================================================

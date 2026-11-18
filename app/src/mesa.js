@@ -191,3 +191,18 @@ function mesaBoard(){ // la mesa hoy: cada agente con su turno, sus FTDs y su ag
   return `<div class="card-h"><h3>La mesa hoy</h3><span class="p-sub">${plural(S.per.length,'agente')} · tocá uno para ver su ficha</span><span class="grow"></span><button type="button" class="btn sm" data-go="equipo">Equipo</button></div>`+
     (rows?`<div class="mboard">${rows}</div>`:'<div class="p-empty">Todavía no hay agentes en la mesa.</div>');
 }
+
+/* ---------- inicio: las ventas de hoy de toda la mesa (en vivo) ---------- */
+let hoyAll=false;
+function hoyMesaCard(){
+  const te=todayS(),L=team.filter(f=>f.date===te).sort((a,b)=>-byDate(a,b)),usd=L.reduce((a,f)=>a+(+f.amount||0),0),ag=new Set(L.map(f=>f.uid)).size;
+  const per={};for(const f of L)per[f.uid]=(per[f.uid]||0)+1;
+  const lead=Object.entries(per).sort((a,b)=>b[1]-a[1])[0];
+  const head=`<div class="card-h"><h3>Ventas de hoy</h3><span class="p-sub">${L.length?`toda la mesa · ${plural(L.length,'FTD')} · ${esc(money(usd))} USD · ${plural(ag,'agente')}${lead&&lead[1]>1?` · ${esc(first(lead[0]))} va primero con ${lead[1]}`:''}`:'toda la mesa'}</span><span class="grow"></span>${L.length?`<button type="button" class="btn sm" data-act="hoyVentas">Ver en Ventas</button>`:''}</div>`;
+  if(!L.length)return head+'<div class="p-empty">Todavía no hay ventas hoy. La primera pone el mate en marcha 🧉</div>';
+  const show=hoyAll?L:L.slice(0,12);
+  return head+`<div class="hv">${show.map(f=>{const nm=memberName(f.uid),mine=f.uid===me;
+    return `<div class="hv-r${mine?' mine':''}"><span class="t">${esc(f.time||'—')}</span><button type="button" class="who-cell lnkp" data-prof="${esc(f.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}<span>${esc(mine?'Vos':nm.split(/\s+/)[0])}</span></button>
+      <span class="n" title="${esc(f.name)}${f.camp?' · '+esc(f.camp):''}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)}${f.camp?' · '+esc(f.camp):''}</small></span><span class="m">${esc(money(f.amount))}</span><span class="b">${tipoBadge(f)}</span></div>`}).join('')}</div>`+
+    (L.length>12?`<button type="button" class="btn sm hv-more" data-act="hoyMas">${hoyAll?'Ver menos':`Ver las ${L.length}`}</button>`:'');
+}

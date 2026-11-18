@@ -41,6 +41,7 @@ V.inicio={
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
     $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
+    $('#iHoy').innerHTML=hoyMesaCard();
     this.turno(true);
     // agenda
     const open=pend.filter(p=>!p.done&&p.due.slice(0,10)<=te).sort(byDue),next=pend.filter(p=>!p.done&&p.due.slice(0,10)>te).sort(byDue)[0];
