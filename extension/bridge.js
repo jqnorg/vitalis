@@ -55,7 +55,7 @@
     }
     if (d.type === 'ftd-agenda-social' && d.v === 1 && d.card && typeof d.card.k === 'string') { // aviso social: tarjeta en la pestaña que estés
       const c = d.card, t = (v, n) => String(v ?? '').slice(0, n);
-      const card = { k: t(c.k, 80), v: t(c.v, 60), kind: 'social', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
+      const card = { k: t(c.k, 80), v: t(c.v, 60), kind: 'social', lvl: ['urg', 'imp', 'info'].includes(c.lvl) ? c.lvl : '', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
         btns: (Array.isArray(c.btns) ? c.btns : []).slice(0, 4).map((b) => [t(b[0], 20), t(b[1], 30), b[2] ? 1 : 0]) };
       try { chrome.runtime.sendMessage({ type: 'social', card }); } catch (x) {}
       return;

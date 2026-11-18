@@ -55,9 +55,10 @@ function ftdOverlay(items) {
     (document.body || document.documentElement).appendChild(host);
     host.attachShadow({ mode: 'open' }).innerHTML = `<style>
       .stack{display:flex;flex-direction:column;gap:10px;width:min(370px,calc(100vw - 28px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-      .card{--c:#e08a1e;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px 13px;box-shadow:0 18px 48px rgba(0,0,0,.28);animation:in .25s ease-out,nudge .6s ease-in-out .3s 2}
-      .card.crm{--c:#2f7fd0}
-      .card.social{--c:#1b874a}
+      .card{--c:#cf3049;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px 13px;box-shadow:0 18px 48px rgba(0,0,0,.28);animation:in .25s ease-out,nudge .6s ease-in-out .3s 2}
+      .card.urg{--c:#cf3049}
+      .card.imp{--c:#c9661f}
+      .card.info{--c:#2f7fd0;animation:in .25s ease-out}
       @keyframes in{from{opacity:0;transform:translateY(-10px)}}
       @keyframes nudge{50%{transform:rotate(-1.2deg) scale(1.02)}}
       .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
@@ -71,8 +72,8 @@ function ftdOverlay(items) {
       .b{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
       .b button{all:unset;cursor:pointer;font-size:13px;font-weight:700;color:#15201a;border:1px solid #dfe5dc;border-radius:999px;padding:5px 12px}
       .b button:hover{border-color:#5b685f}
-      .b button.p{background:#1b874a;border-color:#1b874a;color:#fff}
-      .b button.p:hover{background:#156f3c}
+      .b button.p{background:var(--c);border-color:var(--c);color:#fff}
+      .b button.p:hover{filter:brightness(.92)}
     </style><div class="stack"></div>`;
   }
   const stack = host.shadowRoot.querySelector('.stack');
@@ -81,7 +82,9 @@ function ftdOverlay(items) {
     if (had && (had.dataset.v || '') === (d.v || '')) continue;
     if (had) had.remove(); // misma tarjeta con algo nuevo (otro mensaje del mismo chat)
     const card = document.createElement('div');
-    card.className = 'card' + (d.kind === 'crm' ? ' crm' : d.kind === 'social' ? ' social' : ''); card.dataset.k = d.k; card.dataset.v = d.v || ''; card.setAttribute('role', 'alert');
+    // color según importancia: urgente (agenda) rojo, importante (clientes new, tareas, el team leader te nombra) naranja, el resto (chat, social) celeste
+    const lvl = d.lvl || (d.kind === 'crm' ? 'imp' : d.kind === 'social' ? (/^so:t:/.test(d.k) ? 'imp' : 'info') : 'urg');
+    card.className = 'card ' + lvl + (d.kind ? ' ' + d.kind : ''); card.dataset.k = d.k; card.dataset.v = d.v || ''; card.setAttribute('role', 'alert');
     card.innerHTML = '<div class="h"><img class="mk" alt=""><span class="tag">vitalis</span><span class="t"></span><button class="x" data-a="close" title="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>';
     try { card.querySelector('.mk').src = chrome.runtime.getURL('icons/48.png'); } catch (e) { card.querySelector('.mk').remove(); }
     card.querySelector('.t').textContent = d.title || 'Contactar';

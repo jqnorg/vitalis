@@ -36,8 +36,9 @@ Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.
 - **Privado:** `settings` (sueldo, premios, días) y snippets propios. `adjustments`, `agenda` y `shifts` son de cada uno, pero el team leader y el admin los leen (políticas `lead_*`) y ven las faltas por `team_days()`: en Equipo, la ficha de cada persona con su mes, agenda, turnos, clientes y tareas, sin sueldo.
 - **Desvinculados:** las ventas del CRM de alguien que ya no está en la mesa se cargan a su nombre como desvinculado (`profiles.former`, inactivo, no entra). En Ajustes se ven aparte y, si alguno era de la mesa con otro nombre, se une (`merge_former`).
 - **Fotos de perfil:** `avatars` (una por persona; la ve toda la mesa, la sube y la saca cada uno desde Ajustes o su perfil).
+- **Chat:** responder (`messages.reply_to`), reaccionar (`message_reactions`), @ con sugerencias y @todos del team leader.
 - **Imágenes del chat:** `chat_files` (se pegan, se arrastran o se eligen; la app las achica). Las ven solo los del chat.
-- **Menú:** por categorías (Inicio, Filtros, Ventas, Mi día, Mesa, Sueldo, Ajustes; teclas 1–7) con pestañas arriba.
+- **Menú:** todas las secciones separadas, en orden de importancia.
 - **Entrada:** es para una sola mesa: nombre → PIN. La primera vez el PIN es 0000 y se crea uno propio. Los PIN están en `pins` (nadie los lee desde la app); `pin_login` da una contraseña interna que cambia en cada ingreso. 5 errores seguidos bloquean 15 minutos, y cada bloqueo siguiente dura el doble (hasta 24 h). Registrarse con email está cerrado.
 - **Roles:** `admin` (el primero que crea su PIN), `leader`, `agent`. Solo el admin cambia roles, suma gente, resetea PINs y da de baja.
 - No subir nunca la clave **secret / service_role** de Supabase.

@@ -46,7 +46,7 @@ function socialEvent(p,type,prev){
     closeToast('so'+p._id);extSocialClose(p._id);
     if(p.from===me&&p.by!==me){ // me contestaron
       const txt=p.kind==='toque'?`<b>${esc(first(p.by))}</b> te devolvió el toque 👈`:`<b>${esc(first(p.by))}</b>: ${esc(replyTxt(p))}${p.kind==='msg'?'':' · '+esc(KIND[p.kind].label.toLowerCase())}`;
-      toast(txt,'ok',{ms:9000,key:'sor'+p._id});
+      toast(txt,'info',{ms:9000,key:'sor'+p._id});
       if(!quiet()){pop();if(pageAway())extSocial({k:'so:'+p._id,title:'Te contestaron',id:first(p.by)+': '+replyTxt(p),kw:p.kind==='msg'?p.body:KIND[p.kind].label,meta:'',btns:[['close','Ok',1]]})}
     }
   }
@@ -60,7 +60,7 @@ function socialAlert(p){
     if(pageAway())extSocial({k:'so:'+p._id,title:'Toque',id:who+' te dio un toque 👉',kw:'',meta:'',btns:[['r:si','Devolver el toque',1],['close','Ok']]});
     return;
   }
-  toast(`<b>${esc(who)}</b> ${p.kind==='msg'?'te escribe: '+esc(q):esc(q)}`,'alert',{sticky:1,key:'so'+p._id,
+  toast(`<b>${esc(who)}</b> ${p.kind==='msg'?'te escribe: '+esc(q):esc(q)}`,'info',{sticky:1,key:'so'+p._id,
     actions:[...k.replies.map(([r,l])=>({l,fn:()=>B.replyPing(p._id,r)})),{l:'Silenciar 1 h',fn:()=>setQuiet(36e5)}]});
   if(pageAway())extSocial({k:'so:'+p._id,title:p.kind==='mate'?'Piden un mate':p.kind==='msg'?'Mensaje':'Descanso',id:who+(p.kind==='msg'?'':' '+q),kw:p.kind==='msg'?q:'',meta:p.to?'Para vos':'Para toda la mesa',
     btns:[...k.replies.map(([r,l],i)=>['r:'+r,l,i===0?1:0]),['quiet','Silenciar 1 h']]});

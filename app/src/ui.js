@@ -5,7 +5,7 @@
 function toast(html,kind='ok',o={}){
   const box=$('#toasts');
   if(o.key){const ex=box.querySelector(`[data-key="${o.key}"]`);if(ex)ex.remove()}
-  const t=document.createElement('div');t.className='toast '+kind;if(o.key)t.dataset.key=o.key;t.setAttribute('role',kind==='alert'||kind==='err'?'alert':'status');
+  const t=document.createElement('div');t.className='toast '+kind;if(o.key)t.dataset.key=o.key;t.setAttribute('role',kind==='alert'||kind==='err'?'alert':'status');if(o.sticky)t.dataset.sticky=1;
   const m=document.createElement('div');m.className='tm';m.innerHTML=html;t.appendChild(m);
   let gone=false;const close=()=>{if(gone)return;gone=true;t.classList.add('out');setTimeout(()=>t.remove(),180)};
   if(o.actions&&o.actions.length){
@@ -16,7 +16,7 @@ function toast(html,kind='ok',o={}){
   const xb=document.createElement('button');xb.className='tx';xb.type='button';xb.textContent='✕';xb.title='Cerrar';xb.onclick=close;t.appendChild(xb);
   box.appendChild(t);
   if(!o.sticky)setTimeout(close,o.ms||(kind==='err'?7000:kind==='warn'?6000:4200));
-  const all=[...box.children].filter(x=>!x.classList.contains('alert'));while(all.length>3)all.shift().remove();
+  const all=[...box.children].filter(x=>!x.classList.contains('alert')&&!x.classList.contains('imp')&&!x.dataset.sticky);while(all.length>3)all.shift().remove(); // los urgentes, importantes y fijos no se pierden
   return {close,el:t,set:h=>{m.innerHTML=h}};
 }
 
@@ -122,20 +122,13 @@ function colChart(el,data,o={}){
 const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
-// el menú va por categorías; adentro de cada una, pestañas arriba
-const GROUPS={inicio:['inicio'],filtros:['filtros'],ventas:['ventas','clientes'],dia:['agenda','tareas','turnos','snippets'],mesa:['chat','social','equipo'],sueldo:['sueldo'],config:['config']};
-const GKEYS=['inicio','filtros','ventas','dia','mesa','sueldo','config'];
-const groupOf=v=>GKEYS.find(g=>GROUPS[g].includes(v))||'inicio';
-let lastIn=local.get('lastIn',{});
-function goG(g){const vs=(GROUPS[g]||['inicio']).filter(v=>v!=='equipo'||isLeader());go(vs.includes(lastIn[g])?lastIn[g]:vs[0])}
+// el menú: todas las secciones, en orden de importancia (los números siguen ese orden)
+const NAVKEYS={1:'inicio',2:'filtros',3:'ventas',4:'clientes',5:'agenda',6:'tareas',7:'chat',8:'sueldo',9:'turnos',0:'config'};
 function go(v,opts){
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
-  const g=groupOf(v);lastIn[g]=v;local.set('lastIn',lastIn);
-  $$('#nav [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===g));
-  $$('.subnav').forEach(s=>s.hidden=s.dataset.gsub!==g);
-  $$('.subnav [data-v]').forEach(b=>{b.classList.toggle('on',b.dataset.v===v);b.setAttribute('aria-selected',b.dataset.v===v)});
+  $$('#nav [data-v]').forEach(b=>{b.classList.toggle('on',b.dataset.v===v);if(b.dataset.v===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready)V[v].render(opts||{});
@@ -164,8 +157,6 @@ function status(){
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
-  const ag=+($('#nbAg').textContent||0),cl=+($('#nbCl').textContent||0);
-  $('#ngVentas').textContent=cl||'';$('#ngDia').textContent=ag+tk.length||'';$('#ngMesa').textContent=so+ch?(so+ch>99?'99+':so+ch):'';
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;

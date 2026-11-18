@@ -25,7 +25,7 @@ function tasksLoaded(tk,tp){tasks=tk.filter(r=>r.team_id===profile.team_id).map(
 function taskAlert(t){
   if(Date.now()-t.t>30*6e4)return;
   const who=first(t.by);pop();
-  toast(`📋 <b>${esc(who)}</b> te mandó una tarea: ${esc(clip(taskTxt(t),180))}${t.due?` <span class="dim">· para ${esc(dueTxt(t.due))}</span>`:''}`,'alert',{sticky:true,key:'tk'+t._id,actions:[{l:'Ver',fn:()=>go('tareas')},{l:'Ya la hice',fn:()=>B.taskDone(t._id,true)}]});
+  toast(`📋 <b>${esc(who)}</b> te mandó una tarea: ${esc(clip(taskTxt(t),180))}${t.due?` <span class="dim">· para ${esc(dueTxt(t.due))}</span>`:''}`,'imp',{sticky:true,key:'tk'+t._id,actions:[{l:'Ver',fn:()=>go('tareas')},{l:'Ya la hice',fn:()=>B.taskDone(t._id,true)}]});
   if(pageAway())extSocial({k:'so:t:'+t._id,title:'Tarea nueva',id:'De '+who,kw:clip(taskTxt(t),200),meta:t.due?`Para ${dueTxt(t.due)}`:'',btns:[['close','Entendido',1],['r:done','Ya la hice']]});
 }
 // a quien la mandó: cómo viene (sin sonido, una sola tarjeta por tarea)
@@ -33,7 +33,7 @@ function taskProgress(t,uid){
   if(t.by!==me||uid===me)return;
   const rows=tkRows(t._id),n=rows.filter(p=>p.done_at).length;
   if(cur==='tareas'&&!document.hidden)return;
-  toast(n===rows.length?`✓ Todos hicieron <b>${esc(clip(taskTxt(t),90))}</b>`:`<b>${esc(first(uid))}</b> hizo <b>${esc(clip(taskTxt(t),90))}</b> <span class="dim">· ${n} de ${rows.length}</span>`,'ok',{ms:7000,key:'tkp'+t._id,actions:[{l:'Ver',fn:()=>go('tareas')}]});
+  toast(n===rows.length?`✓ Todos hicieron <b>${esc(clip(taskTxt(t),90))}</b>`:`<b>${esc(first(uid))}</b> hizo <b>${esc(clip(taskTxt(t),90))}</b> <span class="dim">· ${n} de ${rows.length}</span>`,'info',{ms:7000,key:'tkp'+t._id,actions:[{l:'Ver',fn:()=>go('tareas')}]});
 }
 function taskGone(id){tasks=tasks.filter(t=>t._id!==id);taskPeople=taskPeople.filter(p=>p.task_id!==id);closeToast('tk'+id);extSocialClose('t:'+id);refresh()}
 // en vivo

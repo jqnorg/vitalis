@@ -36,13 +36,19 @@
 <aside id="side">
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
-    <button type="button" data-g="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
-    <button type="button" data-g="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>2</kbd></button>
-    <button type="button" data-g="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><span class="nb" id="ngVentas"></span><kbd>3</kbd></button>
-    <button type="button" data-g="dia"><svg><use href="#i-agenda"/></svg><span class="nm">Mi día</span><span class="nb hot" id="ngDia"></span><kbd>4</kbd></button>
-    <button type="button" data-g="mesa"><svg><use href="#i-mesa"/></svg><span class="nm">Mesa</span><span class="nb hot" id="ngMesa"></span><kbd>5</kbd></button>
-    <button type="button" data-g="sueldo"><svg><use href="#i-sueldo"/></svg><span class="nm">Sueldo</span><kbd>6</kbd></button>
-    <button type="button" data-g="config"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span><kbd>7</kbd></button>
+    <button type="button" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
+    <button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
+    <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>2</kbd></button>
+    <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>3</kbd></button>
+    <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>4</kbd></button>
+    <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>5</kbd></button>
+    <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>6</kbd></button>
+    <button type="button" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbCh"></span><kbd>7</kbd></button>
+    <button type="button" data-v="sueldo"><svg><use href="#i-sueldo"/></svg><span class="nm">Sueldo</span><kbd>8</kbd></button>
+    <button type="button" data-v="turnos"><svg><use href="#i-turnos"/></svg><span class="nm">Turnos</span><kbd>9</kbd></button>
+    <button type="button" data-v="social"><svg><use href="#i-social"/></svg><span class="nm">Social</span><span class="nb hot" id="nbSo"></span></button>
+    <button type="button" data-v="snippets"><svg><use href="#i-snippets"/></svg><span class="nm">Snippets</span></button>
+    <button type="button" data-v="config"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span><kbd>0</kbd></button>
   </nav>
   <div class="side-foot">
     <button type="button" class="me" id="sMe" data-go="config" title="Mi cuenta"></button>
@@ -68,9 +74,6 @@
 </header>
 
 <main id="main">
-<div class="subnav" data-gsub="ventas" role="tablist" aria-label="Ventas" hidden><button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg>Ventas</button><button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg>Clientes<span class="nb" id="nbCl"></span></button></div>
-<div class="subnav" data-gsub="dia" role="tablist" aria-label="Mi día" hidden><button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg>Agenda<span class="nb hot" id="nbAg"></span></button><button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg>Tareas<span class="nb hot" id="nbTa"></span></button><button type="button" data-v="turnos"><svg><use href="#i-turnos"/></svg>Turnos</button><button type="button" data-v="snippets"><svg><use href="#i-snippets"/></svg>Snippets</button></div>
-<div class="subnav" data-gsub="mesa" role="tablist" aria-label="Mesa" hidden><button type="button" data-v="chat"><svg><use href="#i-chat"/></svg>Chat<span class="nb hot" id="nbCh"></span></button><button type="button" data-v="social"><svg><use href="#i-social"/></svg>Social<span class="nb hot" id="nbSo"></span></button><button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg>Equipo</button></div>
 
 <section class="view" id="v-inicio">
   <div class="vh"><div><h1 id="iHola">Hola</h1><p class="sub" id="iFecha"></p></div></div>
@@ -209,6 +212,8 @@
     <section class="ch-main" id="chMain" hidden>
       <header class="ch-h" id="chHead"></header>
       <div class="ch-msgs" id="chMsgs"></div>
+      <div class="ch-men" id="chMen" role="listbox" aria-label="A quién nombrar" hidden></div>
+      <div class="ch-rep" id="chRep" hidden></div>
       <div class="ch-att" id="chAtt" hidden></div>
       <form class="ch-form" id="chForm" autocomplete="off"><button type="button" class="ib ch-pic" id="chPic" title="Mandar una imagen (o pegala con Ctrl+V)" aria-label="Mandar una imagen"><svg><use href="#i-img"/></svg></button><input type="file" id="chFile" accept="image/*" hidden><textarea id="chIn" rows="1" maxlength="2000" aria-label="Mensaje"></textarea><button class="btn pri" type="submit">Enviar</button></form>
     </section>
@@ -270,9 +275,8 @@
       <div class="fld"><span>Días laborables</span></div><div class="chips" id="cfDow" style="margin:6px 0 14px"></div>
       <div class="fld"><span>Feriados que no se cuentan</span></div><div class="chips" id="cfFer" style="margin:6px 0 14px"></div>
       <div class="fld"><span>Otros días que no se cuentan, todos los años</span></div><div class="chips" id="cfLibres" style="margin:6px 0"></div>
-      <div class="frow wr" style="margin-bottom:14px"><input type="date" id="cfLibD" aria-label="Feriado"><button type="button" class="btn sm" id="cfLibAdd">Agregar día</button></div>
-      <div class="fld"><span>Faltas</span></div><div id="cfFaltas" style="margin:6px 0"></div>
-      <div class="frow wr"><input type="date" id="cfFalD" aria-label="Fecha de la falta"><select id="cfFalJ" aria-label="Tipo de falta"><option value="1">Justificada</option><option value="0">Sin justificar</option></select><button type="button" class="btn sm" id="cfFalAdd">Agregar falta</button></div>
+      <div class="frow wr" style="margin-bottom:14px"><select id="cfLibDia" aria-label="Día"><option value="">Día</option><option value="01">1</option><option value="02">2</option><option value="03">3</option><option value="04">4</option><option value="05">5</option><option value="06">6</option><option value="07">7</option><option value="08">8</option><option value="09">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option><option value="20">20</option><option value="21">21</option><option value="22">22</option><option value="23">23</option><option value="24">24</option><option value="25">25</option><option value="26">26</option><option value="27">27</option><option value="28">28</option><option value="29">29</option><option value="30">30</option><option value="31">31</option></select><select id="cfLibMes" aria-label="Mes"><option value="">Mes</option><option value="01">enero</option><option value="02">febrero</option><option value="03">marzo</option><option value="04">abril</option><option value="05">mayo</option><option value="06">junio</option><option value="07">julio</option><option value="08">agosto</option><option value="09">setiembre</option><option value="10">octubre</option><option value="11">noviembre</option><option value="12">diciembre</option></select><button type="button" class="btn sm" id="cfLibAdd">Agregar día</button></div>
+      <p class="p-sub" style="margin:0">Las faltas se cargan en <button type="button" class="lnk" data-go="sueldo">Sueldo</button>.</p>
     </section>
     <section class="card"><div class="card-h"><h3>Datos</h3><span class="p-sub" id="cfDb"></span></div>
       <div class="frow"><label class="fld" style="flex:0 0 auto"><span>Separador CSV</span><select data-c="sep"><option value=",">Coma ,</option><option value=";">Punto y coma ;</option></select></label>

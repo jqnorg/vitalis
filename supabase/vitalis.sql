@@ -178,6 +178,17 @@ create table if not exists public.messages (
   created_at timestamptz not null default now()
 );
 create index if not exists messages_chat_created on public.messages (chat_id, created_at desc);
+alter table public.messages add column if not exists reply_to uuid references public.messages(id) on delete set null; -- respuesta a otro mensaje del mismo chat
+-- reacciones a los mensajes (un emoji de la lista, una vez cada uno por persona)
+create table if not exists public.message_reactions (
+  message_id uuid not null references public.messages(id) on delete cascade,
+  chat_id    uuid not null references public.chats(id) on delete cascade,
+  user_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  emoji      text not null check (emoji in ('👍', '❤️', '😂', '😮', '😢', '🙏', '🔥', '🧉')),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id, emoji)
+);
+create index if not exists message_reactions_chat on public.message_reactions (chat_id, created_at desc);
 create index if not exists messages_created on public.messages (created_at desc);
 -- imágenes del chat (se pegan o se eligen; la app las achica antes de mandarlas). El mensaje las nombra con [img:id:AnchoxAlto]
 create table if not exists public.chat_files (
@@ -536,6 +547,9 @@ create or replace function public.msg_guard() returns trigger
 begin
   new.body := left(btrim(coalesce(new.body, ''), E' \t\r\n'), 2000);
   if new.body = '' then raise exception 'MSG_EMPTY: escribí algo'; end if;
+  if new.reply_to is not null and not exists (select 1 from public.messages r where r.id = new.reply_to and r.chat_id = new.chat_id) then
+    new.reply_to := null; -- solo se responde a un mensaje del mismo chat
+  end if;
   if new.body like '[img:%' and not exists (select 1 from public.chat_files f
        where f.id::text = substring(new.body from '^\[img:([0-9a-f-]{36})') and f.chat_id = new.chat_id and f.user_id = new.user_id) then
     raise exception 'IMG: la imagen no se subió, probá de nuevo';
@@ -576,6 +590,18 @@ begin
 end $$;
 drop trigger if exists avatars_guard on public.avatars;
 create trigger avatars_guard before insert or update on public.avatars for each row execute function public.avatar_guard();
+create or replace function public.react_guard() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  new.chat_id := (select chat_id from public.messages where id = new.message_id); -- el chat sale del mensaje
+  new.created_at := now();
+  if (select count(*) from public.message_reactions where user_id = new.user_id and created_at > now() - interval '1 minute') >= 60 then
+    raise exception 'SLOW: muchas reacciones seguidas';
+  end if;
+  return new;
+end $$;
+drop trigger if exists message_reactions_guard on public.message_reactions;
+create trigger message_reactions_guard before insert on public.message_reactions for each row execute function public.react_guard();
 drop trigger if exists chat_files_guard on public.chat_files;
 create trigger chat_files_guard before insert on public.chat_files for each row execute function public.file_guard();
 
@@ -782,6 +808,7 @@ alter table public.task_people  enable row level security;
 alter table public.targets      enable row level security;
 alter table public.chat_files   enable row level security;
 alter table public.avatars      enable row level security;
+alter table public.message_reactions enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -883,6 +910,12 @@ drop policy if exists messages_read on public.messages;
 create policy messages_read on public.messages for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists messages_insert on public.messages;
 create policy messages_insert on public.messages for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists reactions_read on public.message_reactions;
+create policy reactions_read on public.message_reactions for select to authenticated using (public.in_chat(chat_id));
+drop policy if exists reactions_insert on public.message_reactions;
+create policy reactions_insert on public.message_reactions for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists reactions_delete on public.message_reactions;
+create policy reactions_delete on public.message_reactions for delete to authenticated using (user_id = auth.uid());
 drop policy if exists avatars_read on public.avatars;
 create policy avatars_read on public.avatars for select to authenticated using (public.in_my_team(user_id));
 drop policy if exists avatars_own on public.avatars;
@@ -912,6 +945,9 @@ grant select, insert, delete on public.chat_files to authenticated;
 revoke update on public.chat_files from authenticated;
 revoke all on public.chat_files from anon;
 grant select, insert, update, delete on public.avatars to authenticated;
+grant select, insert, delete on public.message_reactions to authenticated;
+revoke update on public.message_reactions from authenticated;
+revoke all on public.message_reactions from anon;
 revoke all on public.avatars from anon;
 grant select, insert, update, delete on public.chat_reads to authenticated;
 revoke all on public.chats, public.chat_members, public.messages, public.chat_reads from anon;
@@ -925,14 +961,14 @@ revoke all on public.targets from anon;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
-revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard(), public.msg_gone(), public.file_guard(), public.avatar_guard() from public, anon, authenticated;
+revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard(), public.msg_gone(), public.file_guard(), public.avatar_guard(), public.react_guard() from public, anon, authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

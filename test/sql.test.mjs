@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 16, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 17, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -352,6 +352,31 @@ ok(r.rows.length === 0, 'B ya no lo lee');
   ok(!!q.error || q.rows.length === 0, 'sin sesión no se ven las fotos');
   q = await as(A, 'delete from public.avatars where user_id = $1 returning 1', [A]);
   ok(!q.error && q.rows.length === 1, 'A saca su foto');
+}
+// responder y reaccionar
+{
+  let q = await say(A, G, 'para responder');
+  const M1 = q.rows[0].id;
+  q = await as(M, 'insert into public.messages (chat_id, body, reply_to) values ($1, $2, $3) returning reply_to::text', [G, 'te respondo', M1]);
+  ok(!q.error && q.rows[0].reply_to === M1, 'Matias responde a un mensaje de A');
+  q = await as(A, 'insert into public.messages (chat_id, body, reply_to) values ($1, $2, $3) returning reply_to', [TC, 'otro chat', M1]);
+  ok(!q.error && q.rows[0].reply_to === null, 'no se responde a un mensaje de otro chat');
+  q = await as(M, 'insert into public.message_reactions (message_id, emoji) values ($1, $2) returning chat_id::text', [M1, '👍']);
+  ok(!q.error && q.rows[0].chat_id === G, 'Matias reacciona 👍 (el chat sale del mensaje)');
+  q = await as(M, 'insert into public.message_reactions (message_id, emoji) values ($1, $2)', [M1, '👍']);
+  ok(!!q.error, 'la misma reacción no se repite');
+  q = await as(M, 'insert into public.message_reactions (message_id, emoji) values ($1, $2)', [M1, '💩']);
+  ok(!!q.error, 'solo los emojis de la lista');
+  q = await as(B, 'insert into public.message_reactions (message_id, emoji) values ($1, $2)', [M1, '🔥']);
+  ok(!!q.error, 'B (que no está en el grupo) no reacciona');
+  q = await as(B, 'select * from public.message_reactions where message_id = $1', [M1]);
+  ok(q.rows.length === 0, 'ni las ve');
+  q = await as(A, 'select emoji from public.message_reactions where message_id = $1', [M1]);
+  ok(q.rows.length === 1, 'A la ve');
+  q = await as(A, 'delete from public.message_reactions where message_id = $1 returning 1', [M1]);
+  ok(!q.error && q.rows.length === 0, 'A no borra la reacción de Matias');
+  q = await as(M, 'delete from public.message_reactions where message_id = $1 returning 1', [M1]);
+  ok(!q.error && q.rows.length === 1, 'Matias la saca');
 }
 // imágenes del chat
 const B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

@@ -88,7 +88,7 @@ async function commitNew(rec){
   if(other){toast(`Venta cargada a <b>${esc(memberName(rec.uid))}</b>: ${esc(rec.id)} ${esc(rec.name)}, ${money(rec.amount)} USD`);return true}
   const s=calc(ym);
   toast(`✔ FTD #${rec.n} · <b>${esc(rec.id)}</b> · ${esc(rec.name)} · ${money(rec.amount)} USD${isLate(rec)?' · '+sp('warn','late '+lateDays(rec)+' d'):''}<br><span class="dim">${esc(mLong(ym))}: ${plural(s.n,'FTD')} · ${money(s.usd)} USD${s.next?' · '+progressTxt(s):''}</span>`);
-  if(s.tier>before.tier){toast(`🎉 ¡${s.n} FTDs! Bono de ${s.bono} USD desbloqueado.`,'alert',{ms:9000});beep(2)}
+  if(s.tier>before.tier){toast(`🎉 ¡${s.n} FTDs! Bono de ${s.bono} USD desbloqueado.`,'win',{ms:9000});beep(2)}
   return true;
 }
 async function borrarFtd(f){
@@ -169,7 +169,7 @@ async function setAjusteN(ym,n){
   const before=calc(ym);if(!await B.setAjuste(ym,n))return false;
   const s=calc(ym);
   toast(`✔ ${esc(mLong(ym))}: ${plural(n,'FTD')} sin detalle → <b>${plural(s.n,'FTD')}</b> · ${money(s.usd)} USD`,'ok',{key:'aj'});
-  if(s.tier>before.tier){toast(`🎉 Bono de ${s.bono} USD desbloqueado (${s.tier}+ FTDs).`,'alert',{ms:9000});beep(2)}
+  if(s.tier>before.tier){toast(`🎉 Bono de ${s.bono} USD desbloqueado (${s.tier}+ FTDs).`,'win',{ms:9000});beep(2)}
   return true;
 }
 function ajusteModal(ym){
@@ -435,7 +435,7 @@ async function importFromExt(rows){
   if(!await B.addMany(list))return {err:'no se pudo guardar en la base'};
   const l=list[list.length-1];last={brand:l.brand,country:l.country,aff:l.aff,camp:l.camp};local.set('last',last);
   toast(`⇪ ${list.length===1?'1 venta nueva':list.length+' ventas nuevas'} desde el CRM: ${list.map(f=>`<b>${esc(f.id)}</b>`).join(', ')}${dup?` · ${dup} ya estaba${dup>1?'n':''}`:''}`);
-  for(const m of months){const s=calc(m);if(s.tier>before[m]){toast(`🎉 ¡${s.n} FTDs! Bono de ${s.bono} USD desbloqueado.`,'alert',{ms:9000});beep(2)}}
+  for(const m of months){const s=calc(m);if(s.tier>before[m]){toast(`🎉 ¡${s.n} FTDs! Bono de ${s.bono} USD desbloqueado.`,'win',{ms:9000});beep(2)}}
   return {added:list.length,dup,bad,ajenas,ids:list.map(f=>f.id),mes:mesOut()};
 }
 
@@ -560,7 +560,7 @@ async function addLeadsFromExt(rows){
   const keys=[...seen];
   if(!list.length)return {added:0,keys};
   const n=await B.addLeads(list,'crm');if(n===false)return {err:'no se pudo guardar'};
-  if(n)toast(`${n===1?'Nuevo cliente':n+' clientes nuevos'} en el registro: ${list.slice(0,4).map(l=>`<b>${esc(l.id.startsWith('n:')?l.name:l.id)}</b>`).join(', ')}${list.length>4?'…':''}`,'ok',{key:'leads'});
+  if(n)toast(`${n===1?'Nuevo cliente':n+' clientes nuevos'} en el registro: ${list.slice(0,4).map(l=>`<b>${esc(l.id.startsWith('n:')?l.name:l.id)}</b>`).join(', ')}${list.length>4?'…':''}`,'imp',{key:'leads'});
   return {added:n,keys};
 }
 function agendarModal(id,kw){
@@ -630,8 +630,7 @@ function ayuda(){
   <h4>Inicio</h4><dl>
     <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono, el líquido, tu turno y tu agenda de hoy.</dd>
     <dt>La mesa</dt><dd>Cuántos FTDs lleva la mesa, cuánto falta para el target, cuántos por día hábil y a qué ritmo vamos. La marca en la barra es dónde hay que cerrar hoy para ir al día.</dd>
-    <dt>Team leader</dt><dd>Su inicio es el de toda la mesa: el target en la pista, quién está en turno y cada agente con sus FTDs de hoy y del mes. El team leader no cuenta como agente.</dd>
-    <dt>Menú</dt><dd>Por categorías: Ventas (y Clientes), Mi día (Agenda, Tareas, Turnos, Snippets) y Mesa (Chat, Social, Equipo). Adentro, pestañas arriba.</dd></dl>
+    <dt>Team leader</dt><dd>Su inicio es el de toda la mesa: el target en la pista, quién está en turno y cada agente con sus FTDs de hoy y del mes. El team leader no cuenta como agente.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
     <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
@@ -649,7 +648,10 @@ function ayuda(){
     <dt>Chats</dt><dd>Uno de toda la mesa, grupos (Nuevo → varias personas y un nombre) y privados (Nuevo → una persona, o Mensaje en su perfil).</dd>
     <dt>Grupos</dt><dd>Cualquiera de adentro suma gente y le cambia el nombre. Quien lo creó puede sacar a alguien. Si se van todos, se borra.</dd>
     <dt>Imágenes</dt><dd>Pegalas con Ctrl+V, arrastralas o tocá el ícono al lado del mensaje. Van achicadas para que carguen rápido. Tocá una para verla grande, copiarla o bajarla.</dd>
-    <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciá un chat desde su encabezado; si te nombran con @tunombre, el aviso llega igual.</dd></dl>
+    <dt>Responder y reaccionar</dt><dd>Pasá por un mensaje: ↩ para responderlo, ☺ para reaccionar. Tocá la cita para ir al mensaje original.</dd>
+    <dt>@</dt><dd>Escribí @ y elegí a quién nombrar (flechas y Enter). El team leader tiene @todos.</dd>
+    <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciar un chat (desde su encabezado) solo calla ese chat. Si te nombran o te responden, el aviso llega igual; si es el team leader con @todos o @vos, llega aunque tengas todo silenciado.</dd>
+    <dt>Colores</dt><dd>Rojo: urgente (agenda, descansos). Cuero: importante (tareas, clientes new, el team leader). Celeste: chat y social. Verde: logros.</dd></dl>
   <h4>Filtros</h4><dl>
     <dt>Qué muestra</dt><dd>Con las ventas de toda la mesa en el período que elijas: campañas, afiliadores, países y combinaciones que más venden, si suben o bajan contra el período anterior y cuándo fue la última.</dd>
     <dt>Lates</dt><dd>Qué campañas y afiliadores convierten lates (clientes que se registraron otro día y depositaron después), y de cuántos FTDs de cada una.</dd>
@@ -661,7 +663,7 @@ function ayuda(){
     <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min) o salir a los 10 o a la media, a toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
     <dt>Perfiles</dt><dd>Tocá a alguien (en Social, en el chat o en Equipo) para ver sus números y darle un toque 👉 (uno cada 2 min por persona).</dd>
     <dt>Tu foto</dt><dd>En Ajustes → Mi cuenta (o tocando tu foto en tu perfil). Se recorta cuadrada y la ve toda la mesa.</dd>
-    <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Vale también para el chat. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
+    <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Solo calla los pedidos sociales (mate, salidas, toques), no el chat ni los clientes new. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
   <h4>Team leader</h4><dl>
     <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que ya no está en la mesa entran a su nombre como <b>desvinculado</b> (cuentan para la mesa; en Ajustes se ven aparte y, si alguno era de la mesa con otro nombre, se une) y las que no tienen vendedor quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
   <h4>Equipo (team leader)</h4><dl>
@@ -682,7 +684,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>7</kbd></dt><dd>Categorías del menú (Inicio, Filtros, Ventas, Mi día, Mesa, Sueldo, Ajustes)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Filtros, Ventas, Clientes, Agenda, Tareas, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -707,8 +709,7 @@ const ACT={
     else toast('Así suenan los avisos. '+sp('hot','La extensión de Chrome no está conectada.'))},
 };
 document.addEventListener('click',e=>{
-  const gb=e.target.closest('#nav [data-g]');if(gb){goG(gb.dataset.g);return}
-  const v=e.target.closest('.subnav [data-v]');if(v){go(v.dataset.v);return}
+  const v=e.target.closest('#nav [data-v]');if(v){go(v.dataset.v);return}
   const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);return}
   const a=e.target.closest('[data-act]');if(a&&ACT[a.dataset.act]){e.preventDefault();primeAudio();ACT[a.dataset.act](a)}
 });
@@ -720,13 +721,13 @@ document.addEventListener('keydown',e=>{
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
-  if(/^[1-7]$/.test(e.key)){e.preventDefault();goG(GKEYS[+e.key-1]);return} // 1-7 categorías del menú
-  if(e.key==='0'){e.preventDefault();go('config');return}
+  if(NAVKEYS[e.key]){e.preventDefault();go(NAVKEYS[e.key]);return} // los números siguen el orden del menú
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
+  if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}
   if(e.key==='/'){e.preventDefault();go('ventas');setTimeout(()=>$('#pQ').focus(),0);return}
   if(e.key==='?'){e.preventDefault();ayuda();return}

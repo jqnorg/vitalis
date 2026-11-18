@@ -463,14 +463,11 @@ V.config={
       if(L.has(w))L.delete(w);else L.add(w);if(!L.size)return toast('Tiene que quedar al menos un día.','err');this.saveDias({laborables:[...L].sort()})});
     $('#cfInicio').addEventListener('change',e=>{if(!noRO())return;const v=e.target.value;if(!v||v>todayS())return toast('Fecha inválida.','err');this.saveDias({inicio:v})});
     $('#cfFer').addEventListener('click',e=>{const c=e.target.closest('[data-fer]');if(!c||!noRO())return;const sf={...(cfg.sinFer||DEF.sinFer)};sf[c.dataset.fer]=!sf[c.dataset.fer];this.saveDias({sinFer:sf})});
-    $('#cfLibAdd').onclick=()=>{if(!noRO())return;const v=$('#cfLibD').value;if(!v)return toast('Elegí la fecha del feriado.','err');const md=v.slice(5),L=cfg.libres||[];
-      if(L.includes(md))return toast('Ese feriado ya está.','warn');$('#cfLibD').value='';this.saveDias({libres:[...L,md].sort()})};
+    $('#cfLibAdd').onclick=()=>{if(!noRO())return;const d=$('#cfLibDia').value,m=$('#cfLibMes').value;if(!d||!m)return toast('Elegí el día y el mes.','err');
+      if(+d>new Date(2024,+m,0).getDate())return toast(`Ese mes no tiene día ${+d}.`,'err'); // 2024: el 29/2 vale
+      const md=`${m}-${d}`,L=cfg.libres||[];if(L.includes(md))return toast('Ese día ya está.','warn');
+      $('#cfLibDia').value='';$('#cfLibMes').value='';this.saveDias({libres:[...L,md].sort()})};
     $('#cfLibres').addEventListener('click',e=>{const c=e.target.closest('[data-lib]');if(!c||!noRO())return;this.saveDias({libres:(cfg.libres||[]).filter(x=>x!==c.dataset.lib)})});
-    $('#cfFalAdd').onclick=()=>{if(!noRO())return;const d=$('#cfFalD').value,er=faltaErr(d);if(er)return toast(esc(er),'err');
-      $('#cfFalD').value='';this.saveDias({faltas:[...(cfg.faltas||[]),{d,j:$('#cfFalJ').value==='1'}].sort((a,b)=>a.d<b.d?-1:1)})};
-    $('#cfFaltas').addEventListener('click',e=>{const c=e.target.closest('[data-fal]');if(!c||!noRO())return;
-      const F=(cfg.faltas||[]).map(x=>({...x}));const it=F.find(x=>x.d===c.dataset.fal);if(!it)return;
-      if(c.dataset.op==='rm')this.saveDias({faltas:F.filter(x=>x!==it)});else{it.j=!it.j;this.saveDias({faltas:F})}});
   },
   async saveDias(ch){cfg={...cfg,...ch};this.render({});if(await B.saveCfg())this.saved()},
   saved(){const s=$('#cfSaved');s.classList.add('on');clearTimeout(this.st);this.st=setTimeout(()=>s.classList.remove('on'),1600)},
@@ -528,9 +525,7 @@ V.config={
     $('#cfFer').innerHTML=`<button type="button" class="chip${sf.no?' on':''}" data-fer="no" title="${esc(fl('no'))}">No laborables</button><button type="button" class="chip${sf.lab?' on':''}" data-fer="lab" title="${esc(fl('lab'))}">Laborables</button>`;
     const L=cfg.libres||[];
     $('#cfLibres').innerHTML=L.length?L.map(x=>`<button type="button" class="chip on" data-lib="${x}" title="Quitar">${+x.slice(3,5)}/${+x.slice(0,2)} ✕</button>`).join(''):'<span class="p-sub">Ninguno</span>';
-    const F=cfg.faltas||[],fj=F.filter(x=>x.j).length;
-    $('#cfFaltas').innerHTML=F.length?`<div class="alist">${F.map(x=>`<div class="ai" style="grid-template-columns:auto 1fr auto"><span class="wh">${DIA[parseYMD(x.d).getDay()]} ${dm(x.d)}/${x.d.slice(0,4)}</span><button type="button" class="chip${x.j?' on':''}" data-fal="${x.d}" data-op="j" title="Cambiar" style="justify-self:start">${x.j?'Justificada':'Sin justificar'}</button><button type="button" class="ib del wr" data-fal="${x.d}" data-op="rm" title="Quitar">Quitar</button></div>`).join('')}</div>`:'<span class="p-sub">Ninguna</span>';
-    $('#cfDiasSub').textContent=F.length?`${plural(F.length,'falta')} · ${fj} justificada${fj===1?'':'s'}`:'';
+    $('#cfDiasSub').textContent='';
     $('#cfDb').textContent=teamInfo?teamInfo.name:'';$('#cfSub').textContent=`Vitalis ${VERSION}`;
     V.cuenta.render();
     $('#cfExt').innerHTML=extOn()?sp('ok b','Extensión conectada')+`: ${plural(extN,'aviso programado','avisos programados')}, ${plural(activeSnips().length,'snippet')}.`:'La extensión no está conectada en esta pestaña. Con ella tenés avisos en cualquier pestaña, el botón del CRM, el registro de clientes new y los snippets.';
