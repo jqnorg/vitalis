@@ -628,7 +628,7 @@ function ayuda(){
     <dt>Nombre y PIN</dt><dd>Elegís tu nombre. La primera vez el PIN es 0000 y creás el tuyo. Si te lo olvidás, el administrador lo vuelve a 0000.</dd>
     <dt>Bloqueo</dt><dd>5 errores seguidos bloquean 15 minutos; si se repite, cada bloqueo dura el doble.</dd></dl>
   <h4>Inicio</h4><dl>
-    <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono, el líquido, tu turno y tu agenda de hoy.</dd>
+    <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono y para tu target (si el team leader te puso uno), el líquido, tu turno y tu agenda de hoy.</dd>
     <dt>La mesa</dt><dd>Cuántos FTDs lleva la mesa, cuánto falta para el target, cuántos por día hábil y a qué ritmo vamos. La marca en la barra es dónde hay que cerrar hoy para ir al día.</dd>
     <dt>Ventas de hoy</dt><dd>Todas las de la mesa, en vivo: hora, quién, cliente, campaña y monto. <b>Ver en Ventas</b> las abre con los filtros.</dd>
     <dt>Team leader</dt><dd>Su inicio es el de toda la mesa: el target en la pista, quién está en turno y cada agente con sus FTDs de hoy y del mes. El team leader no cuenta como agente.</dd></dl>
@@ -669,6 +669,7 @@ function ayuda(){
     <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que ya no está en la mesa entran a su nombre como <b>desvinculado</b> (cuentan para la mesa; en Ajustes se ven aparte y, si alguno era de la mesa con otro nombre, se une) y las que no tienen vendedor quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
   <h4>Equipo (team leader)</h4><dl>
     <dt>Target</dt><dd><b>Fijar target</b> (en Equipo o en el inicio): los FTDs que tiene que hacer la mesa en el mes. Lo ve toda la mesa.</dd>
+    <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
@@ -701,7 +702,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),

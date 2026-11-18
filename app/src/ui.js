@@ -149,6 +149,7 @@ function status(){
   const s=calc(ymNow());
   if(tlView()){const S=mesaMes(ymNow());$('#sMes').innerHTML=`<b>${S.n}</b> FTDs de la mesa`+(S.T?` <span class="dim">${S.falta?`faltan ${S.falta} para ${S.T}`:'target cumplido'}</span>`:'')}
   else $('#sMes').innerHTML=`<b>${s.n}</b> FTDs en ${esc(MES[now.getMonth()])}`+(s.next?` <span class="dim">faltan ${s.next[0]-s.n} para ${s.next[1]} USD</span>`:s.n?' <span class="dim">bono máximo</span>':'');
+  if(!tlView()&&utOf(me))$('#sMes').insertAdjacentHTML('beforeend',` <span class="dim">· target ${utOf(me)}</span>`);
   const P=sueldoPesos(s);
   $('#sLiq').innerHTML=P&&P.total!=null?`Líquido ≈ <b>${esc(pesos(P.total))}</b>${tcViejo()?' <span class="hot">dólar viejo</span>':''}`:`Líquido <span class="hot">cargá el dólar</span>`;
   const open=pend.filter(p=>!p.done),venc=open.filter(p=>parseDue(p.due)<=now).length,hoy=open.filter(p=>p.due.slice(0,10)===te).length;

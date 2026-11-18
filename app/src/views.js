@@ -2,13 +2,14 @@
 /* ============================================================
    Vistas
    ============================================================ */
-function bonoTrack(n,lite){ // la pista del mes: el mate avanza con cada FTD
+function bonoTrack(n,lite,tg){ // la pista del mes: el mate avanza con cada FTD (tg: tu target, si hay)
   const T=tiers();if(!T.length)return '';
-  const top=Math.max(T[T.length-1][0]+3,n+1),P=v=>Math.min(100,v/top*100),cur=porCantidad(n).tier;
+  const top=Math.max(T[T.length-1][0]+3,n+1,(tg||0)+2),P=v=>Math.min(100,v/top*100),cur=porCantidad(n).tier;
   return `<div class="track${lite?' lite':''}" role="meter" aria-valuemin="0" aria-valuemax="${top}" aria-valuenow="${n}" aria-label="FTDs del mes hacia los bonos">
     <div class="rail"></div><div class="fill" style="width:${P(n)}%"></div>
     ${T.map(([t])=>`<i class="st${n>=t?' on':''}" style="left:${P(t)}%"></i>`).join('')}
     ${T.map(([t,b])=>`<span class="lb${t===cur?' at':''}" style="left:${P(t)}%"><b>${t}</b><span class="us">${b} USD</span></span>`).join('')}
+    ${tg?`<i class="ut-tick${n>=tg?' ok':''}" style="left:${P(tg)}%" title="Tu target: ${tg} FTDs"></i><span class="ut-lb${n>=tg?' ok':''}" style="left:${P(tg)}%">target</span>`:''}
     <span class="mate" style="left:${P(n)}%" title="${plural(n,'FTD')}"><svg aria-hidden="true"><use href="#mate"/></svg></span></div>`;
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
@@ -33,8 +34,8 @@ V.inicio={
     const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
-    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
-      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n)}`;
+    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}</div><span class="grow"></span>
+      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
@@ -575,9 +576,9 @@ V.equipo={
     colChart($('#eqChart'),data,{h:210,capMin:18,int:true,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     $('#eqCount').textContent=`${plural(conV,'agente')} con ventas · ${nf(days?R.n/days:0,2)} FTDs por día`;
-    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
+    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th>${utOk?'<th>Target</th>':''}<th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
       per.map(p=>{const act_=p.m.role!=null,th=act_?turnoHoy(p.m.id):{txt:'',cls:'d'},ag=act_?agStats(p.m.id):null;
-        return `<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="eq-hoy ${th.cls}">${esc(th.txt)}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="r">${ag?(ag.open?`${ag.open}${ag.venc?` · <span class="hot b">${ag.venc} venc.</span>`:''}`:'<span class="d">0</span>'):''}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td><td class="act">${act_?`<button type="button" class="btn sm" data-act="ficha" data-uid="${esc(p.m.id)}">Ficha</button>`:''}</td></tr>`}).join('')+'</tbody></table>';
+        return `<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="eq-hoy ${th.cls}">${esc(th.txt)}</td><td class="r">${p.n}</td>${utOk?`<td>${act_?utCell(p.m.id,eqYm,p.n):''}</td>`:''}<td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="r">${ag?(ag.open?`${ag.open}${ag.venc?` · <span class="hot b">${ag.venc} venc.</span>`:''}`:'<span class="d">0</span>'):''}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td><td class="act">${act_?`<button type="button" class="btn sm" data-act="ficha" data-uid="${esc(p.m.id)}">Ficha</button>`:''}</td></tr>`}).join('')+'</tbody></table>';
   },
 };
 

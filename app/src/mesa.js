@@ -3,11 +3,14 @@
    y la ficha de cada persona para el team leader (todo menos el sueldo).
    ============================================================ */
 let targets={},teamAg=[],teamSh={},teamAdj={},teamDays={},mesaOk=false; // mesaOk: la base ya tiene la tabla de targets
+let utargets={},utOk=false; // target individual: uid → {ym: FTDs} (cada uno ve el suyo; el team leader, los de todos)
+const utOf=(uid,ym=ymNow())=>(utargets[uid]||{})[ym]||0;
 
 /* ---------- carga ---------- */
 async function loadMesa(){
   let tg=[];try{tg=await Q(sb.from('targets').select('*'));mesaOk=true}catch(e){mesaOk=false}
   targets=Object.fromEntries(tg.filter(r=>r.team_id===profile.team_id).map(r=>[r.ym,+r.ftds]));
+  try{const ut=await Q(sb.from('user_targets').select('user_id,ym,ftds'));utOk=true;utargets={};for(const r of ut)(utargets[r.user_id]||(utargets[r.user_id]={}))[r.ym]=+r.ftds}catch(e){utOk=false}
   if(!isLeader()){teamAg=[];teamSh={};teamAdj={};teamDays={};return}
   const desde=addDays(todayS().slice(0,8)+'01',-62);
   const [ag,sh,adj,dd]=await Promise.all([
@@ -27,6 +30,7 @@ async function mesaPoll(){if(!ready||!sb)return;try{await loadMesa();refresh()}c
 function mesaLive(table,p){
   const r=p.new||{},o=p.old||{};
   if(table==='targets'){if(p.eventType==='DELETE'){if(o.ym&&(!o.team_id||o.team_id===profile.team_id))delete targets[o.ym]}else if(r.team_id===profile.team_id)targets[r.ym]=+r.ftds;refresh();return}
+  if(table==='user_targets'){if(p.eventType==='DELETE'){if(o.user_id&&utargets[o.user_id])delete utargets[o.user_id][o.ym]}else if(r.user_id)(utargets[r.user_id]||(utargets[r.user_id]={}))[r.ym]=+r.ftds;refresh();return}
   if(!isLeader())return;
   if(table==='agenda'){if(p.eventType==='DELETE'){teamAg=teamAg.filter(x=>x._id!==o.id)}else if(r.user_id!==me){teamAg=teamAg.filter(x=>x._id!==r.id);teamAg.push({...A2P(r),uid:r.user_id})}}
   else if(table==='shifts'){if(p.eventType==='DELETE'){if(o.user_id&&teamSh[o.user_id])delete teamSh[o.user_id][o.date]}else if(r.user_id!==me)(teamSh[r.user_id]||(teamSh[r.user_id]={}))[r.date]=shiftOf(r)}
@@ -34,6 +38,15 @@ function mesaLive(table,p){
   refresh();
 }
 Object.assign(B,{
+  async setUTargets(ym,map){ // {uid: FTDs}; 0 = sin target
+    const up=Object.entries(map).filter(([,n])=>n>0).map(([user_id,n])=>({user_id,ym,ftds:n,set_by:me,updated_at:new Date().toISOString()}));
+    const del=Object.entries(map).filter(([,n])=>!(n>0)).map(([u])=>u);
+    try{if(up.length)await Q(sb.from('user_targets').upsert(up,{onConflict:'user_id,ym'}));
+      if(del.length)await Q(sb.from('user_targets').delete().eq('ym',ym).in('user_id',del));
+      for(const r of up)(utargets[r.user_id]||(utargets[r.user_id]={}))[ym]=r.ftds;for(const u of del)if(utargets[u])delete utargets[u][ym];
+      refresh();return true}
+    catch(e){if(/user_targets|PGRST205|42P01/.test(String(e&&(e.message||e.code))))toast('Los targets por agente se activan en un rato (falta actualizar la base).','warn');else dbErr(e);return false}
+  },
   async setTarget(ym,n){
     try{if(n)await Q(sb.from('targets').upsert({team_id:profile.team_id,ym,ftds:n,set_by:me,updated_at:new Date().toISOString()},{onConflict:'team_id,ym'}));
       else await Q(sb.from('targets').delete().eq('team_id',profile.team_id).eq('ym',ym));
@@ -94,7 +107,7 @@ function mesaCard(){
 function eqTargetCard(ym){
   if(!mesaOk)return `<div class="card-h" style="margin:0"><h3>Target de ${esc(mLong(ym))}</h3><span class="p-sub">falta actualizar la base para poder fijarlo</span></div>`;
   const S=mesaMes(ym);
-  return `<div class="card-h"><h3>Target de ${esc(mLong(ym))}</h3><span class="p-sub">${S.T?(S.falta?`faltan ${S.falta}${S.enCurso&&S.quedan?` · ${nf(S.porDia,1)} por día hábil`:''}`:'cumplido'):'sin fijar'}</span><span class="grow"></span><button type="button" class="btn sm pri" data-act="target" data-ym="${ym}">${S.T?'Cambiar':'Fijar target'}</button></div>`+
+  return `<div class="card-h"><h3>Target de ${esc(mLong(ym))}</h3><span class="p-sub">${S.T?(S.falta?`faltan ${S.falta}${S.enCurso&&S.quedan?` · ${nf(S.porDia,1)} por día hábil`:''}`:'cumplido'):'sin fijar'}</span><span class="grow"></span>${utOk?`<button type="button" class="btn sm" data-act="utargets" data-ym="${ym}">Por agente</button>`:''}<button type="button" class="btn sm pri" data-act="target" data-ym="${ym}">${S.T?'Cambiar':'Fijar target'}</button></div>`+
     (S.T?targetBar(S):`<p class="p-sub" style="margin:0">Fijá cuántos FTDs tiene que hacer la mesa este mes. Lo ven todos en el inicio.</p>`);
 }
 function turnoHoy(uid){ // estado del turno de hoy de alguien
@@ -119,7 +132,7 @@ function fichaModal(uid,tab='mes'){
       const cv=convPeriod(mFrom,te,uid),late=L.filter(isLate).length,dias=new Set(L.map(f=>f.date)).size,fal=(days.faltas||[]).filter(x=>x.d.slice(0,7)===ym);
       const k=(lb,v,s2)=>`<div class="kpi"><div class="lb">${esc(lb)}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`;
       el.innerHTML=`<div class="pf-k">${k('FTDs del mes',L.length+extra,extra?`${L.length} cargados + ${extra} sin detalle`:`${late} late · ${L.length-late} new`)}${k('Depositado',esc(money(L.reduce((a,f)=>a+(+f.amount||0),0))),'USD')}${k('Conversión',cv.rate==null?'—':esc(pct(cv.rate)),`${plural(cv.ftd,'FTD')} de ${plural(cv.leads,'cliente new','clientes new')}`)}
-        ${k('Días con ventas',dias,`de ${plural(mesaMes(ym).pas,'día hábil','días hábiles')}`)}${k('Faltas',fal.length,fal.length?fal.map(x=>`${dm(x.d)}${x.j?' (just.)':''}`).join(', '):'ninguna este mes')}${k('Hoy',L.filter(f=>f.date===te).length,esc(turnoHoy(uid).txt))}</div>
+        ${k('Días con ventas',dias,`de ${plural(mesaMes(ym).pas,'día hábil','días hábiles')}`)}${k('Faltas',fal.length,fal.length?fal.map(x=>`${dm(x.d)}${x.j?' (just.)':''}`).join(', '):'ninguna este mes')}${k('Hoy',L.filter(f=>f.date===te).length,esc(turnoHoy(uid).txt))}${(()=>{const t=utOf(uid,ym),n=L.length+extra;return t?k('Target',`${n} de ${t}`,n>=t?'cumplido':`faltan ${t-n}`):''})()}</div>
         <div class="pf-ch"><div class="lb">FTDs por día <span class="pf-lg"><span class="sw"></span>new <span class="sw s2"></span>late</span></div><div id="fiChart"></div></div>
         <div class="fi-acts"><button type="button" class="btn sm" data-fi="ventas">Ver sus ventas</button></div>`;
       const [Y,M]=ym.split('-').map(Number),n=new Date(Y,M,0).getDate(),data=[];
@@ -187,7 +200,7 @@ function mesaBoard(){ // la mesa hoy: cada agente con su turno, sus FTDs y su ag
     return `<button type="button" class="mb-r${p.m.id===me?' mine':''}" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}
       <span class="who"><span class="nm">${esc(p.m.name)}</span><span class="st ${th.cls}">${esc(th.txt==='—'?'sin entrada':th.txt)}</span></span>
       <span class="ag">${ag.venc?`<span class="hot b">${ag.venc} venc.</span>`:ag.open?`${ag.open} en agenda`:''}</span>
-      <span class="c"><b>${h}</b><small>hoy</small></span><span class="c"><b>${p.n}</b><small>mes</small></span></button>`}).join('');
+      <span class="c"><b>${h}</b><small>hoy</small></span><span class="c"><b>${p.n}</b><small>${utOf(p.m.id,ym)?'de '+utOf(p.m.id,ym):'mes'}</small></span></button>`}).join('');
   return `<div class="card-h"><h3>La mesa hoy</h3><span class="p-sub">${plural(S.per.length,'agente')} · tocá uno para ver su ficha</span><span class="grow"></span><button type="button" class="btn sm" data-go="equipo">Equipo</button></div>`+
     (rows?`<div class="mboard">${rows}</div>`:'<div class="p-empty">Todavía no hay agentes en la mesa.</div>');
 }
@@ -206,3 +219,34 @@ function hoyMesaCard(){
       <span class="n" title="${esc(f.name)}${f.camp?' · '+esc(f.camp):''}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)}${f.camp?' · '+esc(f.camp):''}</small></span><span class="m">${esc(money(f.amount))}</span><span class="b">${tipoBadge(f)}</span></div>`}).join('')}</div>`+
     (L.length>12?`<button type="button" class="btn sm hv-more" data-act="hoyMas">${hoyAll?'Ver menos':`Ver las ${L.length}`}</button>`:'');
 }
+
+/* ---------- target individual (lo fija el team leader; cada uno ve el suyo) ---------- */
+function diasQuedan(){ // mis días de trabajo que quedan en el mes (hoy incluido)
+  const te=todayS(),[Y,M]=te.split('-').map(Number),last=new Date(Y,M,0).getDate();let n=0;
+  for(let d=+te.slice(8);d<=last;d++)if(!noTrabajo(`${te.slice(0,7)}-${z(d)}`))n++;return n;
+}
+function utLine(n){ // en tu inicio: cómo venís con tu target
+  const T=utOf(me);if(!T)return '';
+  const q=diasQuedan(),f=T-n;
+  return `<div class="msg ut">Tu target: <b>${T} FTDs</b> · ${f>0?`faltan <b>${f}</b>${q?` · <b>${nf(f/q,1)}</b> por día`:''}`:'<b>¡cumplido!</b> 🎯'}</div>`;
+}
+function utModal(ym,focus){ // el team leader fija el target de cada uno
+  if(!isLeader())return;
+  if(!utOk)return toast('Los targets por agente se activan en un rato (falta actualizar la base).','warn');
+  const list=team.filter(f=>f.date.slice(0,7)===ym),P=sellers(list).filter(m=>m.role!=='leader'||list.some(f=>f.uid===m.id)).sort((a,b)=>a.name.localeCompare(b.name)),T=targets[ym]||0,mes=MES[+ym.slice(5,7)-1];
+  let sum=()=>{};
+  const row=m=>{const n=list.filter(f=>f.uid===m.id).length,t=utOf(m.id,ym);
+    return `<label class="ut-r">${avatar(m.name)}<span class="nm">${esc(m.name)}<small>${plural(n,'FTD')} en ${esc(mes)}</small></span><input data-ut="${esc(m.id)}" inputmode="numeric" maxlength="5" value="${t||''}" placeholder="—" aria-label="Target de ${esc(m.name)}"></label>`};
+  modal({title:`Targets de ${esc(mLong(ym))}`,wide:1,body:`<p class="mp">Cuántos FTDs tiene que hacer cada uno en el mes. Cada uno ve el suyo en el inicio. Vacío = sin target.</p><div class="ut-list">${P.map(row).join('')}</div><div class="ut-sum" id="utSum"></div>`,
+    actions:[...(T&&P.length?[{l:'Repartir el de la mesa',cls:'l',fn:api=>{const I=[...api.box.querySelectorAll('[data-ut]')],b=Math.floor(T/I.length),r=T-b*I.length;I.forEach((i,k)=>{i.value=b+(k<r?1:0)});sum();return false}}]:[]),
+      {l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
+        const map={};for(const i of api.box.querySelectorAll('[data-ut]')){const v=Math.max(0,Math.round(parseNum(i.value)||0));if(v!==utOf(i.dataset.ut,ym))map[i.dataset.ut]=v}
+        if(!Object.keys(map).length)return;
+        if(await B.setUTargets(ym,map))toast(`Targets de ${esc(mLong(ym))} guardados.`);else return false}}],
+    onOpen:api=>{
+      sum=()=>{let s_=0,c=0;for(const i of api.box.querySelectorAll('[data-ut]')){const v=Math.round(parseNum(i.value)||0);if(v>0){s_+=v;c++}}
+        api.q('#utSum').innerHTML=`${plural(c,'agente')} con target · suman <b>${s_}</b>${T?` de los <b>${T}</b> de la mesa${s_<T?` · faltan ${T-s_}`:s_>T?` · ${s_-T} de más`:' · justo'}`:''}`};
+      api.box.addEventListener('input',e=>{if(e.target.matches('[data-ut]'))sum()});sum();
+      setTimeout(()=>{const f=(focus&&api.q(`[data-ut="${CSS.escape(focus)}"]`))||api.q('[data-ut]');if(f){f.focus();f.select()}},0)}});
+}
+const utCell=(uid,ym,n)=>{const t=utOf(uid,ym);return `<button type="button" class="ut-c${t?(n>=t?' ok':''):' none'}" data-act="utargets" data-ym="${ym}" data-uid="${esc(uid)}" title="${t?'Cambiar el target':'Fijar un target'}">${t?`${n}/${t}<i style="width:${Math.min(100,n/t*100)}%"></i>`:'Fijar'}</button>`};

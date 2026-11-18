@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 17, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 18, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -334,6 +334,24 @@ ok(r.rows.length === 0, 'B ya no lo lee');
   ok(q.rows.every((r) => r.user_id === B) && q.rows[0].n === nB + 1 && q.rows[1].n === nB + 2, 'las ventas pasan a B con números nuevos');
   q = await db.query('select count(*)::int c from public.profiles where id = $1', [GP]);
   ok(q.rows[0].c === 0 && (await db.query('select crm_name from public.profiles where id = $1', [B])).rows[0].crm_name, 'el desvinculado se borra y B queda con ese nombre en el CRM');
+}
+// target individual
+{
+  const Ag = (await db.query("select id from public.profiles where name='Melany Go'")).rows[0].id;
+  let q = await as(M, "insert into public.user_targets (user_id, ym, ftds) values ($1, '2026-11', 20), ($2, '2026-11', 15) returning 1", [Ag, B]);
+  ok(!q.error && q.rows.length === 2, 'el team leader fija el target de dos agentes');
+  q = await as(Ag, "select user_id::text u, ftds from public.user_targets where ym = '2026-11'");
+  ok(q.rows.length === 1 && q.rows[0].u === Ag && q.rows[0].ftds === 20, 'cada agente ve solo el suyo');
+  q = await as(Ag, "update public.user_targets set ftds = 5 where user_id = $1 returning 1", [Ag]);
+  ok(!!q.error || q.rows.length === 0, 'y no se lo cambia');
+  q = await as(Ag, "insert into public.user_targets (user_id, ym, ftds) values ($1, '2026-12', 3)", [Ag]);
+  ok(!!q.error, 'ni se pone uno');
+  q = await as(M, "select count(*)::int c from public.user_targets where ym = '2026-11'");
+  ok(q.rows[0].c === 2, 'el team leader ve los de todos');
+  q = await as(M, "update public.user_targets set ftds = 22 where user_id = $1 and ym = '2026-11' returning ftds", [Ag]);
+  ok(!q.error && q.rows[0].ftds === 22, 'y los cambia');
+  q = await as(null, 'select * from public.user_targets');
+  ok(!!q.error || q.rows.length === 0, 'sin sesión no se ven');
 }
 // foto de perfil
 {

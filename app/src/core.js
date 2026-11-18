@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.9.0';
+const VERSION='1.10.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -354,6 +354,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})});
   if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p));
+  if(utOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'user_targets'},p=>mesaLive('user_targets',p));
   if(avOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'avatars'},avLive);
   if(reactOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'message_reactions'},reactLive); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
   // el team leader ve en vivo la agenda, los turnos y los FTDs sin detalle de todos

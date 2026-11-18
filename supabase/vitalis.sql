@@ -190,6 +190,16 @@ create table if not exists public.message_reactions (
 );
 create index if not exists message_reactions_chat on public.message_reactions (chat_id, created_at desc);
 create index if not exists messages_created on public.messages (created_at desc);
+-- target individual del mes (lo fija el team leader o el admin; lo ven esa persona y los que lo fijan)
+create table if not exists public.user_targets (
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  ym         text not null check (ym ~ '^\d{4}-\d{2}$'),
+  ftds       integer not null check (ftds between 1 and 10000),
+  set_by     uuid default auth.uid() references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, ym)
+);
+
 -- imágenes del chat (se pegan o se eligen; la app las achica antes de mandarlas). El mensaje las nombra con [img:id:AnchoxAlto]
 create table if not exists public.chat_files (
   id         uuid primary key default gen_random_uuid(),
@@ -809,6 +819,7 @@ alter table public.targets      enable row level security;
 alter table public.chat_files   enable row level security;
 alter table public.avatars      enable row level security;
 alter table public.message_reactions enable row level security;
+alter table public.user_targets enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -910,6 +921,13 @@ drop policy if exists messages_read on public.messages;
 create policy messages_read on public.messages for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists messages_insert on public.messages;
 create policy messages_insert on public.messages for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists ut_read on public.user_targets;
+create policy ut_read on public.user_targets for select to authenticated
+  using (user_id = auth.uid() or (public.my_role() in ('admin','leader') and public.in_my_team(user_id)));
+drop policy if exists ut_write on public.user_targets;
+create policy ut_write on public.user_targets for all to authenticated
+  using (public.my_role() in ('admin','leader') and public.in_my_team(user_id))
+  with check (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
 drop policy if exists reactions_read on public.message_reactions;
 create policy reactions_read on public.message_reactions for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists reactions_insert on public.message_reactions;
@@ -946,6 +964,8 @@ revoke update on public.chat_files from authenticated;
 revoke all on public.chat_files from anon;
 grant select, insert, update, delete on public.avatars to authenticated;
 grant select, insert, delete on public.message_reactions to authenticated;
+grant select, insert, update, delete on public.user_targets to authenticated;
+revoke all on public.user_targets from anon;
 revoke update on public.message_reactions from authenticated;
 revoke all on public.message_reactions from anon;
 revoke all on public.avatars from anon;
@@ -968,7 +988,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

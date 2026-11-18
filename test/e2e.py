@@ -471,6 +471,19 @@ async def main():
             ym = await D.evaluate('ymNow()')
             ok(sql(f"select ftds from public.targets where ym='{ym}'")[0]['ftds'] == 60, 'el team leader fija el target del mes')
             ok('de 60 de target' in await D.inner_text('#eqKpis') and 'faltan' in (await D.inner_text('#eqTarget')).lower(), 'equipo: muestra el target y cuánto falta')
+            # target individual: el team leader lo fija para cada uno
+            await D.click('#eqTarget [data-act=utargets]'); await D.wait_for_timeout(400)
+            n_ag = await D.locator('.mbox [data-ut]').count()
+            ok(n_ag >= 10, f'el team leader ve a cada agente para ponerle target ({n_ag})')
+            await D.click('.mbox .mf .btn:has-text("Repartir el de la mesa")'); await D.wait_for_timeout(200)
+            ok('suman 60' in await D.inner_text('#utSum') and 'justo' in await D.inner_text('#utSum'), 'repartir el de la mesa: suman lo mismo que el target')
+            joa = sql("select id from public.profiles where name='Joaquín Or'")[0]['id']
+            await D.fill(f'.mbox [data-ut="{joa}"]', '18'); await D.wait_for_timeout(100)
+            await D.screenshot(path=OUT / 'p0b_targets_agentes.png')
+            await D.click('.mbox .mf .pri'); await D.wait_for_timeout(1000)
+            ut = sql(f"select (select name from public.profiles where id=user_id) who, ftds from public.user_targets where ym='{ym}' order by who")
+            ok(len(ut) == n_ag and any(x['who'] == 'Joaquín Or' and x['ftds'] == 18 for x in ut), f'quedan guardados ({len(ut)}; Joaquín 18)')
+            ok('13/18' in await D.inner_text('#eqTable tr:has-text("Joaquín Or")'), 'en Equipo se ve cómo viene cada uno contra su target')
             te0 = await A.evaluate('todayS()')
             sql(f"insert into public.sales (team_id,user_id,n,date,time,client_id,country,name,camp,amount,brand) select team_id,id,99,'{te0}','10:30','990001','Peru','Hoy Cliente','FB-01',180,'Trade24Seven' from public.profiles where name='Mateo He'")
             await A.reload(); await A.wait_for_timeout(2500); await A.evaluate("go('inicio')"); await A.wait_for_timeout(500)
@@ -484,6 +497,8 @@ async def main():
             n_mesa = await A.evaluate("team.filter(f=>f.date.slice(0,7)===ymNow()).length")
             ok('target 60' in mt and str(n_mesa) in mt and ('Faltan' in mt or 'cumplido' in mt), f'el inicio muestra la mesa contra el target ({n_mesa} de 60)')
             ok('Tus FTDs' in await A.inner_text('#iHero'), 'y arriba, lo mío')
+            ok('Tu target: 18 FTDs' in await A.inner_text('#iHero') and 'faltan 5' in await A.inner_text('#iHero') and await A.locator('#iHero .ut-tick').count() == 1, 'Joaquín ve su target en el inicio (y la marca en la pista)')
+            ok('target 18' in await A.inner_text('#sMes'), 'y arriba en la barra')
             await A.screenshot(path=OUT / 'p1_inicio_mesa.png', full_page=True)
             te = await D.evaluate('todayS()'); now = await D.evaluate('Date.now()')
             sql(f"""insert into public.agenda (user_id,client_id,kw,due) select id,'777001','llamar de nuevo','{te}T00:05' from public.profiles where name='Sofía Ar';
