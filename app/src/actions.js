@@ -601,18 +601,21 @@ function ayuda(){
     <dt>Menú</dt><dd>Por categorías: Ventas (y Clientes), Mi día (Agenda, Tareas, Turnos, Snippets) y Mesa (Chat, Social, Equipo). Adentro, pestañas arriba.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
+    <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
   <h4>Clientes</h4><dl>
     <dt>Registro</dt><dd>Los clientes en "new" del CRM se anotan solos (con la extensión) el día que aparecen. También se cargan a mano.</dd>
     <dt>Conversión</dt><dd>FTDs del período sobre clientes new del período. "Depositó" marca a los clientes del registro que ya tienen una venta en la mesa.</dd></dl>
   <h4>Snippets</h4><dl>
-    <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
+    <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página de Chrome (con la extensión) y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
+    <dt>Clic derecho</dt><dd>Si en alguna página el /atajo no anda: clic derecho en el campo → <b>Snippets de Vitalis</b> → el que quieras.</dd>
     <dt>Variables</dt><dd>{fecha}, {hora}, {yo} (tu nombre) y {cursor} (dónde queda el cursor).</dd>
     <dt>Compartidos</dt><dd>Los ve toda la mesa. Si tenés uno tuyo con el mismo atajo, se usa el tuyo.</dd></dl>
   <h4>Chat</h4><dl>
     <dt>Chats</dt><dd>Uno de toda la mesa, grupos (Nuevo → varias personas y un nombre) y privados (Nuevo → una persona, o Mensaje en su perfil).</dd>
     <dt>Grupos</dt><dd>Cualquiera de adentro suma gente y le cambia el nombre. Quien lo creó puede sacar a alguien. Si se van todos, se borra.</dd>
+    <dt>Imágenes</dt><dd>Pegalas con Ctrl+V, arrastralas o tocá el ícono al lado del mensaje. Van achicadas para que carguen rápido. Tocá una para verla grande, copiarla o bajarla.</dd>
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciá un chat desde su encabezado; si te nombran con @tunombre, el aviso llega igual.</dd></dl>
   <h4>Filtros</h4><dl>
     <dt>Qué muestra</dt><dd>Con las ventas de toda la mesa en el período que elijas: campañas, afiliadores, países y combinaciones que más venden, si suben o bajan contra el período anterior y cuándo fue la última.</dd>

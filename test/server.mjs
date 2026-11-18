@@ -14,7 +14,7 @@ const db = new PGlite({ extensions: { pgcrypto } });
 await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
 await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
-const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'], targets: ['team_id', 'ym'] };
+const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'], targets: ['team_id', 'ym'], chat_files: ['id'] };
 const TABLES = new Set(Object.keys(PK));
 
 // ---------- auth ----------

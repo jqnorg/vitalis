@@ -22,6 +22,7 @@
     <symbol id="i-mesa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6.5 19.5a5.5 5.5 0 0 1 11 0"/><circle cx="5" cy="10.2" r="2.1"/><circle cx="19" cy="10.2" r="2.1"/><path d="M1.8 18a3.6 3.6 0 0 1 4.2-3.3M22.2 18a3.6 3.6 0 0 0-4.2-3.3"/></symbol>
     <symbol id="i-filtros" viewBox="0 0 24 24"><path d="M4 5h16l-6.2 7.4v5.4l-3.6 2V12.4z"/></symbol>
     <symbol id="i-tareas" viewBox="0 0 24 24"><path d="M9 4.5H7.5A2.5 2.5 0 0 0 5 7v11.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V7a2.5 2.5 0 0 0-2.5-2.5H15"/><rect x="9" y="3" width="6" height="3.2" rx="1.2"/><path d="m9 13.5 2.2 2.2L15.5 11"/></symbol>
+    <symbol id="i-img" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 15.5 16 11l-7.5 8.5"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h8a2.5 2.5 0 0 1 2.5 2.5v5A2.5 2.5 0 0 1 14 14H9.5L6 17v-3a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M19.6 8.6a2.4 2.4 0 0 1 .9 1.9v5a2.5 2.5 0 0 1-2.5 2.5v3l-3.5-3h-3.2a2.5 2.5 0 0 1-2-1"/></symbol>
     <symbol id="i-social" viewBox="0 0 24 24"><path d="M6.6 9.5h10.8c.3 4.6-.7 8.5-2.6 10.4-.7.7-1.6 1.1-2.8 1.1s-2.1-.4-2.8-1.1C7.3 18 6.3 14.1 6.6 9.5z"/><path d="M6 9.5h12M13.5 9.2 15.6 4c.3-.6.7-.9 1.4-.9h1"/></symbol>
     <symbol id="i-equipo" viewBox="0 0 24 24"><path d="M8 4h8v5.5a4 4 0 0 1-8 0z"/><path d="M8 6H5.2c0 2.4 1.2 3.8 3 4.2M16 6h2.8c0 2.4-1.2 3.8-3 4.2M12 13.5v3.5M8.5 20.5h7M10 17h4"/></symbol>
@@ -115,7 +116,7 @@
   <div class="p-filters"><label>Vendedor<select id="pWho" aria-label="Vendedor"></select></label><label class="q">Buscar<input id="pQ" type="search" placeholder="Nombre, ID o transacción" autocomplete="off"></label><span id="pFilters" style="display:contents"></span></div>
   <div class="kpis" id="pKpis"></div>
   <section class="card">
-    <div class="card-h"><h3>FTDs por mes</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div><span class="grow"></span><button class="btn sm" type="button" id="pChartTblBtn">Ver tabla</button></div>
+    <div class="card-h"><h3 id="pChartH">FTDs por mes</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div><span class="grow"></span><button class="btn sm" type="button" id="pChartTblBtn">Ver tabla</button></div>
     <div class="chart" id="pChart"></div>
     <div id="pChartTbl" class="p-tablewrap" hidden></div>
   </section>
@@ -208,7 +209,8 @@
     <section class="ch-main" id="chMain" hidden>
       <header class="ch-h" id="chHead"></header>
       <div class="ch-msgs" id="chMsgs"></div>
-      <form class="ch-form" id="chForm" autocomplete="off"><textarea id="chIn" rows="1" maxlength="2000" aria-label="Mensaje"></textarea><button class="btn pri" type="submit">Enviar</button></form>
+      <div class="ch-att" id="chAtt" hidden></div>
+      <form class="ch-form" id="chForm" autocomplete="off"><button type="button" class="ib ch-pic" id="chPic" title="Mandar una imagen (o pegala con Ctrl+V)" aria-label="Mandar una imagen"><svg><use href="#i-img"/></svg></button><input type="file" id="chFile" accept="image/*" hidden><textarea id="chIn" rows="1" maxlength="2000" aria-label="Mensaje"></textarea><button class="btn pri" type="submit">Enviar</button></form>
     </section>
   </div>
 </section>

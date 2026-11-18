@@ -20,7 +20,8 @@ def ok(c, m):
 FORM = '''<!doctype html><meta charset="utf-8"><title>Formulario</title><body style="font:16px system-ui;padding:20px">
 <input id="i" style="width:600px"><br><br><textarea id="t" rows="6" cols="70"></textarea><br><br>
 <div id="ce" contenteditable="true" style="border:1px solid #999;min-height:80px;width:600px;padding:6px"></div>
-<input id="pw" type="password"><input id="no" data-vitalis-nosnip></body>'''
+<input id="pw" type="password"><input id="no" data-vitalis-nosnip><div id="sh"></div>
+<script>document.getElementById('sh').attachShadow({mode:'open'}).innerHTML='<input id="si" style="width:400px"><div id="sce" contenteditable="true" style="border:1px solid #999;min-height:40px;width:400px"></div>'</script></body>'''
 CRM = '''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body style="font:14px system-ui;padding:20px"><h3>Clients</h3><button class="refresh-btn" onclick="window.__clicks=(window.__clicks||0)+1">⟳</button>
 <table border="1" cellpadding="6"><thead><tr><th>Client ID</th><th>Full Name</th><th>Country</th><th>Status</th><th>Registration Time</th></tr></thead><tbody>
 <tr><td>555001</td><td>Lucía Pérez</td><td>Peru</td><td>New</td><td>17/11/2026 10:02</td></tr>
@@ -106,6 +107,22 @@ async def main():
             ok(await F.input_value('#no') == '/kyc', 'en campos marcados data-vitalis-nosnip no se expande')
             await F.click('#i'); await F.fill('#i', ''); await F.keyboard.type('http://x.com/kyc', delay=10); await F.wait_for_timeout(200)
             ok(await F.input_value('#i') == 'http://x.com/kyc', 'en una dirección (x.com/kyc) no se expande')
+            await F.click('#si'); await F.keyboard.type('/dep2', delay=30); await F.wait_for_timeout(300)
+            ok(await F.input_value('#si') == 'Segundo depósito recibido.', 'adentro de un shadow DOM (input) también')
+            await F.click('#sce'); await F.keyboard.type('Ok /dep2', delay=30); await F.wait_for_timeout(300)
+            ok('Segundo depósito recibido.' in await F.inner_text('#sce') and '/dep2' not in await F.inner_text('#sce'), 'y en un editor adentro de un shadow DOM')
+            # la extensión se actualiza con la página abierta: la copia nueva toma el lugar, sin duplicar
+            await sw.evaluate("chrome.tabs.query({url:'https://example.test/*'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id,allFrames:true},files:['snip.js']}))"); await F.wait_for_timeout(300)
+            await F.fill('#i', ''); await F.click('#i'); await F.keyboard.type('/dep2', delay=30); await F.wait_for_timeout(300)
+            ok(await F.input_value('#i') == 'Segundo depósito recibido.', f'después de reinyectar se expande una sola vez ({await F.input_value("#i")!r})')
+            # clic derecho → Snippets de Vitalis: pega en el campo donde estás
+            await sw.evaluate('snipMenu()'); await F.wait_for_timeout(500)
+            await F.fill('#t', 'Hola '); await F.click('#t'); await F.keyboard.press('End')
+            await sw.evaluate("chrome.tabs.query({url:'https://example.test/*'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id},func:pasteSnip,args:['desde el menú {cursor}listo']}))"); await F.wait_for_timeout(300)
+            ok(await F.input_value('#t') == 'Hola desde el menú listo', f'el menú del clic derecho pega el snippet ({await F.input_value("#t")!r})')
+            await F.click('#si'); await F.fill('#si', '')
+            await sw.evaluate("chrome.tabs.query({url:'https://example.test/*'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id},func:pasteSnip,args:['en sombra']}))"); await F.wait_for_timeout(300)
+            ok(await F.input_value('#si') == 'en sombra', 'y también adentro de un shadow DOM')
             await F.screenshot(path=OUT / 'x1_snippets_en_pagina.png')
 
             # clientes new del CRM → registro de Vitalis

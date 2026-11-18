@@ -102,6 +102,12 @@ function marksHTML(t){
 }
 
 /* ---------- ventas ---------- */
+const PRESETS=[['hoy','hoy'],['ayer','ayer'],['sem','esta semana'],['semp','la semana pasada'],['d7','últimos 7 días'],['mes','este mes'],['mesp','el mes pasado'],['d30','últimos 30 días']];
+function presetRange(k){ // [desde, hasta] · null = todo · undefined = fechas elegidas a mano
+  const te=todayS(),ws=weekStart(te),ym=te.slice(0,7),pm=addDays(ym+'-01',-1).slice(0,7);
+  if(!k)return null;if(k==='x')return undefined;if(k.startsWith('m:'))return [k.slice(2),k.slice(2)];
+  return {hoy:[te,te],ayer:[addDays(te,-1),addDays(te,-1)],sem:[ws,te],semp:[addDays(ws,-7),addDays(ws,-1)],d7:[addDays(te,-6),te],mes:[ym+'-01',te],mesp:[pm,pm],d30:[addDays(te,-29),te]}[k]||null;
+}
 let pF={},pShow=40,pExpand={},pBuiltKey='',pWho='me';
 const whoList=()=>pWho==='me'?ftds:pWho==='all'?team:team.filter(f=>f.uid===pWho);
 const whoLabel=()=>pWho==='me'?'Mis ventas':pWho==='all'?'Toda la mesa':memberName(pWho);
@@ -132,8 +138,9 @@ V.ventas={
       pBuiltKey=key;
       const o=(v,l)=>`<option value="${esc(v)}">${esc(l)}</option>`;
       $('#pFilters').innerHTML=
-        `<label>Desde<select data-f="desde">${o('','inicio')}${months.map(m=>o(m,mLabel(m))).join('')}</select></label>`+
-        `<label>Hasta<select data-f="hasta">${o('','hoy')}${months.map(m=>o(m,mLabel(m))).join('')}</select></label>`+
+        `<label>Período<select id="pPer">${o('','todo')}${PRESETS.map(([k,l])=>o(k,l)).join('')}<optgroup label="Meses">${[...months].reverse().map(m=>o('m:'+m,mLabel(m))).join('')}</optgroup>${o('x','fechas elegidas')}</select></label>`+
+        `<label>Desde<input type="date" data-f="desde" max="${todayS()}"></label>`+
+        `<label>Hasta<input type="date" data-f="hasta"></label>`+
         `<label>Marca<select data-f="marca">${o('','todas')}${brands.map(b=>o(b,b)).join('')}</select></label>`+
         `<label>Afiliado<input data-f="aff" list="dlAff" placeholder="todos" autocomplete="off"></label>`+
         `<label>Campaña<input data-f="camp" list="dlCamp" placeholder="todas" autocomplete="off"></label>`+
@@ -146,10 +153,14 @@ V.ventas={
         if(el.tagName==='INPUT')el.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();el.dispatchEvent(new Event('change'))}});
       });
       $('#pClear').addEventListener('click',()=>{pF={};$('#pQ').value='';pShow=40;this.render({})});
+      $('#pPer').addEventListener('change',e=>{const r=presetRange(e.target.value);if(r===undefined)return;pF.desde=r?r[0]:undefined;pF.hasta=r?r[1]:undefined;pShow=40;
+        const R2=fRange(pF);$('#pFilters [data-f=desde]').value=R2.a||'';$('#pFilters [data-f=hasta]').value=R2.b||'';this.render({})});
     }
+    const R=fRange(pF),per=$('#pPer');
+    if(per!==document.activeElement){const m=['',...PRESETS.map(x=>x[0]),...months.map(x=>'m:'+x)].find(k=>{const r=presetRange(k);return r===null?!R.a&&!R.b:r&&fRange({desde:r[0],hasta:r[1]}).a===R.a&&fRange({desde:r[0],hasta:r[1]}).b===R.b});per.value=m!=null?m:'x'}
     $$('[data-f]',$('#pFilters')).forEach(el=>{
       if(el===document.activeElement)return;
-      const k=el.dataset.f;let v=pF[k]||'';
+      const k=el.dataset.f;let v=k==='desde'?(R.a||''):k==='hasta'?(R.b||''):(pF[k]||'');
       if(k==='marca'&&v){const b=[...el.options].find(op=>op.value&&norm(op.value).includes(norm(v)));v=b?b.value:''}
       if(k==='pais'&&v){const b=[...el.options].find(op=>op.value&&norm(op.value)===norm(v));v=b?b.value:''}
       el.value=v;
@@ -162,26 +173,39 @@ V.ventas={
     this.whoSelect();
     this.filters();
     const list=applyF(whoList(),pF),R=resumen(list),many=pWho==='all';
+    const FR=fRange(pF),dA=FR.a||(list.length?list.reduce((m,x)=>x.date<m?x.date:m,list[0].date):null),dB=FR.b&&FR.b<todayS()?FR.b:todayS();
+    const span=FR.a&&dA&&dB>=dA?spanDays(dA,dB):0,porDia=span&&span<=62; // rango corto: todo por día
     $('#pSub').textContent=whoLabel()+' · '+fDesc(pF);
     const top=dim=>groupBy(list,dim)[0]||null;
     const tc=pF.camp?null:top('campanas'),ta=pF.aff?null:top('afiliados');
     const k=(lb,v,s,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v" title="${esc(v)}">${esc(v)}</div><div class="s" title="${esc(s)}">${esc(s)}</div></div>`;
     $('#pKpis').innerHTML=
-      k('FTDs',nf(R.n),`${R.meses} mes${R.meses===1?'':'es'} · ${nf(R.porMes,1)} por mes`,true)+
+      k('FTDs',nf(R.n),porDia?`${plural(span,'día')} · ${nf(R.n/span,1)} por día`:`${R.meses} mes${R.meses===1?'':'es'} · ${nf(R.porMes,1)} por mes`,true)+
       k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
-      k('Mejor mes',R.best?mLabel(R.best[0]):'—',R.best?`${R.best[1]} FTDs`:'')+
+      (porDia?(()=>{const bd={};for(const x of list)bd[x.date]=(bd[x.date]||0)+1;const b=Object.entries(bd).sort((x,y)=>y[1]-x[1]||(x[0]<y[0]?1:-1))[0];
+        return k('Mejor día',b?`${DIA[parseYMD(b[0]).getDay()]} ${dm(b[0])}`:'—',b?`${b[1]} FTDs`:'')})():k('Mejor mes',R.best?mLabel(R.best[0]):'—',R.best?`${R.best[1]} FTDs`:''))+
       (tc?k('Top campaña',tc.k,`${tc.n} FTDs · ${money(tc.monto)} USD`):'')+
       (ta?k('Top afiliado',ta.k,`${ta.n} FTDs · ${money(ta.monto)} USD`):'')+
       (many&&list.length?(()=>{const g=groupBy(list,'vendedores')[0];return k('Top vendedor',g.k,`${g.n} FTDs · ${money(g.monto)} USD`)})():'');
-    // por mes
+    // por mes (o por día, si el rango es corto)
     const data=porMes(list,pF),plain=sinFiltros(pF);
+    $('#pChartH').textContent=porDia?'FTDs por día':'FTDs por mes';
+    if(porDia){
+      const days=[];for(let d=dA,i=0;d<=dB&&i<70;d=addDays(d,1),i++){const l=list.filter(x=>x.date===d),late=l.filter(isLate).length,w=parseYMD(d).getDay();
+        days.push({d,a:l.length-late,b:late,n:l.length,late,monto:l.reduce((s2,x)=>s2+(+x.amount||0),0),lab:String(+d.slice(8)),labC:w===0||w===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
+      colChart($('#pChart'),days,{h:230,int:true,capMin:14,label:'FTDs por día',empty:'Sin ventas para estos filtros.',
+        tip:d=>({title:`${cap(DIAL[parseYMD(d.d).getDay()])} ${dm(d.d)}`,rows:[{v:String(d.n),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.monto),l:'USD depositados'}]})});
+      $('#pChartTbl').innerHTML=`<table class="pt"><thead><tr><th>Día</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Lates</th><th class="r">Monto USD</th></tr></thead><tbody>`+
+        days.map(d=>`<tr><td>${esc(DIA[parseYMD(d.d).getDay()])} ${dm(d.d)}</td><td class="r">${d.n}</td><td class="r">${d.a}</td><td class="r">${d.b}</td><td class="r">${money(d.monto)}</td></tr>`).join('')+'</tbody></table>';
+    }else{
     colChart($('#pChart'),data.map(d=>({...d,a:d.n-d.late,b:d.late,lab:MES[+d.ym.slice(5,7)-1].slice(0,3)+(d.ym===data[0].ym||d.ym.endsWith('-01')?" '"+d.ym.slice(2,4):'')})),{h:230,label:'FTDs por mes',empty:'Sin ventas para estos filtros.',
       tip:d=>{const rows=[{v:String(d.n),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.monto),l:'USD depositados'}];
         if(plain&&pWho==='me')rows.push({v:money(porCantidad(calc(d.ym).n).usd),l:'USD de variable'});return {title:mLong(d.ym),rows}}});
     const pl=plain&&pWho==='me';
     $('#pChartTbl').innerHTML=data.length?`<table class="pt"><thead><tr><th>Mes</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Lates</th><th class="r">Monto USD</th>${pl?'<th class="r">Variable USD</th>':''}</tr></thead><tbody>`+
       data.map(d=>`<tr><td>${esc(mLabel(d.ym))}</td><td class="r">${d.n}</td><td class="r">${d.n-d.late}</td><td class="r">${d.late}</td><td class="r">${money(d.monto)}</td>${pl?`<td class="r">${money(porCantidad(calc(d.ym).n).usd)}</td>`:''}</tr>`).join('')+'</tbody></table>':'';
+    }
     $('#dCard').hidden=pWho!=='me';if(pWho==='me')this.dias(list);
     // rankings
     const rk=$('#pRanks');rk.textContent='';

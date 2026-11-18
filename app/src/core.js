@@ -479,12 +479,15 @@ function agentUid(txt){ // nombre del agente en el CRM → persona de la mesa
 }
 
 /* ---------- filtros y estadísticas ---------- */
+// desde/hasta: un mes (AAAA-MM) o un día (AAAA-MM-DD)
+const lastDay=ym=>{const [y,m]=ym.split('-').map(Number);return ymd(new Date(y,m,0))};
+function fRange(f){return {a:f.desde?(f.desde.length===7?f.desde+'-01':f.desde):null,b:f.hasta?(f.hasta.length===7?lastDay(f.hasta):f.hasta):null}}
+const spanDays=(a,b)=>Math.round((parseYMD(b)-parseYMD(a))/864e5)+1;
 function applyF(list,f){
-  const q=f.q?norm(f.q.trim()):'';
+  const q=f.q?norm(f.q.trim()):'',R=fRange(f);
   return list.filter(x=>{
-    const ym=x.date.slice(0,7);
-    if(f.desde&&ym<f.desde)return false;
-    if(f.hasta&&ym>f.hasta)return false;
+    if(R.a&&x.date<R.a)return false;
+    if(R.b&&x.date>R.b)return false;
     if(f.camp!=null&&f.camp!==''&&x.camp!==f.camp)return false;      // campaña exacta
     if(f.aff!=null&&f.aff!==''&&String(x.aff)!==f.aff)return false;  // afiliado exacto
     if(f.pais&&norm(x.country)!==norm(f.pais))return false;
@@ -498,8 +501,9 @@ function applyF(list,f){
 }
 function fDesc(f){
   const p=[];const q=v=>/\s/.test(v)?`"${v}"`:v;
-  if(f.desde&&f.desde===f.hasta)p.push('mes:'+mLabel(f.desde));
-  else{if(f.desde)p.push('desde:'+mLabel(f.desde));if(f.hasta)p.push('hasta:'+mLabel(f.hasta))}
+  const pd=v=>v.length===7?mLabel(v):`${dm(v)}/${v.slice(2,4)}`;
+  if(f.desde&&f.desde===f.hasta)p.push((f.desde.length===7?'mes:':'día:')+pd(f.desde));
+  else{if(f.desde)p.push('desde:'+pd(f.desde));if(f.hasta)p.push('hasta:'+pd(f.hasta))}
   if(f.camp)p.push('camp:'+q(f.camp));if(f.aff)p.push('aff:'+f.aff);if(f.pais)p.push('pais:'+q(f.pais));
   if(f.marca)p.push('marca:'+q(f.marca));if(f.vend)p.push('vendedor:'+q(f.vend));if(f.late)p.push('tipo:'+(f.late==='si'?'late':'new'));
   if(f.q)p.push('"'+f.q+'"');
@@ -527,7 +531,7 @@ function groupBy(list,dim){
 }
 function mesesRango(list,f){
   const ms=list.map(x=>x.date.slice(0,7)).sort();
-  let a=f.desde||ms[0],b=f.hasta||ms[ms.length-1];if(!a||!b)return [];
+  let a=(f.desde||ms[0]||'').slice(0,7),b=(f.hasta||ms[ms.length-1]||'').slice(0,7);if(!a||!b)return [];
   const out=[];let [y,m]=a.split('-').map(Number);
   while(true){const k=`${y}-${z(m)}`;if(k>b)break;out.push(k);m++;if(m>12){m=1;y++}if(out.length>120)break}
   return out;
@@ -571,8 +575,8 @@ function diasDist(list,f){
   if(!first)return null;
   const byDay={};for(const x of list)byDay[x.date]=(byDay[x.date]||0)+1;
   const te=todayS();
-  let start=first;if(f.desde&&f.desde+'-01'>start)start=f.desde+'-01';
-  let end=te;if(f.hasta){const [y,m]=f.hasta.split('-').map(Number),l=ymd(new Date(y,m,0));if(l<end)end=l}
+  const R=fRange(f);let start=first;if(R.a&&R.a>start)start=R.a;
+  let end=te;if(R.b&&R.b<end)end=R.b;
   const h={},lastD={},ex={finde:0,feriado:0,libre:0,falta:0};let dias=0,tot=0,best=null,fuera=0;
   for(let d=start,i=0;d<=end&&i<5000;d=addDays(d,1),i++){
     const n=byDay[d]||0,r=noTrabajo(d);

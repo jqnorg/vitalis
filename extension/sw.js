@@ -476,3 +476,65 @@ chrome.notifications.onButtonClicked.addListener(async (nid, btn) => {
   if (btn === 0) return openPanel();
   if (k && k !== 'test') await chrome.alarms.create('s:' + k, { when: Date.now() + 15 * 6e4 });
 });
+
+/* ---------- snippets en todo Chrome ---------- */
+// al instalar o actualizar, los pongo en las pestañas que ya estaban abiertas (sin tener que recargarlas)
+const VITALIS_URL = 'https://vitaliscrm.netlify.app/*';
+chrome.runtime.onInstalled.addListener(async () => {
+  snipMenu();
+  for (const t of await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] })) {
+    chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, files: ['snip.js'] }).catch(() => {});
+  }
+  for (const t of await chrome.tabs.query({ url: VITALIS_URL })) {
+    chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['bridge.js'] }).catch(() => {});
+  }
+});
+chrome.runtime.onStartup.addListener(() => snipMenu());
+chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.snips) snipMenu(); });
+// clic derecho en cualquier campo → Snippets de Vitalis → el que quieras (por si el /atajo no anda en alguna página)
+let menuT = null;
+function snipMenu() {
+  clearTimeout(menuT);
+  menuT = setTimeout(async () => {
+    if (!chrome.contextMenus) return;
+    const { snips = [] } = await chrome.storage.local.get('snips');
+    await new Promise((r) => chrome.contextMenus.removeAll(r));
+    chrome.contextMenus.create({ id: 'snip', title: 'Snippets de Vitalis', contexts: ['editable'] });
+    if (!snips.length) { chrome.contextMenus.create({ id: 'snip:none', parentId: 'snip', title: 'Abrí Vitalis para traer tus snippets', contexts: ['editable'], enabled: false }); return; }
+    for (const x of snips.slice(0, 60)) {
+      const pv = (x.t || x.b || '').replace(/\s+/g, ' ').trim();
+      chrome.contextMenus.create({ id: 'snip:' + x.s, parentId: 'snip', title: `/${x.s}${pv ? '  ·  ' + (pv.length > 40 ? pv.slice(0, 39) + '…' : pv) : ''}`, contexts: ['editable'] });
+    }
+  }, 300);
+}
+chrome.contextMenus && chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  const id = String(info.menuItemId || '');
+  if (!id.startsWith('snip:') || !tab || tab.id == null) return;
+  const { snips = [], me = '' } = await chrome.storage.local.get(['snips', 'me']);
+  const x = snips.find((s) => s.s === id.slice(5));
+  if (!x) return;
+  const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
+  const text = x.b.replace(/\{fecha\}/g, `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`).replace(/\{hora\}/g, `${p2(d.getHours())}:${p2(d.getMinutes())}`).replace(/\{yo\}/g, me);
+  const target = { tabId: tab.id }; if (info.frameId) target.frameIds = [info.frameId];
+  chrome.scripting.executeScript({ target, func: pasteSnip, args: [text] }).catch(() => {});
+});
+function pasteSnip(text) { // corre en la página: pega en el campo donde estás (aunque esté en un shadow DOM)
+  let el = document.activeElement;
+  while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+  if (!el) return false;
+  const cur = text.indexOf('{cursor}'); text = text.replace(/\{cursor\}/g, '');
+  if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+    const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a, was = el.value;
+    el.focus();
+    if (!document.execCommand('insertText', false, text) || el.value === was) { el.setRangeText(text, a, b, 'end'); el.dispatchEvent(new Event('input', { bubbles: true })); }
+    if (cur >= 0 && el.setSelectionRange) { const q = a + cur; el.setSelectionRange(q, q); }
+    return true;
+  }
+  if (el.isContentEditable) {
+    let ok = false;
+    if (text.includes('\n')) { try { const dt = new DataTransfer(); dt.setData('text/plain', text); const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }); el.dispatchEvent(ev); ok = ev.defaultPrevented; } catch (e) {} }
+    if (!ok) document.execCommand('insertText', false, text);
+    return true;
+  }
+  return false;
+}

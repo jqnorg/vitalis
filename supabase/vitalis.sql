@@ -178,6 +178,19 @@ create table if not exists public.messages (
 );
 create index if not exists messages_chat_created on public.messages (chat_id, created_at desc);
 create index if not exists messages_created on public.messages (created_at desc);
+-- imágenes del chat (se pegan o se eligen; la app las achica antes de mandarlas). El mensaje las nombra con [img:id:AnchoxAlto]
+create table if not exists public.chat_files (
+  id         uuid primary key default gen_random_uuid(),
+  chat_id    uuid not null references public.chats(id) on delete cascade,
+  user_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  mime       text not null check (mime in ('image/webp', 'image/jpeg', 'image/png')),
+  w          integer check (w between 1 and 6000),
+  h          integer check (h between 1 and 6000),
+  data       text not null check (length(data) between 16 and 1400000),  -- base64
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_files_chat on public.chat_files (chat_id, created_at desc);
+
 -- target de FTDs de la mesa por mes (lo fija el team leader o el admin; lo ven todos)
 create table if not exists public.targets (
   team_id    uuid not null default public.my_team() references public.teams(id),
@@ -456,6 +469,10 @@ create or replace function public.msg_guard() returns trigger
 begin
   new.body := left(btrim(coalesce(new.body, ''), E' \t\r\n'), 2000);
   if new.body = '' then raise exception 'MSG_EMPTY: escribí algo'; end if;
+  if new.body like '[img:%' and not exists (select 1 from public.chat_files f
+       where f.id::text = substring(new.body from '^\[img:([0-9a-f-]{36})') and f.chat_id = new.chat_id and f.user_id = new.user_id) then
+    raise exception 'IMG: la imagen no se subió, probá de nuevo';
+  end if;
   new.created_at := now();
   if (select count(*) from public.messages where user_id = new.user_id and created_at > now() - interval '30 seconds') >= 15 then
     raise exception 'SLOW: vas muy rápido, esperá unos segundos';
@@ -464,6 +481,27 @@ begin
 end $$;
 drop trigger if exists messages_guard on public.messages;
 create trigger messages_guard before insert on public.messages for each row execute function public.msg_guard();
+-- al borrar un mensaje con imagen, se borra la imagen
+create or replace function public.msg_gone() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  if old.body like '[img:%' then delete from public.chat_files where id::text = substring(old.body from '^\[img:([0-9a-f-]{36})'); end if;
+  return old;
+end $$;
+drop trigger if exists messages_gone on public.messages;
+create trigger messages_gone after delete on public.messages for each row execute function public.msg_gone();
+create or replace function public.file_guard() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  new.created_at := now();
+  if new.data !~ '^[A-Za-z0-9+/]+=*$' then raise exception 'IMG: la imagen no es válida'; end if;
+  if (select count(*) from public.chat_files where user_id = new.user_id and created_at > now() - interval '10 minutes') >= 30 then
+    raise exception 'SLOW: muchas imágenes seguidas, esperá unos minutos';
+  end if;
+  return new;
+end $$;
+drop trigger if exists chat_files_guard on public.chat_files;
+create trigger chat_files_guard before insert on public.chat_files for each row execute function public.file_guard();
 
 -- crear un grupo con gente de la mesa (quien lo crea queda adentro)
 create or replace function public.chat_create(nm text, people uuid[]) returns uuid
@@ -666,6 +704,7 @@ alter table public.chat_reads   enable row level security;
 alter table public.tasks        enable row level security;
 alter table public.task_people  enable row level security;
 alter table public.targets      enable row level security;
+alter table public.chat_files   enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -767,6 +806,12 @@ drop policy if exists messages_read on public.messages;
 create policy messages_read on public.messages for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists messages_insert on public.messages;
 create policy messages_insert on public.messages for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists files_read on public.chat_files;
+create policy files_read on public.chat_files for select to authenticated using (public.in_chat(chat_id));
+drop policy if exists files_insert on public.chat_files;
+create policy files_insert on public.chat_files for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists files_delete on public.chat_files;
+create policy files_delete on public.chat_files for delete to authenticated using (user_id = auth.uid());
 drop policy if exists messages_delete on public.messages;
 create policy messages_delete on public.messages for delete to authenticated using (user_id = auth.uid());
 drop policy if exists chat_reads_own on public.chat_reads;
@@ -782,6 +827,9 @@ grant select on public.chats, public.chat_members to authenticated;
 revoke insert, update, delete on public.chats, public.chat_members from authenticated;
 grant select, insert, delete on public.messages to authenticated;
 revoke update on public.messages from authenticated;
+grant select, insert, delete on public.chat_files to authenticated;
+revoke update on public.chat_files from authenticated;
+revoke all on public.chat_files from anon;
 grant select, insert, update, delete on public.chat_reads to authenticated;
 revoke all on public.chats, public.chat_members, public.messages, public.chat_reads from anon;
 grant select, delete on public.tasks to authenticated;
@@ -794,7 +842,7 @@ revoke all on public.targets from anon;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
-revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard() from public, anon, authenticated;
+revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard(), public.msg_gone(), public.file_guard() from public, anon, authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$

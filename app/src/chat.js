@@ -17,6 +17,42 @@ function unread(cid){const t=readT(cid);return (msgs[cid]||[]).filter(m=>m.uid!=
 function unreadAll(){return chats.reduce((a,c)=>a+(muted(c.id)?0:unread(c.id)),0)}
 function mentionsMe(body){const f=nn((profile&&profile.name||'').split(/\s+/)[0]);return !!f&&(String(body).match(/@[A-Za-zÀ-ÿ]+/g)||[]).some(x=>nn(x.slice(1))===f)}
 const clip=(s,n)=>{s=String(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n-1)+'…':s};
+/* imágenes: el mensaje empieza con [img:id:AnchoxAlto]; la imagen va aparte (chat_files) y se trae al verla */
+const IMG_RE=/^\[img:([0-9a-f-]{36})(?::(\d+)x(\d+))?\]\s*/i;
+const msgImg=b=>{const m=String(b||'').match(IMG_RE);return m?{id:m[1],w:+m[2]||0,h:+m[3]||0,rest:String(b).slice(m[0].length)}:null};
+const msgTxt=b=>{const i=msgImg(b);return i?('📷 Foto'+(i.rest?' · '+i.rest:'')):String(b||'')};
+const imgs={}; // id → {url} | {err} | {p: promesa}
+function imgLoad(id){
+  const x=imgs[id];
+  if(x&&!(x.err==='net'&&Date.now()-x.t>3e4))return x.p||Promise.resolve(x); // si falló la red, reintento después de 30 s
+  const p=(async()=>{try{const [r]=await Q(sb.from('chat_files').select('mime,data').eq('id',id));
+      if(!r)return imgs[id]={err:'gone'};
+      const bin=atob(r.data),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+      return imgs[id]={url:URL.createObjectURL(new Blob([u8],{type:r.mime}))}}
+    catch(e){return imgs[id]={err:'net',t:Date.now()}}})();
+  imgs[id]={p};return p;
+}
+function imgPaint(root){ // pone las imágenes que ya llegaron y pide las que faltan
+  for(const el of root.querySelectorAll('[data-img]')){const id=el.dataset.img,x=imgs[id];
+    if(x&&x.url){const im=el.querySelector('img');if(im&&im.getAttribute('src')!==x.url)im.src=x.url;el.classList.remove('wait','fail')}
+    else if(x&&x.err&&!(x.err==='net'&&Date.now()-x.t>3e4)){el.classList.remove('wait');el.classList.add(x.err==='gone'?'gone':'fail')}
+    else if(!el.dataset.w){el.dataset.w=1;imgLoad(id).then(()=>{delete el.dataset.w;if(el.isConnected)imgPaint(root)})}
+  }
+}
+async function prepImg(file){ // la achico (1600 px como mucho) y la paso a webp para que pese poco
+  if(!file||!/^image\//.test(file.type))throw new Error('IMG: eso no es una imagen');
+  const bmp=await createImageBitmap(file);
+  const k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),w=Math.max(1,Math.round(bmp.width*k)),h=Math.max(1,Math.round(bmp.height*k));
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;cv.getContext('2d').drawImage(bmp,0,0,w,h);bmp.close&&bmp.close();
+  const enc=(t,q)=>new Promise(r=>cv.toBlob(r,t,q));
+  let q=.82,blob=await enc('image/webp',q);
+  if(!blob||blob.type!=='image/webp'){const c2=cv.getContext('2d');c2.globalCompositeOperation='destination-over';c2.fillStyle='#fff';c2.fillRect(0,0,w,h);blob=await enc('image/jpeg',q)}
+  while(blob&&blob.size>950e3&&q>.35){q-=.15;blob=await enc(blob.type,q)}
+  if(!blob||blob.size>1e6)throw new Error('IMG: la imagen es muy pesada');
+  return {blob,mime:blob.type,w,h,url:URL.createObjectURL(blob)};
+}
+const b64=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=rej;r.readAsDataURL(blob)});
+let chatAtt=null; // la imagen lista para mandar
 const chatViewing=cid=>ready&&cur==='chat'&&chatCur===cid&&!document.hidden&&document.hasFocus();
 
 function chatsLoaded(ch,cm,rd,ms){
@@ -51,9 +87,9 @@ function chatEvent(m){
   const men=mentionsMe(m.body);
   if(quiet()||(muted(c.id)&&!men))return;
   const n=unread(c.id),who=first(m.uid),where=c.kind==='dm'?'':` en ${esc(chatName(c))}`;
-  toast(`<b>${esc(who)}</b>${where}${men?' te nombró':''}: ${esc(clip(m.body,140))}${n>1?` <span class="dim">· ${n} sin leer</span>`:''}`,'ok',{ms:9000,key:'ch'+c.id,actions:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
+  toast(`<b>${esc(who)}</b>${where}${men?' te nombró':''}: ${esc(clip(msgTxt(m.body),140))}${n>1?` <span class="dim">· ${n} sin leer</span>`:''}`,'ok',{ms:9000,key:'ch'+c.id,actions:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();pop()}
-  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+(men?' te nombró':''),kw:clip(m.body,200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
+  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+(men?' te nombró':''),kw:clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
 }
 function markRead(cid){
   const l=lastMsg(cid);if(!l)return;
@@ -83,6 +119,12 @@ async function chatPoll(){
 }
 
 Object.assign(B,{
+  async sendImg(cid,att,text){
+    try{const [f]=await Q(sb.from('chat_files').insert({chat_id:cid,mime:att.mime,w:att.w,h:att.h,data:await b64(att.blob)}).select('id'));
+      imgs[f.id]={url:att.url};
+      return await B.sendMsg(cid,`[img:${f.id}:${att.w}x${att.h}]`+(text?' '+text.slice(0,1900):''));
+    }catch(e){if(/chat_files|PGRST205|42P01/.test(String(e&&(e.message||e.code))))toast('Las imágenes se activan en un rato (falta actualizar la base).','warn');else dbErr(e);return false}
+  },
   async sendMsg(cid,body){
     try{const row=await Q(sb.from('messages').insert({chat_id:cid,body}).select().single());msgIn(M2X(row));markRead(cid);return true}
     catch(e){toast(esc(errMsg(e)),/^SLOW/.test(String(e.message||''))?'warn':'err');return false}
@@ -162,7 +204,20 @@ V.chat={
     const i=$('#chIn');
     i.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();this.send()}});
     i.addEventListener('input',()=>{if(chatCur)chatDrafts[chatCur]=i.value;growIn(i)});
+    i.addEventListener('paste',e=>{const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(x=>x.kind==='file'&&/^image\//.test(x.type));
+      if(!it)return;const f=it.getAsFile();if(!f)return;
+      if(!e.clipboardData.types.includes('text/plain'))e.preventDefault();
+      this.attFile(f)});
+    $('#chPic').addEventListener('click',()=>$('#chFile').click());
+    $('#chFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)this.attFile(f)});
+    $('#chAtt').addEventListener('click',e=>{if(e.target.closest('[data-attx]'))this.att(null)});
+    const mn=$('#chMain');
+    mn.addEventListener('dragover',e=>{if([...(e.dataTransfer&&e.dataTransfer.items||[])].some(x=>x.kind==='file')){e.preventDefault();mn.classList.add('drop')}});
+    mn.addEventListener('dragleave',e=>{if(!mn.contains(e.relatedTarget))mn.classList.remove('drop')});
+    mn.addEventListener('drop',e=>{mn.classList.remove('drop');const f=[...(e.dataTransfer&&e.dataTransfer.files||[])].find(x=>/^image\//.test(x.type));if(!f)return;e.preventDefault();this.attFile(f)});
     $('#chMsgs').addEventListener('click',async e=>{
+      const pic=e.target.closest('[data-img]');
+      if(pic){const x=imgs[pic.dataset.img];if(x&&x.url)imgView(x.url);return}
       const d=e.target.closest('[data-del]');
       if(d){if(await confirmar('Borrar mensaje','¿Lo borro para todos?','borrar',true))B.delMsg(d.dataset.del);return}
       const o=e.target.closest('[data-older]');
@@ -182,10 +237,22 @@ V.chat={
     setTimeout(()=>{const i=$('#chIn');if(i&&!matchMedia('(pointer:coarse)').matches)i.focus()},0);
   },
   async send(){
-    const i=$('#chIn'),v=i.value.trim(),cid=chatCur;if(!v||!cid)return;
+    const i=$('#chIn'),v=i.value.trim(),cid=chatCur,att=chatAtt;if((!v&&!att)||!cid)return;
     i.value='';chatDrafts[cid]='';growIn(i);
+    if(att){this.att(null,true);const sb_=$('#chForm .pri');sb_.disabled=true;
+      const ok=await B.sendImg(cid,att,v);sb_.disabled=false;
+      if(!ok){this.att(att);if(!i.value){i.value=v;chatDrafts[cid]=v;growIn(i)}}return}
     const ok=await B.sendMsg(cid,v);
     if(!ok&&!i.value){i.value=v;chatDrafts[cid]=v;growIn(i)}
+  },
+  att(a,keep){ // la imagen que va con el próximo mensaje
+    if(chatAtt&&chatAtt!==a&&!keep)URL.revokeObjectURL(chatAtt.url);
+    chatAtt=a;const el=$('#chAtt');el.hidden=!a;
+    el.innerHTML=a?`<img src="${a.url}" alt=""><span>Imagen lista · <b>Enviar</b> la manda${a.w?` <span class="dim">(${a.w}×${a.h})</span>`:''}</span><button type="button" class="ib" data-attx aria-label="Sacar la imagen">✕</button>`:'';
+    if(a)$('#chIn').focus();
+  },
+  async attFile(f){
+    try{const a=await prepImg(f);this.att(a)}catch(e){toast(esc(errMsg(e)),'err')}
   },
   render(o){
     if(o&&o.chat&&chatOf(o.chat)&&o.chat!==chatCur){this.open(o.chat);return}
@@ -196,7 +263,7 @@ V.chat={
     // lista
     const list=[...chats].sort((a,b)=>(a.kind==='team'?-1:0)-(b.kind==='team'?-1:0)||((lastMsg(b.id)||{t:+new Date(b.created_at)}).t-(lastMsg(a.id)||{t:+new Date(a.created_at)}).t));
     $('#chList').innerHTML=list.map(c=>{const l=lastMsg(c.id),n=unread(c.id),mu=muted(c.id);
-      return `<button type="button" class="ch-it${c.id===chatCur?' on':''}${n&&!mu?' un':''}" data-chat="${esc(c.id)}">${chatIcon(c)}<span class="ch-li"><span class="ch-nm">${esc(chatName(c))}${mu?' <span class="q" title="Silenciado">🔕</span>':''}</span><span class="ch-pv">${l?`${l.uid===me?'Vos':esc(first(l.uid))}: ${esc(clip(l.body,60))}`:c.kind==='team'?'Toda la mesa junta':'Sin mensajes todavía'}</span></span><span class="ch-mt">${l?`<span class="ch-tm">${l.t>+parseYMD(todayS())?hhmm(l.t):esc(dm(ymd(new Date(l.t))))}</span>`:''}${n?`<span class="nb${mu?'':' hot'}">${n>99?'99+':n}</span>`:''}</span></button>`}).join('')||'<div class="p-empty">Cargando…</div>';
+      return `<button type="button" class="ch-it${c.id===chatCur?' on':''}${n&&!mu?' un':''}" data-chat="${esc(c.id)}">${chatIcon(c)}<span class="ch-li"><span class="ch-nm">${esc(chatName(c))}${mu?' <span class="q" title="Silenciado">🔕</span>':''}</span><span class="ch-pv">${l?`${l.uid===me?'Vos':esc(first(l.uid))}: ${esc(clip(msgTxt(l.body),60))}`:c.kind==='team'?'Toda la mesa junta':'Sin mensajes todavía'}</span></span><span class="ch-mt">${l?`<span class="ch-tm">${l.t>+parseYMD(todayS())?hhmm(l.t):esc(dm(ymd(new Date(l.t))))}</span>`:''}${n?`<span class="nb${mu?'':' hot'}">${n>99?'99+':n}</span>`:''}</span></button>`}).join('')||'<div class="p-empty">Cargando…</div>';
     const c=chatOf(chatCur),i=$('#chIn');
     $('#chMain').hidden=!c;
     if(!chats.length)$('#chList').innerHTML='<div class="p-empty">El chat se está activando. Probá de nuevo en un rato.</div>';
@@ -222,16 +289,24 @@ V.chat={
       for(const m of l){
         const d=ymd(new Date(m.t));
         if(d!==pd){h+=`<div class="ch-day"><span>${esc(chDay(d))}</span></div>`;pd=d;pu=null}
-        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid);
+        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body);
         h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}">`+
           (mine?'':head?`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`:'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`:''}<div class="ch-tx">${fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div></div>`+
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`:''}<div class="ch-tx${im?' pic':''}">${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div></div>`+
           (mine?`<button type="button" class="ch-del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:'')+`</div>`;
         pu=m.uid;pt=m.t;
       }
-      el.innerHTML=h;
-      if(atBottom)el.scrollTop=el.scrollHeight;
+      el.innerHTML=h;imgPaint(el);
+      if(atBottom){el.scrollTop=el.scrollHeight;for(const im of el.querySelectorAll('.ch-img img'))im.addEventListener('load',()=>{if(el.scrollHeight-el.scrollTop-el.clientHeight<400)el.scrollTop=el.scrollHeight},{once:true})}
     }
     if(chatViewing(c.id)&&el.scrollHeight-el.scrollTop-el.clientHeight<90)markRead(c.id);
   },
 };
+
+function imgView(url){
+  modal({title:'Imagen',wide:true,body:`<div class="imgv"><img src="${url}" alt="Imagen del chat"></div>`,actions:[
+    {l:'Copiar',fn:async()=>{try{const im=new Image();im.src=url;await im.decode();const cv=document.createElement('canvas');cv.width=im.naturalWidth;cv.height=im.naturalHeight;cv.getContext('2d').drawImage(im,0,0);
+      const png=await new Promise(r=>cv.toBlob(r,'image/png'));await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);toast('Imagen copiada: pegala donde quieras.')}catch(e){toast('No se pudo copiar. Usá Descargar.','err')}return false}},
+    {l:'Descargar',fn:()=>{const a=document.createElement('a');a.href=url;a.download='vitalis-'+ymd(new Date())+'.webp';document.body.appendChild(a);a.click();a.remove();return false}},
+    {l:'Cerrar',cls:'pri'}]});
+}

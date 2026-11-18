@@ -1,13 +1,17 @@
 // Vitalis · snippets: escribís /atajo en cualquier campo y se reemplaza por el texto guardado en Vitalis.
 // Si otro atajo empieza igual (por ejemplo /kyc y /kyc2), espera a que toques espacio, Tab o Enter.
 (() => {
-  if (window.__vitalisSnip) return;
-  window.__vitalisSnip = true;
+  // si la extensión se actualizó, la copia vieja queda muerta y esta toma el lugar (sin recargar la página)
+  const ME = {}; window.__vitalisSnip = ME;
+  const live = () => window.__vitalisSnip === ME;
   let map = new Map(), me = '', busy = false;
   const load = (s) => { map = new Map((s.snips || []).filter((x) => x && x.s && typeof x.b === 'string').map((x) => [String(x.s).toLowerCase(), x.b])); me = s.me || ''; };
-  const get = () => chrome.storage.local.get(['snips', 'me']).then(load).catch(() => {});
+  const get = () => { try { return chrome.storage.local.get(['snips', 'me']).then(load).catch(() => {}); } catch (e) { return Promise.resolve(); } };
   get();
-  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && (ch.snips || ch.me)) get(); }); } catch (e) {}
+  try { chrome.storage.onChanged.addListener((ch, area) => { if (live() && area === 'local' && (ch.snips || ch.me)) get(); }); } catch (e) {}
+  // el campo de verdad, aunque esté adentro de un shadow DOM (componentes web, Voiso, etc.)
+  const tgt = (e) => (e.composedPath && e.composedPath()[0]) || e.target;
+  const selOf = (el) => { const r = el && el.getRootNode && el.getRootNode(); return (r && r !== document && r.getSelection && r.getSelection()) || window.getSelection(); };
 
   const z = (n) => String(n).padStart(2, '0');
   function fill(body) {
@@ -29,7 +33,7 @@
       if (!m) return null;
       return { kind: 'field', el: target, start: pos - m[1].length - 1, end: pos, key: m[1].toLowerCase() };
     }
-    const sel = window.getSelection();
+    const sel = selOf(target);
     if (!sel || !sel.isCollapsed || !sel.anchorNode || sel.anchorNode.nodeType !== 3) return null;
     const node = sel.anchorNode, host = node.parentElement;
     if (!host || !host.isContentEditable || blocked(host)) return null;
@@ -54,7 +58,7 @@
         if (!done || el.value === was) { el.setRangeText(text, t.start, t.end, 'end'); el.dispatchEvent(new Event('input', { bubbles: true })); }
         if (cur >= 0) { const p = t.start + cur; el.setSelectionRange(p, p); }
       } else {
-        const sel = window.getSelection(), r = document.createRange();
+        const sel = selOf(t.el), r = document.createRange();
         r.setStart(t.node, t.start); r.setEnd(t.node, t.end);
         sel.removeAllRanges(); sel.addRange(r);
         let handled = false;
@@ -67,19 +71,19 @@
           } catch (e) {}
         }
         if (!handled) document.execCommand('insertText', false, text);
-        if (cur >= 0) { const back = text.length - cur; const s2 = window.getSelection(); for (let i = 0; i < back && s2.modify; i++) s2.modify('move', 'backward', 'character'); }
+        if (cur >= 0) { const back = text.length - cur; const s2 = selOf(t.el); for (let i = 0; i < back && s2.modify; i++) s2.modify('move', 'backward', 'character'); }
       }
     } catch (e) {} finally { setTimeout(() => { busy = false; }, 0); }
   }
 
   document.addEventListener('input', (e) => {
-    if (busy || e.isComposing || !map.size) return;
-    const t = find(e.target);
+    if (!live() || busy || e.isComposing || !map.size) return;
+    const t = find(tgt(e));
     if (t && map.has(t.key) && !longer(t.key)) expand(t);
   }, true);
   document.addEventListener('keydown', (e) => { // atajo que otro más largo también empieza: se completa con espacio, Tab o Enter
-    if (busy || e.isComposing || !map.size || !(e.key === ' ' || e.key === 'Tab' || e.key === 'Enter') || e.ctrlKey || e.metaKey || e.altKey) return;
-    const t = find(e.target);
+    if (!live() || busy || e.isComposing || !map.size || !(e.key === ' ' || e.key === 'Tab' || e.key === 'Enter') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = find(tgt(e));
     if (!t || !map.has(t.key)) return;
     e.preventDefault(); e.stopPropagation();
     expand(t);
