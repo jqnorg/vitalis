@@ -597,6 +597,7 @@ function ayuda(){
   <h4>Inicio</h4><dl>
     <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono, el líquido, tu turno y tu agenda de hoy.</dd>
     <dt>La mesa</dt><dd>Cuántos FTDs lleva la mesa, cuánto falta para el target, cuántos por día hábil y a qué ritmo vamos. La marca en la barra es dónde hay que cerrar hoy para ir al día.</dd>
+    <dt>Team leader</dt><dd>Su inicio es el de toda la mesa: el target en la pista, quién está en turno y cada agente con sus FTDs de hoy y del mes. El team leader no cuenta como agente.</dd>
     <dt>Menú</dt><dd>Por categorías: Ventas (y Clientes), Mi día (Agenda, Tareas, Turnos, Snippets) y Mesa (Chat, Social, Equipo). Adentro, pestañas arriba.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>

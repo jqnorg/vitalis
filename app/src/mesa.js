@@ -42,6 +42,8 @@ Object.assign(B,{
 });
 
 /* ---------- cálculos ---------- */
+const tlView=()=>!!profile&&profile.role==='leader'; // el team leader no vende: su inicio es el de la mesa
+function sellers(list){return members.filter(m=>m.active&&(m.role!=='leader'||list.some(f=>f.uid===m.id)))} // agentes: sin el team leader (salvo que venda)
 const habil=d=>{const r=noTrabajo(d);return !r||r==='falta'}; // día hábil de la mesa (mis faltas no le cambian el mes a la mesa)
 function mesaMes(ym){
   const te=todayS(),list=team.filter(f=>f.date.slice(0,7)===ym),T=targets[ym]||0;
@@ -51,7 +53,7 @@ function mesaMes(ym){
   const n=list.length,falta=Math.max(0,T-n),antes=list.filter(f=>f.date<te).length;
   const ritmo=enCurso?(hechos?Math.max(n,Math.round(antes/hechos*tot)):null):n; // promedio de los días hábiles ya cerrados
   const ideal=T&&tot?Math.round(T*(enCurso?pas:ym<te.slice(0,7)?tot:0)/tot):0; // dónde deberíamos cerrar hoy para ir al día
-  const per=members.filter(m=>m.active).map(m=>({m,n:list.filter(f=>f.uid===m.id).length})).sort((a,b)=>b.n-a.n||a.m.name.localeCompare(b.m.name));
+  const per=sellers(list).map(m=>({m,n:list.filter(f=>f.uid===m.id).length})).sort((a,b)=>b.n-a.n||a.m.name.localeCompare(b.m.name));
   return {list,n,T,falta,tot,pas,quedan,ritmo,ideal,enCurso,per,hoy:list.filter(f=>f.date===te).length,porDia:quedan?falta/quedan:0};
 }
 function targetModal(ym){
@@ -150,4 +152,42 @@ function fichaModal(uid,tab='mes'){
       <p class="note">El sueldo de cada uno es privado: acá no aparece.</p></div>`,
     onOpen:api=>{draw(api,tab);api.box.addEventListener('click',e=>{const b=e.target.closest('#fiTabs [data-t]');if(b)return draw(api,b.dataset.t);
       if(e.target.closest('[data-fi=ventas]')){api.close();go('ventas',{who:uid===me?'me':uid,f:{desde:ym,hasta:ym}})}})}});
+}
+
+/* ---------- inicio del team leader: la mesa entera ---------- */
+function targetTrack(S){ // la pista del hero con el target: el mate avanza con la mesa
+  if(!S.T)return '';
+  const top=Math.max(S.T*1.05,S.n+1),P=v=>Math.min(100,v/top*100),M=[.25,.5,.75,1].map(q=>[Math.round(S.T*q),q]);
+  return `<div class="track" role="meter" aria-valuemin="0" aria-valuemax="${S.T}" aria-valuenow="${S.n}" aria-label="FTDs de la mesa hacia el target">
+    <div class="rail"></div><div class="fill" style="width:${P(S.n)}%"></div>
+    ${S.enCurso&&S.n<S.T&&S.ideal?`<i class="ideal" style="left:${P(S.ideal)}%" title="Para ir al día, hoy hay que cerrar en ${S.ideal}"></i>`:''}
+    ${M.map(([t])=>`<i class="st${S.n>=t?' on':''}" style="left:${P(t)}%"></i>`).join('')}
+    ${M.map(([t,q])=>`<span class="lb${q===1?' at':''}" style="left:${P(t)}%"><b>${t}</b><span class="us">${q===1?'target':pct(q)}</span></span>`).join('')}
+    <span class="mate" style="left:${P(S.n)}%" title="${plural(S.n,'FTD')}"><svg aria-hidden="true"><use href="#mate"/></svg></span></div>`;
+}
+function mesaHero(){
+  const ym=ymNow(),S=mesaMes(ym),mes=MES[+ym.slice(5,7)-1],usd=S.list.reduce((a,f)=>a+(+f.amount||0),0),con=S.per.filter(p=>p.n).length;
+  const msg=S.T?(S.falta?`Faltan <b>${S.falta}</b> para el target de <b>${S.T}</b>${S.enCurso&&S.quedan?` · <b>${nf(S.porDia,1)}</b> por día hábil`:''}`:'<b>¡Target cumplido!</b> Esto merece un mate 🧉')
+    :mesaOk?'Fijá el target del mes para que la mesa vea cuánto falta.':'Los FTDs de toda la mesa, al día.';
+  const btn=mesaOk?`<button type="button" class="hb" data-act="target">${S.T?'Cambiar target':'Fijar target'}</button>`:'';
+  return `<div class="top"><div><div class="n">${S.n}</div><div class="lab">FTDs de la mesa en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
+    <div class="usd"><div class="v">${money(usd)} <small>USD</small></div><div class="s">${plural(con,'agente')} con ventas de ${S.per.length}${S.enCurso&&S.T&&S.ritmo!=null?` · a este ritmo ~${S.ritmo}`:''}</div>${btn}</div></div>${targetTrack(S)}`;
+}
+function mesaSide(){
+  const te=todayS(),ym=ymNow(),S=mesaMes(ym),hoy=S.list.filter(f=>f.date===te),ws=weekStart(te),pw=addDays(ws,-7);
+  const wN=team.filter(f=>f.date>=ws&&f.date<=te).length,pwN=team.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
+  const st=S.per.map(p=>turnoHoy(p.m.id).cls),enT=st.filter(c=>c==='ok'||c==='warn').length,desc=st.filter(c=>c==='warn').length;
+  return kpi('En turno ahora',`${enT} <small>de ${S.per.length}</small>`,desc?`${plural(desc,'en descanso','en descanso')}`:'nadie en descanso','click',' data-go="equipo" title="Ver equipo"')+
+    kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD · ${plural(new Set(hoy.map(f=>f.uid)).size,'agente')}`)+
+    kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
+}
+function mesaBoard(){ // la mesa hoy: cada agente con su turno, sus FTDs y su agenda
+  const ym=ymNow(),te=todayS(),S=mesaMes(ym);
+  const rows=S.per.map(p=>{const th=turnoHoy(p.m.id),ag=agStats(p.m.id),h=S.list.filter(f=>f.uid===p.m.id&&f.date===te).length;
+    return `<button type="button" class="mb-r${p.m.id===me?' mine':''}" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}
+      <span class="who"><span class="nm">${esc(p.m.name)}</span><span class="st ${th.cls}">${esc(th.txt==='—'?'sin entrada':th.txt)}</span></span>
+      <span class="ag">${ag.venc?`<span class="hot b">${ag.venc} venc.</span>`:ag.open?`${ag.open} en agenda`:''}</span>
+      <span class="c"><b>${h}</b><small>hoy</small></span><span class="c"><b>${p.n}</b><small>mes</small></span></button>`}).join('');
+  return `<div class="card-h"><h3>La mesa hoy</h3><span class="p-sub">${plural(S.per.length,'agente')} · tocá uno para ver su ficha</span><span class="grow"></span><button type="button" class="btn sm" data-go="equipo">Equipo</button></div>`+
+    (rows?`<div class="mboard">${rows}</div>`:'<div class="p-empty">Todavía no hay agentes en la mesa.</div>');
 }

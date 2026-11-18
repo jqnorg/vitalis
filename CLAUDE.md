@@ -26,7 +26,7 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 - Filtros (`filtros.js`, tecla F, segundo en el menú): todo sale de `team` (ventas de la mesa), sin tablas nuevas.
 - En la app: `team` = todas las ventas de la mesa, `ftds` = las mías (sueldo, inicio, turnos usan `ftds`).
 - Menú por categorías (`GROUPS` en `ui.js`: Inicio, Filtros, Ventas, Mi día, Mesa, Sueldo, Ajustes; teclas 1–7) con pestañas arriba (`.subnav`). Una vista nueva va en un grupo.
-- La mesa (`mesa.js`): `targets` (target de FTDs del mes, lo fija team leader/admin, lo ve toda la mesa en el inicio). El team leader lee agenda, turnos y ajustes de todos (políticas `lead_*`) y las faltas/días por `team_days()`; **nunca** `settings` de otro (el sueldo es privado). Ficha de cada uno en Equipo (`fichaModal`).
+- La mesa (`mesa.js`): `targets` (target de FTDs del mes, lo fija team leader/admin, lo ve toda la mesa en el inicio). El team leader lee agenda, turnos y ajustes de todos (políticas `lead_*`) y las faltas/días por `team_days()`; **nunca** `settings` de otro (el sueldo es privado). Ficha de cada uno en Equipo (`fichaModal`). El team leader (rol `leader`) no vende: no cuenta como agente (`sellers()`) salvo que tenga ventas, y su inicio y la barra de arriba son los de la mesa (`tlView()`, `mesaHero`, `mesaBoard`).
 - `app/config.json` tiene la URL y la clave **publishable** (pública). Jamás commitear la clave secret/service_role.
 
 ## Extensión

@@ -32,14 +32,15 @@ V.inicio={
     const mes=MES[+ym.slice(5,7)-1];
     const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
-    $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
+    const TL=tlView(); // el team leader ve la mesa entera
+    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
       <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n)}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
-    $('#iKpis').innerHTML=
+    $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
-    $('#iMesa').innerHTML=mesaCard();
+    $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
     this.turno(true);
     // agenda
     const open=pend.filter(p=>!p.done&&p.due.slice(0,10)<=te).sort(byDue),next=pend.filter(p=>!p.done&&p.due.slice(0,10)>te).sort(byDue)[0];
@@ -48,18 +49,18 @@ V.inicio={
     $('#iaList').innerHTML=(open.length?`<div class="alist">${open.map(p=>pendItem(p,now,true)).join('')}</div>`:'<div class="p-empty" style="padding:10px 0">Nada pendiente para hoy.</div>')+
       (next?`<div class="note">Próximo: ${esc(whenTxt(parseDue(next.due)))}, <b style="color:var(--fg)">${esc(next.id)}</b> ${esc(next.kw)}</div>`:'');
     // conversión
-    $('#iConvBody').innerHTML=convCards(me);
+    $('#iConvBody').innerHTML=convCards(TL?null:me);$('#iConvSub').textContent=TL?'de la mesa: FTDs sobre clientes new':'FTDs sobre clientes new';
     // FTDs por día
     const [Y,M]=ym.split('-').map(Number),days=new Date(Y,M,0).getDate(),bd={};
-    for(const f of s.list){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
+    for(const f of (TL?team.filter(x=>x.date.slice(0,7)===ym):s.list)){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
     const data=[];for(let d=1;d<=days;d++){const o=bd[d]||{a:0,b:0,m:0},dw=new Date(Y,M-1,d).getDay();data.push({lab:String(d),a:o.a,b:o.b,m:o.m,d,dw,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
-    $('#idTitle').textContent=`FTDs por día en ${mes}`;
+    $('#idTitle').textContent=TL?`FTDs de la mesa por día en ${mes}`:`FTDs por día en ${mes}`;
     colChart($('#iChart'),data,{h:200,capMin:18,int:true,label:'FTDs por día',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${cap(DIAL[d.dw])} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     // últimas ventas
-    const lastF=[...ftds].sort((a,b)=>-byDate(a,b)).slice(0,7);
-    $('#iLast').innerHTML=lastF.length?`<div class="lst">${lastF.map(f=>`<div class="li"><span class="t">${esc(f.date===te?'hoy':dm(f.date))} ${esc(f.time||'')}</span><span class="n" title="${esc(f.name)} · ${esc(f.camp)}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)}</small></span><span class="m">${money(f.amount)}</span><span>${tipoBadge(f)}</span><span class="wr"><button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button></span></div>`).join('')}</div>`
-      :'<div class="p-empty">Todavía no cargaste ventas. Tocá <b>Venta</b> arriba a la derecha.</div>';
+    const lastF=[...(TL?team:ftds)].sort((a,b)=>-byDate(a,b)).slice(0,7);$('#iLastH').textContent=TL?'Últimas ventas de la mesa':'Últimas ventas';
+    $('#iLast').innerHTML=lastF.length?`<div class="lst">${lastF.map(f=>`<div class="li"><span class="t">${esc(f.date===te?'hoy':dm(f.date))} ${esc(f.time||'')}</span><span class="n" title="${esc(f.name)} · ${esc(f.camp)}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${TL?esc(first(f.uid))+' · ':''}${esc(f.country)}</small></span><span class="m">${money(f.amount)}</span><span>${tipoBadge(f)}</span><span class="wr"><button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button></span></div>`).join('')}</div>`
+      :TL?'<div class="p-empty">La mesa todavía no tiene ventas.</div>':'<div class="p-empty">Todavía no cargaste ventas. Tocá <b>Venta</b> arriba a la derecha.</div>';
   },
   turno(force){
     if(cur!=='inicio')return;
@@ -530,13 +531,13 @@ V.equipo={
     $('#eqMes').innerHTML=months.map(m=>`<option value="${m}"${m===eqYm?' selected':''}>${esc(mLong(m))}</option>`).join('');
     const i=months.indexOf(eqYm);$('#eqPrev').disabled=i>=months.length-1;$('#eqNext').disabled=i<=0;
     const list=team.filter(f=>f.date.slice(0,7)===eqYm),R=resumen(list);
-    const act=members.filter(m=>m.active);
+    const act=sellers(list); // agentes: el team leader no cuenta (salvo que venda)
     const [ya,ma]=eqYm.split('-').map(Number),mFrom=eqYm+'-01',mTo=ymd(new Date(ya,ma,0));
     const per=act.map(m=>{const l=list.filter(f=>f.uid===m.id);return {m,n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:l.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null),cv:convPeriod(mFrom,mTo,m.id)}});
     for(const uid of new Set(list.map(f=>f.uid)))if(!per.some(p=>p.m.id===uid)){const l=list.filter(f=>f.uid===uid);per.push({m:{id:uid,name:memberName(uid)+' (baja)'},n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:null,cv:convPeriod(mFrom,mTo,uid)})}
     per.sort((a,b)=>b.n-a.n||b.monto-a.monto||a.m.name.localeCompare(b.m.name));
     const conV=per.filter(p=>p.n).length;
-    $('#eqSub').textContent=`${teamInfo?teamInfo.name:''} · ${plural(act.length,'integrante')}`;
+    $('#eqSub').textContent=`${teamInfo?teamInfo.name:''} · ${plural(act.length,'agente')}`;
     const k=(lb,v,s2,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`;
     const T=targets[eqYm]||0;
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);

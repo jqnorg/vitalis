@@ -145,7 +145,7 @@ async function socialPoll(){
 function profStats(uid){
   const L=team.filter(f=>f.uid===uid),te=todayS(),ym=ymNow(),ws=weekStart(te);
   const mes=L.filter(f=>f.date.slice(0,7)===ym);
-  const act=members.filter(m=>m.active),cnt=act.map(m=>team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym).length);
+  const act=sellers(team.filter(f=>f.date.slice(0,7)===ym)),cnt=act.map(m=>team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym).length);
   const last=L.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
   const days=[];for(let i=13;i>=0;i--){const d=addDays(te,-i),l=L.filter(f=>f.date===d),x=parseYMD(d);days.push({lab:String(x.getDate()),d:x.getDate(),m0:x.getMonth()+1,dw:x.getDay(),a:l.filter(f=>!isLate(f)).length,b:l.filter(isLate).length,m:l.reduce((s,f)=>s+(+f.amount||0),0),labC:x.getDay()===0||x.getDay()===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
   return {hoy:L.filter(f=>f.date===te).length,sem:L.filter(f=>f.date>=ws&&f.date<=te).length,mes:mes.length,usd:mes.reduce((s,f)=>s+(+f.amount||0),0),

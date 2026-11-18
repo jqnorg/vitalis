@@ -746,3 +746,15 @@ body[data-view=chat] .subnav{margin-bottom:14px;flex:none}
 .fi-it .badge{margin-left:auto}
 .fi-acts{display:flex;gap:8px;margin-top:12px}
 .fi-body .p-sub{margin:0 0 10px}
+.track .ideal{position:absolute;top:41px;height:18px;width:3px;margin-left:-1.5px;border-radius:2px;background:#ffd29a;opacity:.85}
+.mboard{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:8px}
+.mb-r{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--panel);cursor:pointer;text-align:left;font:inherit;color:inherit;min-width:0}
+.mb-r:hover{background:var(--soft)}
+.mb-r .who{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.mb-r .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-r .st{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mb-r .st.ok{color:var(--ok)}.mb-r .st.warn{color:var(--acc)}
+.mb-r .ag{font-size:12px;color:var(--dim);white-space:nowrap}
+.mb-r .c{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05;min-width:30px}
+.mb-r .c b{font-family:var(--display);font-size:18px;font-variant-numeric:tabular-nums}
+.mb-r .c small{font-size:11px;color:var(--dim)}
