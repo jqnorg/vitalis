@@ -14,7 +14,7 @@ const db = new PGlite({ extensions: { pgcrypto } });
 await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
 await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
-const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'] };
+const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'], targets: ['team_id', 'ym'] };
 const TABLES = new Set(Object.keys(PK));
 
 // ---------- auth ----------
@@ -50,7 +50,9 @@ async function rpc(req, res, fn, body) {
   const uid = uidFrom(req), args = body || {}, keys = Object.keys(args);
   try {
     if (!/^[a-z_][a-z0-9_]*$/.test(fn)) throw Object.assign(new Error('bad fn'), { code: 'PGRST202' });
-    const sql = `select (public.${fn}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')}))::text as j`;
+    const call = `public.${fn}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')})`;
+    const set = (await db.query("select bool_or(proretset) s from pg_proc where proname = $1 and pronamespace = 'public'::regnamespace", [fn])).rows[0]?.s;
+    const sql = set ? `select coalesce(json_agg(t), '[]')::text as j from ${call} t` : `select (${call})::text as j`; // las que devuelven tabla, como lista
     const out = await asUser(uid, (tx) => tx.query(sql, keys.map((k) => (args[k] == null ? null : Array.isArray(args[k]) ? '{' + args[k].map((x) => '"' + String(x).replace(/["\\]/g, '') + '"').join(',') + '}' : typeof args[k] === 'object' ? JSON.stringify(args[k]) : String(args[k])))));
     const j = out.rows[0].j;
     let data = null; if (j != null && j !== '') { try { data = JSON.parse(j); } catch (e) { data = j; } }

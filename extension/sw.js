@@ -106,10 +106,22 @@ function ftdOverlayRemove(k) {
   if (!stack.children.length) host.remove();
 }
 
+// donde la tarjeta molesta (el softphone de Voiso): ahí no se muestra; aparece en la próxima pestaña que abras
+const NOCARD = /^https?:\/\/([^/]+\.)?voiso\.com(\/|$)/i;
+const cardOk = (t) => !!t && t.id != null && !NOCARD.test(t.url || t.pendingUrl || '');
+async function cardTab() { // la pestaña activa de la última ventana normal que usaste (no la ventanita de Voiso ni otros popups)
+  let t = null;
+  try { const w = await chrome.windows.getLastFocused({ populate: true, windowTypes: ['normal'] }); t = w && w.tabs && w.tabs.find((x) => x.active); } catch (e) {}
+  if (!t) [t] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!t || cardOk(t)) return { tab: t || null };
+  const otra = (await chrome.tabs.query({ active: true, windowType: 'normal' })).find(cardOk); // Voiso en una pestaña: otra ventana, si hay
+  return { tab: otra || null, blocked: !otra };
+}
 async function injectInto(tabId) {
   const live = await sess.get('live', []);
   if (!live.length) return true;
   try {
+    if (!cardOk(await chrome.tabs.get(tabId))) return false;
     await chrome.scripting.executeScript({ target: { tabId }, func: ftdOverlay, args: [live] });
     const tabs = await sess.get('tabs', []);
     if (!tabs.includes(tabId)) await sess.set('tabs', [...tabs, tabId].slice(-50));
@@ -117,11 +129,12 @@ async function injectInto(tabId) {
   } catch (e) { return false; }
 }
 async function showNow() {
-  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (tab && tab.id != null && await injectInto(tab.id)) {
+  const { tab, blocked } = await cardTab();
+  if (tab && await injectInto(tab.id)) {
     try { await chrome.windows.update(tab.windowId, { drawAttention: true }); } catch (e) {}
     return 'pestaña';
   }
+  if (blocked) return 'espera'; // estás en Voiso: no te tapo nada, la tarjeta te espera en la próxima pestaña
   await openAlertWindow();
   return 'ventana';
 }

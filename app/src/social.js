@@ -170,7 +170,7 @@ function openProfile(uid){
       <button type="button" class="btn" data-pa="mate"${lm?' disabled':''}>${lm?'Mate en '+t(lm):'Pedirle un mate'}</button>
       <button type="button" class="btn" data-pa="d10"${cooldownLeft('d10',uid)?' disabled':''}>¿Salimos a los 10?</button>
       <button type="button" class="btn" data-pa="d30"${cooldownLeft('d30',uid)?' disabled':''}>¿A la media?</button>
-      <button type="button" class="btn" data-pa="chat">Mensaje</button>`};
+      <button type="button" class="btn" data-pa="chat">Mensaje</button>${isLeader()?'<button type="button" class="btn" data-pa="ficha">Ver ficha</button>':''}`};
   modal({title:'Perfil',wide:true,body,onOpen:api=>{
       const ch=api.q('#pfChart');
       colChart(ch,S.days,{h:150,capMin:14,int:true,minTop:3,label:'FTDs por día, últimos 14 días',empty:'Sin FTDs en estos 14 días.',
@@ -179,6 +179,7 @@ function openProfile(uid){
       const el=api.q('#pfActs');if(el)el.addEventListener('click',async e=>{const b=e.target.closest('[data-pa]');if(!b||b.disabled)return;primeAudio();
         const a=b.dataset.pa,who=esc(first(uid));
         if(a==='chat'){const id=await B.chatDm(uid);if(id){api.close();go('chat',{chat:id})}return}
+        if(a==='ficha'){api.close();fichaModal(uid);return}
         b.disabled=true;const g=await B.ping(a,uid);acts(api);
         if(g)toast((a==='toque'?`Le diste un toque a ${who} 👉`:a==='mate'?`Le pediste un mate a ${who}.`:`Le preguntaste a ${who}.`)+(quiet(m)?' '+sp('hot','Tiene los avisos silenciados.'):''));
       });

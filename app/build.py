@@ -9,7 +9,7 @@ mate=re.search(r'<symbol id="mate" viewBox="0 0 32 32">(.*?)</symbol>', body, re
 fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"+re.sub(r'\s+',' ',mate).replace('"',"'")+"</svg>"
 (D/'mate.svg').write_text(fav_svg.replace("'",'"'))
 fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
-js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','auth.js'])
+js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','auth.js'])
 js=js.replace('\nboot();\n','\n')+'\nboot();\n'   # boot() al final, después de auth.js
 html=f'''<!DOCTYPE html>
 <html lang="es">

@@ -178,6 +178,16 @@ create table if not exists public.messages (
 );
 create index if not exists messages_chat_created on public.messages (chat_id, created_at desc);
 create index if not exists messages_created on public.messages (created_at desc);
+-- target de FTDs de la mesa por mes (lo fija el team leader o el admin; lo ven todos)
+create table if not exists public.targets (
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  ym         text not null check (ym ~ '^\d{4}-\d{2}$'),
+  ftds       integer not null check (ftds between 1 and 100000),
+  set_by     uuid default auth.uid() references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (team_id, ym)
+);
+
 -- snippets globales: los crea y edita solo el admin, a todos les funcionan solos
 alter table public.snippets add column if not exists global boolean not null default false;
 
@@ -602,6 +612,15 @@ begin
   return json_build_object('ok', true);
 end $$;
 
+-- el team leader ve los días de cada uno (faltas, días laborables y libres), sin nada del sueldo
+create or replace function public.team_days() returns table (user_id uuid, faltas jsonb, laborables jsonb, libres jsonb)
+  language sql stable security definer set search_path = public as $$
+  select s.user_id, coalesce(s.cfg->'faltas', '[]'::jsonb), s.cfg->'laborables', s.cfg->'libres'
+    from public.settings s join public.profiles p on p.id = s.user_id
+   where p.team_id = public.my_team() and public.my_role() in ('admin', 'leader') $$;
+revoke all on function public.team_days() from public, anon;
+grant execute on function public.team_days() to authenticated;
+
 revoke all on function public.can_see_task(uuid), public._clean_list(text[]),
   public.task_create(text, text[], text[], date, date, text, text, date, uuid[]), public.task_done(uuid, boolean) from public, anon;
 grant execute on function public.can_see_task(uuid), public.task_create(text, text[], text[], date, date, text, text, date, uuid[]),
@@ -646,6 +665,7 @@ alter table public.messages     enable row level security;
 alter table public.chat_reads   enable row level security;
 alter table public.tasks        enable row level security;
 alter table public.task_people  enable row level security;
+alter table public.targets      enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -679,6 +699,19 @@ drop policy if exists own_agenda on public.agenda;
 create policy own_agenda on public.agenda for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy if exists own_shifts on public.shifts;
 create policy own_shifts on public.shifts for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+-- el team leader (y el admin) ven la agenda, los turnos y los "sin detalle" de toda la mesa (solo leer; el sueldo no)
+drop policy if exists lead_agenda on public.agenda;
+create policy lead_agenda on public.agenda for select to authenticated using (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+drop policy if exists lead_shifts on public.shifts;
+create policy lead_shifts on public.shifts for select to authenticated using (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+drop policy if exists lead_adjustments on public.adjustments;
+create policy lead_adjustments on public.adjustments for select to authenticated using (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+drop policy if exists targets_read on public.targets;
+create policy targets_read on public.targets for select to authenticated using (team_id = public.my_team());
+drop policy if exists targets_write on public.targets;
+create policy targets_write on public.targets for all to authenticated
+  using (team_id = public.my_team() and public.my_role() in ('admin','leader'))
+  with check (team_id = public.my_team() and public.my_role() in ('admin','leader'));
 
 drop policy if exists snip_read on public.snippets;
 create policy snip_read on public.snippets for select to authenticated using (user_id = auth.uid() or ((shared or global) and team_id = public.my_team()));
@@ -756,6 +789,8 @@ revoke insert, update on public.tasks from authenticated;
 grant select on public.task_people to authenticated;
 revoke insert, update, delete on public.task_people from authenticated;
 revoke all on public.tasks, public.task_people from anon;
+grant select, insert, update, delete on public.targets to authenticated;
+revoke all on public.targets from anon;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
@@ -766,7 +801,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

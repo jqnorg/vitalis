@@ -694,6 +694,68 @@ button.fl-k:hover{color:var(--pri)}
 .exf #suPrC{flex:1;min-width:180px}
 .exm{width:110px}
 .exs{gap:14px;align-items:flex-end;margin-top:10px}
+
+/* ---------- pestañas de cada categoría ---------- */
+.subnav{display:flex;gap:2px;margin:-4px 0 20px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.subnav[hidden]{display:none}
+.subnav::-webkit-scrollbar{display:none}
+.subnav button{display:flex;align-items:center;gap:8px;border:0;background:none;padding:9px 14px 11px;font:inherit;font-weight:700;font-size:14.5px;color:var(--dim);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-1px;white-space:nowrap;border-radius:10px 10px 0 0}
+.subnav button:hover{color:var(--fg);background:var(--soft)}
+.subnav button.on{color:var(--pri);border-bottom-color:var(--pri)}
+body.dark .subnav button.on{color:var(--pri-h);border-bottom-color:var(--pri-h)}
+.subnav svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.subnav .nb{min-width:19px;text-align:center;font-size:11px;font-weight:700;border-radius:999px;padding:1px 6px;background:var(--soft);color:var(--fg)}
+.subnav .nb.hot{background:var(--acc);color:#fff}
+body.dark .subnav .nb.hot{color:#1e1300}
+.subnav .nb:empty{display:none}
+body[data-view=chat] .subnav{margin-bottom:14px;flex:none}
+@media (max-width:820px){.subnav{margin:0 0 14px}.subnav button{padding:8px 11px 10px;font-size:13.5px}}
+
+/* ---------- la mesa: target, inicio y ficha ---------- */
+.ms .card-h{margin-bottom:12px}
+.ms-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.35fr);gap:20px;align-items:center}
+.ms-big .n{font-family:var(--display);font-weight:800;font-size:62px;line-height:.88;letter-spacing:-.05em;color:var(--info);font-variant-numeric:tabular-nums}
+.ms-big .lab{font-family:var(--display);font-weight:700;font-size:18px;letter-spacing:-.02em;margin-top:6px}
+.ms-big .lab b{font-weight:800}
+.ms-big .msg{color:var(--dim);margin-top:3px}
+.ms-big .msg b{color:var(--fg)}
+.ms-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.ms-k{background:var(--raised);border-radius:var(--r-sm);padding:10px 12px;min-width:0}
+.ms-k .lb{color:var(--dim);font-size:12.5px;font-weight:600}
+.ms-k .v{font-family:var(--display);font-weight:700;font-size:24px;line-height:1.15;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ms-k .s{color:var(--dim);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tg-bar{margin-top:16px}
+.tg-rail{position:relative;height:10px;border-radius:999px;background:var(--soft)}
+.tg-fill{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:var(--info);min-width:10px}
+.tg-fill.done{background:var(--ok)}
+.tg-ideal{position:absolute;top:-5px;bottom:-5px;width:3px;margin-left:-1.5px;border-radius:2px;background:var(--cuero)}
+.tg-leg{display:flex;gap:6px 18px;flex-wrap:wrap;margin-top:8px;font-size:13px;color:var(--dim)}
+.tg-leg b{color:var(--fg);font-variant-numeric:tabular-nums}
+.tg-leg span:last-child{margin-left:auto;font-weight:600}
+.ms-top{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.ms-p{display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:3px 13px 3px 8px;cursor:pointer;font:inherit;color:inherit}
+.ms-p:hover{background:var(--soft)}
+.ms-p.mine{border-color:color-mix(in srgb,var(--pri) 50%,transparent);background:var(--pri-soft)}
+.ms-p .ps{font-weight:800;color:var(--dim);font-size:12px;min-width:12px;text-align:center}
+.ms-p .av{width:26px;height:26px;font-size:11px}
+.ms-p b{font-family:var(--display);font-variant-numeric:tabular-nums}
+@media (max-width:1150px){.ms-grid{grid-template-columns:1fr}}
+@media (max-width:600px){.ms-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.ms-big .n{font-size:52px}}
+.eq-hoy{font-size:13px}
+.eq-hoy.dim{color:var(--dim)}
+.badge.bad{background:color-mix(in srgb,var(--acc) 15%,transparent);color:var(--acc)}
+.fi-tabs{margin:16px 0 12px;flex-wrap:wrap}
+.fi-body{min-height:210px}
+.fi-body .pt{width:100%}
+.fi-list{max-height:380px;overflow:auto}
+.fi-list{display:flex;flex-direction:column;gap:4px}
+.fi-it{display:flex;gap:10px;align-items:center;padding:7px 11px;border-radius:10px;background:var(--raised);min-width:0}
+.fi-it .wh{color:var(--dim);font-size:12.5px;min-width:96px;flex:none}
+.fi-it.hot .wh{color:var(--acc);font-weight:700}
+.fi-it b{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fi-it .badge{margin-left:auto}
+.fi-acts{display:flex;gap:8px;margin-top:12px}
+.fi-body .p-sub{margin:0 0 10px}
 </style>
 </head>
 <body>
@@ -718,6 +780,7 @@ button.fl-k:hover{color:var(--pri)}
     <symbol id="i-turnos" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v4.8l3 1.8M9.5 2.5h5"/></symbol>
     <symbol id="i-sueldo" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12.5" rx="3"/><circle cx="12" cy="12.25" r="2.6"/><path d="M6 9.5v.01M18 15v.01"/></symbol>
     <symbol id="i-snippets" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M13.8 8.2 10.2 15.8"/></symbol>
+    <symbol id="i-mesa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6.5 19.5a5.5 5.5 0 0 1 11 0"/><circle cx="5" cy="10.2" r="2.1"/><circle cx="19" cy="10.2" r="2.1"/><path d="M1.8 18a3.6 3.6 0 0 1 4.2-3.3M22.2 18a3.6 3.6 0 0 0-4.2-3.3"/></symbol>
     <symbol id="i-filtros" viewBox="0 0 24 24"><path d="M4 5h16l-6.2 7.4v5.4l-3.6 2V12.4z"/></symbol>
     <symbol id="i-tareas" viewBox="0 0 24 24"><path d="M9 4.5H7.5A2.5 2.5 0 0 0 5 7v11.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V7a2.5 2.5 0 0 0-2.5-2.5H15"/><rect x="9" y="3" width="6" height="3.2" rx="1.2"/><path d="m9 13.5 2.2 2.2L15.5 11"/></symbol>
     <symbol id="i-chat" viewBox="0 0 24 24"><path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h8a2.5 2.5 0 0 1 2.5 2.5v5A2.5 2.5 0 0 1 14 14H9.5L6 17v-3a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M19.6 8.6a2.4 2.4 0 0 1 .9 1.9v5a2.5 2.5 0 0 1-2.5 2.5v3l-3.5-3h-3.2a2.5 2.5 0 0 1-2-1"/></symbol>
@@ -733,19 +796,13 @@ button.fl-k:hover{color:var(--pri)}
 <aside id="side">
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
-    <button type="button" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
-    <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>F</kbd></button>
-    <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>2</kbd></button>
-    <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>3</kbd></button>
-    <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>4</kbd></button>
-    <button type="button" data-v="turnos"><svg><use href="#i-turnos"/></svg><span class="nm">Turnos</span><kbd>5</kbd></button>
-    <button type="button" data-v="sueldo"><svg><use href="#i-sueldo"/></svg><span class="nm">Sueldo</span><kbd>6</kbd></button>
-    <button type="button" data-v="snippets"><svg><use href="#i-snippets"/></svg><span class="nm">Snippets</span><kbd>7</kbd></button>
-    <button type="button" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbCh"></span><kbd>8</kbd></button>
-    <button type="button" data-v="social"><svg><use href="#i-social"/></svg><span class="nm">Social</span><span class="nb hot" id="nbSo"></span><kbd>9</kbd></button>
-    <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>T</kbd></button>
-    <button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span></button>
-    <button type="button" data-v="config"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span><kbd>0</kbd></button>
+    <button type="button" data-g="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
+    <button type="button" data-g="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>2</kbd></button>
+    <button type="button" data-g="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><span class="nb" id="ngVentas"></span><kbd>3</kbd></button>
+    <button type="button" data-g="dia"><svg><use href="#i-agenda"/></svg><span class="nm">Mi día</span><span class="nb hot" id="ngDia"></span><kbd>4</kbd></button>
+    <button type="button" data-g="mesa"><svg><use href="#i-mesa"/></svg><span class="nm">Mesa</span><span class="nb hot" id="ngMesa"></span><kbd>5</kbd></button>
+    <button type="button" data-g="sueldo"><svg><use href="#i-sueldo"/></svg><span class="nm">Sueldo</span><kbd>6</kbd></button>
+    <button type="button" data-g="config"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span><kbd>7</kbd></button>
   </nav>
   <div class="side-foot">
     <button type="button" class="me" id="sMe" data-go="config" title="Mi cuenta"></button>
@@ -771,6 +828,9 @@ button.fl-k:hover{color:var(--pri)}
 </header>
 
 <main id="main">
+<div class="subnav" data-gsub="ventas" role="tablist" aria-label="Ventas" hidden><button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg>Ventas</button><button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg>Clientes<span class="nb" id="nbCl"></span></button></div>
+<div class="subnav" data-gsub="dia" role="tablist" aria-label="Mi día" hidden><button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg>Agenda<span class="nb hot" id="nbAg"></span></button><button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg>Tareas<span class="nb hot" id="nbTa"></span></button><button type="button" data-v="turnos"><svg><use href="#i-turnos"/></svg>Turnos</button><button type="button" data-v="snippets"><svg><use href="#i-snippets"/></svg>Snippets</button></div>
+<div class="subnav" data-gsub="mesa" role="tablist" aria-label="Mesa" hidden><button type="button" data-v="chat"><svg><use href="#i-chat"/></svg>Chat<span class="nb hot" id="nbCh"></span></button><button type="button" data-v="social"><svg><use href="#i-social"/></svg>Social<span class="nb hot" id="nbSo"></span></button><button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg>Equipo</button></div>
 
 <section class="view" id="v-inicio">
   <div class="vh"><div><h1 id="iHola">Hola</h1><p class="sub" id="iFecha"></p></div></div>
@@ -778,6 +838,7 @@ button.fl-k:hover{color:var(--pri)}
     <section class="hero" id="iHero" aria-label="Tu mes"></section>
     <div class="side-kpis" id="iKpis"></div>
   </div>
+  <section class="card ms" id="iMesa" aria-label="La mesa"></section>
   <div class="g2">
     <section class="card" id="iTurno">
       <div class="card-h"><h3>Turno</h3><span class="p-sub" id="itSub"></span><span class="grow"></span>
@@ -981,12 +1042,13 @@ button.fl-k:hover{color:var(--pri)}
 <section class="view" id="v-equipo" hidden>
   <div class="vh"><div><h1>Equipo</h1><p class="sub" id="eqSub"></p></div><span class="grow"></span>
     <div class="tools"><button type="button" class="btn sm icon" id="eqPrev" aria-label="Mes anterior">‹</button><select id="eqMes" aria-label="Mes"></select><button type="button" class="btn sm icon" id="eqNext" aria-label="Mes siguiente">›</button></div></div>
+  <section class="card ms" id="eqTarget" aria-label="Target del mes"></section>
   <div class="kpis" id="eqKpis"></div>
   <div class="g-wide">
     <section class="card"><div class="card-h"><h3>FTDs por agente</h3><span class="p-sub">Tocá uno para ver sus ventas</span></div><div id="eqRank"></div></section>
     <section class="card"><div class="card-h"><h3>FTDs por día de la mesa</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div></div><div class="chart" id="eqChart"></div></section>
   </div>
-  <section class="card"><div class="card-h"><h3>Agentes</h3><span class="p-sub" id="eqCount"></span></div><div class="p-tablewrap" id="eqTable"></div></section>
+  <section class="card"><div class="card-h"><h3>Agentes</h3><span class="p-sub" id="eqCount"></span><span class="grow"></span><span class="p-sub">Tocá <b>Ficha</b> para ver su agenda, turnos, clientes y tareas</span></div><div class="p-tablewrap" id="eqTable"></div></section>
 </section>
 
 </main>
@@ -1001,7 +1063,7 @@ button.fl-k:hover{color:var(--pri)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.5.0';
+const VERSION='1.6.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -1259,6 +1321,7 @@ async function loadAll(){
     QO(sb.from('messages').select('*').gte('created_at',new Date(Date.now()-7*864e5).toISOString()).order('created_at',{ascending:false}).limit(1500)),
     QO(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),
     QO(sb.from('task_people').select('*').limit(5000)),
+    loadMesa().catch(()=>{}),
   ]);
   chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
@@ -1275,7 +1338,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -1346,8 +1409,11 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       if(p.new.team_id!==profile.team_id)return;
       const t=T2X(p.new),ex=taskOf(t._id);if(ex)Object.assign(ex,t);else tasks.unshift(t);refresh();
     })
-    .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})})
-    .subscribe(st=>{
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})});
+  if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p)); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
+  // el team leader ve en vivo la agenda, los turnos y los FTDs sin detalle de todos
+  if(isLeader())for(const t of ['agenda','shifts','adjustments'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},p=>mesaLive(t,p));
+  chan.subscribe(st=>{
       if(gen!==rtGen)return;
       if(st==='SUBSCRIBED'){clearTimeout(rtWd);const again=rtEver;rtOk=true;rtEver=true;if(again)catchUp(true);return}
       rtOk=false;catchUp(true); // CHANNEL_ERROR, TIMED_OUT, CLOSED: me pongo al día y, si no vuelve solo, me vuelvo a suscribir
@@ -1800,11 +1866,20 @@ function colChart(el,data,o={}){
 const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
+// el menú va por categorías; adentro de cada una, pestañas arriba
+const GROUPS={inicio:['inicio'],filtros:['filtros'],ventas:['ventas','clientes'],dia:['agenda','tareas','turnos','snippets'],mesa:['chat','social','equipo'],sueldo:['sueldo'],config:['config']};
+const GKEYS=['inicio','filtros','ventas','dia','mesa','sueldo','config'];
+const groupOf=v=>GKEYS.find(g=>GROUPS[g].includes(v))||'inicio';
+let lastIn=local.get('lastIn',{});
+function goG(g){const vs=(GROUPS[g]||['inicio']).filter(v=>v!=='equipo'||isLeader());go(vs.includes(lastIn[g])?lastIn[g]:vs[0])}
 function go(v,opts){
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
-  $$('#nav [data-v]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  const g=groupOf(v);lastIn[g]=v;local.set('lastIn',lastIn);
+  $$('#nav [data-g]').forEach(b=>b.classList.toggle('on',b.dataset.g===g));
+  $$('.subnav').forEach(s=>s.hidden=s.dataset.gsub!==g);
+  $$('.subnav [data-v]').forEach(b=>{b.classList.toggle('on',b.dataset.v===v);b.setAttribute('aria-selected',b.dataset.v===v)});
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready)V[v].render(opts||{});
@@ -1831,6 +1906,8 @@ function status(){
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
+  const ag=+($('#nbAg').textContent||0),cl=+($('#nbCl').textContent||0);
+  $('#ngVentas').textContent=cl||'';$('#ngDia').textContent=ag+tk.length||'';$('#ngMesa').textContent=so+ch?(so+ch>99?'99+':so+ch):'';
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
@@ -2450,6 +2527,10 @@ function ayuda(){
   <h4>Entrar</h4><dl>
     <dt>Nombre y PIN</dt><dd>Elegís tu nombre. La primera vez el PIN es 0000 y creás el tuyo. Si te lo olvidás, el administrador lo vuelve a 0000.</dd>
     <dt>Bloqueo</dt><dd>5 errores seguidos bloquean 15 minutos; si se repite, cada bloqueo dura el doble.</dd></dl>
+  <h4>Inicio</h4><dl>
+    <dt>Lo tuyo</dt><dd>Tus FTDs del mes, cuánto falta para el próximo bono, el líquido, tu turno y tu agenda de hoy.</dd>
+    <dt>La mesa</dt><dd>Cuántos FTDs lleva la mesa, cuánto falta para el target, cuántos por día hábil y a qué ritmo vamos. La marca en la barra es dónde hay que cerrar hoy para ir al día.</dd>
+    <dt>Menú</dt><dd>Por categorías: Ventas (y Clientes), Mi día (Agenda, Tareas, Turnos, Snippets) y Mesa (Chat, Social, Equipo). Adentro, pestañas arriba.</dd></dl>
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
@@ -2478,6 +2559,9 @@ function ayuda(){
     <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Vale también para el chat. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
   <h4>Team leader</h4><dl>
     <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que no está en la mesa quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
+  <h4>Equipo (team leader)</h4><dl>
+    <dt>Target</dt><dd><b>Fijar target</b> (en Equipo o en el inicio): los FTDs que tiene que hacer la mesa en el mes. Lo ve toda la mesa.</dd>
+    <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
     <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
@@ -2490,10 +2574,10 @@ function ayuda(){
     <dt>Actualizar</dt><dd>Bajá el zip nuevo, descomprimilo en la misma carpeta y tocá ↻ en chrome://extensions.</dd>
     <dt>Instalar</dt><dd>Ajustes → Descargar extensión. Descomprimí el zip, abrí chrome://extensions, activá Modo de desarrollador, tocá Cargar descomprimida y elegí la carpeta. Recargá Vitalis.</dd></dl>
   <h4>Datos</h4><dl>
-    <dt>Qué ve la mesa</dt><dd>Ventas, clientes y snippets compartidos. Sueldo, agenda, turnos y faltas son solo tuyos.</dd>
+    <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>0</kbd></dt><dd>Secciones (<kbd>8</kbd> chat, <kbd>9</kbd> social, <kbd>0</kbd> ajustes)</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>7</kbd></dt><dd>Categorías del menú (Inicio, Filtros, Ventas, Mi día, Mesa, Sueldo, Ajustes)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -2509,7 +2593,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),
@@ -2518,7 +2602,8 @@ const ACT={
     else toast('Así suenan los avisos. '+sp('hot','La extensión de Chrome no está conectada.'))},
 };
 document.addEventListener('click',e=>{
-  const v=e.target.closest('#nav [data-v]');if(v){go(v.dataset.v);return}
+  const gb=e.target.closest('#nav [data-g]');if(gb){goG(gb.dataset.g);return}
+  const v=e.target.closest('.subnav [data-v]');if(v){go(v.dataset.v);return}
   const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);return}
   const a=e.target.closest('[data-act]');if(a&&ACT[a.dataset.act]){e.preventDefault();primeAudio();ACT[a.dataset.act](a)}
 });
@@ -2530,10 +2615,12 @@ document.addEventListener('keydown',e=>{
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
-  if(/^[0-9]$/.test(e.key)){e.preventDefault();go(VIEWS[e.key==='0'?9:+e.key-1]);return} // 1-7 secciones, 8 chat, 9 social, 0 ajustes
+  if(/^[1-7]$/.test(e.key)){e.preventDefault();goG(GKEYS[+e.key-1]);return} // 1-7 categorías del menú
+  if(e.key==='0'){e.preventDefault();go('config');return}
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='t'){e.preventDefault();go('tareas');return}
+  if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}
   if(e.key==='/'){e.preventDefault();go('ventas');setTimeout(()=>$('#pQ').focus(),0);return}
@@ -2574,13 +2661,14 @@ V.inicio={
     const mes=MES[+ym.slice(5,7)-1];
     const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
-    $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">FTDs en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
+    $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div></div><span class="grow"></span>
       <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n)}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
+    $('#iMesa').innerHTML=mesaCard();
     this.turno(true);
     // agenda
     const open=pend.filter(p=>!p.done&&p.due.slice(0,10)<=te).sort(byDue),next=pend.filter(p=>!p.done&&p.due.slice(0,10)>te).sort(byDue)[0];
@@ -3079,7 +3167,9 @@ V.equipo={
     const conV=per.filter(p=>p.n).length;
     $('#eqSub').textContent=`${teamInfo?teamInfo.name:''} · ${plural(act.length,'integrante')}`;
     const k=(lb,v,s2,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`;
-    $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
+    const T=targets[eqYm]||0;
+    $('#eqTarget').innerHTML=eqTargetCard(eqYm);
+    $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+
       (()=>{const c=convPeriod(mFrom,mTo,null);return k('Conversión de la mesa',c.rate==null?'—':pct(c.rate),`${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente new','clientes new')}`)})()+
@@ -3093,8 +3183,9 @@ V.equipo={
     colChart($('#eqChart'),data,{h:210,capMin:18,int:true,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     $('#eqCount').textContent=`${plural(conV,'agente')} con ventas · ${nf(days?R.n/days:0,2)} FTDs por día`;
-    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Rol</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th>Último FTD</th></tr></thead><tbody>`+
-      per.map(p=>`<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="d">${p.m.role?roleTxt(p.m.role):''}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td></tr>`).join('')+'</tbody></table>';
+    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
+      per.map(p=>{const act_=p.m.role!=null,th=act_?turnoHoy(p.m.id):{txt:'',cls:'d'},ag=act_?agStats(p.m.id):null;
+        return `<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="eq-hoy ${th.cls}">${esc(th.txt)}</td><td class="r">${p.n}</td><td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="r">${ag?(ag.open?`${ag.open}${ag.venc?` · <span class="hot b">${ag.venc} venc.</span>`:''}`:'<span class="d">0</span>'):''}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td><td class="act">${act_?`<button type="button" class="btn sm" data-act="ficha" data-uid="${esc(p.m.id)}">Ficha</button>`:''}</td></tr>`}).join('')+'</tbody></table>';
   },
 };
 
@@ -3494,7 +3585,7 @@ function openProfile(uid){
       <button type="button" class="btn" data-pa="mate"${lm?' disabled':''}>${lm?'Mate en '+t(lm):'Pedirle un mate'}</button>
       <button type="button" class="btn" data-pa="d10"${cooldownLeft('d10',uid)?' disabled':''}>¿Salimos a los 10?</button>
       <button type="button" class="btn" data-pa="d30"${cooldownLeft('d30',uid)?' disabled':''}>¿A la media?</button>
-      <button type="button" class="btn" data-pa="chat">Mensaje</button>`};
+      <button type="button" class="btn" data-pa="chat">Mensaje</button>${isLeader()?'<button type="button" class="btn" data-pa="ficha">Ver ficha</button>':''}`};
   modal({title:'Perfil',wide:true,body,onOpen:api=>{
       const ch=api.q('#pfChart');
       colChart(ch,S.days,{h:150,capMin:14,int:true,minTop:3,label:'FTDs por día, últimos 14 días',empty:'Sin FTDs en estos 14 días.',
@@ -3503,6 +3594,7 @@ function openProfile(uid){
       const el=api.q('#pfActs');if(el)el.addEventListener('click',async e=>{const b=e.target.closest('[data-pa]');if(!b||b.disabled)return;primeAudio();
         const a=b.dataset.pa,who=esc(first(uid));
         if(a==='chat'){const id=await B.chatDm(uid);if(id){api.close();go('chat',{chat:id})}return}
+        if(a==='ficha'){api.close();fichaModal(uid);return}
         b.disabled=true;const g=await B.ping(a,uid);acts(api);
         if(g)toast((a==='toque'?`Le diste un toque a ${who} 👉`:a==='mate'?`Le pediste un mate a ${who}.`:`Le preguntaste a ${who}.`)+(quiet(m)?' '+sp('hot','Tiene los avisos silenciados.'):''));
       });
@@ -4013,6 +4105,160 @@ V.filtros={
       tip:d=>({title:`De ${z(d.h)}:00 a ${z(d.h)}:59`,rows:[{v:String(d.a),l:'FTDs'}]})});
   },
 };
+
+/* ============================================================
+   La mesa: target del mes (lo fija el team leader), cómo viene la mesa en el inicio
+   y la ficha de cada persona para el team leader (todo menos el sueldo).
+   ============================================================ */
+let targets={},teamAg=[],teamSh={},teamAdj={},teamDays={},mesaOk=false; // mesaOk: la base ya tiene la tabla de targets
+
+/* ---------- carga ---------- */
+async function loadMesa(){
+  let tg=[];try{tg=await Q(sb.from('targets').select('*'));mesaOk=true}catch(e){mesaOk=false}
+  targets=Object.fromEntries(tg.filter(r=>r.team_id===profile.team_id).map(r=>[r.ym,+r.ftds]));
+  if(!isLeader()){teamAg=[];teamSh={};teamAdj={};teamDays={};return}
+  const desde=addDays(todayS().slice(0,8)+'01',-62);
+  const [ag,sh,adj,dd]=await Promise.all([
+    QO(sb.from('agenda').select('*').neq('user_id',me).limit(5000)),
+    QO(sb.from('shifts').select('*').neq('user_id',me).gte('date',desde)),
+    QO(sb.from('adjustments').select('*').neq('user_id',me)),
+    QO(sb.rpc('team_days')),
+  ]);
+  teamAg=ag.map(r=>({...A2P(r),uid:r.user_id}));
+  teamSh={};for(const r of sh)(teamSh[r.user_id]||(teamSh[r.user_id]={}))[r.date]=shiftOf(r);
+  teamAdj={};for(const r of adj)(teamAdj[r.user_id]||(teamAdj[r.user_id]={}))[r.ym]=+r.n||0;
+  teamDays=Object.fromEntries(dd.map(r=>[r.user_id,{faltas:r.faltas||[],laborables:r.laborables,libres:r.libres}]));
+}
+const shiftOf=r=>{const t={...r.data};t.date=t.date||r.date;t.breaks=t.breaks||[];return t};
+async function mesaPoll(){if(!ready||!sb)return;try{await loadMesa();refresh()}catch(e){}}
+// en vivo (el team leader recibe los cambios de agenda y turnos de todos; los suyos los maneja core)
+function mesaLive(table,p){
+  const r=p.new||{},o=p.old||{};
+  if(table==='targets'){if(p.eventType==='DELETE'){if(o.ym&&(!o.team_id||o.team_id===profile.team_id))delete targets[o.ym]}else if(r.team_id===profile.team_id)targets[r.ym]=+r.ftds;refresh();return}
+  if(!isLeader())return;
+  if(table==='agenda'){if(p.eventType==='DELETE'){teamAg=teamAg.filter(x=>x._id!==o.id)}else if(r.user_id!==me){teamAg=teamAg.filter(x=>x._id!==r.id);teamAg.push({...A2P(r),uid:r.user_id})}}
+  else if(table==='shifts'){if(p.eventType==='DELETE'){if(o.user_id&&teamSh[o.user_id])delete teamSh[o.user_id][o.date]}else if(r.user_id!==me)(teamSh[r.user_id]||(teamSh[r.user_id]={}))[r.date]=shiftOf(r)}
+  else if(table==='adjustments'){if(p.eventType==='DELETE'){if(o.user_id&&teamAdj[o.user_id])delete teamAdj[o.user_id][o.ym]}else if(r.user_id!==me)(teamAdj[r.user_id]||(teamAdj[r.user_id]={}))[r.ym]=+r.n||0}
+  refresh();
+}
+Object.assign(B,{
+  async setTarget(ym,n){
+    try{if(n)await Q(sb.from('targets').upsert({team_id:profile.team_id,ym,ftds:n,set_by:me,updated_at:new Date().toISOString()},{onConflict:'team_id,ym'}));
+      else await Q(sb.from('targets').delete().eq('team_id',profile.team_id).eq('ym',ym));
+      if(n)targets[ym]=n;else delete targets[ym];refresh();return true}catch(e){dbErr(e);return false}
+  },
+});
+
+/* ---------- cálculos ---------- */
+const habil=d=>{const r=noTrabajo(d);return !r||r==='falta'}; // día hábil de la mesa (mis faltas no le cambian el mes a la mesa)
+function mesaMes(ym){
+  const te=todayS(),list=team.filter(f=>f.date.slice(0,7)===ym),T=targets[ym]||0;
+  const [Y,M]=ym.split('-').map(Number),last=new Date(Y,M,0).getDate();
+  let tot=0,pas=0;for(let d=1;d<=last;d++){const k=`${ym}-${z(d)}`;if(!habil(k))continue;tot++;if(k<=te)pas++}
+  const enCurso=ym===te.slice(0,7),hh=enCurso&&habil(te),hechos=pas-(hh?1:0),quedan=enCurso?tot-hechos:ym>te.slice(0,7)?tot:0; // hoy todavía cuenta como día que queda
+  const n=list.length,falta=Math.max(0,T-n),antes=list.filter(f=>f.date<te).length;
+  const ritmo=enCurso?(hechos?Math.max(n,Math.round(antes/hechos*tot)):null):n; // promedio de los días hábiles ya cerrados
+  const ideal=T&&tot?Math.round(T*(enCurso?pas:ym<te.slice(0,7)?tot:0)/tot):0; // dónde deberíamos cerrar hoy para ir al día
+  const per=members.filter(m=>m.active).map(m=>({m,n:list.filter(f=>f.uid===m.id).length})).sort((a,b)=>b.n-a.n||a.m.name.localeCompare(b.m.name));
+  return {list,n,T,falta,tot,pas,quedan,ritmo,ideal,enCurso,per,hoy:list.filter(f=>f.date===te).length,porDia:quedan?falta/quedan:0};
+}
+function targetModal(ym){
+  if(!isLeader()||!mesaOk)return;
+  const cur=targets[ym]||'',S=mesaMes(ym);
+  modal({title:`Target de ${esc(mLong(ym))}`,body:`<label class="fld"><span>FTDs de la mesa</span><input name="t" inputmode="numeric" value="${cur}" placeholder="Ej.: 400"></label>
+    <p class="note">Van ${plural(S.n,'FTD')}${S.enCurso?` y quedan ${plural(S.quedan,'día hábil','días hábiles')}`:''}. Lo ve toda la mesa en el inicio.</p><div class="ebox" id="tgE"></div>`,
+    actions:[...(cur?[{l:'Quitar',cls:'danger l',fn:async()=>{if(await B.setTarget(ym,0))toast('Target quitado.')}}]:[]),{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
+      const n=Math.round(parseNum(api.q('[name=t]').value));if(!(n>0)){api.q('#tgE').textContent='Poné un número de FTDs.';return false}
+      if(await B.setTarget(ym,n))toast(`Target de ${esc(mLong(ym))}: <b>${n} FTDs</b>.`);else return false}}],
+    onOpen:api=>setTimeout(()=>api.q('[name=t]').select(),0)});
+}
+function targetBar(S){ // barra hacia el target con la marca de dónde deberíamos ir hoy
+  if(!S.T)return '';
+  const P=v=>Math.min(100,v/Math.max(S.T,S.n)*100),okR=S.ritmo!=null&&S.ritmo>=S.T;
+  return `<div class="tg-bar" role="meter" aria-valuemin="0" aria-valuemax="${S.T}" aria-valuenow="${S.n}" aria-label="FTDs de la mesa hacia el target">
+      <div class="tg-rail"><i class="tg-fill${S.n>=S.T?' done':''}" style="width:${P(S.n)}%"></i>${S.enCurso&&S.n<S.T?`<span class="tg-ideal" style="left:${P(S.ideal)}%" title="Para ir al día, hoy cerrar en ${S.ideal}"></span>`:''}</div>
+      <div class="tg-leg"><span><b>${S.n}</b> de ${S.T}</span>${S.enCurso&&S.n<S.T?(S.n>=S.ideal?`<span>vamos <b>${S.n-S.ideal}</b> arriba de lo que pide el target</span>`:`<span>para ir al día, hoy hay que cerrar en <b>${S.ideal}</b></span>`):''}<span class="${S.n>=S.T||okR?'ok':'hot'}">${S.n>=S.T?'¡Target cumplido! 🧉':S.enCurso?(S.ritmo==null?'recién arranca el mes':`a este ritmo: ~${S.ritmo}`):S.quedan?'todavía no empezó':`quedaron ${S.T-S.n} abajo`}</span></div></div>`;
+}
+
+/* ---------- inicio: la mesa ---------- */
+function mesaCard(){
+  const ym=ymNow(),S=mesaMes(ym),mes=MES[+ym.slice(5,7)-1],te=todayS(),pos=S.per.findIndex(p=>p.m.id===me),mio=S.per[pos];
+  const ws=weekStart(te),sem=team.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),semP=team.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
+  const hoyUsd=S.list.filter(f=>f.date===te).reduce((a,f)=>a+(+f.amount||0),0);
+  const head=`<div class="card-h"><h3>La mesa</h3><span class="p-sub">${esc(cap(mes))}</span><span class="grow"></span>${isLeader()&&mesaOk?`<button type="button" class="btn sm" data-act="target">${S.T?'Cambiar target':'Fijar target'}</button>`:''}</div>`;
+  const big=`<div class="ms-big"><div class="n">${S.n}</div><div class="lab">FTDs de la mesa${S.T?` · target <b>${S.T}</b>`:''}</div>
+    <div class="msg">${S.T?(S.falta?`Faltan <b>${S.falta}</b>${S.enCurso&&S.quedan?` · <b>${nf(S.porDia,1)}</b> por día en ${plural(S.quedan,'día hábil','días hábiles')}`:''}`:'<b>¡Target cumplido!</b> Esto merece un mate 🧉'):!mesaOk?'':isLeader()?'Fijá el target del mes para que la mesa vea cuánto falta.':'El team leader todavía no fijó el target del mes.'}</div></div>`;
+  const k=(lb,v,s2)=>`<div class="ms-k"><div class="lb">${esc(lb)}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`;
+  const kp=k('Hoy',`${S.hoy}`,`${money(hoyUsd)} USD`)+k('Esta semana',`${sem}`,`la pasada a esta altura: ${semP}`)+
+    (mio?k('Tu aporte',`${mio.n}`,S.n?`${pct(mio.n/S.n)} de la mesa`:'—')+k('Tu puesto',mio.n?`${pos+1}º`:'—',`de ${S.per.length}`):'');
+  const top=S.per.filter(p=>p.n).slice(0,5);
+  const podio=top.length?`<div class="ms-top">${top.map((p,i)=>`<button type="button" class="ms-p${p.m.id===me?' mine':''}" data-prof="${esc(p.m.id)}" title="Ver el perfil de ${esc(p.m.name)}"><span class="ps">${i+1}</span>${avatar(p.m.name)}<span class="nm">${esc(p.m.name.split(/\s+/)[0])}</span><b>${p.n}</b></button>`).join('')}</div>`:'';
+  return head+`<div class="ms-grid">${big}<div class="ms-kpis">${kp}</div></div>${targetBar(S)}${podio}`;
+}
+
+/* ---------- equipo: target y ficha de cada persona ---------- */
+function eqTargetCard(ym){
+  if(!mesaOk)return `<div class="card-h" style="margin:0"><h3>Target de ${esc(mLong(ym))}</h3><span class="p-sub">falta actualizar la base para poder fijarlo</span></div>`;
+  const S=mesaMes(ym);
+  return `<div class="card-h"><h3>Target de ${esc(mLong(ym))}</h3><span class="p-sub">${S.T?(S.falta?`faltan ${S.falta}${S.enCurso&&S.quedan?` · ${nf(S.porDia,1)} por día hábil`:''}`:'cumplido'):'sin fijar'}</span><span class="grow"></span><button type="button" class="btn sm pri" data-act="target" data-ym="${ym}">${S.T?'Cambiar':'Fijar target'}</button></div>`+
+    (S.T?targetBar(S):`<p class="p-sub" style="margin:0">Fijá cuántos FTDs tiene que hacer la mesa este mes. Lo ven todos en el inicio.</p>`);
+}
+function turnoHoy(uid){ // estado del turno de hoy de alguien
+  const t=uid===me?(openTurno()||turnos[todayS()]):((teamSh[uid]||{})[todayS()]);
+  if(!t||!t.in)return {txt:'—',cls:'dim'};
+  if(t.out)return {txt:`salió ${hhmm(t.out)}`,cls:'dim'};
+  const b=t.breaks.find(x=>!x.e);if(b)return {txt:`descanso desde ${hhmm(b.s)}`,cls:'warn'};
+  return {txt:`en turno desde ${hhmm(t.in)}`,cls:'ok'};
+}
+function agOf(uid){return uid===me?pend:teamAg.filter(p=>p.uid===uid)}
+function agStats(uid){const now=new Date(),te=todayS(),L=agOf(uid).filter(p=>!p.done);return {hoy:L.filter(p=>p.due.slice(0,10)===te).length,venc:L.filter(p=>parseDue(p.due)<=now).length,open:L.length}}
+function fichaModal(uid,tab='mes'){
+  if(!isLeader())return;
+  const m=members.find(x=>x.id===uid);if(!m)return;
+  const ym=ymNow(),te=todayS(),mFrom=ym+'-01';
+  const L=team.filter(f=>f.uid===uid&&f.date.slice(0,7)===ym),extra=uid===me?(ajustes[ym]||0):((teamAdj[uid]||{})[ym]||0);
+  const sh=uid===me?turnos:(teamSh[uid]||{}),days=uid===me?{faltas:cfg.faltas||[]}:(teamDays[uid]||{faltas:[]});
+  const draw=(api,t)=>{
+    api.box.querySelectorAll('#fiTabs [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+    const el=api.q('#fiBody');
+    if(t==='mes'){
+      const cv=convPeriod(mFrom,te,uid),late=L.filter(isLate).length,dias=new Set(L.map(f=>f.date)).size,fal=(days.faltas||[]).filter(x=>x.d.slice(0,7)===ym);
+      const k=(lb,v,s2)=>`<div class="kpi"><div class="lb">${esc(lb)}</div><div class="v">${v}</div><div class="s">${s2}</div></div>`;
+      el.innerHTML=`<div class="pf-k">${k('FTDs del mes',L.length+extra,extra?`${L.length} cargados + ${extra} sin detalle`:`${late} late · ${L.length-late} new`)}${k('Depositado',esc(money(L.reduce((a,f)=>a+(+f.amount||0),0))),'USD')}${k('Conversión',cv.rate==null?'—':esc(pct(cv.rate)),`${plural(cv.ftd,'FTD')} de ${plural(cv.leads,'cliente new','clientes new')}`)}
+        ${k('Días con ventas',dias,`de ${plural(mesaMes(ym).pas,'día hábil','días hábiles')}`)}${k('Faltas',fal.length,fal.length?fal.map(x=>`${dm(x.d)}${x.j?' (just.)':''}`).join(', '):'ninguna este mes')}${k('Hoy',L.filter(f=>f.date===te).length,esc(turnoHoy(uid).txt))}</div>
+        <div class="pf-ch"><div class="lb">FTDs por día <span class="pf-lg"><span class="sw"></span>new <span class="sw s2"></span>late</span></div><div id="fiChart"></div></div>
+        <div class="fi-acts"><button type="button" class="btn sm" data-fi="ventas">Ver sus ventas</button></div>`;
+      const [Y,M]=ym.split('-').map(Number),n=new Date(Y,M,0).getDate(),data=[];
+      for(let d=1;d<=n;d++){const k2=`${ym}-${z(d)}`,l=L.filter(f=>f.date===k2),dw=new Date(Y,M-1,d).getDay();data.push({lab:String(d),d,dw,a:l.filter(f=>!isLate(f)).length,b:l.filter(isLate).length,m:l.reduce((s,f)=>s+(+f.amount||0),0),labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
+      colChart(api.q('#fiChart'),data,{h:150,int:true,minTop:3,capMin:14,label:'FTDs por día',empty:'Sin FTDs este mes.',
+        tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD'}]})});
+    }else if(t==='agenda'){
+      const now=new Date(),A=agOf(uid),open=A.filter(p=>!p.done).sort(byDue),hechos=A.filter(p=>p.done&&p.doneAt&&p.doneAt.slice(0,7)===ym).length;
+      const it=p=>{const d=parseDue(p.due),v=d<=now;return `<div class="fi-it${v?' hot':''}"><span class="wh">${esc(whenTxt(d))}</span><b>${esc(p.id)}</b><span class="dim">${esc(p.kw)}</span>${v?'<span class="badge bad">vencido</span>':''}</div>`};
+      el.innerHTML=`<p class="p-sub">${plural(open.length,'contacto pendiente','contactos pendientes')} · ${plural(open.filter(p=>parseDue(p.due)<=now).length,'vencido')} · ${plural(hechos,'hecho')} este mes</p>`+
+        (open.length?`<div class="fi-list">${open.slice(0,60).map(it).join('')}</div>`:'<div class="p-empty">Nada pendiente.</div>');
+    }else if(t==='turnos'){
+      const rows=Object.values(sh).filter(x=>x.date&&x.date.slice(0,7)===ym&&x.in).sort((a,b)=>a.date<b.date?1:-1);
+      const tot=rows.reduce((a,x)=>a+((x.out||(x.date===te?Date.now():x.in))-x.in),0);
+      el.innerHTML=`<p class="p-sub">${plural(rows.length,'día trabajado','días trabajados')} este mes · ${esc(dur(tot))} en total</p>`+(rows.length?`<table class="pt"><thead><tr><th>Día</th><th>Entrada</th><th>Salida</th><th class="r">Horas</th><th class="r">Descansos</th></tr></thead><tbody>${rows.map(x=>{
+        const end=x.out||(x.date===te?Date.now():null),br=x.breaks||[],bm=br.reduce((a,b)=>a+((b.e||end||b.s)-b.s),0);
+        return `<tr><td>${esc(DIA[parseYMD(x.date).getDay()])} ${dm(x.date)}</td><td>${hhmm(x.in)}</td><td>${x.out?hhmm(x.out):x.date===te?'<span class="ok">en turno</span>':'—'}</td><td class="r">${end?esc(durS(end-x.in)):'—'}</td><td class="r">${br.length?`${br.length} · ${esc(dur(bm))}`:'—'}</td></tr>`}).join('')}</tbody></table>`:'<div class="p-empty">Sin turnos marcados este mes.</div>');
+    }else if(t==='clientes'){
+      const C=leads.filter(l=>l.uid===uid&&l.date.slice(0,7)===ym).sort((a,b)=>a.date<b.date?1:-1),hoy=C.filter(l=>l.date===te).length,cv=convPeriod(te,te,uid);
+      el.innerHTML=`<p class="p-sub">${plural(C.length,'cliente new','clientes new')} este mes · ${hoy} hoy${cv.rate!=null?` · conversión de hoy ${pct(cv.rate)}`:''}</p>`+
+        (C.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th></tr></thead><tbody>${C.slice(0,80).map(l=>`<tr><td>${dm(l.date)}</td><td><b>${esc(l.id)}</b></td><td>${esc(l.name)}</td><td>${esc(l.country)}</td></tr>`).join('')}</tbody></table>`:'<div class="p-empty">Sin clientes new este mes.</div>');
+    }else if(t==='tareas'){
+      const rows=taskPeople.filter(p=>p.user_id===uid).map(p=>({p,t:taskOf(p.task_id)})).filter(x=>x.t).sort((a,b)=>(!!a.p.done_at-!!b.p.done_at)||b.t.t-a.t.t);
+      el.innerHTML=rows.length?`<div class="fi-list">${rows.slice(0,40).map(({p,t})=>`<div class="fi-it"><span class="wh">${esc(tkWhen(t.at))}</span><b>${esc(clip(taskTxt(t),90))}</b>${p.done_at?`<span class="badge">hecha ${esc(tkWhen(p.done_at))}</span>`:`<span class="badge bad">pendiente</span>`}</div>`).join('')}</div>`:'<div class="p-empty">No tiene tareas.</div>';
+    }
+  };
+  const tabs=[['mes','Mes'],['agenda','Agenda'],['turnos','Turnos'],['clientes','Clientes'],['tareas','Tareas']];
+  modal({title:'Ficha',wide:true,body:`<div class="pf"><div class="pf-h">${avatar(m.name,'xl')}<div><h2>${esc(m.name)}</h2><p>${esc(roleTxt(m.role))} · ${esc(mLong(ym))} · ${esc(turnoHoy(uid).txt)}</p></div></div>
+      <span class="seg fi-tabs" id="fiTabs">${tabs.map(([k,l])=>`<button type="button" data-t="${k}">${l}</button>`).join('')}</span><div id="fiBody" class="fi-body"></div>
+      <p class="note">El sueldo de cada uno es privado: acá no aparece.</p></div>`,
+    onOpen:api=>{draw(api,tab);api.box.addEventListener('click',e=>{const b=e.target.closest('#fiTabs [data-t]');if(b)return draw(api,b.dataset.t);
+      if(e.target.closest('[data-fi=ventas]')){api.close();go('ventas',{who:uid===me?'me':uid,f:{desde:ym,hasta:ym}})}})}});
+}
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.

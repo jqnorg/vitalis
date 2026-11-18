@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 14, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 15, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -405,6 +405,47 @@ r = await as(X, 'select id from public.tasks');
 ok(r.rows.length === 0, 'alguien de otra mesa no ve las tareas');
 r = await as(M, 'delete from public.tasks where id = $1 returning id', [T2]);
 ok(!r.error && r.rows.length === 1 && (await db.query('select count(*)::int c from public.task_people where task_id = $1', [T2])).rows[0].c === 0, 'quien la mandó la borra (y se va de todos)');
+
+// ---------- el team leader ve todo de la mesa menos el sueldo ----------
+await as(B, "insert into public.agenda (client_id, kw, due) values ('70001', 'kyc', '2026-11-18T10:00')");
+await as(B, "insert into public.shifts (date, data) values ('2026-11-18', '{\"in\": 1, \"breaks\": []}')");
+await as(B, "insert into public.adjustments (ym, n) values ('2026-11', 2)");
+await as(B, `insert into public.settings (cfg) values ('{"base": 40000, "hijos": 2, "faltas": [{"d": "2026-11-10", "j": false}], "laborables": [1,2,3,4,5]}') on conflict (user_id) do update set cfg = excluded.cfg`);
+r = await as(M, 'select client_id from public.agenda where user_id = $1', [B]);
+ok(r.rows.length === 1, 'el team leader ve la agenda de un agente');
+r = await as(M, 'select date from public.shifts where user_id = $1', [B]);
+ok(r.rows.length === 1, 'y sus turnos');
+r = await as(M, 'select n from public.adjustments where user_id = $1', [B]);
+ok(r.rows.length === 1 && r.rows[0].n === 2, 'y sus "sin detalle"');
+r = await as(M, 'select cfg from public.settings where user_id = $1', [B]);
+ok(r.rows.length === 0, 'pero no sus datos de sueldo');
+R = await as(M, 'select user_id, faltas, laborables from public.team_days() where user_id = $1', [B]);
+ok(R.rows.length === 1 && R.rows[0].faltas.length === 1 && !('base' in R.rows[0]), 've sus faltas y días laborables (sin el sueldo)');
+r = await as(B, 'select * from public.team_days()');
+ok(r.rows.length === 0, 'un agente no ve los días de los demás');
+r = await as(Dh, 'select client_id from public.agenda where user_id = $1', [B]);
+ok(r.rows.length === 0, 'un agente no ve la agenda de otro');
+r = await as(Dh, 'select date from public.shifts where user_id = $1', [B]);
+ok(r.rows.length === 0, 'ni sus turnos');
+r = await as(M, "update public.agenda set kw = 'tocado' where user_id = $1 returning id", [B]);
+ok(!r.error && r.rows.length === 0, 'el team leader no le cambia la agenda (solo mira)');
+r = await as(M, 'delete from public.shifts where user_id = $1 returning date', [B]);
+ok(!r.error && r.rows.length === 0, 'ni le borra turnos');
+r = await as(X, 'select client_id from public.agenda');
+ok(r.rows.length === 0, 'alguien de otra mesa no ve agendas');
+// target del mes
+r = await as(B, "insert into public.targets (ym, ftds) values ('2026-11', 400)");
+ok(!!r.error, 'un agente no fija el target');
+r = await as(M, "insert into public.targets (ym, ftds) values ('2026-11', 400) on conflict (team_id, ym) do update set ftds = excluded.ftds returning ftds");
+ok(!r.error && r.rows[0].ftds === 400, 'el team leader fija el target del mes');
+r = await as(M, "insert into public.targets (ym, ftds) values ('2026-11', 450) on conflict (team_id, ym) do update set ftds = excluded.ftds returning ftds");
+ok(!r.error && r.rows[0].ftds === 450, 'y lo cambia');
+r = await as(B, "select ftds from public.targets where ym = '2026-11'");
+ok(r.rows.length === 1 && r.rows[0].ftds === 450, 'todos lo ven');
+r = await as(X, 'select * from public.targets');
+ok(r.rows.length === 0, 'otra mesa no');
+r = await as(M, "insert into public.targets (ym, ftds) values ('nov', 10)");
+ok(!!r.error, 'el mes va como AAAA-MM');
 
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);

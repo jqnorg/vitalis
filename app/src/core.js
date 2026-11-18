@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.5.0';
+const VERSION='1.6.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -261,6 +261,7 @@ async function loadAll(){
     QO(sb.from('messages').select('*').gte('created_at',new Date(Date.now()-7*864e5).toISOString()).order('created_at',{ascending:false}).limit(1500)),
     QO(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),
     QO(sb.from('task_people').select('*').limit(5000)),
+    loadMesa().catch(()=>{}),
   ]);
   chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
@@ -277,7 +278,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -348,8 +349,11 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       if(p.new.team_id!==profile.team_id)return;
       const t=T2X(p.new),ex=taskOf(t._id);if(ex)Object.assign(ex,t);else tasks.unshift(t);refresh();
     })
-    .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})})
-    .subscribe(st=>{
+    .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})});
+  if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p)); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
+  // el team leader ve en vivo la agenda, los turnos y los FTDs sin detalle de todos
+  if(isLeader())for(const t of ['agenda','shifts','adjustments'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},p=>mesaLive(t,p));
+  chan.subscribe(st=>{
       if(gen!==rtGen)return;
       if(st==='SUBSCRIBED'){clearTimeout(rtWd);const again=rtEver;rtOk=true;rtEver=true;if(again)catchUp(true);return}
       rtOk=false;catchUp(true); // CHANNEL_ERROR, TIMED_OUT, CLOSED: me pongo al día y, si no vuelve solo, me vuelvo a suscribir
