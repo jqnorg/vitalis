@@ -298,6 +298,43 @@ R = await rpc(B, 'select public.chat_leave($1) j', [G]);
 ok(R.ok, 'B sale del grupo');
 r = await as(B, 'select id from public.messages where chat_id = $1', [G]);
 ok(r.rows.length === 0, 'B ya no lo lee');
+// desvinculados desde el CRM
+{
+  let R2 = await rpc(B, 'select public.add_former($1) j', ['Gonzalo Perez']);
+  ok(!!R2.error, 'un agente no crea desvinculados');
+  R2 = await rpc(M, 'select public.add_former($1) j', ['  Gonzalo   Perez ']);
+  ok(R2.ok && R2.new, 'el team leader crea un desvinculado (Gonzalo Perez)');
+  const GP = R2.id;
+  let q = await db.query('select name, active, former, crm_name, login is not null l from public.profiles where id = $1', [GP]);
+  ok(q.rows[0].name === 'Gonzalo Perez' && !q.rows[0].active && q.rows[0].former && q.rows[0].crm_name === 'Gonzalo Perez', 'queda dado de baja, marcado como desvinculado y con su nombre en el CRM');
+  R2 = await rpc(M, 'select public.add_former($1) j', ['gonzalo perez']);
+  ok(R2.ok && !R2.new && R2.id === GP, 'si ya existe, no lo repite');
+  R2 = await rpc(M, 'select public.add_former($1) j', ['Matias Me']);
+  ok(R2.ok && !R2.new && R2.id === M, 'si es alguien de la mesa, devuelve a esa persona');
+  R2 = await rpc(M, "select public.add_formers(array['Gonzalo Perez','Lucia Diaz','x']) j");
+  ok(Array.isArray(R2) && R2[0].id === GP && !R2[0].new && R2[1].new && R2[2].error, 'de a varios: reusa, crea y avisa los nombres inválidos');
+  R2 = await rpc(B, "select public.add_formers(array['Otro Mas']) j");
+  ok(!!R2.error, 'un agente no crea de a varios');
+  R2 = await rpc(null, 'select public.roster() j');
+  ok(!R2.people.some((p) => p.id === GP), 'no aparece en la lista para entrar');
+  R2 = await rpc(null, `select public.pin_login('${GP}', '0000') j`);
+  ok(!!R2.error || !R2.ok, 'y no puede entrar');
+  q = await as(M, 'insert into public.sales (user_id, n, date, client_id, amount, brand) values ($1, 1, $2, $3, 100, $4), ($1, 2, $2, $5, 120, $4) returning id', [GP, '2025-03-10', 'F-1', 'Trade24Seven', 'F-2']);
+  ok(!q.error && q.rows.length === 2, 'el team leader le carga ventas');
+  q = await as(B, 'update public.profiles set former = true where id = $1', [B]);
+  ok(!!q.error, 'nadie se cambia la marca de desvinculado');
+  R2 = await rpc(B, `select public.merge_former('${GP}', '${B}') j`);
+  ok(!!R2.error, 'un agente no une desvinculados');
+  R2 = await rpc(M, `select public.merge_former('${A}', '${B}') j`);
+  ok(!!R2.error, 'solo se unen desvinculados del CRM (no a alguien de la mesa)');
+  const nB = (await db.query('select coalesce(max(n),0)::int m from public.sales where user_id = $1', [B])).rows[0].m;
+  R2 = await rpc(M, `select public.merge_former('${GP}', '${B}') j`);
+  ok(R2.ok && R2.moved === 2, 'era B: el team leader los une');
+  q = await db.query("select user_id, n from public.sales where client_id in ('F-1','F-2') order by n");
+  ok(q.rows.every((r) => r.user_id === B) && q.rows[0].n === nB + 1 && q.rows[1].n === nB + 2, 'las ventas pasan a B con números nuevos');
+  q = await db.query('select count(*)::int c from public.profiles where id = $1', [GP]);
+  ok(q.rows[0].c === 0 && (await db.query('select crm_name from public.profiles where id = $1', [B])).rows[0].crm_name, 'el desvinculado se borra y B queda con ese nombre en el CRM');
+}
 // foto de perfil
 {
   const PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

@@ -122,7 +122,7 @@ V.ventas={
   whoSelect(){
     const sel=$('#pWho');if(sel===document.activeElement)return;
     const ms=members.filter(m=>m.id!==me&&(m.active||team.some(f=>f.uid===m.id)));
-    sel.innerHTML=`<option value="me">Yo</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.active?'':' (baja)'}</option>`).join('');
+    sel.innerHTML=`<option value="me">Yo</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}${m.active?'':' (desvinculado)'}</option>`).join('');
     if(![...sel.options].some(o=>o.value===pWho))pWho='me';
     sel.value=pWho;
   },
@@ -558,7 +558,7 @@ V.equipo={
     const act=sellers(list); // agentes: el team leader no cuenta (salvo que venda)
     const [ya,ma]=eqYm.split('-').map(Number),mFrom=eqYm+'-01',mTo=ymd(new Date(ya,ma,0));
     const per=act.map(m=>{const l=list.filter(f=>f.uid===m.id);return {m,n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:l.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null),cv:convPeriod(mFrom,mTo,m.id)}});
-    for(const uid of new Set(list.map(f=>f.uid)))if(!per.some(p=>p.m.id===uid)){const l=list.filter(f=>f.uid===uid);per.push({m:{id:uid,name:memberName(uid)+' (baja)'},n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:null,cv:convPeriod(mFrom,mTo,uid)})}
+    for(const uid of new Set(list.map(f=>f.uid)))if(!per.some(p=>p.m.id===uid)){const l=list.filter(f=>f.uid===uid);per.push({m:{id:uid,name:memberName(uid)+' (desvinculado)'},n:l.length,late:l.filter(isLate).length,monto:l.reduce((a,f)=>a+(+f.amount||0),0),last:null,cv:convPeriod(mFrom,mTo,uid)})}
     per.sort((a,b)=>b.n-a.n||b.monto-a.monto||a.m.name.localeCompare(b.m.name));
     const conV=per.filter(p=>p.n).length;
     $('#eqSub').textContent=`${teamInfo?teamInfo.name:''} · ${plural(act.length,'agente')}`;
@@ -621,7 +621,7 @@ V.cuenta={
     if(!isLeader())return;
     const adm=isAdmin();$('#cfAddM').hidden=!adm;
     $('#cfTeamName').textContent=teamInfo.name;
-    const list=[...members].sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name));
+    const list=members.filter(m=>!m.former).sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name)),fm=members.filter(m=>m.former).sort((a,b)=>a.name.localeCompare(b.name));
     const crmIn=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.crm;if(crmIn)return; // no pisar lo que estás escribiendo
     $('#cfMembers').innerHTML=`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Nombre</th><th>Nombre en el CRM</th><th>Rol</th><th>PIN</th><th class="r">FTDs</th>${adm?'<th class="act"></th>':''}</tr></thead><tbody>`+
       list.map(m=>`<tr${m.active?'':' class="warn"'}><td><span class="who-cell">${avatar(m.name)}${esc(m.name)}${m.id===me?' <span class="dim">(vos)</span>':''}</span></td>
@@ -630,6 +630,10 @@ V.cuenta={
         <td>${!m.login?'<span class="d">Cuenta vieja (email)</span>':m.pin_set?'<span class="badge paid">Creado</span>':'<span class="badge">0000, sin entrar</span>'}</td>
         <td class="r">${team.filter(f=>f.uid===m.id).length}</td>
         ${adm?`<td class="act">${m.login&&m.active&&m.id!==me&&m.pin_set?`<button type="button" class="ib" data-mact="pin" data-id="${esc(m.id)}">Resetear PIN</button>`:''}${m.id===me?'':`<button type="button" class="ib${m.active?' del':''}" data-mact="baja" data-id="${esc(m.id)}">${m.active?'Dar de baja':'Reactivar'}</button>`}</td>`:''}</tr>`).join('')+'</tbody></table></div>';
+    $('#cfFormers').hidden=!fm.length;
+    if(fm.length)$('#cfFormers').innerHTML=`<div class="card-h" style="margin:18px 0 8px"><h3>Desvinculados</h3><span class="p-sub">${plural(fm.length,'persona')} del CRM que ya no está en la mesa · ${plural(team.filter(f=>fm.some(m=>m.id===f.uid)).length,'venta')}</span><span class="grow"></span><button type="button" class="btn sm" data-act="formers">¿Alguno es de la mesa?</button></div>
+      <div class="p-tablewrap"><table class="pt"><thead><tr><th>Nombre</th><th>En el CRM</th><th class="r">FTDs</th><th>Última venta</th></tr></thead><tbody>${fm.map(m=>{const L=team.filter(f=>f.uid===m.id),l=L.reduce((a,f)=>!a||f.date>a.date?f:a,null);
+        return `<tr><td><button type="button" class="who-cell lnkp" data-prof="${esc(m.id)}">${avatar(m.name)}${esc(m.name)}</button></td><td class="d">${esc(m.crm_name||'')}</td><td class="r">${L.length}</td><td class="d">${l?esc(dm(l.date)+'/'+l.date.slice(2,4)):''}</td></tr>`}).join('')}</tbody></table></div>`;
   },
 };
 function pinModal(){

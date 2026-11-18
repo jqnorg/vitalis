@@ -25,6 +25,7 @@ create table if not exists public.profiles (
 );
 alter table public.profiles add column if not exists login text unique;                    -- cuenta interna para entrar con PIN
 alter table public.profiles add column if not exists pin_set boolean not null default false; -- ya cambió el 0000
+alter table public.profiles add column if not exists former boolean not null default false;  -- desvinculado: se creó al cargar ventas del CRM de alguien que ya no está
 
 -- PIN de cada uno (solo lo tocan las funciones de abajo: nadie lo puede leer desde la app)
 create table if not exists public.pins (
@@ -408,11 +409,68 @@ begin
   return json_build_object('ok', true);
 end $$;
 
+-- team leader / admin: alguien del CRM que ya no está en la mesa → queda como desvinculado (no entra, no figura en la lista)
+-- y sus ventas cuentan para la mesa. Si ya existe (por nombre o por nombre en el CRM), devuelve ese.
+create or replace function public.add_former(nm text) returns json
+  language plpgsql security definer set search_path = public, extensions as $$
+declare uid uuid; t uuid := public.my_team(); crm text;
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  crm := left(regexp_replace(btrim(coalesce(nm, '')), '\s+', ' ', 'g'), 80);
+  nm := btrim(left(crm, 40));
+  if nm !~ '[[:alpha:]].*[[:alpha:]]' then raise exception 'NAME: nombre inválido'; end if;
+  select id into uid from public.profiles
+   where team_id = t and (lower(name) = lower(nm) or lower(crm_name) = lower(crm)) order by active desc, created_at limit 1;
+  if uid is not null then return json_build_object('ok', true, 'id', uid, 'new', false); end if;
+  if (select count(*) from public.profiles where team_id = t and former and created_at > now() - interval '1 hour') >= 300 then
+    raise exception 'SLOW: demasiados desvinculados nuevos, esperá un rato';
+  end if;
+  uid := public._new_seat(t, nm, 'agent');
+  update public.profiles set active = false, former = true, crm_name = crm where id = uid;
+  return json_build_object('ok', true, 'id', uid, 'new', true);
+end $$;
+
+-- varios de una (una carga grande desde el CRM)
+create or replace function public.add_formers(nms text[]) returns json
+  language plpgsql security definer set search_path = public as $$
+declare n text; r json; out json[] := '{}';
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  if coalesce(array_length(nms, 1), 0) > 300 then raise exception 'MANY: hasta 300 por vez'; end if;
+  foreach n in array coalesce(nms, '{}') loop
+    begin r := public.add_former(n); out := out || jsonb_build_object('name', n, 'id', r->>'id', 'new', (r->>'new')::boolean)::json;
+    exception when others then out := out || jsonb_build_object('name', n, 'error', sqlerrm)::json; end;
+  end loop;
+  return coalesce(array_to_json(out), '[]'::json);
+end $$;
+
+-- era alguien de la mesa: sus ventas pasan a esa persona (con números nuevos) y el desvinculado se borra
+create or replace function public.merge_former(src uuid, dst uuid) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); nxt integer; moved integer; c text;
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  if not exists (select 1 from public.profiles where id = src and team_id = t and former and not pin_set) then
+    raise exception 'FORMER: solo se pueden unir desvinculados que se crearon desde el CRM';
+  end if;
+  if src = dst or not exists (select 1 from public.profiles where id = dst and team_id = t) then raise exception 'NO_MEMBER: elegí a alguien de la mesa'; end if;
+  select coalesce(max(n), 0) into nxt from public.sales where user_id = dst;
+  with s as (select id, row_number() over (order by date, time, created_at) rn from public.sales where user_id = src)
+  update public.sales x set user_id = dst, n = nxt + s.rn from s where x.id = s.id;
+  get diagnostics moved = row_count;
+  select crm_name into c from public.profiles where id = src;
+  update public.profiles set crm_name = coalesce(crm_name, c) where id = dst;
+  delete from auth.users where id = src; -- la cuenta vacía (y su perfil)
+  return json_build_object('ok', true, 'moved', moved);
+end $$;
+
 revoke all on function public.roster(), public.pin_login(uuid, text), public.set_pin(text, text),
   public.reset_pin(uuid), public.add_member(text, text), public.in_my_team(uuid), public.set_crm_name(uuid, text) from public;
 grant execute on function public.roster(), public.pin_login(uuid, text) to anon, authenticated;
 grant execute on function public.set_pin(text, text), public.reset_pin(uuid), public.add_member(text, text),
   public.in_my_team(uuid), public.set_crm_name(uuid, text) to authenticated;
+revoke all on function public.add_former(text), public.add_formers(text[]), public.merge_former(uuid, uuid) from public, anon;
+grant execute on function public.add_former(text), public.add_formers(text[]), public.merge_former(uuid, uuid) to authenticated;
 revoke execute on function public.set_pin(text, text), public.reset_pin(uuid), public.add_member(text, text),
   public.in_my_team(uuid), public.set_crm_name(uuid, text) from anon;
 
@@ -687,7 +745,7 @@ create or replace function public.guard_profile() returns trigger
   language plpgsql set search_path = public as $$
 begin
   if current_user not in ('authenticated', 'anon') then return new; end if;
-  if new.login is distinct from old.login or new.pin_set is distinct from old.pin_set or new.id is distinct from old.id then
+  if new.login is distinct from old.login or new.pin_set is distinct from old.pin_set or new.id is distinct from old.id or new.former is distinct from old.former then
     raise exception 'Eso no se puede cambiar desde la app';
   end if;
   if (new.role is distinct from old.role or new.team_id is distinct from old.team_id or new.active is distinct from old.active)

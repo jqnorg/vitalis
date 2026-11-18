@@ -100,6 +100,37 @@ async function borrarFtd(f){
 
 /* ---------- team leader: cargar ventas de la mesa ---------- */
 // list: ventas con .uid (vendedor) o sin uid y con .agent (nombre en el CRM que no se pudo emparejar)
+/* ---------- desvinculados: gente del CRM que ya no está en la mesa ---------- */
+const NOREP=/^(-+|n\/?a|none|null|undefined|sin asignar|no asignado|unassigned|system|sistema|admin)$/i;
+const repName=n=>{n=String(n||'').replace(/\s+/g,' ').trim();return n&&!NOREP.test(n)&&/[a-zà-ÿ].*[a-zà-ÿ]/i.test(n)?n:''};
+async function ensureFormers(rows){ // crea (o encuentra) a cada uno y le pasa sus ventas
+  const names=[...new Set(rows.filter(x=>!x.uid&&repName(x.agent)).map(x=>repName(x.agent)))].slice(0,300),nuevos=[];
+  if(!names.length)return nuevos;
+  const {data,error}=await sb.rpc('add_formers',{nms:names}); // todos de una
+  if(error){if(/add_former|PGRST202|42883/.test(String(error.message||error.code)))toast('Los desvinculados se activan en un rato (falta actualizar la base).','warn');else toast(esc(errMsg(error)),'err');return nuevos}
+  for(const r of data||[])if(r&&r.id){for(const x of rows)if(!x.uid&&repName(x.agent)===r.name)x.uid=r.id;if(r.new)nuevos.push(r.id)}
+  if(names.length)try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'))}catch(e){}
+  return nuevos;
+}
+function formersToast(ids,rows){
+  const L=ids.map(id=>`<b>${esc(memberName(id))}</b> (${rows.filter(x=>x.uid===id).length})`);
+  toast(`${ids.length===1?'Nuevo desvinculado':'Nuevos desvinculados'}: ${L.slice(0,8).join(', ')}${L.length>8?` y ${L.length-8} más`:''}. Sus ventas cuentan para la mesa.`,'ok',{sticky:1,key:'formers',actions:[{l:'¿Alguno es de la mesa?',fn:()=>formersModal(ids)}]});
+}
+function formersModal(ids){ // un desvinculado que en realidad es alguien de la mesa: se unen sus ventas
+  const F=members.filter(m=>m.former&&(!ids||ids.includes(m.id))).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!F.length)return toast('No hay desvinculados para revisar.');
+  const opts=members.filter(m=>m.active).sort((a,b)=>a.name.localeCompare(b.name)).map(m=>`<option value="${esc(m.id)}">Es ${esc(m.name)}</option>`).join('');
+  modal({title:'Desvinculados',wide:1,body:`<p class="mp">Si alguno en realidad es alguien de la mesa (con otro nombre en el CRM), elegilo: sus ventas pasan a esa persona y queda guardado para la próxima.</p>
+    <div class="fm-list">${F.map(m=>`<label class="fm-row"><span class="who-cell">${avatar(m.name)}<span><b>${esc(m.name)}</b><small>${plural(team.filter(f=>f.uid===m.id).length,'venta')}${m.crm_name&&m.crm_name!==m.name?' · en el CRM: '+esc(m.crm_name):''}</small></span></span>
+      <select data-fm="${esc(m.id)}"><option value="">Desvinculado</option>${opts}</select></label>`).join('')}</div>`,
+    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
+      const pick=[...api.box.querySelectorAll('[data-fm]')].filter(s=>s.value).map(s=>[s.dataset.fm,s.value]);
+      if(!pick.length)return;
+      let n=0;for(const [src,dst] of pick){const r=await B.rpc('merge_former',{src,dst});if(r&&r.ok)n+=r.moved}
+      await reloadMembers();team=(await fetchAll('sales','*','date')).map(S2F);mine();refresh();
+      toast(`Listo: ${plural(n,'venta pasó','ventas pasaron')} a quien corresponde.`);
+    }}]});
+}
 async function addForSellers(list,src){
   const sin=list.filter(x=>!x.uid);
   const ok=list.filter(x=>x.uid);
@@ -371,7 +402,7 @@ function cleanExtRow(r){
   const o={date,time:/^\d{2}:\d{2}$/.test(s(r.time,5))?s(r.time,5):'',id:s(r.id,40),name:s(r.name),country:s(r.country,60),aff:s(r.aff,60),camp:s(r.camp),amount:Math.round(amount*100)/100,brand:s(r.brand,40)||DEF_BRAND};
   const tx=s(r.tx,60);if(tx)o.tx=tx;
   o.reg=/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(reg)&&reg.slice(0,10)<=date?reg:date;
-  if(ag)o.agent=ag;if(u)o.uid=u;
+  if(ag)o.agent=ag;if(u)o.uid=u;if(r.rep)o.rep=1;
   return o;
 }
 async function importFromExt(rows){
@@ -387,11 +418,13 @@ async function importFromExt(rows){
   }
   const mesOut=()=>{const s=calc(ymNow());return {n:s.n,usd:s.usd,next:s.next}};
   if(!nuevas.length)return {added:0,dup,bad,mes:mesOut()};
-  if(isLeader()&&nuevas.some(x=>(x.uid&&x.uid!==me)||x.agent)){ // team leader: cada venta a su vendedor
-    for(const x of nuevas)x.uid=x.uid&&members.some(m=>m.id===x.uid)?x.uid:x.agent?agentUid(x.agent):me;
+  if(isLeader()&&nuevas.some(x=>(x.uid&&x.uid!==me)||x.agent||x.rep)){ // team leader: cada venta a su vendedor
+    for(const x of nuevas){x.uid=x.uid&&members.some(m=>m.id===x.uid)?x.uid:x.agent?agentUid(x.agent):x.rep?null:me;delete x.rep}
+    const nuevos=await ensureFormers(nuevas); // los que ya no están en la mesa quedan como desvinculados
     const r=await addForSellers(nuevas,'desde el CRM');
     if(r.err)return r;
-    return {added:r.added,dup,bad,unmatched:r.unmatched,ids:nuevas.filter(x=>x.uid).map(f=>f.id),mes:mesOut()};
+    if(nuevos.length)formersToast(nuevos,nuevas);
+    return {added:r.added,dup,bad,unmatched:r.unmatched,formers:nuevos.length,ids:nuevas.filter(x=>x.uid).map(f=>f.id),mes:mesOut()};
   }
   let ajenas=0;
   if(nuevas.some(x=>x.agent)){const mias=nuevas.filter(x=>!x.agent||agentUid(x.agent)===me);ajenas=nuevas.length-mias.length;nuevas.length=0;nuevas.push(...mias)} // un agente: solo las suyas
@@ -481,7 +514,7 @@ function syncExt(){
   const sig=JSON.stringify(items)+'#'+known.ids.length+'#'+known.ids.join(',').length+'#'+known.txs.length+'#'+JSON.stringify(snips)+'#'+leadIds.length+'#'+profile.role+'#'+members.map(m=>m.id+(m.crm_name||'')+m.active).join(),beat=extOk&&Date.now()-extBeat>6e4;
   if(sig===extSig&&!beat)return;
   extSig=sig;extBeat=Date.now();
-  const desk={role:profile.role,me,members:members.filter(m=>m.active).map(m=>({id:m.id,name:m.name,crm:m.crm_name||''}))}; // para el botón del CRM del team leader
+  const desk={role:profile.role,me,members:members.filter(m=>m.active||m.former).map(m=>({id:m.id,name:m.name,crm:m.crm_name||'',act:!!m.active}))}; // para el botón del CRM del team leader
   postTop({type:'ftd-agenda',v:1,items,known,snips,leadIds,desk,user:profile&&profile.name,sent:Date.now()});
 }
 window.addEventListener('message',e=>{
@@ -630,7 +663,7 @@ function ayuda(){
     <dt>Tu foto</dt><dd>En Ajustes → Mi cuenta (o tocando tu foto en tu perfil). Se recorta cuadrada y la ve toda la mesa.</dd>
     <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Vale también para el chat. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
   <h4>Team leader</h4><dl>
-    <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que no está en la mesa quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
+    <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que ya no está en la mesa entran a su nombre como <b>desvinculado</b> (cuentan para la mesa; en Ajustes se ven aparte y, si alguno era de la mesa con otro nombre, se une) y las que no tienen vendedor quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
   <h4>Equipo (team leader)</h4><dl>
     <dt>Target</dt><dd><b>Fijar target</b> (en Equipo o en el inicio): los FTDs que tiene que hacer la mesa en el mes. Lo ve toda la mesa.</dd>
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
@@ -665,7 +698,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),

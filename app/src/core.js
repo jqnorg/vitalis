@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.7.0';
+const VERSION='1.8.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -468,17 +468,18 @@ const byDate=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.time||'')<(b.time||'')?-
 const nextN=()=>ftds.reduce((a,f)=>Math.max(a,f.n||0),0)+1;
 const nextNFor=uid=>team.reduce((a,f)=>f.uid===uid?Math.max(a,f.n||0):a,0)+1; // numeración de cada vendedor
 const nn=s=>norm(s).replace(/[^a-z0-9]+/g,' ').trim();
-function agentUid(txt){ // nombre del agente en el CRM → persona de la mesa
+function agentUid(txt){ // nombre del agente en el CRM → persona de la mesa (primero los que están; después los desvinculados)
   const t=nn(txt);if(!t)return null;
-  const act=members.filter(m=>m.active);
-  let m=act.find(x=>x.crm_name&&nn(x.crm_name)===t)||act.find(x=>nn(x.name)===t);if(m)return m.id;
-  const one=l=>l.length===1?l[0].id:null;
-  // "Joaquín Or" en la lista y "Joaquin Ortega" en el CRM (o al revés)
-  let r=one(act.filter(x=>{const n=nn(x.name);return t.startsWith(n)||n.startsWith(t)}));if(r)return r;
-  // mismo nombre e inicial del apellido
-  const [f,l]=t.split(' ');
-  r=one(act.filter(x=>{const [a,b]=nn(x.name).split(' ');return a===f&&(!l||!b||b[0]===l[0])}));if(r)return r;
-  return one(act.filter(x=>nn(x.name).split(' ')[0]===f)); // solo el nombre, si no se repite
+  const pick=L=>{
+    const m=L.find(x=>x.crm_name&&nn(x.crm_name)===t)||L.find(x=>nn(x.name)===t);if(m)return m.id;
+    const F=L.filter(x=>!x.crm_name),one=l=>l.length===1?l[0].id:null; // al que ya tiene su nombre del CRM no se lo adivina
+    // "Joaquín Or" en la lista y "Joaquin Ortega" en el CRM (o al revés)
+    let r=one(F.filter(x=>{const n=nn(x.name);return t.startsWith(n)||n.startsWith(t)}));if(r)return r;
+    // mismo nombre e inicial del apellido (o solo el nombre, si el CRM muestra solo el nombre y no se repite)
+    const [f,l]=t.split(' ');
+    return one(F.filter(x=>{const [a,b]=nn(x.name).split(' ');return a===f&&(!l||!b||b[0]===l[0])}));
+  };
+  return pick(members.filter(m=>m.active))||pick(members.filter(m=>!m.active));
 }
 
 /* ---------- filtros y estadísticas ---------- */

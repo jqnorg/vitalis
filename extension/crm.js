@@ -236,16 +236,21 @@
 
   /* ================= de quién es cada venta (columna "Sales Rep" o similar) ================= */
   const nn = (x) => norm(x).replace(/[^a-z0-9]+/g, ' ').trim();
-  function repUid(txt) { // igual que en Vitalis: nombre en el CRM, nombre exacto, comienzo, nombre + inicial, solo nombre
-    const t = nn(txt), act = (desk && desk.members) || [];
-    if (!t || !act.length) return null;
-    const m = act.find((x) => x.crm && nn(x.crm) === t) || act.find((x) => nn(x.name) === t); if (m) return m.id;
-    const one = (l) => (l.length === 1 ? l[0].id : null);
-    let r = one(act.filter((x) => { const n = nn(x.name); return t.startsWith(n) || n.startsWith(t); })); if (r) return r;
-    const [f, l] = t.split(' ');
-    r = one(act.filter((x) => { const [a, b] = nn(x.name).split(' '); return a === f && (!l || !b || b[0] === l[0]); })); if (r) return r;
-    return one(act.filter((x) => nn(x.name).split(' ')[0] === f));
+  function repUid(txt) { // igual que en Vitalis: primero los que están en la mesa, después los desvinculados
+    const t = nn(txt), all = (desk && desk.members) || [];
+    if (!t || !all.length) return null;
+    const pick = (L) => {
+      const m = L.find((x) => x.crm && nn(x.crm) === t) || L.find((x) => nn(x.name) === t); if (m) return m.id;
+      const F = L.filter((x) => !x.crm), one = (l) => (l.length === 1 ? l[0].id : null); // al que ya tiene su nombre del CRM no se lo adivina
+      const r = one(F.filter((x) => { const n = nn(x.name); return t.startsWith(n) || n.startsWith(t); })); if (r) return r;
+      const [f, l] = t.split(' ');
+      return one(F.filter((x) => { const [a, b] = nn(x.name).split(' '); return a === f && (!l || !b || b[0] === l[0]); }));
+    };
+    return pick(all.filter((x) => x.act !== false)) || pick(all.filter((x) => x.act === false));
   }
+  // un nombre de verdad en la columna de vendedor (alguien que ya no está en la mesa → Vitalis lo suma como desvinculado)
+  const NOREP = /^(-+|n\/?a|none|null|undefined|sin asignar|no asignado|unassigned|system|sistema|admin)$/i;
+  const repName = (n) => { n = String(n || '').replace(/\s+/g, ' ').trim(); return n && !NOREP.test(n) && /[a-zà-ÿ].*[a-zà-ÿ]/i.test(n) ? n : ''; };
   const firstName = (uid) => { const m = desk && desk.members.find((x) => x.id === uid); return m ? m.name.split(/\s+/)[0] : ''; };
   // las que ya mandé solas en esta pestaña (para no repetir si Vitalis no las tomó)
   const tried = new Set((() => { try { return JSON.parse(sessionStorage.getItem('vitalis-auto') || '[]'); } catch (e) { return []; } })());
@@ -307,7 +312,7 @@
       const lead = isLeader(), hasCol = sales.some((s) => s.agent), mineOnly = !lead && hasCol && desk; // un agente que ve ventas de otros: solo las suyas
       const pool = mineOnly ? sales.filter((s) => repUid(s.agent) === desk.me) : sales;
       const n0 = pool.filter((s) => !isKnown(s)), espera = n0.filter(isQueued), nuevas = n0.filter((s) => !isQueued(s)), ya = pool.length - n0.length;
-      const sinV = lead && hasCol ? nuevas.filter((s) => !repUid(s.agent)) : [];
+      const sinV = lead && hasCol ? nuevas.filter((s) => !repUid(s.agent) && !repName(s.agent)) : [];
       head.push(`${plural(pool.length, mineOnly ? 'tuya' : 'aprobada', mineOnly ? 'tuyas' : 'aprobadas')}${known ? ` · ${ya} ya en Vitalis` : ''}`);
       const go = $('go');
       if (busy) { go.disabled = true; go.textContent = 'Enviando…'; }
@@ -319,12 +324,12 @@
       else { go.disabled = false; go.textContent = `Pasar ${plural(nuevas.length, 'venta nueva', 'ventas nuevas')} a Vitalis`; }
       const show = lead && hasCol ? sinV : nuevas;
       $('ids').innerHTML = lead && hasCol
-        ? `<span class="on">Se pasan solas a cada vendedor (columna ${escH(agentHead || 'Sales Rep')}).</span>` + (sinV.length ? `<br><span class="warn">No están en la mesa: ${[...new Set(sinV.map((s) => s.agent || 'sin nombre'))].slice(0, 6).map(escH).join(', ')}</span>` : '')
+        ? `<span class="on">Se pasan solas a cada vendedor (columna ${escH(agentHead || 'Sales Rep')}).</span>` + (sinV.length ? `<br><span class="warn">Sin vendedor: ${plural(sinV.length, 'venta')}</span>` : '') + (lead && hasCol ? '<br>Los que ya no están en la mesa entran como desvinculados.' : '')
         : show.length ? 'Nuevas: ' + show.slice(0, 12).map((s) => `<b>${escH(s.id)}</b>`).join(', ') + (show.length > 12 ? '…' : '') : '';
       // team leader sin columna de vendedor: elige de quién son (por defecto, de quien usa Vitalis)
       $('whoRow').hidden = !lead || hasCol;
       if (lead && !hasCol) {
-        const opts = [[desk.me, 'Yo'], ...desk.members.filter((m) => m.id !== desk.me).map((m) => [m.id, m.name])];
+        const opts = [[desk.me, 'Yo'], ...desk.members.filter((m) => m.id !== desk.me && m.act !== false).map((m) => [m.id, m.name])];
         if (!opts.some((o) => o[0] === whoSel)) whoSel = opts[0][0];
         const sel = $('who'), sig = opts.map((o) => o[0]).join();
         if (sel.dataset.sig !== sig) { sel.innerHTML = opts.map(([v, l]) => `<option value="${escH(v)}">${escH(l)}</option>`).join(''); sel.dataset.sig = sig; }
@@ -362,7 +367,7 @@
     clearTimeout(autoT);
     if (!sales || !isLeader() || !known || busy || !sales.some((s) => s.agent)) return;
     autoT = setTimeout(() => {
-      const rows = (scanSales(tables()) || []).filter((s) => s.agent && !isKnown(s) && !isQueued(s) && !tried.has(norm(s.brand) + '|' + norm(s.id)) && repUid(s.agent));
+      const rows = (scanSales(tables()) || []).filter((s) => s.agent && !isKnown(s) && !isQueued(s) && !tried.has(norm(s.brand) + '|' + norm(s.id)) && (repUid(s.agent) || repName(s.agent)));
       if (rows.length && !busy) sendSales(rows);
     }, 1500); // espero a que la tabla termine de cargar
   }
@@ -373,7 +378,8 @@
     if (res.queued) return setMsg(`${plural(res.queued, 'venta')} en espera: se cargan cuando abras Vitalis.<button class="lnk" data-open>Abrir Vitalis</button>`, 'warn');
     const mes = res.mes && !isLeader() ? ` Este mes: ${res.mes.n} FTDs, ${res.mes.usd} USD.` : '';
     const sin = res.unmatched ? ` ${plural(res.unmatched, 'quedó sin vendedor', 'quedaron sin vendedor')}: asignalas en Vitalis.` : '';
-    if (res.added) setMsg(`${res.added === 1 ? 'Pasé 1 venta' : 'Pasé ' + res.added + ' ventas'} a Vitalis.${mes}${sin}`, sin ? 'warn' : 'ok', 12000);
+    const fm = res.formers ? ` ${res.formers === 1 ? 'Sumé 1 desvinculado' : 'Sumé ' + res.formers + ' desvinculados'} (ya no están en la mesa).` : '';
+    if (res.added) setMsg(`${res.added === 1 ? 'Pasé 1 venta' : 'Pasé ' + res.added + ' ventas'} a Vitalis.${mes}${fm}${sin}`, sin ? 'warn' : 'ok', 12000);
     else setMsg(sin ? sin.trim() : `No había nada nuevo.${mes}`, sin ? 'warn' : 'ok', 8000);
   }
   async function sendSales(auto) {
@@ -385,6 +391,7 @@
     if (!nuevas.length) return refresh();
     busy = true; if (!Array.isArray(auto)) msg = null; render();
     if (isLeader() && !hasCol && whoSel) for (const s of nuevas) s.uid = whoSel; // sin columna de vendedor: a quien eligió
+    if (isLeader() && hasCol) for (const s of nuevas) s.rep = 1; // la tabla tiene columna de vendedor: si está vacía, queda para asignar
     if (Array.isArray(auto)) markTried(nuevas);
     const r = await send({ type: 'crm-import', rows: nuevas });
     result(r || { err: 'La extensión se actualizó: recargá la página.' });

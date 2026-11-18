@@ -268,7 +268,7 @@ async function crmImport(rows) {
   const tabs = await vitalisTabs();
   for (const t of tabs) {
     try {
-      const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'import', rows }), 10000);
+      const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'import', rows }), 60000); // muchas de una (toda la historia) pueden tardar
       if (r && !r.noPanel) return r;
     } catch (e) {}
   }

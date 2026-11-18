@@ -42,7 +42,7 @@
       return;
     }
     if (d.type === 'ftd-agenda-import-ack' && d.v === 1) {
-      const res = { added: d.added || 0, dup: d.dup || 0, bad: d.bad || 0, unmatched: d.unmatched || 0, ids: d.ids || [], mes: d.mes || null, err: d.err || null };
+      const res = { added: d.added || 0, dup: d.dup || 0, bad: d.bad || 0, unmatched: d.unmatched || 0, formers: d.formers || 0, ids: d.ids || [], mes: d.mes || null, err: d.err || null };
       if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }
       else if (String(d.reqId).startsWith('q')) { try { chrome.runtime.sendMessage({ type: 'import-done', res }); } catch (x) {} }
       return;
@@ -71,7 +71,7 @@
       .map((x) => ({ s: x.s, t: String(x.t || '').slice(0, 60), b: x.b.slice(0, 20000) })) : null;
     const leadIds = Array.isArray(d.leadIds) ? d.leadIds.slice(0, 50000).map(String) : null;
     const desk = d.desk && typeof d.desk === 'object' ? { role: String(d.desk.role || '').slice(0, 10), me: String(d.desk.me || '').slice(0, 40),
-      members: (Array.isArray(d.desk.members) ? d.desk.members : []).slice(0, 100).map((m) => ({ id: String(m.id || '').slice(0, 40), name: String(m.name || '').slice(0, 60), crm: String(m.crm || '').slice(0, 80) })) } : null;
+      members: (Array.isArray(d.desk.members) ? d.desk.members : []).slice(0, 600).map((m) => ({ id: String(m.id || '').slice(0, 40), name: String(m.name || '').slice(0, 60), crm: String(m.crm || '').slice(0, 80), act: m.act !== false })) } : null;
     try {
       chrome.runtime.sendMessage({ type: 'sync', items, known, snips, leadIds, desk, url: location.origin + location.pathname, user: String(d.user || '').slice(0, 60) }, (res) => {
         if (chrome.runtime.lastError) return;

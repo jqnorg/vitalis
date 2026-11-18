@@ -34,6 +34,8 @@ T24 = '''<!doctype html><meta charset="utf-8"><title>CRM · Bank transactions</t
 <tr><td>Approved</td><td>17/11/2026 11:20</td><td>777002</td><td>Diego Soto</td><td>Chile</td><td>300</td><td>TX777002</td><td>Mateo Herrera</td></tr>
 <tr><td>Approved</td><td>17/11/2026 12:05</td><td>777003</td><td>Rosa Paz</td><td>Mexico</td><td>200</td><td>TX777003</td><td>Fulano Externo</td></tr>
 <tr><td>Declined</td><td>17/11/2026 12:30</td><td>777004</td><td>Luis Mora</td><td>Peru</td><td>100</td><td>TX777004</td><td>Sofia Arias</td></tr>
+<tr><td>Approved</td><td>16/11/2026 15:40</td><td>777005</td><td>Ana Vera</td><td>Chile</td><td>150</td><td>TX777005</td><td>Mauricio Gomez</td></tr>
+<tr><td>Approved</td><td>16/11/2026 16:10</td><td>777006</td><td>Pedro Gil</td><td>Peru</td><td>120</td><td>TX777006</td><td></td></tr>
 </tbody></table></body>'''
 
 T24_SINREP = '''<!doctype html><meta charset="utf-8"><title>CRM · FTDs</title><body style="font:14px system-ui;padding:20px"><h3>FTDs</h3><button class="refresh-btn">⟳</button>
@@ -164,10 +166,13 @@ async def main():
             await G.goto('https://crmtrade24seven.com/#/bank-transactions'); await G.wait_for_timeout(3000)
             panel = G.locator('#ftd-crm-button')
             r = sql("select client_id, brand, (select name from public.profiles where id=user_id) who from public.sales where client_id like '7770%' order by client_id")
-            ok([(x['client_id'], x['who'], x['brand']) for x in r] == [('777001', 'Sofía Ar', 'Trade24Seven'), ('777002', 'Mateo He', 'Trade24Seven')], f'con la columna Sales Rep se pasan solas, cada una a su vendedor, sin tocar nada ({r})')
+            ok([(x['client_id'], x['who']) for x in r] == [('777001', 'Sofía Ar'), ('777002', 'Mateo He'), ('777003', 'Fulano Externo'), ('777005', 'Mauricio Gomez')], f'con la columna Sales Rep se pasan solas, cada una a su vendedor, sin tocar nada ({r})')
+            fm = sql("select name, active, former, crm_name from public.profiles where former order by name")
+            ok([(x['name'], x['active'], x['crm_name']) for x in fm] == [('Fulano Externo', False, 'Fulano Externo'), ('Mauricio Gomez', False, 'Mauricio Gomez')], f'los que no están en la mesa quedan como desvinculados (y Mauricio Gomez no es Mauricio Mo) ({fm})')
+            ok(await A2.locator('#toasts [data-key=formers]').count() == 1 and 'Fulano Externo' in await A2.inner_text('#toasts [data-key=formers]'), 'Vitalis avisa quiénes entraron como desvinculados')
             ok(not await panel.locator('#whoRow').is_visible(), 'con Sales Rep no hay "De" para elegir')
             t = await panel.locator('.box').inner_text()
-            ok('Se pasan solas' in t and 'Sales Rep' in t and 'Fulano Externo' in t, f'el panel lo dice y muestra quién no está en la mesa ({t!r})')
+            ok('Se pasan solas' in t and 'Sales Rep' in t and 'desvinculados' in t, f'el panel lo dice ({t!r})')
             ok('Asignar 1 venta sin vendedor' in await panel.locator('#go').inner_text(), 'la que no es de nadie de la mesa queda para asignar')
             await G.screenshot(path=OUT / 'x5_crm_leader.png')
             ok(sql("select count(*)::int c from public.sales where client_id='777004'")[0]['c'] == 0, 'las rechazadas no pasan')
@@ -178,8 +183,19 @@ async def main():
             matias = sql("select id from public.profiles where name='Matias Me'")[0]['id']
             await A2.click('#toasts [data-key=asignar] .btn'); await A2.wait_for_timeout(400)
             await A2.select_option('.mbox [data-an="0"]', matias); await A2.click('.mbox .mf .pri'); await A2.wait_for_timeout(1500)
+            r = sql("select (select name from public.profiles where id=user_id) who from public.sales where client_id='777006'")
+            ok(len(r) == 1 and r[0]['who'] == 'Matias Me', f'la que no tiene vendedor se asigna a mano desde Vitalis ({r})')
+            # un desvinculado que en realidad era alguien de la mesa: se unen
+            await A2.evaluate("go('config')"); await A2.wait_for_timeout(500)
+            ok('Fulano Externo' in await A2.inner_text('#cfFormers') and 'Fulano Externo' not in await A2.inner_text('#cfMembers'), 'en Ajustes los desvinculados van aparte')
+            await A2.screenshot(path=OUT / 'x5b_desvinculados.png', full_page=True)
+            await A2.click('#cfFormers [data-act=formers]'); await A2.wait_for_timeout(400)
+            dahi = sql("select id from public.profiles where name='Dahiana Le'")[0]['id']
+            fid = sql("select id from public.profiles where name='Fulano Externo'")[0]['id']
+            await A2.select_option(f'.mbox [data-fm="{fid}"]', dahi); await A2.click('.mbox .mf .pri'); await A2.wait_for_timeout(2000)
             r = sql("select (select name from public.profiles where id=user_id) who from public.sales where client_id='777003'")
-            ok(len(r) == 1 and r[0]['who'] == 'Matias Me', f'asignada a mano desde Vitalis ({r})')
+            ok(r and r[0]['who'] == 'Dahiana Le' and sql("select count(*)::int c from public.profiles where name='Fulano Externo'")[0]['c'] == 0, f'"era Dahiana": su venta pasa a ella y el desvinculado se borra ({r})')
+            ok(sql("select crm_name from public.profiles where name='Dahiana Le'")[0]['crm_name'] == 'Fulano Externo', 'y queda guardado para la próxima')
             # una tabla sin columna de vendedor: "De" aparece y por defecto es "Yo"
             G2 = await ctx.new_page()
             await G2.goto('https://crmtrade24seven.com/sinrep'); await G2.wait_for_timeout(3500)

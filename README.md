@@ -34,6 +34,7 @@ Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.
 - **Tiempo real:** todo llega por Supabase Realtime (con el latido en un worker para que no se frene en segundo plano). Si el canal se corta, la app se pone al día enseguida, sondea cada 5 s hasta que vuelve y se resuscribe; con la extensión, además, se despierta cada 30 s.
 - **Target y la mesa:** `targets` (FTDs del mes de la mesa; lo fija team leader o admin, lo leen todos). El inicio muestra lo tuyo (FTDs, bono, líquido) y la mesa (cuántos van, cuánto falta, por día hábil, ritmo y podio).
 - **Privado:** `settings` (sueldo, premios, días) y snippets propios. `adjustments`, `agenda` y `shifts` son de cada uno, pero el team leader y el admin los leen (políticas `lead_*`) y ven las faltas por `team_days()`: en Equipo, la ficha de cada persona con su mes, agenda, turnos, clientes y tareas, sin sueldo.
+- **Desvinculados:** las ventas del CRM de alguien que ya no está en la mesa se cargan a su nombre como desvinculado (`profiles.former`, inactivo, no entra). En Ajustes se ven aparte y, si alguno era de la mesa con otro nombre, se une (`merge_former`).
 - **Fotos de perfil:** `avatars` (una por persona; la ve toda la mesa, la sube y la saca cada uno desde Ajustes o su perfil).
 - **Imágenes del chat:** `chat_files` (se pegan, se arrastran o se eligen; la app las achica). Las ven solo los del chat.
 - **Menú:** por categorías (Inicio, Filtros, Ventas, Mi día, Mesa, Sueldo, Ajustes; teclas 1–7) con pestañas arriba.
