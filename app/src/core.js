@@ -14,8 +14,9 @@ const local={
 };
 const DEF={base:33500,porftd:20,bonos:[[10,80],[16,150],[21,250],[26,350],[31,450]],tc:0,hora:'09:00',sep:',',tema:'auto',
   fonasa:'nadie',hijos:0,comRecibo:true,bpc:6864,fondoSol:0,tcFecha:'',jornada:450,
-  laborables:[1,2,3,4,5],libres:['05-01','08-25'],faltas:[],inicio:'',sinFer:{no:true,lab:true}};
+  laborables:[1,2,3,4,5],libres:['05-01','08-25'],faltas:[],inicio:'',sinFer:{no:true,lab:true},premios:[],descFalta:0,faltaJust:true};
   // libres: 'MM-DD' todos los años · faltas: [{d:'YYYY-MM-DD',j:true}] · sinFer: feriados que no se cuentan (no laborables / laborables)
+  // premios: [{id,ym:'YYYY-MM',c:'concepto',m:monto,cur:'USD'|'UYU'}] · descFalta: UYU por falta (0 = el fijo ÷ 30) · faltaJust: las justificadas también descuentan
 let cfg={...DEF};
 let ftds=[];    // mis ventas: {_id,uid,n,date,time,id,country,name,aff,camp,amount,tx,reg,brand}
 let pend=[];    // {_id,n,id,kw,due:'YYYY-MM-DDTHH:MM',notified,done,doneAt}
@@ -425,11 +426,29 @@ function liquido(N){
   const irpf=Math.max(0,bruto-ded*tasaDed);
   return {N,rF,jub,fon,frl,aportes,base,bruto,ded,tasaDed,irpf,neto:N-aportes-irpf};
 }
-function sueldoPesos(s){ // null si falta el dólar y las comisiones van en el recibo
-  const tc=+cfg.tc||0;
-  if(cfg.comRecibo){if(!(tc>0))return null;const L=liquido(cfg.base+s.usd*tc);return {...L,tc,usdAparte:0,total:L.neto}}
-  const L=liquido(cfg.base);return {...L,tc,usdAparte:s.usd,total:tc>0?L.neto+s.usd*tc:null};
+// premios y faltas del mes: los premios van como las comisiones (en el recibo o aparte); cada falta descuenta del fijo
+function extrasMes(ym){
+  const pr=(cfg.premios||[]).filter(p=>p.ym===ym);
+  const usd=pr.filter(p=>p.cur!=='UYU').reduce((a,p)=>a+(+p.m||0),0),uyu=pr.filter(p=>p.cur==='UYU').reduce((a,p)=>a+(+p.m||0),0);
+  const fl=(cfg.faltas||[]).filter(x=>x.d.slice(0,7)===ym),cuentan=fl.filter(x=>cfg.faltaJust!==false||!x.j);
+  const porFalta=+cfg.descFalta>0?+cfg.descFalta:Math.round((+cfg.base||0)/30);
+  return {pr,usd,uyu,fl,nDesc:cuentan.length,porFalta,desc:Math.min(+cfg.base||0,cuentan.length*porFalta)};
 }
+function sueldoPesos(s){ // null si falta el dólar y hay dólares que van en el recibo
+  const tc=+cfg.tc||0,ex=extrasMes(s.ym||ymNow()),fijo=Math.max(0,(+cfg.base||0)-ex.desc);
+  if(cfg.comRecibo){const usd=s.usd+ex.usd;if(usd>0&&!(tc>0))return null;const L=liquido(fijo+usd*tc+ex.uyu);return {...L,tc,ex,fijo,usdAparte:0,uyuAparte:0,total:L.neto}}
+  const L=liquido(fijo),usdA=s.usd+ex.usd;
+  return {...L,tc,ex,fijo,usdAparte:usdA,uyuAparte:ex.uyu,total:usdA>0?(tc>0?L.neto+usdA*tc+ex.uyu:null):L.neto+ex.uyu};
+}
+function faltaErr(d){ // por qué no se puede cargar una falta ese día (o null)
+  if(!d)return 'Elegí la fecha de la falta.';
+  if(d>todayS())return 'Esa fecha todavía no llegó.';
+  if((cfg.faltas||[]).some(x=>x.d===d))return 'Esa falta ya está cargada.';
+  const r=noTrabajo(d);if(r==='finde')return 'Ese día no es laborable.';if(r==='feriado'||r==='libre')return 'Ese día ya no se cuenta.';
+  const n=ftds.filter(f=>f.date===d).length;if(n)return `Ese día tenés ${plural(n,'venta')}.`;
+  return null;
+}
+const parseNum=v=>{v=String(v||'').trim().replace(/\s|\$|usd|uyu/gi,'');if(v.includes(','))v=v.replace(/\./g,'').replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(v))v=v.replace(/\./g,'');const n=Number(v);return isFinite(n)?n:NaN};
 const tcTxt=()=>cfg.tc>0?`BROU compra ${nf(cfg.tc,2)}${cfg.tcFecha?' del '+dm(cfg.tcFecha):''}`:'sin cargar';
 const tcViejo=()=>cfg.tc>0&&cfg.tcFecha&&(parseYMD(todayS())-parseYMD(cfg.tcFecha))/864e5>=3;
 const progressTxt=s=>s.next?`faltan ${s.next[0]-s.n} para ${s.next[1]} USD`:(s.n?'bono máximo 🔥':'');

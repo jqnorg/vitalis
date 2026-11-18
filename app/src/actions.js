@@ -611,7 +611,7 @@ function ayuda(){
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciá un chat desde su encabezado; si te nombran con @tunombre, el aviso llega igual.</dd></dl>
   <h4>Filtros</h4><dl>
     <dt>Qué muestra</dt><dd>Con las ventas de toda la mesa en el período que elijas: campañas, afiliadores, países y combinaciones que más venden, si suben o bajan contra el período anterior y cuándo fue la última.</dd>
-    <dt>Registro</dt><dd>A cuántos días de registrarse depositan los clientes. "Para filtrar ahora" lo pasa a fechas: los registrados en esa franja son los que están por depositar.</dd>
+    <dt>Lates</dt><dd>Qué campañas y afiliadores convierten lates (clientes que se registraron otro día y depositaron después), y de cuántos FTDs de cada una.</dd>
     <dt>Usarlo</dt><dd>Tocá un valor para copiarlo y pegarlo en el filtro del CRM. El team leader lo puede mandar como tarea.</dd></dl>
   <h4>Tareas</h4><dl>
     <dt>Para hacer</dt><dd>Las que te manda el team leader (campañas, afiliadores, fechas y status). Tocá un valor para copiarlo y pegarlo en el filtro del CRM. Cuando la termines, <b>Marcar hecha</b>.</dd>

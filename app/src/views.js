@@ -301,6 +301,20 @@ V.turnos={
 let suYm='',siN=null;
 V.sueldo={
   build(){
+    $('#suEx').addEventListener('click',e=>{
+      const t=e.target;
+      if(t.closest('#suPrAdd')){const c=$('#suPrC').value.trim(),m=parseNum($('#suPrM').value),cur=$('#suPrU').value;
+        if(!(m>0))return toast('Poné el monto del premio.','err');
+        return this.saveEx({premios:[...(cfg.premios||[]),{id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),ym:suYm,c:c||'Premio',m:Math.round(m*100)/100,cur}]},`Premio sumado: ${cur==='UYU'?pesos(m)+' UYU':money(m)+' USD'}.`)}
+      const pr=t.closest('[data-prm]');if(pr)return this.saveEx({premios:(cfg.premios||[]).filter(p=>p.id!==pr.dataset.prm)},'Premio quitado.');
+      if(t.closest('#suFlAdd')){const d=$('#suFlD').value,er=faltaErr(d);if(er)return toast(esc(er),'err');
+        return this.saveEx({faltas:[...(cfg.faltas||[]),{d,j:$('#suFlJ').value==='1'}].sort((a,b)=>a.d<b.d?-1:1)},`Falta del ${dm(d)} cargada.`)}
+      const fl=t.closest('[data-fl]');if(fl)return this.saveEx({faltas:(cfg.faltas||[]).filter(x=>x.d!==fl.dataset.fl)},'Falta quitada.');
+    });
+    $('#suEx').addEventListener('change',e=>{
+      if(e.target.id==='suFlP'){const v=e.target.value.trim(),n=v?parseNum(v):0;if(v&&!(n>=0))return toast('Ese descuento no es un número.','err');this.saveEx({descFalta:n||0})}
+      if(e.target.id==='suFlJu')this.saveEx({faltaJust:e.target.checked});
+    });
     $('#suMes').addEventListener('change',e=>{suYm=e.target.value;this.render({})});
     const step=d=>{const o=[...$('#suMes').options].map(x=>x.value),i=o.indexOf(suYm);const j=i-d;if(j>=0&&j<o.length){suYm=o[j];this.render({})}};
     $('#suPrev').onclick=()=>step(-1);$('#suNext').onclick=()=>step(1);
@@ -328,7 +342,8 @@ V.sueldo={
     if(!suYm||!months.includes(suYm))suYm=now;
     $('#suMes').innerHTML=months.map(m=>`<option value="${m}"${m===suYm?' selected':''}>${esc(mLong(m))}</option>`).join('');
     const i=months.indexOf(suYm);$('#suPrev').disabled=i>=months.length-1;$('#suNext').disabled=i<=0;
-    const s=calc(suYm),P=sueldoPesos(s);
+    const s=calc(suYm),P=sueldoPesos(s),EX=extrasMes(suYm);
+    this.extras(suYm);
     $('#suNomSub').textContent=suYm===now?'Este mes':'';$('#suSub').textContent=mLong(suYm);
     $('#suNom').innerHTML=`<div class="rows">`+
       rw('FTDs',`<b>${s.n}</b>`,'big')+
@@ -338,8 +353,10 @@ V.sueldo={
       rw(`Por FTD (${s.n} × ${cfg.porftd} USD)`,`${money(s.porftd)} USD`)+
       rw(s.tier?`Bono (${s.tier}+ FTDs)`:'Bono',`${money(s.bono)} USD`)+
       rw('Variable',`${money(s.usd)} USD`,'tot hl')+
-      rw('Total nominal',`${pesos(cfg.base)} + ${money(s.usd)} USD`)+
-      (cfg.tc>0?rw('≈ en pesos',`${pesos(cfg.base+s.usd*cfg.tc)} UYU`):'')+
+      (EX.usd?rw('+ Premios',`${money(EX.usd)} USD`):'')+(EX.uyu?rw('+ Premios',`${pesos(EX.uyu)} UYU`):'')+
+      (EX.desc?rw(`− ${plural(EX.nDesc,'falta')} (× ${pesos(EX.porFalta)})`,`${pesos(EX.desc)} UYU`):'')+
+      rw('Total nominal',`${pesos(cfg.base-EX.desc+EX.uyu)} + ${money(s.usd+EX.usd)} USD`)+
+      (cfg.tc>0?rw('≈ en pesos',`${pesos(cfg.base-EX.desc+EX.uyu+(s.usd+EX.usd)*cfg.tc)} UYU`):'')+
       `</div>`+(s.monto?`<div class="note">${money(s.monto)} USD depositados por tus FTDs</div>`:'');
     $('#suLiqSub').textContent=P?(cfg.comRecibo?'Comisiones en el recibo':'Comisiones aparte'):'';
     $('#suLiq').innerHTML=!P?`<div class="p-empty">Falta el dólar BROU compra.<br><button type="button" class="btn sm wr" style="margin-top:8px" data-act="focusTc">Cargar dólar</button></div>`:
@@ -347,7 +364,8 @@ V.sueldo={
       rw('− Aporte jubilatorio 15%',pesos(P.jub))+rw(`− FONASA ${nf(P.rF*100,1).replace(',0','')}%`,pesos(P.fon))+rw('− FRL 0,1%',pesos(P.frl))+rw('− IRPF',pesos(P.irpf))+
       rw('Líquido',`${pesos(P.neto)} UYU`,'tot hl big')+
       (P.tc>0&&cfg.comRecibo?rw('≈ en dólares',`${money(Math.round(P.neto/P.tc))} USD`):'')+
-      (P.usdAparte?rw('+ Comisiones aparte',`${money(P.usdAparte)} USD`)+(P.total!=null?rw('≈ Total en mano',`${pesos(P.total)} UYU`,'tot hl'):''):'')+`</div>`;
+      (P.usdAparte?rw(EX.usd?'+ Comisiones y premios aparte':'+ Comisiones aparte',`${money(P.usdAparte)} USD`):'')+(P.uyuAparte?rw('+ Premios aparte',`${pesos(P.uyuAparte)} UYU`):'')+
+      (P.usdAparte||P.uyuAparte?(P.total!=null?rw('≈ Total en mano',`${pesos(P.total)} UYU`,'tot hl'):''):'')+`</div>`;
     // bonos
     $('#suBonoSub').textContent=s.next?`Faltan ${s.next[0]-s.n} para ${s.next[1]} USD`:s.n?'Bono máximo 🧉':'';
     const T=tiers();
@@ -361,6 +379,23 @@ V.sueldo={
     $('#siChips').innerHTML=[calc(now).n,...T.map(t=>t[0])].filter((v,i,a)=>a.indexOf(v)===i).map(n=>`<button type="button" class="chip" data-n="${n}">${n}${n===calc(now).n?' (hoy)':''}</button>`).join('');
     this.sim();
   },
+  extras(ym){ // premios y faltas del mes elegido (solo se redibuja si cambió algo, para no borrar lo que estás escribiendo)
+    const ex=extrasMes(ym),ro=readOnly,auto=Math.round((+cfg.base||0)/30),te=todayS();
+    const sig=JSON.stringify([ym,ex.pr,ex.fl,cfg.descFalta,cfg.faltaJust,cfg.base,ro]);const box=$('#suEx');if(box.dataset.sig===sig)return;box.dataset.sig=sig;
+    $('#suExSub').textContent=[ex.usd?`+ ${money(ex.usd)} USD`:'',ex.uyu?`+ ${pesos(ex.uyu)} UYU`:'',ex.desc?`− ${pesos(ex.desc)} UYU`:''].filter(Boolean).join(' · ');
+    const end=ym===te.slice(0,7)?te:addDays(ym+'-01',new Date(+ym.slice(0,4),+ym.slice(5,7),0).getDate()-1);
+    box.innerHTML=`<div class="g2 ex2">
+      <div><div class="ex-h">Premios</div>
+        ${ex.pr.length?`<div class="exl">${ex.pr.map(p=>`<div class="exi"><span>${esc(p.c||'Premio')}</span><b>+ ${p.cur==='UYU'?pesos(p.m)+' UYU':money(p.m)+' USD'}</b>${ro?'':`<button type="button" class="ib del" data-prm="${esc(p.id)}" aria-label="Quitar premio">✕</button>`}</div>`).join('')}</div>`:'<p class="p-sub">Sin premios este mes.</p>'}
+        ${ro?'':`<div class="frow wr exf"><input id="suPrC" maxlength="60" placeholder="Concepto (ej.: premio 5 FTDs en el día)" aria-label="Concepto del premio"><input id="suPrM" inputmode="decimal" placeholder="Monto" aria-label="Monto" class="exm"><select id="suPrU" aria-label="Moneda"><option>USD</option><option>UYU</option></select><button type="button" class="btn sm pri" id="suPrAdd">Sumar premio</button></div>`}
+        <p class="note">${cfg.comRecibo?'Van en el recibo, como las comisiones.':'Van aparte, como las comisiones.'}</p></div>
+      <div><div class="ex-h">Faltas</div>
+        ${ex.fl.length?`<div class="exl">${ex.fl.map(x=>`<div class="exi"><span>${DIA[parseYMD(x.d).getDay()]} ${dm(x.d)} · ${x.j?'justificada':'sin justificar'}</span><b>${cfg.faltaJust!==false||!x.j?'− '+pesos(ex.porFalta):'no descuenta'}</b>${ro?'':`<button type="button" class="ib del" data-fl="${x.d}" aria-label="Quitar falta">✕</button>`}</div>`).join('')}</div>`:'<p class="p-sub">Sin faltas este mes.</p>'}
+        ${ro?'':`<div class="frow wr exf"><input type="date" id="suFlD" min="${ym}-01" max="${end}" aria-label="Fecha de la falta"><select id="suFlJ" aria-label="Tipo de falta"><option value="0">Sin justificar</option><option value="1">Justificada</option></select><button type="button" class="btn sm" id="suFlAdd">Sumar falta</button></div>
+        <div class="frow wr exs"><label class="fld"><span>Descuento por falta (UYU)</span><input id="suFlP" inputmode="decimal" placeholder="${nf(auto,0)}" value="${+cfg.descFalta>0?nf(+cfg.descFalta,0):''}" class="exm"></label><label class="tog"><input type="checkbox" id="suFlJu"${cfg.faltaJust!==false?' checked':''}>Las justificadas también descuentan</label></div>`}
+        <p class="note">Si no ponés el descuento, cada falta descuenta el fijo ÷ 30 (${pesos(auto)} UYU). También se cargan en Ajustes → Días de trabajo.</p></div></div>`;
+  },
+  async saveEx(ch,msg){if(!noRO())return;cfg={...cfg,...ch};this.render({});if(await B.saveCfg()&&msg)toast(msg)},
   sim(){
     const n=siN,q=porCantidad(n),L=sueldoPesos(q),curS=calc(ymNow()),Lc=sueldoPesos(curS);
     $('#siR').max=Math.max(50,n);$('#siR').value=n;if($('#siN')!==document.activeElement||+$('#siN').value!==n)$('#siN').value=n;
@@ -405,12 +440,8 @@ V.config={
     $('#cfLibAdd').onclick=()=>{if(!noRO())return;const v=$('#cfLibD').value;if(!v)return toast('Elegí la fecha del feriado.','err');const md=v.slice(5),L=cfg.libres||[];
       if(L.includes(md))return toast('Ese feriado ya está.','warn');$('#cfLibD').value='';this.saveDias({libres:[...L,md].sort()})};
     $('#cfLibres').addEventListener('click',e=>{const c=e.target.closest('[data-lib]');if(!c||!noRO())return;this.saveDias({libres:(cfg.libres||[]).filter(x=>x!==c.dataset.lib)})});
-    $('#cfFalAdd').onclick=()=>{if(!noRO())return;const d=$('#cfFalD').value;if(!d)return toast('Elegí la fecha de la falta.','err');
-      if(d>todayS())return toast('Esa fecha todavía no llegó.','err');
-      const F=cfg.faltas||[];if(F.some(x=>x.d===d))return toast('Esa falta ya está cargada.','warn');
-      const r=noTrabajo(d);if(r==='finde')return toast('Ese día no es laborable.','warn');if(r==='feriado'||r==='libre')return toast('Ese día ya no se cuenta.','warn');
-      const n=ftds.filter(f=>f.date===d).length;if(n)return toast(`Ese día tenés ${plural(n,'venta')}.`,'err');
-      $('#cfFalD').value='';this.saveDias({faltas:[...F,{d,j:$('#cfFalJ').value==='1'}].sort((a,b)=>a.d<b.d?-1:1)})};
+    $('#cfFalAdd').onclick=()=>{if(!noRO())return;const d=$('#cfFalD').value,er=faltaErr(d);if(er)return toast(esc(er),'err');
+      $('#cfFalD').value='';this.saveDias({faltas:[...(cfg.faltas||[]),{d,j:$('#cfFalJ').value==='1'}].sort((a,b)=>a.d<b.d?-1:1)})};
     $('#cfFaltas').addEventListener('click',e=>{const c=e.target.closest('[data-fal]');if(!c||!noRO())return;
       const F=(cfg.faltas||[]).map(x=>({...x}));const it=F.find(x=>x.d===c.dataset.fal);if(!it)return;
       if(c.dataset.op==='rm')this.saveDias({faltas:F.filter(x=>x!==it)});else{it.j=!it.j;this.saveDias({faltas:F})}});
