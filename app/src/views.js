@@ -611,6 +611,9 @@ V.cuenta={
   render(){
     if(!profile)return;
     if($('#cfName')!==document.activeElement)$('#cfName').value=profile.name;
+    const ph=!!avatars[me];$('#cfPic').innerHTML=`<button type="button" class="av-edit" data-act="foto" title="${ph?'Cambiar':'Subir'} mi foto">${avatar(profile.name,'xl')}<span>${ph?'Cambiar':'Subir'}</span></button>
+      <div><b>Foto de perfil</b><p class="p-sub">${ph?'La ve toda la mesa.':'Subí una y la ve toda la mesa en el chat, Social y Equipo.'}</p>
+      <div class="btns"><button type="button" class="btn sm" data-act="foto">${ph?'Cambiar foto':'Subir foto'}</button>${ph?'<button type="button" class="btn sm danger" data-act="fotoX">Sacar</button>':''}</div></div>`;
     $('#cfEmail').textContent=profile.login?`Entrás eligiendo tu nombre y tu PIN${teamInfo?' en '+teamInfo.name:''}.`:(profile.email||'')+(teamInfo?' · '+teamInfo.name:'');
     $('#cfPin').hidden=!profile.login;
     $('#cfRole').textContent=roleTxt(profile.role);

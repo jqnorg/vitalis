@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 15, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 16, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -298,6 +298,24 @@ R = await rpc(B, 'select public.chat_leave($1) j', [G]);
 ok(R.ok, 'B sale del grupo');
 r = await as(B, 'select id from public.messages where chat_id = $1', [G]);
 ok(r.rows.length === 0, 'B ya no lo lee');
+// foto de perfil
+{
+  const PX = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  let q = await as(A, 'insert into public.avatars (mime, data) values ($1, $2) returning user_id::text', ['image/png', PX]);
+  ok(!q.error && q.rows[0].user_id === A, 'A sube su foto');
+  q = await as(B, 'select data from public.avatars where user_id = $1', [A]);
+  ok(q.rows.length === 1 && q.rows[0].data === PX, 'B la ve');
+  q = await as(B, 'update public.avatars set data = $1 where user_id = $2 returning 1', [PX, A]);
+  ok(!q.error && q.rows.length === 0, 'B no le cambia la foto a A');
+  q = await as(B, 'insert into public.avatars (user_id, mime, data) values ($1, $2, $3)', [A, 'image/png', PX]);
+  ok(!!q.error, 'ni sube una a su nombre');
+  q = await as(A, 'insert into public.avatars (mime, data) values ($1, $2) on conflict (user_id) do update set data = excluded.data returning 1', ['image/png', '<svg onload=x>']);
+  ok(!!q.error, 'la foto tiene que ser una imagen');
+  q = await as(null, 'select * from public.avatars');
+  ok(!!q.error || q.rows.length === 0, 'sin sesión no se ven las fotos');
+  q = await as(A, 'delete from public.avatars where user_id = $1 returning 1', [A]);
+  ok(!q.error && q.rows.length === 1, 'A saca su foto');
+}
 // imágenes del chat
 const B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 r = await as(A, 'insert into public.chat_files (chat_id, mime, w, h, data) values ($1, $2, 1, 1, $3) returning id::text', [G, 'image/png', B64]);

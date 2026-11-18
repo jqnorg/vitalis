@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.6.0';
+const VERSION='1.7.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -101,6 +101,7 @@ function rel(d){
 // Ventas: compartidas en la mesa (team). "ftds" = las mías (sueldo, inicio, turnos); "team" = todas.
 let sb=null,me=null,profile=null,teamInfo=null,members=[],team=[],chan=null,dl=null,snippets=[],leads=[],pings=[];
 let chats=[],chatMem=[],msgs={},reads={};
+let avatars={},avOk=false; // fotos de perfil: uid → {url, at}
 let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
@@ -262,6 +263,7 @@ async function loadAll(){
     QO(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),
     QO(sb.from('task_people').select('*').limit(5000)),
     loadMesa().catch(()=>{}),
+    loadAvatars(),
   ]);
   chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
@@ -278,7 +280,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -350,7 +352,8 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       const t=T2X(p.new),ex=taskOf(t._id);if(ex)Object.assign(ex,t);else tasks.unshift(t);refresh();
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'task_people'},p=>{taskRow(p.eventType,p.new,p.old||{})});
-  if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p)); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
+  if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p));
+  if(avOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'avatars'},avLive); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
   // el team leader ve en vivo la agenda, los turnos y los FTDs sin detalle de todos
   if(isLeader())for(const t of ['agenda','shifts','adjustments'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},p=>mesaLive(t,p));
   chan.subscribe(st=>{

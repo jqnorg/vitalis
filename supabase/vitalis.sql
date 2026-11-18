@@ -191,6 +191,14 @@ create table if not exists public.chat_files (
 );
 create index if not exists chat_files_chat on public.chat_files (chat_id, created_at desc);
 
+-- foto de perfil (la app la recorta cuadrada y la achica); la ve toda la mesa, la cambia cada uno
+create table if not exists public.avatars (
+  user_id    uuid primary key default auth.uid() references public.profiles(id) on delete cascade,
+  mime       text not null check (mime in ('image/webp', 'image/jpeg', 'image/png')),
+  data       text not null check (length(data) between 16 and 300000),  -- base64
+  updated_at timestamptz not null default now()
+);
+
 -- target de FTDs de la mesa por mes (lo fija el team leader o el admin; lo ven todos)
 create table if not exists public.targets (
   team_id    uuid not null default public.my_team() references public.teams(id),
@@ -500,6 +508,15 @@ begin
   end if;
   return new;
 end $$;
+create or replace function public.avatar_guard() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  new.updated_at := now();
+  if new.data !~ '^[A-Za-z0-9+/]+=*$' then raise exception 'IMG: la foto no es válida'; end if;
+  return new;
+end $$;
+drop trigger if exists avatars_guard on public.avatars;
+create trigger avatars_guard before insert or update on public.avatars for each row execute function public.avatar_guard();
 drop trigger if exists chat_files_guard on public.chat_files;
 create trigger chat_files_guard before insert on public.chat_files for each row execute function public.file_guard();
 
@@ -705,6 +722,7 @@ alter table public.tasks        enable row level security;
 alter table public.task_people  enable row level security;
 alter table public.targets      enable row level security;
 alter table public.chat_files   enable row level security;
+alter table public.avatars      enable row level security;
 
 drop policy if exists team_read on public.teams;
 create policy team_read on public.teams for select to authenticated using (id = public.my_team());
@@ -806,6 +824,10 @@ drop policy if exists messages_read on public.messages;
 create policy messages_read on public.messages for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists messages_insert on public.messages;
 create policy messages_insert on public.messages for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+drop policy if exists avatars_read on public.avatars;
+create policy avatars_read on public.avatars for select to authenticated using (public.in_my_team(user_id));
+drop policy if exists avatars_own on public.avatars;
+create policy avatars_own on public.avatars for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 drop policy if exists files_read on public.chat_files;
 create policy files_read on public.chat_files for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists files_insert on public.chat_files;
@@ -830,6 +852,8 @@ revoke update on public.messages from authenticated;
 grant select, insert, delete on public.chat_files to authenticated;
 revoke update on public.chat_files from authenticated;
 revoke all on public.chat_files from anon;
+grant select, insert, update, delete on public.avatars to authenticated;
+revoke all on public.avatars from anon;
 grant select, insert, update, delete on public.chat_reads to authenticated;
 revoke all on public.chats, public.chat_members, public.messages, public.chat_reads from anon;
 grant select, delete on public.tasks to authenticated;
@@ -842,14 +866,14 @@ revoke all on public.targets from anon;
 grant execute on function public.my_team(), public.my_role() to authenticated;
 -- las funciones internas no se llaman desde la app sin sesión
 revoke execute on function public.my_team(), public.my_role() from public, anon;
-revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard(), public.msg_gone(), public.file_guard() from public, anon, authenticated;
+revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard(), public.msg_gone(), public.file_guard(), public.avatar_guard() from public, anon, authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

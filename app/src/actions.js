@@ -627,6 +627,7 @@ function ayuda(){
   <h4>Social</h4><dl>
     <dt>Pedidos</dt><dd>Pedir un mate (cada 20 min) o salir a los 10 o a la media, a toda la mesa o a alguien. Le llega como aviso; el primero que contesta se lo lleva.</dd>
     <dt>Perfiles</dt><dd>Tocá a alguien (en Social, en el chat o en Equipo) para ver sus números y darle un toque 👉 (uno cada 2 min por persona).</dd>
+    <dt>Tu foto</dt><dd>En Ajustes → Mi cuenta (o tocando tu foto en tu perfil). Se recorta cuadrada y la ve toda la mesa.</dd>
     <dt>Silenciar</dt><dd>En Social: por 1 hora, hasta mañana o siempre. Vale también para el chat. Los demás ven 🔕 al lado de tu nombre.</dd></dl>
   <h4>Team leader</h4><dl>
     <dt>Ventas de la mesa</dt><dd>En Nueva venta elegís el vendedor. En el CRM, si la tabla tiene la columna Sales Rep, las ventas nuevas se pasan solas a cada vendedor; las de alguien que no está en la mesa quedan para asignar. Sin esa columna, el botón las pasa a quien elijas en "De". En Ajustes → Mesa ponés cómo figura cada uno en el CRM.</dd></dl>
@@ -664,7 +665,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),
