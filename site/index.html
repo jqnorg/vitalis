@@ -871,6 +871,27 @@ button.fl-k:hover{color:var(--pri)}
 .ut-c.ok i{background:var(--ok)}
 .ut-c.none{color:var(--dim);font-weight:600;border-style:dashed}
 .ut-c:hover{background:var(--soft)}
+/* sueldo: cuenta regresiva al cobro (5º día hábil) */
+.cobro{display:flex;align-items:center;gap:28px;flex-wrap:wrap;background:var(--cuero-soft);border-color:color-mix(in srgb,var(--cuero) 30%,var(--line))}
+.cb-main{display:flex;align-items:center;gap:22px;flex:1;min-width:280px}
+.cb-big{display:flex;flex-direction:column;align-items:flex-start;min-width:92px}
+.cb-n{font-family:var(--display);font-weight:800;font-size:68px;line-height:.85;letter-spacing:-.05em;color:var(--cuero);font-variant-numeric:tabular-nums}
+.cb-n.hoy{font-size:52px}
+.cb-u{font-weight:700;font-size:13px;color:var(--cuero);margin-top:4px}
+.cb-t{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.02em}
+.cb-s{color:var(--dim);margin-top:2px}
+.cb-s b{color:var(--fg)}
+.cb-strip{display:flex;gap:6px}
+.cb-d{display:flex;flex-direction:column;align-items:center;min-width:52px;padding:6px 8px 7px;border-radius:12px;background:var(--panel);border:1px solid var(--line);line-height:1.15}
+.cb-d .o{font-size:11px;font-weight:700;color:var(--dim)}
+.cb-d b{font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.cb-d .w{font-size:11.5px;color:var(--dim)}
+.cb-d.ya{opacity:.5}
+.cb-d.hoy{outline:2px solid var(--cuero);outline-offset:-2px}
+.cb-d.pay{background:var(--cuero);border-color:var(--cuero);color:#fff}
+.cb-d.pay .o,.cb-d.pay .w{color:rgba(255,255,255,.85)}
+body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{color:rgba(30,19,0,.75)}
+@media (max-width:600px){.cb-strip{width:100%;justify-content:space-between}.cb-d{min-width:0;flex:1;padding:5px 4px}.cb-n{font-size:56px}}
 </style>
 </head>
 <body>
@@ -1045,6 +1066,7 @@ button.fl-k:hover{color:var(--pri)}
 <section class="view" id="v-sueldo" hidden>
   <div class="vh"><div><h1>Sueldo</h1><p class="sub" id="suSub"></p></div><span class="grow"></span>
     <div class="tools"><button type="button" class="btn sm icon" id="suPrev" aria-label="Mes anterior">‹</button><select id="suMes" aria-label="Mes"></select><button type="button" class="btn sm icon" id="suNext" aria-label="Mes siguiente">›</button></div></div>
+  <section class="card cobro" id="suCobro" aria-label="Día de cobro"></section>
   <div class="grid2">
     <section class="card"><div class="card-h"><h3>Nominal</h3><span class="p-sub" id="suNomSub"></span></div><div id="suNom"></div></section>
     <section class="card"><div class="card-h"><h3>Líquido</h3><span class="p-sub" id="suLiqSub"></span></div><div id="suLiq"></div></section>
@@ -1187,7 +1209,7 @@ button.fl-k:hover{color:var(--pri)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.10.0';
+const VERSION='1.11.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2734,6 +2756,7 @@ function ayuda(){
     <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
   <h4>Sueldo</h4><dl>
+    <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
     <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
@@ -3126,6 +3149,33 @@ V.turnos={
 
 /* ---------- sueldo ---------- */
 let suYm='',siN=null;
+/* ---------- día de cobro: el 5º día hábil del mes ----------
+   Hábil: lunes a sábado que se trabaje en la mesa (tus días laborables), sin domingos, feriados que no se trabajan ni días libres (MTSS). */
+const ymStep=(ym,d)=>{let [y,m]=ym.split('-').map(Number);m+=d;while(m>12){m-=12;y++}while(m<1){m+=12;y--}return `${y}-${z(m)}`};
+function payDays(ym){ // los 5 primeros días hábiles del mes
+  const [Y,M]=ym.split('-').map(Number),last=new Date(Y,M,0).getDate(),out=[];
+  for(let d=1;d<=last&&out.length<5;d++){const k=`${ym}-${z(d)}`;if(parseYMD(k).getDay()===0)continue;const r=noTrabajo(k);if(r&&r!=='falta')continue;out.push(k)}
+  return out;
+}
+function nextPay(){ // el próximo cobro: este mes (si todavía no pasó) o el que viene
+  const te=todayS(),ym=te.slice(0,7);let D=payDays(ym),pay=D[4]||`${ym}-10`;
+  if(te<=pay)return {pay,days:D,of:ymStep(ym,-1)};
+  const n=ymStep(ym,1);D=payDays(n);return {pay:D[4]||`${n}-10`,days:D,of:ym};
+}
+function cobroCard(){
+  const te=todayS(),N=nextPay(),dd=Math.round((parseYMD(N.pay)-parseYMD(te))/864e5),pd=parseYMD(N.pay);
+  let hab=0;for(let d=addDays(te,1),i=0;d<=N.pay&&i<45;d=addDays(d,1),i++){if(parseYMD(d).getDay()===0)continue;const r=noTrabajo(d);if(!r||r==='falta')hab++} // hábiles de acá al cobro
+  const P=sueldoPesos(calc(N.of)),liq=P&&P.total!=null?pesos(P.total):null,mesOf=MES[+N.of.slice(5,7)-1];
+  const when=`${DIAL[pd.getDay()]} ${pd.getDate()} de ${MES[pd.getMonth()]}`;
+  const big=dd===0?'<div class="cb-n hoy">¡Hoy!</div>':`<div class="cb-n">${dd}</div><div class="cb-u">${dd===1?'día':'días'} para cobrar</div>`;
+  const strip=N.days.map((d,i)=>{const x=parseYMD(d),st=d<te?' ya':d===te?' hoy':'',last=i===4;
+    return `<div class="cb-d${st}${last?' pay':''}" title="${i+1}º día hábil"><span class="o">${i+1}º</span><b>${x.getDate()}</b><span class="w">${DIA[x.getDay()]}</span></div>`}).join('');
+  return `<div class="cb-main"><div class="cb-big">${big}</div>
+    <div class="cb-info"><div class="cb-t">${dd===0?`Hoy cobrás el sueldo de ${esc(mesOf)} 🧉`:`Cobrás el <b>${esc(when)}</b>`}</div>
+      <div class="cb-s">${dd===0?'Es el 5º día hábil.':`Sueldo de ${esc(mesOf)} · 5º día hábil${dd>0&&hab?` · faltan ${plural(hab,'día hábil','días hábiles')}`:''}`}</div>
+      <div class="cb-s">${liq?`Líquido ≈ <b>${esc(liq)}</b>`:'<button type="button" class="lnk" data-act="focusTc">Cargá el dólar</button> para ver cuánto cobrás.'}</div></div></div>
+    <div class="cb-strip" aria-label="Los cinco primeros días hábiles de ${esc(MES[pd.getMonth()])}">${strip}</div>`;
+}
 V.sueldo={
   build(){
     $('#suEx').addEventListener('click',e=>{
@@ -3165,6 +3215,7 @@ V.sueldo={
   },
   render(){
     const now=ymNow();
+    $('#suCobro').innerHTML=cobroCard();
     const months=[...new Set([now,...ftds.map(f=>f.date.slice(0,7)),...Object.keys(ajustes)])].sort().reverse();
     if(!suYm||!months.includes(suYm))suYm=now;
     $('#suMes').innerHTML=months.map(m=>`<option value="${m}"${m===suYm?' selected':''}>${esc(mLong(m))}</option>`).join('');

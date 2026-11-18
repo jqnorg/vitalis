@@ -327,6 +327,33 @@ V.turnos={
 
 /* ---------- sueldo ---------- */
 let suYm='',siN=null;
+/* ---------- día de cobro: el 5º día hábil del mes ----------
+   Hábil: lunes a sábado que se trabaje en la mesa (tus días laborables), sin domingos, feriados que no se trabajan ni días libres (MTSS). */
+const ymStep=(ym,d)=>{let [y,m]=ym.split('-').map(Number);m+=d;while(m>12){m-=12;y++}while(m<1){m+=12;y--}return `${y}-${z(m)}`};
+function payDays(ym){ // los 5 primeros días hábiles del mes
+  const [Y,M]=ym.split('-').map(Number),last=new Date(Y,M,0).getDate(),out=[];
+  for(let d=1;d<=last&&out.length<5;d++){const k=`${ym}-${z(d)}`;if(parseYMD(k).getDay()===0)continue;const r=noTrabajo(k);if(r&&r!=='falta')continue;out.push(k)}
+  return out;
+}
+function nextPay(){ // el próximo cobro: este mes (si todavía no pasó) o el que viene
+  const te=todayS(),ym=te.slice(0,7);let D=payDays(ym),pay=D[4]||`${ym}-10`;
+  if(te<=pay)return {pay,days:D,of:ymStep(ym,-1)};
+  const n=ymStep(ym,1);D=payDays(n);return {pay:D[4]||`${n}-10`,days:D,of:ym};
+}
+function cobroCard(){
+  const te=todayS(),N=nextPay(),dd=Math.round((parseYMD(N.pay)-parseYMD(te))/864e5),pd=parseYMD(N.pay);
+  let hab=0;for(let d=addDays(te,1),i=0;d<=N.pay&&i<45;d=addDays(d,1),i++){if(parseYMD(d).getDay()===0)continue;const r=noTrabajo(d);if(!r||r==='falta')hab++} // hábiles de acá al cobro
+  const P=sueldoPesos(calc(N.of)),liq=P&&P.total!=null?pesos(P.total):null,mesOf=MES[+N.of.slice(5,7)-1];
+  const when=`${DIAL[pd.getDay()]} ${pd.getDate()} de ${MES[pd.getMonth()]}`;
+  const big=dd===0?'<div class="cb-n hoy">¡Hoy!</div>':`<div class="cb-n">${dd}</div><div class="cb-u">${dd===1?'día':'días'} para cobrar</div>`;
+  const strip=N.days.map((d,i)=>{const x=parseYMD(d),st=d<te?' ya':d===te?' hoy':'',last=i===4;
+    return `<div class="cb-d${st}${last?' pay':''}" title="${i+1}º día hábil"><span class="o">${i+1}º</span><b>${x.getDate()}</b><span class="w">${DIA[x.getDay()]}</span></div>`}).join('');
+  return `<div class="cb-main"><div class="cb-big">${big}</div>
+    <div class="cb-info"><div class="cb-t">${dd===0?`Hoy cobrás el sueldo de ${esc(mesOf)} 🧉`:`Cobrás el <b>${esc(when)}</b>`}</div>
+      <div class="cb-s">${dd===0?'Es el 5º día hábil.':`Sueldo de ${esc(mesOf)} · 5º día hábil${dd>0&&hab?` · faltan ${plural(hab,'día hábil','días hábiles')}`:''}`}</div>
+      <div class="cb-s">${liq?`Líquido ≈ <b>${esc(liq)}</b>`:'<button type="button" class="lnk" data-act="focusTc">Cargá el dólar</button> para ver cuánto cobrás.'}</div></div></div>
+    <div class="cb-strip" aria-label="Los cinco primeros días hábiles de ${esc(MES[pd.getMonth()])}">${strip}</div>`;
+}
 V.sueldo={
   build(){
     $('#suEx').addEventListener('click',e=>{
@@ -366,6 +393,7 @@ V.sueldo={
   },
   render(){
     const now=ymNow();
+    $('#suCobro').innerHTML=cobroCard();
     const months=[...new Set([now,...ftds.map(f=>f.date.slice(0,7)),...Object.keys(ajustes)])].sort().reverse();
     if(!suYm||!months.includes(suYm))suYm=now;
     $('#suMes').innerHTML=months.map(m=>`<option value="${m}"${m===suYm?' selected':''}>${esc(mLong(m))}</option>`).join('');

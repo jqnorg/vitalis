@@ -672,6 +672,7 @@ function ayuda(){
     <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
   <h4>Sueldo</h4><dl>
+    <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
     <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>

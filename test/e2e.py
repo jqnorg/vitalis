@@ -436,6 +436,13 @@ async def main():
 
             # sueldo: premios y faltas
             await A.evaluate("go('sueldo')"); await A.wait_for_timeout(600)
+            np = await A.evaluate("(()=>{const n=nextPay();return {pay:n.pay,days:n.days,of:n.of,te:todayS()}})()")
+            ok(len(np['days']) == 5 and np['days'][4] == np['pay'] and np['pay'] >= np['te'], f'el cobro es el 5º día hábil ({np})')
+            ok(await A.evaluate("nextPay().days.every(d=>{const w=parseYMD(d).getDay();return w>=1&&w<=5&&!feriado(d)})"), 'sin fines de semana ni feriados')
+            if np['te'][:7] == '2026-11': ok(np['pay'] == '2026-12-07', 'en noviembre de 2026: cobrás el lunes 7/12 (sueldo de noviembre)')
+            cb = await A.inner_text('#suCobro')
+            ok(('días para cobrar' in cb or 'día para cobrar' in cb or 'Hoy' in cb) and await A.locator('#suCobro .cb-d').count() == 5 and await A.locator('#suCobro .cb-d.pay').count() == 1, f'Sueldo muestra la cuenta regresiva ({cb[:80]!r})')
+            await A.screenshot(path=OUT / 'o0_sueldo_cobro.png')
             if not await A.evaluate('cfg.tc>0'): await A.fill('#suTc', '40,50'); await A.click('#suTcSave'); await A.wait_for_timeout(800)
             t0 = await A.evaluate('sueldoPesos(calc(ymNow())).total')
             await A.fill('#suPrC', 'Premio 5 FTDs en el día'); await A.fill('#suPrM', '50'); await A.select_option('#suPrU', 'USD')

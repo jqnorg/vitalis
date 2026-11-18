@@ -861,3 +861,24 @@ button.fl-k:hover{color:var(--pri)}
 .ut-c.ok i{background:var(--ok)}
 .ut-c.none{color:var(--dim);font-weight:600;border-style:dashed}
 .ut-c:hover{background:var(--soft)}
+/* sueldo: cuenta regresiva al cobro (5º día hábil) */
+.cobro{display:flex;align-items:center;gap:28px;flex-wrap:wrap;background:var(--cuero-soft);border-color:color-mix(in srgb,var(--cuero) 30%,var(--line))}
+.cb-main{display:flex;align-items:center;gap:22px;flex:1;min-width:280px}
+.cb-big{display:flex;flex-direction:column;align-items:flex-start;min-width:92px}
+.cb-n{font-family:var(--display);font-weight:800;font-size:68px;line-height:.85;letter-spacing:-.05em;color:var(--cuero);font-variant-numeric:tabular-nums}
+.cb-n.hoy{font-size:52px}
+.cb-u{font-weight:700;font-size:13px;color:var(--cuero);margin-top:4px}
+.cb-t{font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-.02em}
+.cb-s{color:var(--dim);margin-top:2px}
+.cb-s b{color:var(--fg)}
+.cb-strip{display:flex;gap:6px}
+.cb-d{display:flex;flex-direction:column;align-items:center;min-width:52px;padding:6px 8px 7px;border-radius:12px;background:var(--panel);border:1px solid var(--line);line-height:1.15}
+.cb-d .o{font-size:11px;font-weight:700;color:var(--dim)}
+.cb-d b{font-family:var(--display);font-size:20px;font-variant-numeric:tabular-nums}
+.cb-d .w{font-size:11.5px;color:var(--dim)}
+.cb-d.ya{opacity:.5}
+.cb-d.hoy{outline:2px solid var(--cuero);outline-offset:-2px}
+.cb-d.pay{background:var(--cuero);border-color:var(--cuero);color:#fff}
+.cb-d.pay .o,.cb-d.pay .w{color:rgba(255,255,255,.85)}
+body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{color:rgba(30,19,0,.75)}
+@media (max-width:600px){.cb-strip{width:100%;justify-content:space-between}.cb-d{min-width:0;flex:1;padding:5px 4px}.cb-n{font-size:56px}}
