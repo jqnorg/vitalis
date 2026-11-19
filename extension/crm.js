@@ -4,8 +4,9 @@
 //   3) una sola pestaña del CRM (la que elegís con el botón) se actualiza cada 10 s y avisa cuando entra un cliente en "new";
 //      todas las pestañas mandan al registro de Vitalis los clientes que se ven, con su status
 (() => {
-  if (window.__ftdCrm) return;
-  window.__ftdCrm = true;
+  // al actualizar la extensión, sw.js inyecta la copia nueva en las pestañas del CRM abiertas: la vieja se apaga sola
+  const ME = {}; window.__ftdCrm = true; window.__ftdCrmMe = ME;
+  const live = () => { try { return window.__ftdCrmMe === ME && !!chrome.runtime.id; } catch (e) { return false; } };
 
   const BRANDS = { 'crmnovaramarkets.com': 'Novara Markets', 'crmtrade24seven.com': 'Trade24Seven' };
   const host = location.hostname;
@@ -234,6 +235,7 @@
   let lastInput = 0;
   for (const ev of ['keydown', 'pointerdown', 'wheel']) addEventListener(ev, () => { lastInput = Date.now(); }, { capture: true, passive: true });
   chrome.runtime.onMessage.addListener((m, sender, reply) => {
+    if (!live()) return false;
     if (m && m.type === 'import-result') { result(m.res); return false; }
     if (m && m.type === 'crm-refresh') { // pedido de la extensión: refrescar la lista
       if (document.hasFocus() && Date.now() - lastInput < 15000) { reply({ skipped: true }); return false; } // la estás usando: no te la muevo
@@ -351,6 +353,7 @@
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
     root.getElementById('wids').addEventListener('click', (e) => { if (e.target.closest('[data-diag]')) diagClients(); });
     root.getElementById('msg').addEventListener('click', (e) => { if (e.target.closest('[data-open]')) send({ type: 'open-panel' }); });
+    for (const e of document.querySelectorAll('#ftd-crm-button')) e.remove(); // el panel de una copia vieja
     document.documentElement.appendChild(h);
     return { h, root, $: (id) => root.getElementById(id), diag: false };
   }
@@ -414,7 +417,10 @@
     }
     $('t').textContent = head.join(' · ');
   }
+  function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } }
   function refresh(force) {
+    if (!live()) return retire();
+    for (const e of document.querySelectorAll('#ftd-crm-button')) if (!ui || e !== ui.h) e.remove(); // paneles de copias viejas
     const T = tables();
     sales = scanSales(T);
     seen = scanAll(T);

@@ -195,6 +195,11 @@ async def main():
             ok('880104' in t and '880101' in t and t.index('880104') < t.index('880103') < t.index('880102') < t.index('880101'), 'en Ahora: Call Again, Hang Up y después NA por día')
             ok('NA 3.1' in t, 'con la última nota a la vista')
             await A2.screenshot(path=OUT / 'x2c_ahora_novara.png')
+            # al actualizar la extensión, la copia nueva entra en la pestaña abierta y la vieja se apaga (sin recargar el CRM)
+            await sw.evaluate("chrome.tabs.query({url:'https://crmnovaramarkets.com/novara'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id,allFrames:true},files:['crm.js']}))"); await Nv.wait_for_timeout(1500)
+            ok(await Nv.locator('#ftd-crm-button').count() == 1, 'al actualizar, la copia nueva reemplaza a la vieja: un solo panel')
+            await Nv.evaluate("()=>{const td=[...document.querySelectorAll('.dx-data-row td')].find(t=>t.textContent==='NA - DAY2');td.textContent='Call Again'}"); await Nv.wait_for_timeout(3000)
+            ok(sql("select status_group g from public.crm_clients where client_id='880102'")[0]['g'] == 'call_again', 'y sigue mandando los cambios de status')
             # si la tabla cambia y no leo las filas, el panel ofrece copiar un diagnóstico sin datos de clientes
             await Nv.evaluate("()=>document.querySelectorAll('.dx-datagrid-rowsview .dx-data-row').forEach(r=>{r.querySelectorAll('td').forEach(c=>c.removeAttribute('role'));r.insertAdjacentHTML('beforeend','<td>a</td><td>b</td><td>c</td>')})"); await Nv.wait_for_timeout(1500)
             ok(await nvp.locator('[data-diag]').count() == 1 and 'no leo las filas' in await nvp.locator('#wids').inner_text(), 'si la tabla cambia y no leo las filas, el panel ofrece copiar un diagnóstico')

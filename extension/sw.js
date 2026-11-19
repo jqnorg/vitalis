@@ -551,6 +551,10 @@ chrome.runtime.onInstalled.addListener(async () => {
   for (const t of await chrome.tabs.query({ url: VITALIS_URL })) {
     chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['bridge.js'] }).catch(() => {});
   }
+  // las pestañas del CRM abiertas también reciben la copia nueva (si no, quedaban sin andar hasta recargarlas)
+  for (const t of await chrome.tabs.query({ url: await crmUrls() })) {
+    chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, files: ['crm.js'] }).catch(() => {});
+  }
 });
 chrome.runtime.onStartup.addListener(() => snipMenu());
 chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.snips) snipMenu(); });
