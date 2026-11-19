@@ -10,6 +10,7 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 
 const PORT = +(process.argv[2] || 54321);
 const DIST = process.argv[3] || new URL('../site', import.meta.url).pathname;
+process.on('uncaughtException', (e) => console.error('UNCAUGHT', (e && e.stack) || e)); process.on('unhandledRejection', (e) => console.error('UNHANDLED', (e && e.stack) || e)); process.on('exit', (c) => console.error('EXIT', c));
 const db = new PGlite({ extensions: { pgcrypto } });
 await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
@@ -168,6 +169,7 @@ http.createServer(async (req, res) => {
     let f = path.join(DIST, decodeURIComponent(u.pathname === '/' ? '/index.html' : u.pathname));
     if (u.pathname === '/config.js') { res.writeHead(200, { 'content-type': MIME['.js'] }); return res.end(`window.VITALIS_CONFIG={url:'http://localhost:${PORT}',key:'test-anon-key'};`); }
     if (!f.startsWith(DIST) || !fs.existsSync(f)) { res.writeHead(404); return res.end('no'); }
+    if (f.endsWith('index.html')) { res.writeHead(200, { 'content-type': MIME['.html'] || 'text/html' }); return res.end(fs.readFileSync(f, 'utf8').replace(/<script id="cfg">[\s\S]*?<\/script>/, `<script id="cfg">window.VITALIS_CONFIG={url:'http://localhost:${PORT}',key:'test-anon-key'};</script>`)); } // la configuración va adentro de la página: apunto a esta base de prueba
     res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' });
     fs.createReadStream(f).pipe(res);
   } catch (e) { send(res, 500, { message: String(e.message || e) }); }

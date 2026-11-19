@@ -9,7 +9,7 @@ const ARCH='Trade24Seven',isArch=b=>norm(b)===norm(ARCH); // la marca que quedó
 const GRPS={new:'New (y Talking)',na:'No Answer y NA',callback:'CallBack (con cita)',call_again:'Call Again',hang_up:'Hang Up',low_potential:'Low potential',not_interested:'Not interested',
   pending:'Pending Payment (boleto)',failed:'Depósito trabado (Failed, Bank Block, Declined)',ftd:'FTD',dnc:'Do Not Call',invalid:'Inválido (número, idioma)',crm:'Del CRM (Reassign, Test, FAKE…)',otro:'Otro'};
 const G3=['call_again','hang_up','na'],G2=['callback','pending'],DAYS5=['callback','call_again','hang_up','low_potential']; // con cita · los de 5 días seguidos y al 5º pasan a Not interested
-let crm={ok:null,rows:new Map(),at:0,busy:null,rot:[]};
+let crm={ok:null,rows:new Map(),byId:new Map(),at:0,busy:null,rot:[]};
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
 const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:r.status||'',grp:r.status_group||'otro',agent:r.crm_agent||'',
   camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',firstAgent:r.first_agent||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
@@ -24,9 +24,9 @@ function crmOwner(r){if(r.agent)return notLead(agentUid(r.agent));return notLead
 function convOwner(r){if(r.firstAgent)return notLead(agentUid(r.firstAgent));return crmOwner(r)}
 // de quién es un cliente del registro de new: el del CRM si se lo vio; si no, quien lo anotó (nunca el team leader)
 function leadOwner(l){const r=crmStatusOf(l.id);if(r&&(r.agent||r.firstAgent))return convOwner(r);return notLead(l.uid)}
-function soldIdx(){const m=new Map();for(const f of [...team].sort(byDate)){const k=ckey(f.brand,f.id);if(!m.has(k))m.set(k,f)}return m} // la primera venta de cada cliente
+const soldIdx=perPass(()=>{const m=new Map();for(const f of [...team].sort(byDate)){const k=ckey(f.brand,f.id);if(!m.has(k))m.set(k,f)}return m}); // la primera venta de cada cliente
 function soldOf(id,brand){const k=norm(id);let best=null;for(const f of team)if(norm(f.id)===k&&(!brand||norm(f.brand)===norm(brand))&&(!best||byDate(f,best)<0))best=f;return best}
-function crmStatusOf(id){const k=norm(id);let r=crm.rows.get(ckey(DEF_BRAND,id));if(r)return r;for(const x of crm.rows.values())if(norm(x.id)===k&&!isArch(x.brand))return x;return null}
+function crmStatusOf(id){let r=crm.rows.get(ckey(DEF_BRAND,id));if(r)return r;return crm.byId.get(norm(id))||null} // por ID, de cualquier marca menos el archivo
 const isDnc=id=>{const r=crmStatusOf(id);return !!(r&&r.grp==='dnc')};
 // horas desde el registro hasta el depósito (dato: a la empresa le importa new o late, pero se muestra)
 function regHrs(f){const r=String(f.reg||'');if(r.length<16||!/^\d{1,2}:\d{2}/.test(f.time||''))return null;
@@ -36,7 +36,8 @@ const TZ={chile:'America/Santiago',colombia:'America/Bogota',mexico:'America/Mex
   panama:'America/Panama',ecuador:'America/Guayaquil',argentina:'America/Argentina/Buenos_Aires',uruguay:'America/Montevideo',paraguay:'America/Asuncion',bolivia:'America/La_Paz',
   venezuela:'America/Caracas',brazil:'America/Sao_Paulo',brasil:'America/Sao_Paulo','el salvador':'America/El_Salvador',honduras:'America/Tegucigalpa',nicaragua:'America/Managua',
   'republica dominicana':'America/Santo_Domingo','dominican republic':'America/Santo_Domingo',spain:'Europe/Madrid','espana':'Europe/Madrid'};
-function cliTime(country){const tz=TZ[norm(country).trim()];if(!tz)return '';try{return new Intl.DateTimeFormat('es-UY',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:tz}).format(new Date())}catch(e){return ''}}
+const tzFmt=new Map();
+function cliTime(country){const tz=TZ[norm(country).trim()];if(!tz)return '';try{let f=tzFmt.get(tz);if(!f)tzFmt.set(tz,f=new Intl.DateTimeFormat('es-UY',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:tz}));return f.format(new Date())}catch(e){return ''}}
 const stBadge=r=>`<span class="badge st st-${esc(r.grp)}" title="${esc(GRPS[r.grp]||'')}">${esc(r.status||GRPS[r.grp]||'—')}</span>`;
 
 /* ---------- carga: lo que está en la cola, lo registrado este mes y la semana, y los de la agenda ---------- */
@@ -49,21 +50,26 @@ async function crmLoad(force){
     try{
       const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromTs=parseYMD(from).toISOString();
       const base=()=>sb.from('crm_clients').select('*').neq('brand',ARCH);
-      const [act,coh,cohS]=await Promise.all([
+      const ids=[...new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>String(p.id)))].slice(0,300);
+      // todo junto: la cola, los registrados del mes y la semana, los de la agenda y (team leader) las rotaciones de hoy
+      const [act,coh,cohS,ag,rot]=await Promise.all([
         crmPage(()=>base().in('status_group',['new','na','callback','call_again','hang_up','low_potential','pending','failed']).order('client_id')),
         crmPage(()=>base().gte('reg',from).order('client_id')),
         crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
+        ids.length?Q(base().in('client_id',ids)):Promise.resolve([]),
+        isLeader()?QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)):Promise.resolve([]),
       ]);
-      const ids=[...new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>String(p.id)))].slice(0,300);
-      const ag=ids.length?await Q(base().in('client_id',ids)):[];
-      if(isLeader())crm.rot=await QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)).catch(()=>[]);
-      const m=new Map();for(const r of [...act,...coh,...cohS,...ag]){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
-      const was=crm.ok;crm.rows=m;crm.ok=true;crm.at=Date.now();
-      if(!was||['ahora','inicio','clientes','equipo','agenda'].includes(cur))refresh();
+      const rows=[...act,...coh,...cohS,...ag];crmApply(rows,rot);snapCrm(rows,rot);
     }catch(e){if(/crm_clients|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))crm.ok=false}
     finally{crm.busy=null}
   })();
   return crm.busy;
+}
+function crmApply(rows,rot){
+  const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
+  const by=new Map();for(const x of m.values())if(!isArch(x.brand)&&!by.has(norm(x.id)))by.set(norm(x.id),x);
+  const was=crm.ok;crm.rows=m;crm.byId=by;crm.rot=rot||[];crm.ok=true;crm.at=Date.now();
+  if(ready&&(!was||['ahora','inicio','clientes','equipo','agenda','cliente'].includes(cur)))refresh();
 }
 let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}

@@ -69,6 +69,11 @@ async def main():
             sql(SEED)
             await A.reload(); await A.wait_for_timeout(2500)
             ok(await A.evaluate('ready'), 'la sesión sigue al recargar')
+            html = urllib.request.urlopen(URL).read().decode()
+            ok('<body class="auth">' in html and 'Cebando' in html.split('<nav')[0], 'antes de cargar se ve la entrada, nunca la app sin sesión')
+            ok(await A.evaluate("snapGet('boot:'+me).then(x=>!!(x&&x.raw&&x.raw.sales.length))"), 'lo cargado queda guardado en esta computadora')
+            t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&document.querySelector('#iHero .n')&&document.querySelector('#iHero .n').textContent.trim()==='13'", timeout=15000)
+            ok(time.time() - t0 < 1.5, f'al volver a abrir, Vitalis se dibuja al instante con lo guardado ({time.time()-t0:.2f}s)')
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
             order = ['inicio', 'ahora', 'cliente', 'equipo', 'filtros', 'ventas', 'clientes', 'banking', 'agenda', 'tareas', 'chat', 'sueldo', 'turnos', 'social', 'snippets', 'config']
@@ -315,8 +320,10 @@ async def main():
             await D.click('#chIn'); await D.keyboard.type('@to', delay=30); await D.wait_for_timeout(300)
             ok('@todos' in await D.inner_text('#chMen'), 'el team leader tiene @todos')
             await D.keyboard.press('Enter'); await D.keyboard.type('reunión en 5', delay=10); await D.keyboard.press('Enter'); await D.wait_for_timeout(800)
-            await A.evaluate("go('social')"); await A.evaluate('catchUp(true)'); await A.wait_for_timeout(1600)
+            await A.evaluate("go('social')"); await A.evaluate('catchUp(true)')
             t = A.locator('#toasts .toast:has-text("reunión en 5")')
+            try: await t.first.wait_for(timeout=6000)
+            except Exception: pass
             ok(await t.count() == 1 and 'imp' in (await t.get_attribute('class')) and 'a todos' in await t.inner_text(), '@todos del team leader: le llega a Joaquín aunque silenció el chat, como importante')
             await D.evaluate("go('social')")
             await A.evaluate("go('chat')"); await A.wait_for_timeout(300); await A.fill('#chIn', '@todos prueba de agente'); await A.keyboard.press('Enter'); await A.wait_for_timeout(700)

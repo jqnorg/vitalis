@@ -12,6 +12,15 @@ fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
 js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','ficha.js','auth.js'])
 js=js.replace('\nboot();\n','\n')+'\nboot();\n'
 js=js.replace('__EXT_VER__', json.loads((ROOT/'extension'/'manifest.json').read_text())['version'])   # la versión de la extensión que se descarga   # boot() al final, después de auth.js
+cfg=json.loads((ROOT/'app'/'config.json').read_text())
+import hashlib
+vend=(ROOT/'app'/'vendor'/'supabase.js').read_bytes()
+SUPA='supabase.'+hashlib.sha256(vend).hexdigest()[:10]+'.js'   # con el hash en el nombre: el navegador lo guarda para siempre y no vuelve a preguntar
+cfgjs='window.VITALIS_CONFIG = '+json.dumps(cfg)+';'
+# antes de que cargue nada: el tema guardado y la pantalla de entrada (nunca se ve la app sin sesión)
+pre='''<script>try{var t=JSON.parse(localStorage.getItem('vitalis.tema'))||'auto';if(t==='oscuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))document.body.classList.add('dark')}catch(e){}</script>
+<div id="auth"><div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"><div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div></div></div></div>
+'''
 html=f'''<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -21,24 +30,29 @@ html=f'''<!DOCTYPE html>
 <meta name="theme-color" content="#f1f4ef">
 <title>Vitalis</title>
 <link rel="icon" href="{fav}">
+<link rel="preconnect" href="{cfg['url']}" crossorigin>
+<link rel="preload" href="{SUPA}" as="script">
+<link rel="preload" href="fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 {(S/'style.css').read_text()}</style>
 </head>
-<body>
-{body}<script src="supabase.js"></script>
-<script src="config.js"></script>
+<body class="auth">
+{pre}{body}<script src="{SUPA}"></script>
+<script id="cfg">{cfgjs}</script>
 <script>
 {js}</script>
 </body>
 </html>
 '''
 (D/'index.html').write_text(html)
-shutil.copy(ROOT/'app'/'vendor'/'supabase.js', D/'supabase.js')
-cfg=json.loads((ROOT/'app'/'config.json').read_text())
+for old in D.glob('supabase.*.js'):
+    if old.name!=SUPA: old.unlink()
+(D/SUPA).write_bytes(vend)
+shutil.copy(ROOT/'app'/'vendor'/'supabase.js', D/'supabase.js')   # por si alguna página vieja todavía la pide
 (D/'config.js').write_text('// Datos públicos del proyecto de Supabase (la clave publishable es pública por diseño; los datos los protegen las reglas RLS).\nwindow.VITALIS_CONFIG = '+json.dumps(cfg,indent=2)+';\n')
 (D/'fonts').mkdir(exist_ok=True)
 for f in (ROOT/'app'/'fonts').iterdir(): shutil.copy(f, D/'fonts'/f.name)
-(D/'_headers').write_text('/*\n  X-Frame-Options: DENY\n  Referrer-Policy: same-origin\n  X-Content-Type-Options: nosniff\n/*.js\n  Cache-Control: no-cache\n/index.html\n  Cache-Control: no-cache\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n')
+(D/'_headers').write_text('/*\n  X-Frame-Options: DENY\n  Referrer-Policy: same-origin\n  X-Content-Type-Options: nosniff\n/*.js\n  Cache-Control: no-cache\n/supabase.*.js\n  Cache-Control: public, max-age=31536000, immutable\n/index.html\n  Cache-Control: no-cache\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n')
 with zipfile.ZipFile(D/'vitalis-extension.zip','w',zipfile.ZIP_DEFLATED) as z:   # la extensión se descarga desde la app
     for p in sorted((ROOT/'extension').rglob('*')):
         if p.is_file(): z.write(p, p.relative_to(ROOT/'extension'))

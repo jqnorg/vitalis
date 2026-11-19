@@ -194,11 +194,9 @@ function avSet(r){
   if(o)URL.revokeObjectURL(o.url);avatars[r.user_id]={url:URL.createObjectURL(b64Blob(r.data,r.mime)),at};return true;
 }
 function avDrop(uid){const o=avatars[uid];if(!o)return false;URL.revokeObjectURL(o.url);delete avatars[uid];return true}
-async function loadAvatars(){
-  try{const rows=await Q(sb.from('avatars').select('user_id,mime,data,updated_at'));avOk=true;
-    const ids=new Set(rows.map(r=>r.user_id));for(const u in avatars)if(!ids.has(u))avDrop(u);for(const r of rows)avSet(r)}
-  catch(e){avOk=false}
-}
+const avFetch=()=>QN(sb.from('avatars').select('user_id,mime,data,updated_at'));
+function avApply(rows){avOk=!!rows;if(!rows)return;const ids=new Set(rows.map(r=>r.user_id));for(const u in avatars)if(!ids.has(u))avDrop(u);for(const r of rows)avSet(r)}
+async function loadAvatars(){avApply(await avFetch())}
 async function avPoll(){ // al ponerme al día: solo traigo las que cambiaron
   if(!ready||!sb)return;if(!avOk){await loadAvatars();if(avOk)refresh();return}
   try{const rows=await Q(sb.from('avatars').select('user_id,updated_at'));let ch=false;

@@ -549,7 +549,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){if(ready)setCurrent(String(d.k||'').slice(0,60),String(d.r||'').slice(0,120),'crm');return} // el cliente abierto en el CRM
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){catchUp();return} // la extensión despierta a la pestaña: me pongo al día
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){if(needCatch())catchUp();return} // la extensión despierta a la pestaña: me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});

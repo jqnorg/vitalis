@@ -125,6 +125,7 @@ const V={}; // vistas: {build(), render()}
 // el menú: todas las secciones, en orden de importancia (los números siguen ese orden)
 const NAVKEYS={1:'inicio',2:'ahora',3:'filtros',4:'ventas',5:'clientes',6:'agenda',7:'chat',8:'sueldo',9:'turnos',0:'config'}; // Tareas: T
 function go(v,opts){
+  pass++;
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
@@ -134,7 +135,13 @@ function go(v,opts){
   if(ready)V[v].render(opts||{});
 }
 let rT=null;
-function refresh(){clearTimeout(rT);rT=setTimeout(()=>{if(!ready)return status();status();V[cur].render({});syncExt()},60)}
+// con la pestaña escondida no se dibuja la sección (nadie la ve): se dibuja al volver. La barra y la extensión sí se actualizan.
+let rDirty=false;
+// lo que estaba desplegado sigue desplegado después de volver a dibujar
+const openKeys=el=>new Set([...el.querySelectorAll('details[data-k][open]')].map(d=>d.dataset.k));
+function reopen(el,keys){if(keys.size)for(const d of el.querySelectorAll('details[data-k]'))if(keys.has(d.dataset.k))d.open=true}
+function refresh(){clearTimeout(rT);rT=setTimeout(()=>{pass++;if(!ready)return status();status();if(document.hidden)rDirty=true;else{rDirty=false;V[cur].render({})}syncExt()},60)}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&rDirty&&ready){rDirty=false;V[cur].render({})}});
 
 /* ---------- barra de estado ---------- */
 const avHue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h};
@@ -143,6 +150,7 @@ const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name),a=m&&avatars
   return a?`<span class="av pic ${cls}" aria-hidden="true"><img src="${a.url}" alt=""></span>`:`<span class="av ${cls}" style="--h:${avHue(name)}" aria-hidden="true">${esc(initials(name))}</span>`};
 const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':'Agente';
 function status(){
+  pass++;
   const now=new Date(),te=todayS();
   $('#sClock').textContent=`${z(now.getHours())}:${z(now.getMinutes())}`;$('#sClock').title=`${DIAL[now.getDay()]} ${dm(te)}`;
   if(!ready){$('#sMes').textContent='Cebando…';return}

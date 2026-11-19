@@ -28,17 +28,23 @@ async function bkLoad(force){
   if(bk.busy)return bk.busy;
   if(!force&&Date.now()-bk.at<15e3)return;
   bk.busy=(async()=>{
-    try{
-      const [pr,ms,pm,bn,inc,fl]=await Promise.all([Q(sb.from('processors').select('*').order('sort').order('name')),Q(sb.from('pay_methods').select('*').order('sort').order('name')),
-        Q(sb.from('processor_methods').select('*')),Q(sb.from('banks').select('*').order('country').order('name')),
-        Q(sb.from('pay_incidents').select('*').order('created_at',{ascending:false}).limit(60)),Q(sb.from('pay_files').select('id,ref_kind,ref_id,w,h,caption,created_at').order('created_at'))]);
-      const was=bk.ok;Object.assign(bk,{ok:true,procs:pr,methods:ms,pm,banks:bn,inc,files:fl,at:Date.now()});
-      if(was!==true){bkSeenAt=Math.max(bkSeenAt,0,...inc.map(i=>+new Date(i.created_at)));local.set('bkSeen',bkSeenAt)}else bkNotify(inc); // al entrar no avisa lo viejo: las fallas activas se ven arriba del inicio
-      if(ready&&['banking','inicio'].includes(cur))refresh();else if(ready)status();
-    }catch(e){if(/processors|pay_|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))bk.ok=false}
+    try{bkApply(await bkFetch())}
+    catch(e){if(/processors|pay_|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))bk.ok=false}
     finally{bk.busy=null}
   })();
   return bk.busy;
+}
+async function bkFetch(){
+  const [pr,ms,pm,bn,inc,fl]=await Promise.all([Q(sb.from('processors').select('*').order('sort').order('name')),Q(sb.from('pay_methods').select('*').order('sort').order('name')),
+    Q(sb.from('processor_methods').select('*')),Q(sb.from('banks').select('*').order('country').order('name')),
+    Q(sb.from('pay_incidents').select('*').order('created_at',{ascending:false}).limit(60)),Q(sb.from('pay_files').select('id,ref_kind,ref_id,w,h,caption,created_at').order('created_at'))]);
+  return {pr,ms,pm,bn,inc,fl};
+}
+function bkApply(x,quiet){
+  if(!x){bk.ok=false;return}
+  const {pr,ms,pm,bn,inc,fl}=x,was=bk.ok;Object.assign(bk,{ok:true,procs:pr,methods:ms,pm,banks:bn,inc,files:fl,at:Date.now()});
+  if(was!==true||quiet){bkSeenAt=Math.max(bkSeenAt,0,...inc.map(i=>+new Date(i.created_at)));local.set('bkSeen',bkSeenAt)}else bkNotify(inc); // al entrar no avisa lo viejo: las fallas activas se ven arriba del inicio
+  if(ready&&['banking','inicio'].includes(cur))refresh();else if(ready)status();
 }
 function bkNotify(list){
   const fresh=list.filter(i=>+new Date(i.created_at)>bkSeenAt).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
@@ -117,7 +123,7 @@ function bkOptions(pais=bkPais,tipo=bkTipo){ // procesador + método que sirven 
 }
 function bkOptHTML(o){
   const {p,x}=o,note=p.status==='falla'?p.status_note:x.status_note,otros=pmOf(p.id).filter(y=>y.method_id!==x.method_id&&bkPaisOk(y.countries&&y.countries.length?y.countries:p.countries));
-  return `<details class="bk-opt${o.falla?' falla':''}"><summary>${bkIcon(p.id)}<span><b>${esc(x.m.name)}</b> con ${esc(p.name)}</span><span class="grow"></span>${o.falla?`<span class="badge bad">Falla</span>`:'<span class="badge paid">Anda</span>'}</summary>
+  return `<details class="bk-opt${o.falla?' falla':''}" data-k="${esc(p.id+'|'+x.method_id)}"><summary>${bkIcon(p.id)}<span><b>${esc(x.m.name)}</b> con ${esc(p.name)}</span><span class="grow"></span>${o.falla?`<span class="badge bad">Falla</span>`:'<span class="badge paid">Anda</span>'}</summary>
     <div class="bk-od">${o.falla?`<p class="hot">⚠ ${esc(note||'Está fallando: no lo ofrezcas por ahora.')}</p>`:''}${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}
       ${otros.length?`<p class="dim">${esc(p.name)} también tiene: ${otros.map(y=>esc(y.m.name)).join(', ')}</p>`:''}${bkMini(p.id)}</div></details>`;
 }
@@ -178,11 +184,12 @@ V.banking={
     const banks=bk.banks.filter(b=>(!bkPais||!b.country||b.country===bkPais)&&(hit(b.name)||hit(b.country)));
     const bRow=b=>`<div class="bk-bank"><div class="bk-bn"><b>${esc(b.name)}</b><span class="dim">${esc(b.country||'Todos los países')}</span></div><div class="bk-chips">${bankChips(b)}</div><span class="grow"></span><button type="button" class="btn sm" data-bka="bank" data-id="${esc(b.id)}">Ver flujo</button>${ed?`<button type="button" class="btn sm" data-bka="bankEd" data-id="${esc(b.id)}">Editar</button>`:''}</div>`;
     const hist=bk.inc.slice(0,30);
+    const opened=openKeys(body);
     body.innerHTML=paso+fallas+
       `<section class="card"><div class="card-h"><h3>Procesadores</h3><span class="p-sub">${plural(procs.length,'procesador','procesadores')}${bkTipo?' para '+esc(bkTipo==='digital'?'pago digital':KINDS[bkTipo].toLowerCase()):''}${bkPais?' en '+esc(bkPais):''}</span></div>${procs.length?`<div class="bk-grid">${procs.map(pc).join('')}</div>`:`<div class="p-empty">${bk.procs.length?'Nada con ese filtro.':ed?'Cargá el primer procesador con el botón de arriba.':'Todavía no hay procesadores cargados.'}</div>`}</section>`+
       `<section class="card"><div class="card-h"><h3>Bancos</h3><span class="p-sub">cómo conviene pagar según el banco del cliente</span></div>${banks.length?banks.map(bRow).join(''):`<div class="p-empty">${bk.banks.length?'Ningún banco con ese filtro.':ed?'Cargá un banco con su flujo recomendado (por ejemplo, Falabella Chile: no transferencia).':'Todavía no hay bancos cargados.'}</div>`}</section>`+
       (hist.length?`<section class="card"><div class="card-h"><h3>Historial</h3><span class="p-sub">fallas y vueltas</span></div><div class="lst">${hist.map(i=>`<div class="li"><span class="t">${esc(whenTxt(new Date(i.created_at)))}</span><span class="n"><b>${esc(bkName(i.processor_id,i.method_id))}</b> ${i.kind==='falla'?'<span class="badge bad">falla</span>':'<span class="badge paid">volvió</span>'}${i.note?`<small>${esc(i.note)}</small>`:''}</span><span class="d">${i.created_by?esc(first(i.created_by)):''}</span><span></span><span></span></div>${bkThumbs('incident',i.id)}`).join('')}</div></section>`:'');
-    bkHydrate(body);
+    reopen(body,opened);bkHydrate(body);
   },
 };
 // en el inicio: si algo está fallando, arriba de todo

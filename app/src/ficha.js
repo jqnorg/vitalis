@@ -12,7 +12,7 @@ async function dimStats(col,val){
   const sales=team.filter(f=>norm(get(f))===k&&!isArch(f.brand));
   const d30=addDays(todayS(),-29),s30=sales.filter(f=>f.date>=d30),lat=sales.filter(isLate).length,last=sales.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
   let seen=null;
-  if(crm.ok!==false){try{const rows=(await crmPage(()=>sb.from('crm_clients').select('*').neq('brand',ARCH).eq(col,String(val)).order('client_id'),5000)).map(C2X),S=soldIdx();
+  if(crm.ok!==false){try{const rows=(await crmPage(()=>sb.from('crm_clients').select('*').neq('brand',ARCH).eq(col,String(val)).order('client_id'),5000)).map(C2X);pass++;const S=soldIdx();
     let dep=0,nw=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){dep++;if(!isLate(f))nw++}else if(paidCrm(r)){dep++;if(r.ftd&&r.ftd.slice(0,10)===regDay(r))nw++}}seen={n:rows.length,dep,nw}}catch(e){}}
   return {n:sales.length,n30:s30.length,lat,last,seen};
 }
@@ -199,7 +199,8 @@ async function cuRender(force){
   if(body.dataset.fid!==id)body.innerHTML='<div class="p-empty">Cargando la ficha…</div>';
   const d=await fichaData(id,force);if(gen!==cuGen||!curCl||curCl.id!==id)return;
   const ta=body.querySelector('[data-fcom]'),txt=ta&&body.dataset.fid===id?ta.value:'',foc=ta&&document.activeElement===ta,bs=body.querySelector('[data-fbank]'),bv=bs&&body.dataset.fid===id?bs.value:'';
-  body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);bkHydrate(body);
+  const opened=body.dataset.fid===id?openKeys(body):new Set();
+  body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);reopen(body,opened);bkHydrate(body);
   const t2=body.querySelector('[data-fcom]');if(t2&&txt){t2.value=txt;if(foc)t2.focus()}
   const b2=body.querySelector('[data-fbank]');if(b2&&bv){b2.value=bv;b2.dispatchEvent(new Event('change',{bubbles:true}))}
   if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);top.innerHTML=cuTopHTML()}
@@ -220,7 +221,8 @@ V.cliente={
 };
 // en vivo: comentarios y campañas del cliente que tenés abierto
 function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);if(cur==='cliente')cuRender(true)}
-async function ficInit(){try{await Q(sb.from('client_comments').select('id').limit(1));ficOk=true}catch(e){ficOk=false}}
+const ficFetch=()=>QN(sb.from('client_comments').select('id').limit(1)).then(r=>!!r);
+async function ficInit(){ficOk=await ficFetch()}
 
 /* ---------- cuando entra un new ---------- */
 function fichaNew(id){if(id)setCurrent(id,'','new')}

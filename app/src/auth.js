@@ -16,14 +16,19 @@ async function start() {
   sb = window.supabase.createClient(c.url, c.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'vitalis-auth' }, realtime: { worker: true } }); // worker: el latido del tiempo real no se frena con la pestaña en segundo plano
   if (/mesa=/.test(location.hash || '')) { try { history.replaceState(null, '', location.pathname); } catch (e) {} } // links viejos
   local.set('desk', null);
-  sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT' && ready) location.reload(); });
+  sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { snapClear(); if (ready) location.reload(); } });
+  // con la sesión guardada en esta computadora, se dibuja al instante con lo último que cargó (y después llega lo nuevo)
+  const uid = storedUid();
+  const cached = uid ? await bootCached(uid) : false;
   let session = null;
   try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
-  if (!session) return authScreen('who');
+  if (!session) { await snapClear(); if (cached) return location.reload(); return authScreen('who'); }
+  if (cached && session.user.id !== me) { await snapClear(); return location.reload(); }
   me = session.user.id;
-  authScreen('loading');
-  connect();
+  if (!cached) authScreen('loading');
+  connect(cached);
 }
+function storedUid() { try { const s = JSON.parse(localStorage.getItem('vitalis-auth') || 'null'); const u = s && (s.user || (s.currentSession && s.currentSession.user)); return u && u.id || ''; } catch (e) { return ''; } }
 
 function authErr(e) {
   const m = String((e && (e.message || e.msg)) || e || '');
@@ -41,12 +46,12 @@ async function loadRoster() {
   return data;
 }
 
-function authScreen(mode, msg) {
+function authScreen(mode, msg, x) {
   document.body.classList.add('auth');
   let A = $('#auth');
   if (!A) { A = document.createElement('div'); A.id = 'auth'; document.body.appendChild(A); }
   A.innerHTML = `<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"></div></div>`;
-  (AUTH[mode] || AUTH.error)(A.querySelector('#abox'), msg);
+  (AUTH[mode] || AUTH.error)(A.querySelector('#abox'), msg, x);
 }
 
 const AUTH = {
@@ -67,10 +72,19 @@ const AUTH = {
     focusFirst(box);
   },
 
-  async who(box, msg) {
+  async who(box, msg, fresh) {
+    const keep = local.get('roster', null);
+    if (!fresh && keep && keep.people) { // al instante con la última lista; si cambió, se vuelve a dibujar
+      roster = keep; AUTH.whoDraw(box, msg);
+      loadRoster().then((r) => { local.set('roster', r); if (JSON.stringify(r) !== JSON.stringify(keep) && document.body.contains(box) && box.querySelector('.people')) { roster = r; AUTH.whoDraw(box, msg); } }).catch(() => {});
+      return;
+    }
     box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div>`;
-    try { roster = await loadRoster(); }
-    catch (x) { box.innerHTML = `<h2>No se pudo conectar</h2><p class="lead">${esc(authErr(x))}</p><button class="btn pri big" type="button" id="aRe">Reintentar</button>`; box.querySelector('#aRe').onclick = () => authScreen('who'); return; }
+    try { roster = await loadRoster(); local.set('roster', roster); }
+    catch (x) { box.innerHTML = `<h2>No se pudo conectar</h2><p class="lead">${esc(authErr(x))}</p><button class="btn pri big" type="button" id="aRe">Reintentar</button>`; box.querySelector('#aRe').onclick = () => authScreen('who', '', true); return; }
+    AUTH.whoDraw(box, msg);
+  },
+  whoDraw(box, msg) {
     const lastU = local.get('lastUser', '');
     const people = (roster && roster.people) || [];
     box.innerHTML = `<h2>¿Quién sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
@@ -101,7 +115,7 @@ const AUTH = {
               return ui.fail(data && data.left <= 2 ? `PIN incorrecto. ${data.left === 1 ? 'Te queda 1 intento.' : `Te quedan ${data.left} intentos.`}` : 'PIN incorrecto.');
             }
             const r = await sb.auth.signInWithPassword({ email: data.email, password: data.password });
-            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); authScreen('loading'); connect(); return; }
+            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
             if (!/invalid login credentials/i.test(r.error.message || '')) throw r.error;
           }
           ui.fail('No se pudo abrir la sesión. Probá de nuevo.');

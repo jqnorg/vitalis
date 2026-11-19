@@ -7,18 +7,22 @@ let utargets={},utOk=false; // target individual: uid → {ym: FTDs} (cada uno v
 const utOf=(uid,ym=ymNow())=>(utargets[uid]||{})[ym]||0;
 
 /* ---------- carga ---------- */
-async function loadMesa(){
-  let tg=[];try{tg=await Q(sb.from('targets').select('*'));mesaOk=true}catch(e){mesaOk=false}
-  targets=Object.fromEntries(tg.filter(r=>r.team_id===profile.team_id).map(r=>[r.ym,+r.ftds]));
-  try{const ut=await Q(sb.from('user_targets').select('user_id,ym,ftds'));utOk=true;utargets={};for(const r of ut)(utargets[r.user_id]||(utargets[r.user_id]={}))[r.ym]=+r.ftds}catch(e){utOk=false}
-  if(!isLeader()){teamAg=[];teamSh={};teamAdj={};teamDays={};return}
-  const desde=addDays(todayS().slice(0,8)+'01',-62);
-  const [ag,sh,adj,dd]=await Promise.all([
-    QO(sb.from('agenda').select('*').neq('user_id',me).limit(5000)),
-    QO(sb.from('shifts').select('*').neq('user_id',me).gte('date',desde)),
-    QO(sb.from('adjustments').select('*').neq('user_id',me)),
-    QO(sb.rpc('team_days')),
-  ]);
+// buscar y aplicar van separados: así el arranque lo pide todo junto y lo puede guardar para la próxima vez
+async function mesaFetch(lead){
+  const desde=addDays(todayS().slice(0,8)+'01',-62),N=()=>Promise.resolve(null);
+  const [tg,ut,ag,sh,adj,dd]=await Promise.all([QN(sb.from('targets').select('*')),QN(sb.from('user_targets').select('user_id,ym,ftds')),
+    lead?QO(sb.from('agenda').select('*').neq('user_id',me).limit(5000)):N(),
+    lead?QO(sb.from('shifts').select('*').neq('user_id',me).gte('date',desde)):N(),
+    lead?QO(sb.from('adjustments').select('*').neq('user_id',me)):N(),
+    lead?QO(sb.rpc('team_days')):N()]);
+  return {lead:!!lead,tg,ut,ag,sh,adj,dd};
+}
+async function loadMesa(){mesaApply(await mesaFetch(isLeader()))}
+function mesaApply(x){
+  mesaOk=!!x.tg;targets=Object.fromEntries((x.tg||[]).filter(r=>r.team_id===profile.team_id).map(r=>[r.ym,+r.ftds]));
+  utOk=!!x.ut;utargets={};for(const r of x.ut||[])(utargets[r.user_id]||(utargets[r.user_id]={}))[r.ym]=+r.ftds;
+  if(!isLeader()||!x.lead){teamAg=[];teamSh={};teamAdj={};teamDays={};return}
+  const {ag,sh,adj,dd}=x;
   teamAg=ag.map(r=>({...A2P(r),uid:r.user_id}));
   teamSh={};for(const r of sh)(teamSh[r.user_id]||(teamSh[r.user_id]={}))[r.date]=shiftOf(r);
   teamAdj={};for(const r of adj)(teamAdj[r.user_id]||(teamAdj[r.user_id]={}))[r.ym]=+r.n||0;

@@ -6,7 +6,9 @@ let chatCur=local.get('chatCur',null),chatSig='',chatSound=0,chatInitT=0;
 const chatDrafts={},chatMore={},readSave={};
 const EMOJIS=['👍','❤️','😂','😮','😢','🙏','🔥','🧉'];
 let reacts={},reactVer=0,reactOk=false,chatReply=null; // reacciones por mensaje: id → [{uid,e}] · el mensaje al que estoy respondiendo
-async function loadReacts(){try{reactsLoaded(await Q(sb.from('message_reactions').select('message_id,user_id,emoji').gte('created_at',new Date(Date.now()-30*864e5).toISOString()).limit(5000)))}catch(e){reactOk=false}}
+const reactFetch=()=>QN(sb.from('message_reactions').select('message_id,user_id,emoji').gte('created_at',new Date(Date.now()-30*864e5).toISOString()).limit(5000));
+function reactApply(rows){if(rows)reactsLoaded(rows);else reactOk=false}
+async function loadReacts(){reactApply(await reactFetch())}
 function reactsLoaded(rows){reactOk=true;reacts={};for(const r of rows||[])(reacts[r.message_id]||(reacts[r.message_id]=[])).push({uid:r.user_id,e:r.emoji});reactVer++}
 function msgById(id){if(!id)return null;for(const k in msgs){const m=msgs[k].find(x=>x._id===id);if(m)return m}return null}
 function reactLive(p){ // en vivo

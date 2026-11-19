@@ -1,7 +1,7 @@
 # Prueba la extensión de Chrome con Vitalis (base de prueba server.mjs):
 # snippets con /atajo en otra página y clientes "new" del CRM que llegan al registro.
 # Uso: cd test && python3 e2e_ext.py   → capturas en test/shots/
-import asyncio, subprocess, time, json, urllib.request, pathlib, sys, tempfile
+import asyncio, re, subprocess, time, json, urllib.request, pathlib, sys, tempfile
 from playwright.async_api import async_playwright
 PORT = 54420
 LOCAL = f'http://localhost:{PORT}'
@@ -64,7 +64,7 @@ NOVARA = ('''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><
 <div class="dx-datagrid-content dx-datagrid-content-fixed"><table class="dx-datagrid-table"><tbody>''' + ''.join('<tr class="dx-row dx-data-row"><td colspan="10" class="dx-pointer-events-none"></td><td><i class="ic"></i></td></tr>' for _ in _NV) + '''</tbody></table></div></div></div></body>''')
 
 async def main():
-    srv = subprocess.Popen(['node', 'server.mjs', str(PORT)], cwd=pathlib.Path(__file__).parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT); time.sleep(5)
+    srv = subprocess.Popen(['node', 'server.mjs', str(PORT)], cwd=pathlib.Path(__file__).parent, stdout=open('/tmp/srv_ext.log','w'), stderr=subprocess.STDOUT); time.sleep(5)
     errs = []
     try:
         async with async_playwright() as p:
@@ -79,6 +79,10 @@ async def main():
                 path = route.request.url[len(APP) - 1:].split('#')[0] or '/'
                 if path.startswith('/config.js'):
                     return await route.fulfill(status=200, content_type='text/javascript', body=f"window.VITALIS_CONFIG={{url:'{API}',key:'test-anon-key'}};")
+                if path.split('?')[0] in ('/', '/index.html'):
+                    r = await route.fetch(url=LOCAL + '/')
+                    html = re.sub(r'<script id="cfg">[\s\S]*?</script>', f"<script id=\"cfg\">window.VITALIS_CONFIG={{url:'{API}',key:'test-anon-key'}};</script>", await r.text())
+                    return await route.fulfill(status=200, content_type='text/html', body=html)
                 await to_local(route, path)
             await ctx.route(APP + '**', app)
             await ctx.route(API + '/**', lambda route: to_local(route, route.request.url[len(API):]))

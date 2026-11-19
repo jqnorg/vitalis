@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.16.0';
+const VERSION='1.17.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -39,7 +39,11 @@ const ymNow=()=>todayS().slice(0,7);
 const MES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','setiembre','octubre','noviembre','diciembre'];
 const DIA=['dom','lun','mar','mié','jue','vie','sáb'];
 const DIAL=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
-const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const normC=new Map();
+const norm=s=>{s=String(s||'');let r=normC.get(s);if(r===undefined){r=s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');if(normC.size>50000)normC.clear();normC.set(s,r)}return r};
+// lo que se calcula muchas veces en un mismo dibujo se guarda hasta el próximo dibujo (pass sube en cada go/refresh/status)
+let pass=0;
+function perPass(fn){let p=-1,v;return()=>{if(p!==pass){p=pass;v=fn()}return v}}
 const dm=s=>{const p=s.split('-');return `${p[2]}/${p[1]}`};
 const parseYMD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const parseDue=s=>{const [a,b]=s.split('T');const d=parseYMD(a);const [h,mi]=(b||'09:00').split(':').map(Number);d.setHours(h,mi,0,0);return d};
@@ -133,11 +137,26 @@ function errMsg(e){
 function dbErr(e){toast('No se pudo guardar: '+esc(errMsg(e)),'err');refresh()}
 async function Q(p){const r=await p;if(r.error)throw r.error;return r.data}
 async function QO(p){try{return await Q(p)}catch(e){return []}} // opcional: si la tabla todavía no está en la base, sigo sin eso
+async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, pero distingo "no está" (null) de "vacío"
+
+/* ---------- lo último que cargué, guardado en esta computadora (IndexedDB) ----------
+   Al abrir Vitalis con la sesión abierta se dibuja al instante con eso y en paralelo se pide lo nuevo.
+   Uno por persona; se borra al salir. */
+const SNAP_V=1;
+const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',1);r.onupgradeneeded=()=>r.result.createObjectStore('snap');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
+async function snapOp(mode,fn){try{const db=await snapDb();return await new Promise((ok,no)=>{const t=db.transaction('snap',mode),q=fn(t.objectStore('snap'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
+const snapGet=k=>snapOp('readonly',s=>s.get(k));
+const snapPut=(k,v)=>snapOp('readwrite',s=>s.put(v,k));
+const snapClear=()=>snapOp('readwrite',s=>s.clear());
+function snapCrm(rows,rot){if(me)snapPut('crm:'+me,{v:SNAP_V,at:Date.now(),rows,rot})}
 async function W(fn){try{await fn();return true}catch(e){dbErr(e);return false}}
-async function fetchAll(table,cols='*',order='created_at'){
-  const out=[];
-  for(let i=0;;i+=1000){const rows=await Q(sb.from(table).select(cols).order(order,{ascending:true}).range(i,i+999));out.push(...rows);if(rows.length<1000)break}
-  return out;
+// todas las filas, de a 1000: las páginas que espero las pido juntas (no una detrás de otra); orden estable con el id
+async function fetchAll(table,cols='*',order='created_at',guess=0){
+  const page=i=>Q(sb.from(table).select(cols).order(order,{ascending:true}).order('id',{ascending:true}).range(i*1000,i*1000+999));
+  const n=Math.max(1,Math.ceil((guess+200)/1000));
+  const pages=await Promise.all(Array.from({length:n},(_,i)=>page(i)));
+  for(let i=n;pages[pages.length-1].length===1000;i++)pages.push(await page(i));
+  return pages.flat();
 }
 const B={ // todas las escrituras pasan por acá
   async addFtd(r){
@@ -241,41 +260,57 @@ const B={ // todas las escrituras pasan por acá
     try{return await Q(sb.rpc(fn,args))}catch(e){toast(esc(errMsg(e)),'err');return null}
   },
 };
-async function loadAll(){
-  const [prof]=await Q(sb.from('profiles').select('*').eq('id',me));
-  if(!prof)throw new Error('NO_PROFILE');
-  profile=prof;
-  if(!prof.active)throw new Error('INACTIVE');
-  const [tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp]=await Promise.all([
-    Q(sb.from('teams').select('*').eq('id',prof.team_id).single()),
-    Q(sb.from('profiles').select('*').eq('team_id',prof.team_id).order('name')),
-    fetchAll('sales','*','date'),
+// el arranque: todo en paralelo (las reglas de la base ya filtran por mesa), y se guarda para la próxima vez
+async function bootFetch(hint={}){
+  const lead=!!hint.lead,ago=ms=>new Date(Date.now()-ms).toISOString();
+  const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic]=await Promise.all([
+    Q(sb.from('profiles').select('*').eq('id',me)),
+    Q(sb.from('teams').select('*').limit(1)),
+    Q(sb.from('profiles').select('*').order('name')),
+    fetchAll('sales','*','date',hint.nSales||0),
     Q(sb.from('agenda').select('*').eq('user_id',me)),
     Q(sb.from('adjustments').select('*').eq('user_id',me)),
     Q(sb.from('shifts').select('*').eq('user_id',me)),
     Q(sb.from('settings').select('*').eq('user_id',me)),
     Q(sb.from('snippets').select('*').order('shortcut')),
-    fetchAll('leads','*','date'),
-    Q(sb.from('pings').select('*').gte('created_at',new Date(Date.now()-36e5*24).toISOString()).order('created_at',{ascending:false}).limit(300)),
+    fetchAll('leads','*','date',hint.nLeads||0),
+    Q(sb.from('pings').select('*').gte('created_at',ago(36e5*24)).order('created_at',{ascending:false}).limit(300)),
     QO(sb.from('chats').select('*')),
     QO(sb.from('chat_members').select('*')),
     QO(sb.from('chat_reads').select('*').eq('user_id',me)),
-    QO(sb.from('messages').select('*').gte('created_at',new Date(Date.now()-7*864e5).toISOString()).order('created_at',{ascending:false}).limit(1500)),
-    QO(sb.from('tasks').select('*').gte('created_at',new Date(Date.now()-60*864e5).toISOString()).order('created_at',{ascending:false}).limit(300)),
+    QO(sb.from('messages').select('*').gte('created_at',ago(7*864e5)).order('created_at',{ascending:false}).limit(1500)),
+    QO(sb.from('tasks').select('*').gte('created_at',ago(60*864e5)).order('created_at',{ascending:false}).limit(300)),
     QO(sb.from('task_people').select('*').limit(5000)),
-    loadMesa().catch(()=>{}),
-    loadAvatars(),
-    loadReacts(),
-    bkLoad(true).catch(()=>{}),
-    ficInit(),
+    mesaFetch(lead).catch(()=>null),
+    avFetch(),
+    reactFetch(),
+    bkFetch().catch(()=>null),
+    ficFetch(),
   ]);
-  chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
-  snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
-  teamInfo=tm;members=mem;team=sales.map(S2F);mine();
-  pend=ag.map(A2P);
-  ajustes=Object.fromEntries(adj.map(r=>[r.ym,+r.n||0]));
-  turnos=Object.fromEntries(sh.map(r=>{const t={...r.data};t.date=t.date||r.date;t.breaks=t.breaks||[];return [r.date,t]}));
-  cfg={...DEF,...((st[0]&&st[0].cfg)||{})};
+  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic};
+  if(raw.prof&&['admin','leader'].includes(raw.prof.role)!==lead)raw.mesa=await mesaFetch(!lead).catch(()=>null); // adiviné mal el rol
+  return raw;
+}
+function bootApply(R,quiet){
+  if(!R.prof)throw new Error('NO_PROFILE');
+  profile=R.prof;
+  if(!profile.active)throw new Error('INACTIVE');
+  teamInfo=R.tm;members=R.mem.filter(m=>m.team_id===profile.team_id);
+  chatsLoaded(R.ch,R.cm,R.rd,R.ms);tasksLoaded(R.tk,R.tp);
+  snippets=R.sn.map(N2S);leads=R.ld.map(L2C);pings=R.pg.map(G2P);
+  team=R.sales.map(S2F);mine();
+  pend=R.ag.map(A2P);
+  ajustes=Object.fromEntries(R.adj.map(r=>[r.ym,+r.n||0]));
+  turnos=Object.fromEntries(R.sh.map(r=>{const t={...r.data};t.date=t.date||r.date;t.breaks=t.breaks||[];return [r.date,t]}));
+  cfg={...DEF,...((R.st[0]&&R.st[0].cfg)||{})};
+  if(R.mesa)mesaApply(R.mesa);else mesaOk=false;
+  avApply(R.av);reactApply(R.rx);bkApply(R.bkx,quiet);ficOk=R.fic;
+}
+async function loadAll(first){
+  const snap=me?await snapGet('boot:'+me):null,h=snap&&snap.raw?{lead:snap.raw.prof&&['admin','leader'].includes(snap.raw.prof.role),nSales:snap.raw.sales.length,nLeads:snap.raw.ld.length}:{lead:!!(authPerson&&['admin','leader'].includes(authPerson.role))};
+  const R=await bootFetch(h);
+  bootApply(R,!!first);
+  if(!(profile.login&&!profile.pin_set))snapPut('boot:'+me,{v:SNAP_V,at:Date.now(),ver:VERSION,raw:R});
 }
 // tiempo real: si el canal se cae, me pongo al día enseguida y sondeo cada 5 s hasta que vuelva
 let rtOk=false,rtGen=0,rtWd=null,rtEver=false,lastCatch=0,catching=null;
@@ -287,10 +322,14 @@ async function catchUp(force){
   catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
-setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
+// con el tiempo real andando todo llega solo: ponerse al día es solo una red de seguridad (cada 5 min, o al volver después de un rato).
+// Sin tiempo real: cada 5 s con la pestaña a la vista, cada minuto escondida. Los clientes del CRM no van en tiempo real: cada 45 s a la vista.
+let hidAt=0;
+const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:5e3):Date.now()-lastCatch>5*6e4;
+setInterval(()=>{if(!ready)return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad()},5e3);
 addEventListener('online',()=>catchUp(true));
-addEventListener('focus',()=>catchUp());
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)catchUp(true)});
+addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
   const gen=++rtGen;rtOk=false;
@@ -371,19 +410,35 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
       clearTimeout(rtWd);rtWd=setTimeout(()=>{if(gen===rtGen&&!rtOk)live()},12e3);
     });
 }
-async function connect(){
-  try{await loadAll()}
-  catch(e){
-    const m=String(e&&e.message||e);
-    if(m==='INACTIVE')return authScreen('inactive');
-    if(m==='NO_PROFILE')return authScreen('noprofile');
-    return authScreen('error',errMsg(e));
+// cached: ya se dibujó con lo guardado; acá llega lo nuevo y se vuelve a dibujar
+async function connect(cached){
+  if(cached)live(); // el tiempo real arranca ya: lo que cambie mientras cargo, llega
+  for(let i=0;;i++){
+    try{await loadAll(true);break}
+    catch(e){
+      const m=String(e&&e.message||e);
+      if(m==='INACTIVE'||m==='NO_PROFILE'){snapClear();if(cached){ready=false;document.body.classList.add('auth')}return authScreen(m==='INACTIVE'?'inactive':'noprofile')}
+      if(!cached)return authScreen('error',errMsg(e));
+      if(i===0)toast('Sin conexión: ves lo último que cargó esta computadora. Sigo intentando.','warn',{key:'boot',sticky:true});
+      await new Promise(r=>setTimeout(r,Math.min(30e3,3e3*(i+1)))); // con lo guardado a la vista, reintento solo
+    }
   }
+  closeToast('boot');
   if(profile.login&&!profile.pin_set)return authScreen('newpin'); // primera vez: crear el PIN
+  if(cached){applyTheme();$('#navEquipo').hidden=!isLeader();refresh();crmLoad(true);return}
   enter();
 }
-function enter(){
-  live();
+// arranque instantáneo: con lo guardado de esta persona, antes de que conteste la base
+async function bootCached(uid){
+  const [s,c]=await Promise.all([snapGet('boot:'+uid),snapGet('crm:'+uid)]);
+  if(!s||s.v!==SNAP_V||!s.raw||Date.now()-s.at>14*864e5)return false;
+  try{me=uid;bootApply(s.raw,true);if(c&&c.v===SNAP_V&&c.rows)crmApply(c.rows,c.rot);crm.at=0}
+  catch(e){return false}
+  if(profile.login&&!profile.pin_set)return false;
+  enter(true);return true;
+}
+function enter(cached){
+  if(!cached)live();
   // al volver a la pestaña después de un rato, recargo por si se perdió algún cambio en vivo
   let hiddenAt=0;
   document.addEventListener('visibilitychange',()=>{if(document.hidden)hiddenAt=Date.now();else if(hiddenAt&&Date.now()-hiddenAt>10*6e4)loadAll().then(()=>refresh()).catch(()=>{})});
@@ -479,7 +534,9 @@ const byDate=(a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.time||'')<(b.time||'')?-
 const nextN=()=>ftds.reduce((a,f)=>Math.max(a,f.n||0),0)+1;
 const nextNFor=uid=>team.reduce((a,f)=>f.uid===uid?Math.max(a,f.n||0):a,0)+1; // numeración de cada vendedor
 const nn=s=>norm(s).replace(/[^a-z0-9]+/g,' ').trim();
-function agentUid(txt){ // nombre del agente en el CRM → persona de la mesa (primero los que están; después los desvinculados)
+const agentC={p:-1,m:new Map()};
+function agentUid(txt){if(agentC.p!==pass){agentC.p=pass;agentC.m.clear()}const k=String(txt||'');if(agentC.m.has(k))return agentC.m.get(k);const r=agentUid0(k);agentC.m.set(k,r);return r}
+function agentUid0(txt){ // nombre del agente en el CRM → persona de la mesa (primero los que están; después los desvinculados)
   const t=nn(txt);if(!t)return null;
   const pick=L=>{
     const m=L.find(x=>x.crm_name&&nn(x.crm_name)===t)||L.find(x=>nn(x.name)===t);if(m)return m.id;

@@ -15,6 +15,17 @@ Vitalis es el asistente de ventas de la mesa **Team Matías** (12 agentes + 1 te
 - `cd test && python3 e2e.py` (app entera) y `python3 e2e_ext.py` (extensión) con Playwright + Chrome headless. Mirar las capturas de `test/shots/` después de cambios visuales.
 - La red del entorno no llega a `*.supabase.co`: no se puede probar contra la base real.
 
+## Velocidad (todo tiene que sentirse instantáneo)
+- La página arranca con `<body class="auth">` y la pantalla "Cebando…" ya en el HTML (`build.py`): nunca se ve la app sin sesión. El tema guardado se aplica antes de pintar.
+- Arranque: `bootFetch()` pide todo en paralelo (las reglas RLS ya filtran por mesa; nada espera al perfil) y `bootApply()` lo aplica. Cada carga se divide en buscar/aplicar (`mesaFetch/mesaApply`, `avFetch/avApply`, `reactFetch/reactApply`, `bkFetch/bkApply`, `crmApply`) para poder guardarla.
+- Lo último que cargó cada persona queda en IndexedDB (`snapGet/snapPut`, claves `boot:<uid>` y `crm:<uid>`; `SNAP_V` se sube si cambia la forma). Con la sesión guardada, `bootCached()` dibuja al instante y después llega lo nuevo (`connect(true)`); sin conexión sigue mostrando lo guardado y reintenta. Se borra al salir (`snapClear`). La lista de nombres del login también se guarda (`roster`).
+- `fetchAll` pide juntas las páginas que espera (orden estable con `id`).
+- Tiempo real primero: con el canal andando, ponerse al día (`catchUp`) es solo una red de seguridad cada 5 min o al volver después de 2 min (`needCatch`); sin canal, cada 5 s a la vista y cada minuto escondida. El `tick` de la extensión no fuerza nada. Los clientes del CRM (no van en tiempo real) cada 45 s con la pestaña a la vista.
+- Con la pestaña escondida no se dibuja la sección (`rDirty`, se dibuja al volver); la barra y la extensión sí.
+- Lo que se calcula muchas veces en un dibujo va por `perPass` (`pass` sube en `go`/`refresh`/`status`): `soldIdx`, `agentUid`. `norm` guarda sus resultados. Lo desplegado (`details[data-k]`) sigue desplegado al redibujar (`openKeys`/`reopen`).
+- `supabase.<hash>.js` se cachea para siempre; la configuración va adentro de la página (`<script id="cfg">`; los servidores de prueba la reemplazan).
+- `cd test && python3 perf.py` mide arranque, login y cada sección con datos de tamaño real y 220 ms por consulta.
+
 ## Datos y reglas
 - Ventas (`sales`) compartidas en la mesa; `settings`, `adjustments`, `agenda`, `shifts` privados de cada uno.
 - `leads` (clientes new, compartidos en la mesa) y `snippets` (propios o compartidos).
