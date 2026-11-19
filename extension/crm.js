@@ -167,6 +167,7 @@
     agent: COLS.agent, camp: ['campaign', 'user source', 'utm campaign', 'source'], aff: ['affiliate', 'affiliate id', 'afiliado', 'aff id'],
     call: ['last communication time', 'last communication', 'last call time', 'last call', 'last contact', 'ultima comunicacion', 'ultimo contacto'],
     note: ['last note', 'note', 'notes', 'last comment', 'comment', 'nota', 'notas'],
+    ftd: ['time of ftd', 'ftd time', 'ftd date', 'fecha ftd'], desk: ['sales desk', 'desk'],
   };
   let clHead = null; // la tabla de clientes que encontré (para el diagnóstico)
   function scanAll(T) { // tabla con columna de estado que no sea la de FTDs: todas las filas, con su status
@@ -186,10 +187,10 @@
       const name = g(c, 'name') || [g(c, 'first'), g(c, 'last')].filter(Boolean).join(' ');
       const id = g(c, 'id');
       if ((!id && !name) || !status) continue;
-      const r = parseDT(g(c, 'created')), lc = parseDT(g(c, 'call'));
+      const r = parseDT(g(c, 'created')), lc = parseDT(g(c, 'call')), fd = parseDT(g(c, 'ftd'));
       out.push({ key: id ? 'id:' + id : 'n:' + norm(name) + '|' + g(c, 'created'), id, name, country: g(c, 'country'), created: g(c, 'created'), status,
         reg: r ? r.date + (r.time ? ' ' + r.time : '') : '', agent: g(c, 'agent'), camp: g(c, 'camp'), aff: g(c, 'aff'), brand,
-        call: lc && lc.time ? lc.date + ' ' + lc.time : '', note: g(c, 'note').slice(0, 200) });
+        call: lc && lc.time ? lc.date + ' ' + lc.time : '', note: g(c, 'note').slice(0, 200), ftd: fd ? fd.date + (fd.time ? ' ' + fd.time : '') : '', desk: g(c, 'desk').slice(0, 80) });
     }
     return out;
   }
@@ -278,10 +279,10 @@
     const rows = [];
     for (const c of all) {
       if (!c.id) continue;
-      const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country, c.call, c.note].join('|');
+      const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country, c.call, c.note, c.ftd, c.desk].join('|');
       if (sentSig.get(k) === sig) continue;
       sentSig.set(k, sig);
-      rows.push({ id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note });
+      rows.push({ id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note, ftd: c.ftd, desk: c.desk });
     }
     if (!rows.length) return;
     try { sessionStorage.setItem('vitalis-seen', JSON.stringify([...sentSig].slice(-5000))); } catch (e) {}

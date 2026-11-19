@@ -908,6 +908,10 @@ body.dark .ah-n{color:var(--pri-h)}
 .badge.st-hang_up,.badge.st-na{background:color-mix(in srgb,var(--acc) 16%,transparent)}
 .badge.st-low_potential{background:var(--cuero-soft)}
 .badge.st-dnc{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+.badge.st-callback,.badge.st-pending{background:color-mix(in srgb,var(--s2,var(--pri)) 18%,transparent)}
+.badge.st-failed{background:color-mix(in srgb,var(--warn,var(--acc)) 18%,transparent)}
+.badge.st-ftd{background:color-mix(in srgb,var(--s1) 22%,transparent)}
+.badge.st-invalid,.badge.st-crm{color:var(--dim)}
 .ai .kw .badge{margin-left:6px;vertical-align:1px}
 .ah-card .lst .n small{margin-left:6px}
 .lnkp:hover b{text-decoration:underline}
@@ -1257,8 +1261,8 @@ body.dark .ah-n{color:var(--pri-h)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.12.1';
-const EXT_VER='1.6.3'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.13.0';
+const EXT_VER='1.7.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -4918,12 +4922,13 @@ const utCell=(uid,ym,n)=>{const t=utOf(uid,ym);return `<button type="button" cla
    la conversión por día de registro, el panel de la cola para el team leader y la calidad de datos.
    ============================================================ */
 const ARCH='Trade24Seven',isArch=b=>norm(b)===norm(ARCH); // la marca que quedó como archivo
-const GRPS={new:'New',na:'No Answer y NA',call_again:'Call Again',hang_up:'Hang Up',low_potential:'Low potential',not_interested:'Not interested',dnc:'Do Not Call',otro:'Otro'};
-const G3=['call_again','hang_up','na'];
-let crm={ok:null,rows:new Map(),at:0,busy:null};
+const GRPS={new:'New (y Talking)',na:'No Answer y NA',callback:'CallBack (con cita)',call_again:'Call Again',hang_up:'Hang Up',low_potential:'Low potential',not_interested:'Not interested',
+  pending:'Pending Payment (boleto)',failed:'Depósito trabado (Failed, Bank Block, Declined)',ftd:'FTD',dnc:'Do Not Call',invalid:'Inválido (número, idioma)',crm:'Del CRM (Reassign, Test, FAKE…)',otro:'Otro'};
+const G3=['call_again','hang_up','na'],G2=['callback','pending'],DAYS5=['callback','call_again','hang_up','low_potential']; // con cita · los de 5 días seguidos y al 5º pasan a Not interested
+let crm={ok:null,rows:new Map(),at:0,busy:null,rot:[]};
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
 const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:r.status||'',grp:r.status_group||'otro',agent:r.crm_agent||'',
-  camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
+  camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
 const crmAll=()=>[...crm.rows.values()];
 const regDay=r=>r.reg?r.reg.slice(0,10):(r.first?ymd(new Date(r.first)):'');
 const callAt=r=>r.call?parseDue(r.call.slice(0,10)+'T'+r.call.slice(11,16)):null; // "Last Communication Time" del CRM
@@ -4955,12 +4960,13 @@ async function crmLoad(force){
       const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromTs=parseYMD(from).toISOString();
       const base=()=>sb.from('crm_clients').select('*').neq('brand',ARCH);
       const [act,coh,cohS]=await Promise.all([
-        crmPage(()=>base().in('status_group',['new','na','call_again','hang_up','low_potential']).order('client_id')),
+        crmPage(()=>base().in('status_group',['new','na','callback','call_again','hang_up','low_potential','pending','failed']).order('client_id')),
         crmPage(()=>base().gte('reg',from).order('client_id')),
         crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
       ]);
       const ids=[...new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>String(p.id)))].slice(0,300);
       const ag=ids.length?await Q(base().in('client_id',ids)):[];
+      if(isLeader())crm.rot=await QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)).catch(()=>[]);
       const m=new Map();for(const r of [...act,...coh,...cohS,...ag]){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
       const was=crm.ok;crm.rows=m;crm.ok=true;crm.at=Date.now();
       if(!was||['ahora','inicio','clientes','equipo','agenda'].includes(cur))refresh();
@@ -4971,7 +4977,11 @@ async function crmLoad(force){
 }
 let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}
-async function crmLog(id){return (await QO(sb.from('crm_status_log').select('*').eq('client_id',String(id)).order('seen_at',{ascending:true}).limit(60))).filter(r=>!isArch(r.brand))}
+async function crmLog(id){ // status y rotaciones, en orden
+  const [a,b]=await Promise.all([QO(sb.from('crm_status_log').select('*').eq('client_id',String(id)).order('seen_at',{ascending:true}).limit(60)),
+    QO(sb.from('crm_agent_log').select('*').eq('client_id',String(id)).order('seen_at',{ascending:true}).limit(30)).catch(()=>[])]);
+  return [...a,...b].filter(r=>!isArch(r.brand)).sort((x,y)=>new Date(x.seen_at)-new Date(y.seen_at));
+}
 
 // lo que mandó la extensión: todos los clientes vistos en el CRM
 async function crmSeenFromExt(rows){
@@ -4980,7 +4990,8 @@ async function crmSeenFromExt(rows){
   const s=v=>String(v??'').replace(/\s+/g,' ').trim(),batch=rows.slice(0,500);
   const list=batch.filter(r=>r&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
     reg:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.reg||'')?r.reg:'',agent:s(r.agent).slice(0,80),camp:s(r.camp).slice(0,120),aff:s(r.aff).slice(0,60),
-    call:/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call||'')?r.call:'',note:s(r.note).slice(0,200)}));
+    call:/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call||'')?r.call:'',note:s(r.note).slice(0,200),
+    ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80)}));
   const keys=batch.map(r=>String(r&&r.k||''));
   if(!list.length)return {keys};
   try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();return {keys,added:res&&res.new||0}}
@@ -4989,23 +5000,33 @@ async function crmSeenFromExt(rows){
 
 /* ---------- la cola, en el orden de la mesa ---------- */
 const naNum=s=>{const m=norm(s).match(/(?:^|[^a-z])na\D*([2-9])/);return m?+m[1]:1};
+const NA_MAX=4; // los NA se llaman del día 1 al 4; el 5 queda para repasos
+const paidCrm=r=>r.grp==='ftd'||!!r.ftd; // el CRM ya lo marca con FTD
+// día del status para los de "5 días seguidos" (cuenta desde que Vitalis lo vio cambiar)
+const statusDay=r=>{if(!DAYS5.includes(r.grp)||!r.since)return 0;return Math.max(1,Math.round((parseYMD(todayS())-parseYMD(ymd(new Date(r.since))))/864e5)+1)};
+const dayTag=r=>{const n=statusDay(r);return n?` <span class="d${n>=5?' hot b':''}" title="Al 5º día seguido pasa a Not interested">día ${Math.min(n,5)}/5</span>`:''};
 const g3rank=r=>r.grp==='call_again'?0:r.grp==='hang_up'?10:20+naNum(r.status);
 const byRegDesc=(a,b)=>(regAt(b)||0)-(regAt(a)||0);
 const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
 function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
-  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id)));
+  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
   const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
   const ags=uid===me?pend:uid==null?[...pend,...(isLeader()?teamAg:[])]:agOf(uid);
   const ag=ags.filter(p=>!p.done&&p.due.slice(0,10)<=te&&!soldOf(p.id)&&!isDnc(p.id)).sort(byDue);
-  const all3=live.filter(r=>G3.includes(r.grp)),cap=qCap(),many=all3.length>cap;
+  const agIds=new Set(ags.filter(p=>!p.done).map(p=>norm(p.id)));
+  const cb=live.filter(r=>G2.includes(r.grp)&&!agIds.has(norm(r.id))).sort((a,b)=>(a.grp==='pending'?0:1)-(b.grp==='pending'?0:1)||byRegDesc(a,b)); // con cita en el CRM y sin agenda en Vitalis
+  const rep=live.filter(r=>r.grp==='na'&&naNum(r.status)>NA_MAX).sort(byRegDesc);
+  const all3=live.filter(r=>G3.includes(r.grp)&&!(r.grp==='na'&&naNum(r.status)>NA_MAX)),cap=qCap(),many=all3.length>cap;
   const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>g3rank(a)-g3rank(b)||byRegDesc(a,b));
   const cnt=g=>mineAll.filter(r=>r.grp===g).length;
-  return {g1,ag,g3,n3:all3.length,cap,many,low:live.filter(r=>r.grp==='low_potential').sort(byRegDesc),ni:cnt('not_interested'),dnc:cnt('dnc'),otro:cnt('otro')};
+  const low=live.filter(r=>r.grp==='low_potential').sort(byRegDesc);
+  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
+    ni:cnt('not_interested'),dnc:cnt('dnc'),inv:cnt('invalid'),otro:cnt('otro')+cnt('crm')};
 }
 function ahRow(r,i,who){
   const ra=regAt(r),ca=callAt(r),tz=cliTime(r.country);
-  return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td>
+  return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}${dayTag(r)}</td>
     <td class="d" title="${ca?esc(whenTxt(ca)):''}">${ca?esc(rel(ca)):'—'}${r.note?`<div class="ah-nt trunc" title="${esc(r.note)}">${esc(r.note)}</div>`:''}</td>
     <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
     ${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}<td class="act wr"><button type="button" class="ib" data-ah="ficha" data-id="${esc(r.id)}">Ficha</button><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
@@ -5015,7 +5036,7 @@ function ahTable(list,who,lim){
   return `<div class="p-tablewrap"><table class="pt ah-t"><thead><tr><th></th><th>Cliente</th><th>Status</th><th>Último contacto</th><th>Registro</th><th>País</th><th>Campaña</th>${who?'<th>Agente</th>':''}<th class="act"></th></tr></thead><tbody>${list.slice(0,lim||list.length).map((r,i)=>ahRow(r,i+1,who)).join('')}</tbody></table></div>`;
 }
 const noCrm=()=>'Todavía no llegaron clientes del CRM. '+(extOld()?`Actualizá la extensión a la ${EXT_VER} (Ajustes) y recargá el CRM.`:'Abrí la lista de clientes del CRM con la extensión.');
-let ahWho='',ahLow=false,ahMore={};
+let ahWho='',ahLow=false,ahRep=false,ahFail=false,ahMore={};
 V.ahora={
   build(){
     $('#ahWho').addEventListener('change',e=>{ahWho=e.target.value;ahMore={};this.render({})});
@@ -5025,6 +5046,8 @@ V.ahora={
       if(a==='ficha')return openFicha(id);
       if(a==='ag')return agendarCliente(id,b.dataset.nm||'');
       if(a==='low'){ahLow=!ahLow;this.render({});return}
+      if(a==='rep'){ahRep=!ahRep;this.render({});return}
+      if(a==='fail'){ahFail=!ahFail;this.render({});return}
       if(a==='more'){ahMore[b.dataset.g]=1;this.render({});return}
       if(a==='cap')return capModal();
     });
@@ -5041,17 +5064,21 @@ V.ahora={
     const uid=ahWho==='me'?me:ahWho==='all'?null:ahWho,who=uid!==me;
     if(crm.ok===false){$('#ahSub').textContent='';$('#ahBody').innerHTML='<section class="card"><div class="p-empty">La cola se activa en un rato (falta actualizar la base).</div></section>';return}
     const q=queueOf(uid),now=new Date();
-    $('#ahSub').innerHTML=`En el orden de la mesa: new, agendas, y después Call Again, Hang Up y NA. ${extOn()?'':sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
+    $('#ahSub').innerHTML=`En el orden de la mesa: new, agendas, y después Call Again, Hang Up y NA del día 1 al ${NA_MAX}. ${extOn()?'':sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
     const sec=(n,t,sub,body,empty)=>`<section class="card ah-g"><div class="card-h"><span class="ah-n">${n}</span><h3>${t}</h3><span class="p-sub">${sub}</span></div>${body||`<div class="p-empty" style="padding:10px 0">${empty}</div>`}</section>`;
     const lim=g=>ahMore[g]?0:40,more=(g,l)=>l.length>40&&!ahMore[g]?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${g}">Ver los ${l.length}</button>`:'';
     const agBody=q.ag.length?`<div class="alist">${q.ag.map(p=>uid===me||pend.includes(p)?pendItem(p,now,true):`<div class="ai"><span class="wh">${esc(whenTxt(parseDue(p.due)))}</span><span class="id">${esc(p.id)}</span><span class="kw">${esc(p.kw)}<small>${esc(memberName(p.uid))}</small></span><span></span></div>`).join('')}</div>`:'';
     const g3sub=q.many?`Son ${q.n3}: más que el tope de ${q.cap}, así que van solo los registrados en ${MES[now.getMonth()]} (${q.g3.length})`:`${plural(q.n3,'cliente')} · hasta ${q.cap} se llaman todos`;
     $('#ahBody').innerHTML=
       sec(1,'New',`${q.g1.length} sin depositar`,ahTable(q.g1,who,lim('g1'))+more('g1',q.g1),crm.rows.size?'No hay new sin depositar.':esc(noCrm()))+
-      sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas'),agBody,'Nada agendado para ahora.')+
+      sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas')+(q.cb.length?` · ${plural(q.cb.length,'CallBack o Pending Payment','CallBack o Pending Payment')} sin agenda en Vitalis`:''),
+        agBody+(q.cb.length?`<p class="p-sub" style="margin:10px 0 6px">Tienen cita en el CRM: agendalos en Vitalis para que te avise.</p>`+ahTable(q.cb,who,lim('cb'))+more('cb',q.cb):''),'Nada agendado para ahora.')+
       sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+
-      `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">Low potential ${q.low.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.otro?` · otros status ${q.otro}`:''}</span><span class="grow"></span>${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}</div>
-        ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">Dicen no tener el dinero: candidatos para agendar.</p>`+ahTable(q.low,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p></section>`;
+      `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
+        ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
+        ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}
+        ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">No tienen el dinero ahora: van agendados para el día que dijeron.${q.lowSin?` <span class="hot">${plural(q.lowSin,'está','están')} sin agenda: sin cita, CRM los puede mover.</span>`:''}</p>`+ahTable(q.low,who):''}
+        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p></section>`;
   },
 };
 function capModal(){
@@ -5082,7 +5109,7 @@ function ahoraCard(){
 function cohort(from,to,uid){
   const S=soldIdx(),own=r=>uid==null||crmOwner(r)===uid;
   const rows=crmAll().filter(r=>!isArch(r.brand)&&own(r)&&(()=>{const d=regDay(r);return d>=from&&d<=to})());
-  let nw=0,lt=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){if(isLate(f))lt++;else nw++}}
+  let nw=0,lt=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){if(isLate(f))lt++;else nw++}else if(paidCrm(r)&&r.ftd){if(r.ftd.slice(0,10)!==regDay(r))lt++;else nw++}}
   return {n:rows.length,nw,lt,rate:rows.length?nw/rows.length:null,lrate:rows.length?lt/rows.length:null};
 }
 function cohortOn(){const te=todayS();return crm.ok&&crmAll().some(r=>!isArch(r.brand)&&regDay(r)>=te.slice(0,8)+'01')}
@@ -5141,16 +5168,16 @@ async function openFicha(id,o={}){
   const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
   api.mb.innerHTML=`<div class="fi">
     <div class="fi-h"><div><div class="fi-nm">${esc(name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${country?' · '+esc(country):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
-      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}</div></div>
+      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}</div></div>
     <div class="fi-grid">
       <div class="fi-c"><h4>Cliente</h4>
-        ${rw2('Status',r?`${esc(r.status||'—')}${r.since?` <span class="d">desde ${esc(rel(new Date(r.since)))}</span>`:''}`:'<span class="d">todavía no se vio en el CRM</span>')}
+        ${rw2('Status',r?`${esc(r.status||'—')}${r.since?` <span class="d">desde ${esc(rel(new Date(r.since)))}</span>`:''}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
-        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Marca',r?esc(r.brand):'')}
+        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Desk',r&&r.desk?esc(r.desk):'')}${rw2('Marca',r?esc(r.brand):'')}
         ${rw2('Lo vio primero',r&&r.firstBy?`${esc(first(r.firstBy))}, ${esc(rel(new Date(r.first)))}`:'')}
         ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
-        ${log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${log.map(x=>`<span>${esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
+        ${log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
       ${statHTML('Campaña',r&&r.camp,sc)}${statHTML('Afiliado',r&&r.aff,sa)}${country?statHTML('País',country,sp_):''}
     </div></div>`;
@@ -5163,12 +5190,13 @@ function colaMesaCard(){
   const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)]};
   const rows=act.map(m=>{const q=queueOf(m.id),c=cohort(te,te,m.id),ag=agStats(m.id);
     const sal=crmAll().filter(r=>!isArch(r.brand)&&crmOwner(r)===m.id&&regDay(r)===te&&r.grp!=='new'&&r.since&&r.first&&new Date(r.since)>new Date(r.first)).map(r=>(new Date(r.since)-new Date(r.first))/6e4);
-    return {m,q,c,ag,t:med(sal),late:team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym&&isLate(f)).length}});
+    const rin=crm.rot.filter(x=>agentUid(x.new_agent)===m.id).length,rout=crm.rot.filter(x=>agentUid(x.old_agent)===m.id).length;
+    return {m,q,c,ag,rin,rout,t:med(sal),late:team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym&&isLate(f)).length}});
   const sinDueno=crmAll().filter(r=>!isArch(r.brand)&&!crmOwner(r)&&G3.concat('new').includes(r.grp)).length;
   return `<div class="card-h"><h3>La cola de cada uno</h3><span class="p-sub">hoy, en el orden de la mesa · tope del grupo 3: ${qCap()}</span><span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button></div>
-    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">New sin depositar</th><th class="r">Agendas vencidas</th><th class="r">Grupo 3</th><th class="r">Registrados hoy</th><th class="r">New hoy</th><th class="r">Late del mes</th><th class="r" title="Mediana del tiempo hasta que el cliente deja New (aprox.: es cuando alguien lo vio cambiar)">Deja New en</th></tr></thead><tbody>`+
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">New sin depositar</th><th class="r">Agendas vencidas</th><th class="r">Grupo 3</th><th class="r">Registrados hoy</th><th class="r">New hoy</th><th class="r">Late del mes</th><th class="r" title="Clientes que CRM le pasó hoy / que le sacó hoy">Rotados hoy</th><th class="r" title="Mediana del tiempo hasta que el cliente deja New (aprox.: es cuando alguien lo vio cambiar)">Deja New en</th></tr></thead><tbody>`+
     rows.map(x=>`<tr><td><button type="button" class="who-cell lnkp" data-prof="${esc(x.m.id)}">${avatar(x.m.name)}${esc(x.m.name)}</button></td><td class="r">${x.q.g1.length||'<span class="d">0</span>'}</td><td class="r">${x.ag.venc?`<span class="hot b">${x.ag.venc}</span>`:'<span class="d">0</span>'}</td>
-      <td class="r">${x.q.g3.length}${x.q.many?` <span class="d">de ${x.q.n3}</span>`:''}</td><td class="r">${x.c.n}</td><td class="r">${x.c.n?`${x.c.nw} · ${pct(x.c.nw/x.c.n)}`:'<span class="d">—</span>'}</td><td class="r">${x.late}</td><td class="r d">${x.t==null?'—':x.t<60?Math.round(x.t)+' min':nf(x.t/60,1)+' h'}</td></tr>`).join('')+
+      <td class="r">${x.q.g3.length}${x.q.many?` <span class="d">de ${x.q.n3}</span>`:''}</td><td class="r">${x.c.n}</td><td class="r">${x.c.n?`${x.c.nw} · ${pct(x.c.nw/x.c.n)}`:'<span class="d">—</span>'}</td><td class="r">${x.late}</td><td class="r">${x.rin||x.rout?`${x.rin?'+'+x.rin:''}${x.rin&&x.rout?' · ':''}${x.rout?'−'+x.rout:''}`:'<span class="d">0</span>'}</td><td class="r d">${x.t==null?'—':x.t<60?Math.round(x.t)+' min':nf(x.t/60,1)+' h'}</td></tr>`).join('')+
     `</tbody></table></div>${sinDueno?`<p class="note">${plural(sinDueno,'cliente')} de la cola sin agente asignado (la lista del CRM no trae la columna de agente).</p>`:''}`;
 }
 

@@ -1013,6 +1013,8 @@ create index if not exists crm_clients_seen on public.crm_clients (team_id, firs
 create index if not exists crm_clients_camp on public.crm_clients (team_id, camp);
 alter table public.crm_clients add column if not exists last_call text; -- "Last Communication Time" del CRM (AAAA-MM-DD HH:MM)
 alter table public.crm_clients add column if not exists note text;      -- "Last Note" del CRM
+alter table public.crm_clients add column if not exists ftd_at text;    -- "Time of FTD" del CRM (AAAA-MM-DD HH:MM): ya depositó
+alter table public.crm_clients add column if not exists desk text;      -- "Sales Desk" del CRM
 create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
   id         bigserial primary key,
   team_id    uuid not null references public.teams(id),
@@ -1025,12 +1027,29 @@ create table if not exists public.crm_status_log ( -- cada cambio de status que 
   seen_by    uuid references public.profiles(id) on delete set null
 );
 create index if not exists crm_status_log_cl on public.crm_status_log (team_id, client_id, seen_at);
+-- rotaciones: cada cambio de agente (Sales Rep) que se vio en el CRM
+create table if not exists public.crm_agent_log (
+  id         bigserial primary key,
+  team_id    uuid not null references public.teams(id),
+  brand      text not null,
+  client_id  text not null,
+  old_agent  text,
+  new_agent  text,
+  status     text,
+  seen_at    timestamptz not null default now(),
+  seen_by    uuid references public.profiles(id) on delete set null
+);
+create index if not exists crm_agent_log_cl on public.crm_agent_log (team_id, client_id, seen_at);
+create index if not exists crm_agent_log_at on public.crm_agent_log (team_id, seen_at);
 create table if not exists public.crm_status_map ( -- status que el admin clasificó a mano
   team_id    uuid not null references public.teams(id),
   status_key text not null,
-  grp        text not null check (grp in ('new','na','call_again','hang_up','low_potential','not_interested','dnc','otro')),
+  grp        text not null check (grp in ('new','na','callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd','dnc','invalid','crm','otro')),
   primary key (team_id, status_key)
 );
+
+alter table public.crm_status_map drop constraint if exists crm_status_map_grp_check;
+alter table public.crm_status_map add constraint crm_status_map_grp_check check (grp in ('new','na','callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd','dnc','invalid','crm','otro'));
 
 create or replace function public.crm_key(st text) returns text language sql immutable set search_path = ''
   as $$ select lower(regexp_replace(coalesce(st, ''), '[^A-Za-z0-9]', '', 'g')) $$;
@@ -1045,13 +1064,20 @@ begin
   select grp into g from public.crm_status_map where team_id = t and status_key = k;
   if g is not null then return g; end if;
   return case
-    when k like 'new%' then 'new'
+    -- la tabla de status de la mesa: Talking es el new en llamada; CallBack tiene cita; POTENTIAL NO KYC es el Call Again viejo
+    when k like 'new%' or k = 'talking' then 'new'
     when k in ('na', 'noanswer', 'noresponse') or k ~ '^(na|noanswer)(day)?[0-9]{1,2}$' then 'na'
-    when k in ('callagain', 'callback', 'callagainlater') then 'call_again'
+    when k = 'callback' then 'callback'
+    when k in ('callagain', 'callagainlater', 'potentialnokyc') then 'call_again'
     when k in ('hangup', 'hungup') then 'hang_up'
-    when k = 'lowpotential' then 'low_potential'
+    when k in ('lowpotential', 'lowpotencial') then 'low_potential'
     when k = 'notinterested' then 'not_interested'
+    when k = 'pendingpayment' then 'pending'
+    when k in ('faileddeposit', 'bankblock', 'declined') then 'failed'
+    when k = 'ftd' then 'ftd'
     when k in ('donotcall', 'dnc', 'dontcall') then 'dnc'
+    when k = 'invalidnumber' or k like 'languagebarrier%' then 'invalid'
+    when k in ('reassign', 'reshuffle', 'test', 'fake', 'duplicate') then 'crm'
     else 'otro' end;
 end $$;
 
@@ -1060,7 +1086,7 @@ create or replace function public.crm_seen(rows jsonb) returns json
   language plpgsql security definer set search_path = public as $$
 declare
   t uuid := public.my_team();
-  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; cur record;
+  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; fa text; ag text; cur record;
   n_new integer := 0; n_chg integer := 0; fresh text[] := '{}';
 begin
   if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
@@ -1076,12 +1102,15 @@ begin
     lc := public._clip(r->>'call', 16);
     if lc is not null and (lc !~ '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$' or left(lc, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then lc := null; end if;
     nt := public._clip(r->>'note', 200);
+    fa := public._clip(r->>'ftd', 16);
+    if fa is not null and (fa !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(fa, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then fa := null; end if;
+    ag := public._clip(r->>'agent', 80);
     g := public.crm_group(st, t);
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
     if not found then
-      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, first_seen_by, last_seen_by)
+      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
-              public._clip(r->>'agent', 80), public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), lc, nt, auth.uid(), auth.uid())
+              ag, public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), lc, nt, fa, public._clip(r->>'desk', 80), auth.uid(), auth.uid())
       on conflict do nothing;
       if st is not null then
         insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, null, st, g, auth.uid());
@@ -1093,16 +1122,21 @@ begin
         name = coalesce(public._clip(r->>'name', 120), name),
         country = coalesce(public._clip(r->>'country', 60), country),
         reg = coalesce(rg, reg),
-        crm_agent = coalesce(public._clip(r->>'agent', 80), crm_agent),
+        crm_agent = coalesce(ag, crm_agent),
         camp = coalesce(public._clip(r->>'camp', 120), camp),
         aff = coalesce(public._clip(r->>'aff', 60), aff),
         last_call = coalesce(lc, last_call),
         note = coalesce(nt, note),
+        ftd_at = coalesce(fa, ftd_at),
+        desk = coalesce(public._clip(r->>'desk', 80), desk),
         status = coalesce(st, status),
         status_group = case when st is null then status_group else g end,
         status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
         last_seen = now(), last_seen_by = auth.uid()
       where team_id = t and brand = br and client_id = cid;
+      if ag is not null and cur.crm_agent is not null and lower(ag) <> lower(cur.crm_agent) then -- lo rotaron
+        insert into public.crm_agent_log (team_id, brand, client_id, old_agent, new_agent, status, seen_by) values (t, br, cid, cur.crm_agent, ag, coalesce(st, cur.status), auth.uid());
+      end if;
       if st is not null and st is distinct from cur.status then
         insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, cur.status, st, g, auth.uid());
         n_chg := n_chg + 1;
@@ -1115,7 +1149,7 @@ end $$;
 -- el admin clasifica un status que no se reconoce (y se reclasifican los clientes que lo tienen)
 -- los que quedaron en "otro" con una versión vieja de crm_group (p. ej. NA - DAY3) pasan a su grupo
 update public.crm_clients c set status_group = public.crm_group(c.status, c.team_id)
-  where c.status_group = 'otro' and public.crm_group(c.status, c.team_id) <> 'otro';
+  where c.status is not null and c.status_group is distinct from public.crm_group(c.status, c.team_id);
 
 create or replace function public.crm_map_status(st text, grp text) returns json
   language plpgsql security definer set search_path = public as $$
@@ -1123,7 +1157,7 @@ declare t uuid := public.my_team(); k text := public.crm_key(st); n integer;
 begin
   if coalesce(public.my_role(), '') <> 'admin' then raise exception 'Solo el administrador clasifica status'; end if;
   if k = '' then raise exception 'STATUS: falta el status'; end if;
-  if grp not in ('new','na','call_again','hang_up','low_potential','not_interested','dnc','otro') then raise exception 'GRP: grupo inválido'; end if;
+  if grp not in ('new','na','callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd','dnc','invalid','crm','otro') then raise exception 'GRP: grupo inválido'; end if;
   insert into public.crm_status_map (team_id, status_key, grp) values (t, k, grp)
     on conflict (team_id, status_key) do update set grp = excluded.grp;
   update public.crm_clients set status_group = grp where team_id = t and public.crm_key(status) = k;
@@ -1185,13 +1219,16 @@ drop policy if exists crm_clients_read on public.crm_clients;
 create policy crm_clients_read on public.crm_clients for select to authenticated using (team_id = public.my_team());
 drop policy if exists crm_log_read on public.crm_status_log;
 create policy crm_log_read on public.crm_status_log for select to authenticated using (team_id = public.my_team());
+drop policy if exists crm_agent_log_read on public.crm_agent_log;
+create policy crm_agent_log_read on public.crm_agent_log for select to authenticated using (team_id = public.my_team());
+alter table public.crm_agent_log enable row level security;
 drop policy if exists crm_map_read on public.crm_status_map;
 create policy crm_map_read on public.crm_status_map for select to authenticated using (team_id = public.my_team());
 drop policy if exists audit_read on public.audit_log;
 create policy audit_read on public.audit_log for select to authenticated using (team_id = public.my_team() and public.my_role() in ('admin', 'leader'));
-grant select on public.crm_clients, public.crm_status_log, public.crm_status_map, public.audit_log to authenticated;
-revoke insert, update, delete, truncate on public.crm_clients, public.crm_status_log, public.crm_status_map, public.audit_log from authenticated;
-revoke all on public.crm_clients, public.crm_status_log, public.crm_status_map, public.audit_log from anon;
+grant select on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log to authenticated;
+revoke insert, update, delete, truncate on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log from authenticated;
+revoke all on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log from anon;
 revoke all on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) from public, anon;
 grant execute on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) to authenticated;
 revoke execute on function public.crm_group(text, uuid), public.audit_sales() from public, anon, authenticated;

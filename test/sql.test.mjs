@@ -623,6 +623,21 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '70936', status: 'NA - DAY3', call: '2026-11-19 11:02' }])]);
   r = await as(B, "select last_call, note from public.crm_clients where client_id = '70936'");
   ok(r.rows[0].last_call === '2026-11-19 11:02' && r.rows[0].note === 'NA 3.1', 'un contacto nuevo actualiza la hora y no borra la nota');
+  // la tabla de status de la mesa
+  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(['Talking','CallBack','POTENTIAL NO KYC','Pending Payment','Failed Deposit','Bank Block','Declined','FTD','Invalid Number','Language Barrier','Reassign','FAKE','Special - New','Voicemail']
+    .map((st, i) => ({ id: 'G' + i, status: st })))]);
+  r = await as(B, "select client_id, status_group g from public.crm_clients where client_id like 'G%' order by length(client_id), client_id");
+  ok(r.rows.map((x) => x.g).join(',') === 'new,callback,call_again,pending,failed,failed,failed,ftd,invalid,invalid,crm,crm,otro,otro', 'cada status de la tabla de la mesa en su grupo (' + r.rows.map((x) => x.g).join(',') + ')');
+  // FTD, desk y rotaciones
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', status: 'Call Again', agent: 'Ana Uno', desk: 'Team Matías' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', status: 'Call Again', agent: 'Beto Dos', ftd: '2026-11-19 10:15' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', agent: 'beto dos' }])]);
+  r = await as(B, "select crm_agent, ftd_at, desk from public.crm_clients where client_id = 'R1'");
+  ok(r.rows[0].crm_agent === 'beto dos' && r.rows[0].ftd_at === '2026-11-19 10:15' && r.rows[0].desk === 'Team Matías', 'guarda el agente actual, la hora del FTD y el desk');
+  r = await as(B, "select old_agent, new_agent, status from public.crm_agent_log where client_id = 'R1'");
+  ok(r.rows.length === 1 && r.rows[0].old_agent === 'Ana Uno' && r.rows[0].new_agent === 'Beto Dos' && r.rows[0].status === 'Call Again', 'una rotación queda anotada una vez (mayúsculas no cuentan)');
+  r = await as(B, "insert into public.crm_agent_log (team_id, brand, client_id) values (public.my_team(), 'x', 'y')");
+  ok(!!r.error, 'nadie escribe las rotaciones a mano');
   R = await rpc(B, 'select public.set_queue_cap(40) j');
   ok(!!R.error, 'un agente no cambia el tope del grupo 3');
   R = await rpc(M, 'select public.set_queue_cap(40) j');

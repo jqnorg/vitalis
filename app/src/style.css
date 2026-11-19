@@ -898,6 +898,10 @@ body.dark .ah-n{color:var(--pri-h)}
 .badge.st-hang_up,.badge.st-na{background:color-mix(in srgb,var(--acc) 16%,transparent)}
 .badge.st-low_potential{background:var(--cuero-soft)}
 .badge.st-dnc{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+.badge.st-callback,.badge.st-pending{background:color-mix(in srgb,var(--s2,var(--pri)) 18%,transparent)}
+.badge.st-failed{background:color-mix(in srgb,var(--warn,var(--acc)) 18%,transparent)}
+.badge.st-ftd{background:color-mix(in srgb,var(--s1) 22%,transparent)}
+.badge.st-invalid,.badge.st-crm{color:var(--dim)}
 .ai .kw .badge{margin-left:6px;vertical-align:1px}
 .ah-card .lst .n small{margin-left:6px}
 .lnkp:hover b{text-decoration:underline}
