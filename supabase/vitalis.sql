@@ -1018,6 +1018,8 @@ alter table public.crm_clients add column if not exists desk text;      -- "Sale
 -- el primero que lo llamó (el Sales Rep cuando se lo vio contactado por primera vez): a ese le suma la conversión del new
 alter table public.crm_clients add column if not exists first_agent text;
 alter table public.crm_clients add column if not exists first_call_at timestamptz;
+-- un Talking que desapareció de la lista que se actualiza: ya cambió de status en el CRM (cuál, se sabe cuando aparezca en otra pestaña)
+alter table public.crm_clients add column if not exists left_new_at timestamptz;
 create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
   id         bigserial primary key,
   team_id    uuid not null references public.teams(id),
@@ -1099,6 +1101,12 @@ begin
     cid := public._clip(r->>'id', 60);
     if cid is null then continue; end if;
     br := coalesce(public._clip(r->>'brand', 40), 'Novara Markets');
+    if coalesce(r->>'gone', '') in ('1', 'true') then -- salió de Talking: deja de ser new hasta que se lo vuelva a ver
+      update public.crm_clients set left_new_at = now()
+        where team_id = t and brand = br and client_id = cid and status_group = 'new' and public.crm_key(status) = 'talking' and left_new_at is null;
+      if found then n_chg := n_chg + 1; end if;
+      continue;
+    end if;
     st := public._clip(r->>'status', 60);
     rg := public._clip(r->>'reg', 16);
     if rg is not null and (rg !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(rg, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then rg := null; end if;
@@ -1138,6 +1146,7 @@ begin
         status = coalesce(st, status),
         status_group = case when st is null then status_group else g end,
         status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
+        left_new_at = case when st is null then left_new_at end, -- se lo vio con su status: vale lo que se ve
         last_seen = now(), last_seen_by = auth.uid()
       where team_id = t and brand = br and client_id = cid;
       if ag is not null and cur.crm_agent is not null and lower(ag) <> lower(cur.crm_agent) then -- lo rotaron

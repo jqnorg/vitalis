@@ -236,6 +236,16 @@ async def main():
             await A2.screenshot(path=OUT / 'x11_ficha_new.png')
             await A2.keyboard.press('Escape'); await A2.wait_for_timeout(300)
             await A2.evaluate("(()=>{const h=document.getElementById('ftd-agenda-overlay');if(h)h.remove()})()")
+            # un Talking que desaparece de la lista que se actualiza: en Vitalis deja de ser new
+            await C.evaluate("() => { document.querySelector('tbody').insertAdjacentHTML('afterbegin', '<tr id=tk><td>555007</td><td>Tito Habla</td><td>Peru</td><td>Talking</td><td>17/11/2026 13:10</td></tr>'); }")
+            await C.wait_for_timeout(3000)
+            ok(sql("select status from public.crm_clients where client_id='555007'")[0]['status'] == 'Talking', 'el Talking llega al registro')
+            await C.evaluate("document.getElementById('tk').remove()"); await C.wait_for_timeout(3000)
+            ok(sql("select left_new_at from public.crm_clients where client_id='555007'")[0]['left_new_at'] is None, 'recién desaparecido, todavía no (puede ser la lista recargando)')
+            await C.wait_for_timeout(11000); await C.evaluate("document.querySelector('h3').textContent='Clients '"); await C.wait_for_timeout(3000)
+            ok(sql("select left_new_at from public.crm_clients where client_id='555007'")[0]['left_new_at'] is not None, 'a los 12 s sin aparecer, sale de Talking en Vitalis')
+            await A2.evaluate('crmLoad(true)'); await A2.wait_for_timeout(1500)
+            ok(await A2.evaluate("!queueOf(null).g1.some(r=>r.id==='555007')"), 'y ya no está entre los new de la cola')
             await cpn.locator('#wbtn').click(); await C.wait_for_timeout(1000)
             ok(await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.keys(s.watches||{}).length)") == 0, '"Dejar de actualizar" la libera')
             # aviso de prueba (tarjeta en la pestaña)
@@ -299,9 +309,9 @@ async def main():
             await G2.close()
 
             # social: aviso en la pestaña activa y la respuesta vuelve a Vitalis
-            sql("insert into public.pings (team_id,from_id,to_id,kind) select p.team_id, p.id, (select id from public.profiles where name='Matias Me'), 'd10' from public.profiles p where p.name='Joaquín Or'")
             await F.bring_to_front(); await F.wait_for_timeout(500)
             await A2.evaluate('document.hasFocus=()=>false') # en headless todas las pestañas tienen foco: simulo que Vitalis quedó atrás
+            sql("insert into public.pings (team_id,from_id,to_id,kind) select p.team_id, p.id, (select id from public.profiles where name='Matias Me'), 'd10' from public.profiles p where p.name='Joaquín Or'")
             await A2.evaluate('socialPoll()'); await F.wait_for_timeout(2500)
             card = F.locator('#ftd-agenda-overlay .card.social')
             ok(await card.count() == 1, 'el pedido social aparece como tarjeta en la pestaña donde estás')

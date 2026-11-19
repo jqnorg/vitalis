@@ -291,6 +291,32 @@
     for (let i = 0; i < rows.length; i += 300) send({ type: 'crm-seen', rows: rows.slice(i, i + 300) });
   }
 
+  // en la pestaña que se actualiza: un Talking que desaparece de la lista ya cambió de status en el CRM.
+  // Cuenta si sigue sin estar 12 s (más de una vuelta de actualización), en la misma lista, y no lo empujaron a la página siguiente los que entraron.
+  let gPrev = null; const gCand = new Map(), gSent = new Set();
+  function goneCheck(all) {
+    if (!watched || !all || !all.length) { if (!watched) { gPrev = null; gCand.clear(); } return; }
+    const loc = location.pathname + location.hash + '|' + (clHead || []).join(','), now = Date.now();
+    const keyOf = (c) => norm(c.brand) + '|' + norm(c.id);
+    const L = all.filter((c) => c.id), ids = L.map(keyOf), cur = new Set(ids);
+    if (gPrev && gPrev.loc === loc) {
+      const added = ids.filter((k) => !gPrev.set.has(k)).length;
+      gPrev.ids.forEach((k, i) => {
+        if (cur.has(k) || !gPrev.talk.has(k) || gCand.has(k)) return;
+        if (added && ids.length >= gPrev.ids.length && i >= gPrev.ids.length - added) return; // estaba al final: lo empujaron los nuevos
+        gCand.set(k, { since: now, row: gPrev.talk.get(k) });
+      });
+    } else gCand.clear();
+    const out = [];
+    for (const [k, c] of gCand) {
+      if (cur.has(k)) { gCand.delete(k); gSent.delete(k); continue; }
+      if (now - c.since >= 12000) { gCand.delete(k); if (!gSent.has(k)) { gSent.add(k); sentSig.delete(k); out.push({ id: c.row.id, brand: c.row.brand, gone: 1 }); } }
+    }
+    for (const k of ids) gSent.delete(k);
+    gPrev = { loc, ids, set: cur, talk: new Map(L.filter((c) => /^talking\b/i.test(c.status)).map((c) => [keyOf(c), c])) };
+    if (out.length) send({ type: 'crm-seen', rows: out });
+  }
+
   /* ================= de quién es cada venta (columna "Sales Rep" o similar) ================= */
   const nn = (x) => norm(x).replace(/[^a-z0-9]+/g, ' ').trim();
   function repUid(txt) { // igual que en Vitalis: primero los que están en la mesa, después los desvinculados
@@ -492,6 +518,7 @@
     if (watched) report(clients, force);
     reportLeads(clients);
     reportSeen(seen);
+    goneCheck(seen);
     if (!sales && !seen && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
     render();

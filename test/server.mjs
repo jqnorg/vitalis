@@ -127,7 +127,7 @@ function send(res, status, obj, extra = {}) {
 }
 const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'GET,POST,PATCH,PUT,DELETE,OPTIONS', 'access-control-expose-headers': 'content-range' };
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json', '.woff2': 'font/woff2', '.css': 'text/css', '.svg': 'image/svg+xml', '.zip': 'application/zip' };
-http.createServer(async (req, res) => {
+const srv = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
   const u = new URL(req.url, 'http://x');
   let raw = ''; for await (const c of req) raw += c;
@@ -174,3 +174,5 @@ http.createServer(async (req, res) => {
     fs.createReadStream(f).pipe(res);
   } catch (e) { send(res, 500, { message: String(e.message || e) }); }
 }).listen(PORT, () => console.log('mock supabase en http://localhost:' + PORT));
+// el navegador de prueba reusa conexiones: si el servidor las cierra a los 5 s (lo normal en Node) a veces choca con un pedido nuevo (ECONNRESET)
+srv.keepAliveTimeout = 120000; srv.headersTimeout = 121000;

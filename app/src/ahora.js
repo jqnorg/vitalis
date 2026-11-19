@@ -11,7 +11,9 @@ const GRPS={new:'New (y Talking)',na:'No Answer y NA',callback:'CallBack (con ci
 const G3=['call_again','hang_up','na'],G2=['callback','pending'],DAYS5=['callback','call_again','hang_up','low_potential']; // con cita · los de 5 días seguidos y al 5º pasan a Not interested
 let crm={ok:null,rows:new Map(),byId:new Map(),at:0,busy:null,rot:[]};
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
-const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:r.status||'',grp:r.status_group||'otro',agent:r.crm_agent||'',
+// un Talking que desapareció de la lista que se actualiza ya no es new (su status nuevo llega cuando se lo vea)
+const gone=r=>!!r.left_new_at&&r.status_group==='new';
+const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:gone(r)?'Salió de Talking':r.status||'',grp:gone(r)?'gone':r.status_group||'otro',agent:r.crm_agent||'',
   camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',firstAgent:r.first_agent||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
 const crmAll=()=>[...crm.rows.values()];
 const regDay=r=>r.reg?r.reg.slice(0,10):(r.first?ymd(new Date(r.first)):'');
@@ -87,7 +89,7 @@ async function crmSeenFromExt(rows){
   const list=batch.filter(r=>r&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
     reg:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.reg||'')?r.reg:'',agent:s(r.agent).slice(0,80),camp:s(r.camp).slice(0,120),aff:s(r.aff).slice(0,60),
     call:/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call||'')?r.call:'',note:s(r.note).slice(0,200),
-    ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80)}));
+    ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
   const keys=batch.map(r=>String(r&&r.k||''));
   if(!list.length)return {keys};
   try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();return {keys,added:res&&res.new||0}}
@@ -226,7 +228,7 @@ function colaMesaCard(){
   const te=todayS(),ym=te.slice(0,7),act=sellers(team.filter(f=>f.date.slice(0,7)===ym));
   const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)]};
   const rows=act.map(m=>{const q=queueOf(m.id),c=cohort(te,te,m.id),ag=agStats(m.id);
-    const sal=crmAll().filter(r=>!isArch(r.brand)&&crmOwner(r)===m.id&&regDay(r)===te&&r.grp!=='new'&&r.since&&r.first&&new Date(r.since)>new Date(r.first)).map(r=>(new Date(r.since)-new Date(r.first))/6e4);
+    const sal=crmAll().filter(r=>!isArch(r.brand)&&crmOwner(r)===m.id&&regDay(r)===te&&r.grp!=='new'&&r.grp!=='gone'&&r.since&&r.first&&new Date(r.since)>new Date(r.first)).map(r=>(new Date(r.since)-new Date(r.first))/6e4);
     const rin=crm.rot.filter(x=>agentUid(x.new_agent)===m.id).length,rout=crm.rot.filter(x=>agentUid(x.old_agent)===m.id).length;
     return {m,q,c,ag,rin,rout,t:med(sal),late:team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym&&isLate(f)).length}});
   const sinDueno=crmAll().filter(r=>!isArch(r.brand)&&!crmOwner(r)&&G3.concat('new').includes(r.grp)).length;
