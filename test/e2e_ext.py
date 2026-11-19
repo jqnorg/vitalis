@@ -227,8 +227,8 @@ async def main():
             await C.evaluate("""() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', '<tr><td>555006</td><td>Rita Nueva</td><td>Chile</td><td>New</td><td>17/11/2026 13:00</td></tr>'); }""")
             await C.wait_for_timeout(3500)
             await A2.evaluate("document.hasFocus=()=>true;dispatchEvent(new Event('focus'))"); await A2.wait_for_timeout(3000)
-            fi = await A2.inner_text('#dock') if await A2.is_visible('#dock') else (await A2.inner_text('.mbox') if await A2.locator('.mbox').count() else '')
-            ok('Entró un new' in fi and 'Rita Nueva' in fi and 'Chile' in fi, f'al volver a Vitalis, el new está en el panel del cliente actual ({fi[:120]!r})')
+            fi = await A2.inner_text('#v-cliente') if await A2.is_visible('#v-cliente') else ''
+            ok('entró un new' in fi and 'Rita Nueva' in fi and 'Chile' in fi, f'al volver a Vitalis, el new está en la sección Cliente ({fi[:120]!r})')
             await A2.screenshot(path=OUT / 'x11_ficha_new.png')
             await A2.keyboard.press('Escape'); await A2.wait_for_timeout(300)
             await A2.evaluate("(()=>{const h=document.getElementById('ftd-agenda-overlay');if(h)h.remove()})()")

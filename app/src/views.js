@@ -845,7 +845,6 @@ function onReady(){
   let h='';try{h=location.hash.slice(1)}catch(e){}
   go(VIEWS.includes(h)?h:'inicio');
   status();check();setInterval(check,15000);setInterval(tick,1000);turnoBar(true);
-  dockInit();dockRender(); // el cliente actual, siempre a mano
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Cargá tu primera venta con <b>Venta</b> o importá tu historial en Ajustes.`,'ok',{ms:12000});
 }

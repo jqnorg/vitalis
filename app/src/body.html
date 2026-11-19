@@ -14,6 +14,7 @@
     </symbol>
     <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></symbol>
     <symbol id="i-ventas" viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4M11 16V7M16 16v-6M20.5 5.5 16 10l-3-3-4 4"/></symbol>
+    <symbol id="i-cliente" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.7 3.7-5.6 7-5.6s6.1 1.9 7 5.6"/></symbol>
     <symbol id="i-clientes" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 19.5c.8-3.4 3.2-5.2 6.2-5.2s5.4 1.8 6.2 5.2"/><path d="M15.5 4.8a3.4 3.4 0 0 1 0 6.4M17.6 14.6c1.8.7 3 2.3 3.5 4.9"/></symbol>
     <symbol id="i-agenda" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/></symbol>
     <symbol id="i-turnos" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v4.8l3 1.8M9.5 2.5h5"/></symbol>
@@ -40,6 +41,7 @@
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Ahora</span><span class="nb hot" id="nbAh"></span><kbd>2</kbd></button>
+    <button type="button" data-v="cliente"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><kbd>L</kbd></button>
     <button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
     <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>3</kbd></button>
     <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>4</kbd></button>
@@ -200,6 +202,11 @@
   </section>
 </section>
 
+<section class="view" id="v-cliente" hidden>
+  <div id="cuTop" class="cu-top"></div>
+  <div id="cuBody"></div>
+</section>
+
 <section class="view" id="v-banking" hidden>
   <div class="vh"><div><h1>Banking</h1><p class="sub">Qué procesadores andan y cómo conviene pagar según el banco del cliente.</p></div><span class="grow"></span>
     <div class="tools"><input id="bkQ" type="search" placeholder="Buscar banco, procesador o método" autocomplete="off" aria-label="Buscar"><span id="bkTools" class="tools"></span></div></div>
@@ -323,8 +330,6 @@
 </section>
 
 </main>
-<aside id="dock" aria-label="Cliente actual" hidden><div id="dockH" class="dk-h"></div><div id="dockB" class="dk-b"></div></aside>
-<button type="button" id="dockChip" class="dock-chip" title="Ver el cliente actual" hidden></button>
 <div id="toasts" aria-live="polite"></div>
 <div id="tip" role="tooltip" hidden></div>
 <input type="file" id="file" accept=".csv,text/csv,text/plain" hidden><input type="file" id="avFile" accept="image/*" hidden>

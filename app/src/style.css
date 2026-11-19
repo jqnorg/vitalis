@@ -980,19 +980,26 @@ body.dark .ah-n{color:var(--pri-h)}
 .bk-ph.ico .bk-img{width:48px;height:48px;border-radius:10px}.bk-ph.ico .bk-img img{object-fit:contain}.bk-ph.ico figure.ed{max-width:none;flex-direction:row;align-items:center}
 .bk-opt summary .bk-ico{width:22px;height:22px;border-radius:6px}
 
-/* ---------- el cliente actual (panel a la derecha) y la ficha ---------- */
-body.dock-on{grid-template-columns:236px minmax(0,1fr) 400px;grid-template-areas:"side bar dock" "side main dock"}
-#dock{grid-area:dock;display:flex;flex-direction:column;min-height:0;background:var(--panel);border-left:1px solid var(--line)}
-body:not(.dock-on) #dock{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);z-index:55;box-shadow:-18px 0 40px rgba(0,0,0,.18)}
-.dk-h{display:flex;align-items:center;gap:6px;padding:14px 14px 10px 18px;border-bottom:1px solid var(--line)}
-.dk-t{flex:1;display:flex;flex-direction:column;min-width:0}.dk-k{font-family:var(--display);font-weight:800;font-size:16px}.dk-s{font-size:12px;color:var(--dim)}
-.dk-b{flex:1;overflow:auto;padding:14px 16px 40px;scrollbar-width:thin}
-.fi.dock .fi-grid{grid-template-columns:1fr}
-.fi.dock .fi-h{flex-direction:column;align-items:flex-start;gap:6px}
-.dock-chip{position:fixed;left:252px;bottom:18px;z-index:45;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.14);cursor:pointer;font-size:13.5px;max-width:320px}
-.dock-chip svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
-.dock-chip:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
-@media (max-width:760px){.dock-chip{left:12px;bottom:12px}}
+/* ---------- la sección Cliente: la ficha del cliente actual, del tamaño de cualquier sección ---------- */
+.cu-top{margin:0 0 18px}
+.cu-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cu-src{display:inline-flex;align-items:center;gap:8px;font-size:13.5px;color:var(--dim)}
+.cu-dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}.cu-dot.crm{background:var(--s1);box-shadow:0 0 0 4px color-mix(in srgb,var(--s1) 22%,transparent)}.cu-dot.new{background:var(--acc)}
+.cu-find input{width:150px}
+.cu-rec{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px}.cu-rec .p-sub{margin-right:4px}
+.cu-empty{max-width:520px;margin:9vh auto;text-align:center;color:var(--dim)}
+.cu-empty svg{width:44px;height:44px;fill:none;stroke:var(--pri);stroke-width:1.6}
+.cu-empty h2{margin:10px 0 6px;font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.02em;color:var(--fg)}
+.cu-empty p{margin:0;font-size:14.5px;line-height:1.5}
+#v-cliente .fi-h{margin-bottom:18px}
+#v-cliente .fi-nm{font-size:34px;letter-spacing:-.03em;line-height:1.05}
+#v-cliente .fi-meta{font-size:14px;margin-top:6px}
+.fi-cols{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;align-items:start}
+.fi-col{display:grid;gap:14px;min-width:0}
+.fi-pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+#v-cliente .fi-c{padding:14px 16px}
+@media (max-width:1000px){.fi-cols{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){#v-cliente .fi-nm{font-size:27px}.cu-find input{width:120px}}
 .fi-pay .fi-pk{display:flex;flex-direction:column;gap:4px;margin:6px 0}.fi-pl{font-size:12px;font-weight:700;color:var(--dim)}
 .fi-pay select{width:100%}
 .fi-bflow .bk-steps{margin-top:6px}

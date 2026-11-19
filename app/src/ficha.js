@@ -1,12 +1,10 @@
 /* ---------- la ficha del cliente y el "cliente actual" ----------
-   El cliente actual es el que tenés abierto en el CRM (la extensión lo manda) o el último new que entró.
-   Queda siempre a mano: en pantallas anchas, en un panel a la derecha; si no, en un botón abajo que abre la ficha.
+   El cliente actual es el que tenés abierto en el CRM (la extensión lo manda), el último new que entró o el que abriste
+   desde una lista. Va en su propia sección (Cliente, tecla L), del tamaño de cualquier otra: solo quedan el menú y la barra.
    La ficha: el cliente, cómo hacerlo depositar (Banking chico), las campañas de su afiliado en su país y los comentarios. */
-let curCl=local.get('curCl',null),dockOpen=local.get('dockOpen',true),ficOk=null,dockGen=0;
+let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen=0,cuAt=0;
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
-const dockWide=()=>innerWidth>=1280,fiMobile=()=>innerWidth<=820;
-const dockShown=()=>!!curCl&&dockOpen&&!fiMobile();
 
 /* ---------- números de la campaña y del afiliado ---------- */
 async function dimStats(col,val){
@@ -55,13 +53,13 @@ async function campsFor(aff,pais,mine){
 }
 
 /* ---------- la ficha ---------- */
-function fichaHTML(d,o={}){
+function fichaHTML(d){
   const {id,r,f}=d,ra=r?regAt(r):null,tz=cliTime(d.country),ags=[...pend,...teamAg].filter(p=>norm(p.id)===norm(id)&&!p.done);
   const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
-  return `<div class="fi${o.dock?' dock':''}" data-fid="${esc(id)}">
+  return `<div class="fi" data-fid="${esc(id)}">
     <div class="fi-h"><div><div class="fi-nm">${esc(d.name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${d.country?' · '+esc(d.country):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
       <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}</div></div>
-    <div class="fi-grid">
+    <div class="fi-cols"><div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
         ${rw2('Status',r?`${esc(r.status||'—')}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
@@ -70,8 +68,8 @@ function fichaHTML(d,o={}){
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
-      ${fiPayHTML(d)}${fiCampsHTML(d)}${fiComsHTML(d)}
-      ${statHTML('Campaña',d.camp,d.sc)}${statHTML('Afiliado',d.aff,d.sa)}
+      ${fiPayHTML(d)}${fiCampsHTML(d)}</div>
+      <div class="fi-col">${fiComsHTML(d)}<div class="fi-pair">${statHTML('Campaña',d.camp,d.sc)}${statHTML('Afiliado',d.aff,d.sa)}</div></div>
     </div></div>`;
 }
 // cómo hacerlo depositar: lo que anda en su país, por tipo de pago, y el flujo de su banco
@@ -160,64 +158,69 @@ async function campReqPoll(quiet){
   }catch(e){}
 }
 
-/* ---------- la ficha en un modal (desde cualquier lista) ---------- */
-async function openFicha(id,o={}){
-  if(!id)return;
-  let d=null;
-  const acts=[{l:'Copiar ID',fn:async()=>{try{await navigator.clipboard.writeText(id);toast(`<b>${esc(id)}</b> copiado.`)}catch(e){toast('No pude copiar.','err')}return false}},
-    {l:'Agendar',fn:()=>{setTimeout(()=>agendarCliente(id,d&&d.r&&d.r.status||''),0)}},{l:fichaQ.length?`Siguiente (${fichaQ.length})`:'Listo',cls:'pri',fn:()=>{if(fichaQ.length)setTimeout(()=>openFicha(fichaQ.shift()),0)}}];
-  const api=modal({title:`${o.auto?'Entró un new · ':''}Cliente ${esc(id)}`,wide:1,body:'<div class="p-empty">Cargando la ficha…</div>',actions:acts});
-  const draw=async force=>{d=await fichaData(id,force);if(document.body.contains(api.box)){api.mb.innerHTML=fichaHTML(d);bkHydrate(api.mb)}if(curCl&&curCl.id===id)dockRender()};
-  fichaWire(api.mb,()=>d,draw);
-  await draw();
-}
-
-/* ---------- el cliente actual ---------- */
+/* ---------- la sección Cliente ---------- */
+// desde cualquier lista: la ficha se abre en la sección Cliente
+function openFicha(id){id=String(id||'').trim();if(!id)return;closeAllModals();setCurrent(id,'','lista');go('cliente')}
 function setCurrent(id,name,src){
   id=String(id||'').trim();if(!id)return;
   const same=curCl&&curCl.id===id;
   curCl={id,name:name||(same&&curCl.name)||'',src,at:Date.now()};local.set('curCl',curCl);
-  if(!same)dockOpen=true,local.set('dockOpen',true);
-  dockRender(!same);
+  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);
+  if(src!=='lista'&&!same)cuShow(src);
+  else if(cur==='cliente')cuRender(!same);
 }
-async function dockRender(force){
-  const dock=$('#dock'),chip=$('#dockChip');if(!dock)return;
-  const on=ready&&dockShown();
-  document.body.classList.toggle('dock-on',on&&dockWide());
-  dock.hidden=!on;chip.hidden=!(ready&&curCl&&!on);
-  if(curCl)chip.innerHTML=`<svg><use href="#i-clientes"/></svg><span><b>${esc(curCl.id)}</b>${curCl.name?' '+esc(clip(curCl.name,22)):''}</span>`;
-  if(!on)return;
-  const gen=++dockGen,id=curCl.id;
-  $('#dockH').innerHTML=`<div class="dk-t"><span class="dk-k">${curCl.src==='new'?'Entró un new':'Cliente actual'}</span><span class="dk-s">${curCl.src==='crm'?'abierto en el CRM':curCl.src==='new'?'recién llegado':''} · ${esc(rel(new Date(curCl.at)))}</span></div>
-    <button type="button" class="btn sm" data-dk="ag">Agendar</button><button type="button" class="ib" data-dk="re" title="Actualizar" aria-label="Actualizar">↻</button><button type="button" class="ib" data-dk="min" title="Achicar" aria-label="Achicar">—</button>`;
-  if(!$('#dockB').dataset.fid||$('#dockB').dataset.fid!==id)$('#dockB').innerHTML='<div class="p-empty">Cargando la ficha…</div>';
-  const d=await fichaData(id,force);if(gen!==dockGen)return;
-  $('#dockB').dataset.fid=id;$('#dockB').innerHTML=fichaHTML(d,{dock:1});bkHydrate($('#dockB'));
+// un cliente nuevo del CRM o un new: la sección Cliente pasa adelante (salvo para el team leader, o si estás escribiendo en Vitalis)
+let lastKey=0;
+document.addEventListener('keydown',()=>{lastKey=Date.now()},true);
+function cuShow(src){
+  if(!ready)return;
+  const t=src==='new'?`Entró un new: <b>${esc(curCl.id)}</b>`:`Cliente actual: <b>${esc(curCl.id)}</b>${curCl.name?' '+esc(clip(curCl.name,30)):''}`;
+  if(isLeadUid(me)||modals.length||Date.now()-lastKey<4000){if(cur==='cliente')cuRender(true);toast(t,src==='new'?'imp':'info',{key:'ficha',actions:[{l:'Ver',fn:()=>go('cliente')}]});return}
+  closeToast('ficha');if(src==='new')toast(t,'imp',{key:'ficha'});
+  if(cur==='cliente')cuRender(true);else go('cliente');
 }
-function dockInit(){
-  const dock=$('#dock');if(!dock||dock.dataset.wired)return;dock.dataset.wired=1;
-  let d=null;const getD=()=>curCl&&(fichaCache.get(curCl.id)||{}).d;
-  fichaWire($('#dockB'),getD,async force=>{await dockRender(force)});
-  $('#dockH').addEventListener('click',e=>{const b=e.target.closest('[data-dk]');if(!b)return;
-    if(b.dataset.dk==='min'){dockOpen=false;local.set('dockOpen',false);dockRender()}
-    else if(b.dataset.dk==='re')dockRender(true);
-    else if(b.dataset.dk==='ag'&&curCl){const x=getD();agendarCliente(curCl.id,x&&x.r&&x.r.status||'')}});
-  $('#dockChip').addEventListener('click',()=>{if(!curCl)return;if(fiMobile())return openFicha(curCl.id);dockOpen=true;local.set('dockOpen',true);dockRender()});
-  addEventListener('resize',()=>{clearTimeout(dock._rt);dock._rt=setTimeout(()=>dockRender(),200)});
+const cuSrc=c=>c.src==='crm'?'abierto en el CRM':c.src==='new'?'entró un new':'abierto desde Vitalis';
+function cuTopHTML(){
+  const h=cuHist.filter(x=>!curCl||x.id!==curCl.id);
+  return `<div class="cu-bar">${curCl?`<span class="cu-src"><span class="cu-dot ${esc(curCl.src||'')}"></span>Cliente actual · ${cuSrc(curCl)} · ${esc(rel(new Date(curCl.at)))}</span>`:'<span class="cu-src">Cliente actual</span>'}
+    <span class="grow"></span>
+    <form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>
+    ${curCl?`<button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="btn sm" data-cu="ag">Agendar</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
+    ${h.length?`<div class="cu-rec"><span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b>${x.name?' '+esc(clip(x.name,22)):''}</button>`).join('')}</div>`:''}`;
 }
+async function cuRender(force){
+  const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
+  if(!top.contains(document.activeElement)||force)top.innerHTML=cuTopHTML(); // sin pisar el ID que estás escribiendo
+  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con cómo hacerlo depositar, las campañas de su afiliado y los comentarios. Cuando entra un new, también.</p></div>`;return}
+  const id=curCl.id;
+  // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
+  if(!force&&body.dataset.fid===id&&Date.now()-cuAt<30e3)return;
+  const gen=++cuGen;
+  if(body.dataset.fid!==id)body.innerHTML='<div class="p-empty">Cargando la ficha…</div>';
+  const d=await fichaData(id,force);if(gen!==cuGen||!curCl||curCl.id!==id)return;
+  const ta=body.querySelector('[data-fcom]'),txt=ta&&body.dataset.fid===id?ta.value:'',foc=ta&&document.activeElement===ta,bs=body.querySelector('[data-fbank]'),bv=bs&&body.dataset.fid===id?bs.value:'';
+  body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);bkHydrate(body);
+  const t2=body.querySelector('[data-fcom]');if(t2&&txt){t2.value=txt;if(foc)t2.focus()}
+  const b2=body.querySelector('[data-fbank]');if(b2&&bv){b2.value=bv;b2.dispatchEvent(new Event('change',{bubbles:true}))}
+  if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);top.innerHTML=cuTopHTML()}
+}
+V.cliente={
+  build(){
+    const getD=()=>curCl&&(fichaCache.get(curCl.id)||{}).d;
+    fichaWire($('#cuBody'),getD,force=>cuRender(force===undefined?true:force));
+    $('#cuTop').addEventListener('submit',e=>{const f=e.target.closest('[data-cu=find]');if(!f)return;e.preventDefault();const q=f.q.value.replace(/\D/g,'');if(q)setCurrent(q,'','lista')});
+    $('#cuTop').addEventListener('click',async e=>{const b=e.target.closest('[data-cu]');if(!b||b.tagName==='FORM')return;const a=b.dataset.cu;
+      if(a==='re')return cuRender(true);
+      if(a==='rec'){const h=cuHist.find(x=>x.id===b.dataset.id);return setCurrent(b.dataset.id,h&&h.name||'','lista')}
+      if(!curCl)return;
+      if(a==='copy'){try{await navigator.clipboard.writeText(curCl.id);toast(`<b>${esc(curCl.id)}</b> copiado.`)}catch(err){toast('No pude copiar.','err')}return}
+      if(a==='ag'){const x=getD();agendarCliente(curCl.id,x&&x.r&&x.r.status||'')}});
+  },
+  render(o){cuRender(!!o.force)}
+};
 // en vivo: comentarios y campañas del cliente que tenés abierto
-function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);if(dockShown())dockRender(true)}
+function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);if(cur==='cliente')cuRender(true)}
 async function ficInit(){try{await Q(sb.from('client_comments').select('id').limit(1));ficOk=true}catch(e){ficOk=false}}
 
 /* ---------- cuando entra un new ---------- */
-let fichaQ=[],lastKey=0;
-document.addEventListener('keydown',()=>{lastKey=Date.now()},true);
-function fichaNew(id){if(!id)return;setCurrent(id,'','new');if(dockShown()){toast(`Entró un new: <b>${esc(id)}</b>`,'imp',{key:'ficha'});return}if(!fichaQ.includes(id))fichaQ.push(id);setTimeout(fichaTry,400)}
-function fichaTry(){ // sin el panel a la vista: la ficha se abre cuando entrás a Vitalis (o enseguida si ya estás, salvo que estés escribiendo)
-  if(!ready||!fichaQ.length||modals.length)return;
-  if(document.hidden||!document.hasFocus())return;
-  if(Date.now()-lastKey<4000){toast(`Entró un new: <b>${esc(fichaQ[0])}</b>`,'imp',{key:'ficha',actions:[{l:'Ver ficha',fn:()=>{if(fichaQ.length)openFicha(fichaQ.shift())}}]});return}
-  closeToast('ficha');openFicha(fichaQ.shift(),{auto:1});
-}
-addEventListener('focus',()=>setTimeout(fichaTry,300));
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(fichaTry,300)});
+function fichaNew(id){if(id)setCurrent(id,'','new')}

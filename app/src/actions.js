@@ -707,7 +707,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Ahora, Filtros, Ventas, Clientes, Agenda, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Ahora, Filtros, Ventas, Clientes, Agenda, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -750,6 +750,7 @@ document.addEventListener('keydown',e=>{
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
+  if(k==='l'){e.preventDefault();go('cliente');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}
