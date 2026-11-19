@@ -570,6 +570,75 @@ ok(r.rows.length === 0, 'otra mesa no');
 r = await as(M, "insert into public.targets (ym, ftds) values ('nov', 10)");
 ok(!!r.error, 'el mes va como AAAA-MM');
 
+// ---------- clientes del CRM: todos los que se ven, con su status ----------
+{
+  const rows = [
+    { id: '900001', brand: 'Novara Markets', name: 'Ana Uno', country: 'Peru', status: 'New', reg: '2026-11-19 10:02', agent: 'Sofia Arias', camp: 'Google ES', aff: '88843' },
+    { id: '900002', brand: 'Novara Markets', name: 'Beto Dos', status: 'NA 2', reg: '19/11/2026' },
+    { id: '900003', status: 'Do Not Call' },
+    { id: '900004', status: 'call again' },
+    { id: '900005', status: 'Raro raro' },
+    { id: ' ', status: 'New' },
+  ];
+  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(rows)]);
+  ok(R && R.ok && R.new === 5 && R.changed === 0 && R.fresh.length === 1 && R.fresh[0] === '900001', `crm_seen guarda los clientes vistos (las filas sin ID no) (${JSON.stringify(R)})`);
+  r = await as(B, 'select client_id, brand, status_group g, reg, crm_agent, camp, (first_seen_by = $1) mio from public.crm_clients order by client_id', [B]);
+  const G = Object.fromEntries(r.rows.map((x) => [x.client_id, x]));
+  ok(G['900001'].g === 'new' && G['900002'].g === 'na' && G['900003'].g === 'dnc' && G['900004'].g === 'call_again' && G['900005'].g === 'otro', 'cada status cae en su grupo (New, NA 2, Do Not Call, call again, uno desconocido)');
+  ok(G['900001'].reg === '2026-11-19 10:02' && G['900002'].reg === null && G['900003'].brand === 'Novara Markets' && G['900001'].crm_agent === 'Sofia Arias' && G['900001'].camp === 'Google ES' && G['900001'].mio, 'guarda registro, agente, campaña y quién lo vio; un registro con otro formato queda vacío; sin marca es Novara');
+  r = await as(B, 'select count(*)::int c from public.crm_status_log');
+  ok(r.rows[0].c === 5, 'el historial arranca con el primer status de cada uno');
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(rows)]);
+  ok(R.new === 0 && R.changed === 0, 'ver lo mismo otra vez no cambia nada');
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'No Answer' }])]);
+  r = await as(Dh, "select status, status_group g, camp, reg, (first_seen_by = $1) b, (last_seen_by = $2) d from public.crm_clients where client_id = '900001'", [B, Dh]);
+  ok(R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].g === 'na' && r.rows[0].camp === 'Google ES' && r.rows[0].reg === '2026-11-19 10:02' && r.rows[0].b && r.rows[0].d, 'otro agente actualiza el status de un cliente que vio otro, sin perder campaña ni registro');
+  r = await as(Dh, "select old_status, new_status from public.crm_status_log where client_id = '900001' order by id");
+  ok(r.rows.length === 2 && r.rows[1].old_status === 'New' && r.rows[1].new_status === 'No Answer', 'el cambio de status queda en el historial');
+  r = await as(B, "insert into public.crm_clients (brand, client_id) values ('Novara Markets', '1')");
+  ok(!!r.error, 'nadie escribe directo en crm_clients');
+  r = await as(B, "update public.crm_clients set status = 'x' returning 1");
+  ok(!!r.error || r.rows.length === 0, 'ni lo cambia a mano');
+  r = await as(B, 'delete from public.crm_status_log returning 1');
+  ok(!!r.error || r.rows.length === 0, 'ni borra el historial');
+  r = await as(X, 'select * from public.crm_clients');
+  ok(!r.error && r.rows.length === 0, 'otra mesa no ve los clientes');
+  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(Array.from({ length: 501 }, (_, i) => ({ id: 'z' + i, status: 'New' })))]);
+  ok(!!R.error, 'de a 500 filas como máximo');
+  R = await rpc(B, "select public.crm_map_status('Raro raro', 'low_potential') j");
+  ok(!!R.error, 'un agente no clasifica status');
+  R = await rpc(A, "select public.crm_map_status('raro-raro', 'low_potential') j");
+  r = await as(B, "select status_group g from public.crm_clients where client_id = '900005'");
+  ok(R.ok && R.clientes === 1 && r.rows[0].g === 'low_potential', 'el admin clasifica un status desconocido y se reclasifican los clientes');
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900006', status: 'RARO RARO' }])]);
+  r = await as(B, "select status_group g from public.crm_clients where client_id = '900006'");
+  ok(r.rows[0].g === 'low_potential', 'y los nuevos con ese status ya entran clasificados');
+  R = await rpc(B, 'select public.set_queue_cap(40) j');
+  ok(!!R.error, 'un agente no cambia el tope del grupo 3');
+  R = await rpc(M, 'select public.set_queue_cap(40) j');
+  r = await as(B, 'select queue_cap from public.teams');
+  ok(R.ok && r.rows[0].queue_cap === 40, 'el team leader cambia el tope del grupo 3 y lo ve toda la mesa');
+  await rpc(M, 'select public.set_queue_cap(60) j');
+  // registro de accesos
+  r = await as(B, "insert into public.sales (date, client_id, amount, tx) values ('2026-11-19', '900009', 100, 'TXAUD1') returning id");
+  const sid = r.rows[0].id;
+  await as(M, 'update public.sales set amount = 120 where id = $1', [sid]);
+  r = await as(M, "select action, detail->>'client_id' c, detail->'campos' campos from public.audit_log where action = 'venta ajena editada' and detail->>'client_id' = '900009'");
+  ok(r.rows.length === 1 && JSON.stringify(r.rows[0].campos) === '["amount"]', 'editar una venta ajena queda registrado, con qué campo cambió');
+  await as(B, 'update public.sales set amount = 130 where id = $1', [sid]);
+  r = await as(M, "select count(*)::int c from public.audit_log where detail->>'client_id' = '900009'");
+  ok(r.rows[0].c === 1, 'editar la propia no');
+  r = await as(B, 'select * from public.audit_log');
+  ok(!r.error && r.rows.length === 0, 'un agente no ve el registro de accesos');
+  R = await rpc(B, "select public.audit_note('exportó ventas', '{\"filas\": 3}'::jsonb) j");
+  ok(R.ok, 'exportar queda registrado');
+  R = await rpc(B, "select public.audit_note('cualquier cosa') j");
+  ok(!!R.error, 'solo acciones conocidas');
+  r = await as(A, "select count(*)::int c from public.audit_log where action = 'exportó ventas'");
+  ok(r.rows[0].c === 1, 'el admin lo ve');
+  await as(B, 'delete from public.sales where id = $1', [sid]);
+}
+
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');

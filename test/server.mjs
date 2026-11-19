@@ -14,7 +14,7 @@ const db = new PGlite({ extensions: { pgcrypto } });
 await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8'));
 await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8'));
 await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
-const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'], targets: ['team_id', 'ym'], chat_files: ['id'], avatars: ['user_id'], message_reactions: ['message_id', 'user_id', 'emoji'], user_targets: ['user_id', 'ym'] };
+const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'], targets: ['team_id', 'ym'], chat_files: ['id'], avatars: ['user_id'], message_reactions: ['message_id', 'user_id', 'emoji'], user_targets: ['user_id', 'ym'], crm_clients: ['team_id', 'brand', 'client_id'], crm_status_log: ['id'], crm_status_map: ['team_id', 'status_key'], audit_log: ['id'] };
 const TABLES = new Set(Object.keys(PK));
 
 // ---------- auth ----------
@@ -53,9 +53,11 @@ async function rpc(req, res, fn, body) {
   try {
     if (!/^[a-z_][a-z0-9_]*$/.test(fn)) throw Object.assign(new Error('bad fn'), { code: 'PGRST202' });
     const call = `public.${fn}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')})`;
-    const set = (await db.query("select bool_or(proretset) s from pg_proc where proname = $1 and pronamespace = 'public'::regnamespace", [fn])).rows[0]?.s;
+    const meta = (await db.query("select bool_or(proretset) s, max(array_to_string(proargnames, ',')) n, max(array_to_string(proargtypes::regtype[]::text[], ',')) t from pg_proc where proname = $1 and pronamespace = 'public'::regnamespace", [fn])).rows[0] || {};
+    const set = meta.s, an = String(meta.n || '').split(','), at = String(meta.t || '').split(',');
+    const isJson = (k) => /json/.test(at[an.indexOf(k)] || '');
     const sql = set ? `select coalesce(json_agg(t), '[]')::text as j from ${call} t` : `select (${call})::text as j`; // las que devuelven tabla, como lista
-    const out = await asUser(uid, (tx) => tx.query(sql, keys.map((k) => (args[k] == null ? null : Array.isArray(args[k]) ? '{' + args[k].map((x) => '"' + String(x).replace(/["\\]/g, '') + '"').join(',') + '}' : typeof args[k] === 'object' ? JSON.stringify(args[k]) : String(args[k])))));
+    const out = await asUser(uid, (tx) => tx.query(sql, keys.map((k) => (args[k] == null ? null : isJson(k) ? JSON.stringify(args[k]) : Array.isArray(args[k]) ? '{' + args[k].map((x) => '"' + String(x).replace(/["\\]/g, '') + '"').join(',') + '}' : typeof args[k] === 'object' ? JSON.stringify(args[k]) : String(args[k])))));
     const j = out.rows[0].j;
     let data = null; if (j != null && j !== '') { try { data = JSON.parse(j); } catch (e) { data = j; } }
     return send(res, 200, data);

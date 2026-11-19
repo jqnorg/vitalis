@@ -1,6 +1,7 @@
 // Vitalis — service worker
 // · Agenda: recibe los contactos de Vitalis y, a la hora, avisa.
-// · CRM: pasa a Vitalis las ventas (solas, por Sales Rep, para el team leader) y actualiza cada 10 s las páginas con tabla; avisa cuando entra un cliente en "new".
+// · CRM: pasa a Vitalis las ventas (solas, por Sales Rep, para el team leader) y todos los clientes que se ven (con su status);
+//   una sola pestaña (la que elegís con el botón) se actualiza cada 10 s y avisa cuando entra un cliente en "new".
 // Los avisos son:
 //   · tarjeta en la pestaña que estés mirando (o una ventanita si esa pestaña no se puede usar)
 //   · sonido
@@ -12,8 +13,8 @@ const hm = (ms) => { const d = new Date(ms); return `${z(d.getHours())}:${z(d.ge
 const keyOf = (it) => it.k + '@' + it.due;
 
 async function state() {
-  const s = await chrome.storage.local.get(['items', 'fired', 'url', 'lastSync', 'cmds', 'importQ', 'leadQ', 'leadIds']);
-  return { items: s.items || [], fired: s.fired || {}, url: s.url || null, lastSync: s.lastSync || 0, cmds: s.cmds || [], importQ: s.importQ || [], leadQ: s.leadQ || [], leadIds: s.leadIds || [] };
+  const s = await chrome.storage.local.get(['items', 'fired', 'url', 'lastSync', 'cmds', 'importQ', 'leadQ', 'leadIds', 'crmQ']);
+  return { items: s.items || [], fired: s.fired || {}, url: s.url || null, lastSync: s.lastSync || 0, cmds: s.cmds || [], importQ: s.importQ || [], leadQ: s.leadQ || [], leadIds: s.leadIds || [], crmQ: s.crmQ || [] };
 }
 const nrm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // igual que en Vitalis
 const leadKey = (c) => nrm(c.id ? String(c.id).replace(/\s+/g, ' ').trim().slice(0, 60) : 'n:' + nrm(c.name));
@@ -214,7 +215,7 @@ async function sync(msg) {
     if (it.due > now) { await chrome.alarms.create('p:' + it.k, { when: it.due }); scheduled++; }
     else if (now - it.due < MAX_LATE) await alertItem(it);
   }
-  return { scheduled, cmds: st.cmds, imports: st.importQ, leads: upd.leadQ || st.leadQ };
+  return { scheduled, cmds: st.cmds, imports: st.importQ, leads: upd.leadQ || st.leadQ, seen: st.crmQ.slice(0, 500) };
 }
 
 /* ---------- clientes new del CRM → registro de Vitalis ---------- */
@@ -246,6 +247,44 @@ async function leadsDone(keys) {
   const st = await state(), ks = new Set(keys.map(String));
   await chrome.storage.local.set({ leadQ: st.leadQ.filter((c) => !ks.has(leadKey(c))), leadIds: [...new Set([...st.leadIds, ...ks])].slice(-50000) });
 }
+
+/* ---------- todos los clientes que se ven en el CRM → registro de clientes de Vitalis ---------- */
+// cola por marca y cliente con la última foto de cada uno; cada fila lleva k = clave@hora, y Vitalis devuelve las que guardó
+const seenKey = (r) => nrm(r.brand) + '|' + nrm(r.id);
+const REG_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/;
+async function crmSeen(rows) {
+  const st = await state(), q = new Map(st.crmQ.map((r) => [seenKey(r), r])), now = Date.now();
+  const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  for (const r of rows.slice(0, 1000)) {
+    const id = cl(r.id, 60); if (!id) continue;
+    const row = { id, brand: cl(r.brand, 40), name: cl(r.name, 120), country: cl(r.country, 60), status: cl(r.status, 60), reg: REG_RE.test(r.reg || '') ? r.reg : '',
+      agent: cl(r.agent, 80), camp: cl(r.camp, 120), aff: cl(r.aff, 60) };
+    row.k = seenKey(row) + '@' + now;
+    q.set(seenKey(row), row);
+  }
+  await chrome.storage.local.set({ crmQ: [...q.values()].slice(-5000) });
+  await deliverSeen();
+  return { ok: true };
+}
+let delivering = false;
+async function deliverSeen() {
+  if (delivering) return false; delivering = true;
+  try {
+    for (let round = 0; round < 10; round++) {
+      const st = await state(); if (!st.crmQ.length) return true;
+      let done = false;
+      for (const t of await vitalisTabs()) {
+        try {
+          const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'seen', rows: st.crmQ.slice(0, 500) }), 20000);
+          if (r && !r.noPanel && !r.err) { await seenDone(r.keys || []); done = true; break; }
+        } catch (e) {}
+      }
+      if (!done) return false; // Vitalis cerrado (o sin la base nueva): quedan en cola
+    }
+    return true;
+  } finally { delivering = false; }
+}
+async function seenDone(keys) { const st = await state(), ks = new Set(keys.map(String)); await chrome.storage.local.set({ crmQ: st.crmQ.filter((r) => !ks.has(r.k)) }); }
 
 /* ---------- ventas desde el CRM ---------- */
 const CRM_URLS = ['https://crmnovaramarkets.com/*', 'https://*.crmnovaramarkets.com/*', 'https://crmtrade24seven.com/*', 'https://*.crmtrade24seven.com/*'];
@@ -281,21 +320,38 @@ async function crmImport(rows) {
   await chrome.storage.local.set({ importQ: q.slice(-500) });
   return { queued: rows.length };
 }
-/* ---------- páginas del CRM con tabla: se actualizan solas cada 10 s (todas las pestañas) ---------- */
+/* ---------- una sola pestaña del CRM se actualiza sola cada 10 s: la que se eligió con el botón ---------- */
 const EVERY = 10; // segundos, fijo
 async function allW() { return (await chrome.storage.local.get('watches')).watches || {}; }
 async function getW(tabId) { return (await allW())[tabId] || null; }
 async function setW(tabId, w) { const all = await allW(); if (w) all[tabId] = w; else delete all[tabId]; await chrome.storage.local.set({ watches: all }); }
+const isCrmUrl = async (url) => { try { const h = new URL(url).hostname, s = (await chrome.storage.local.get('crmSites')).crmSites || {}; return /(^|\.)crm(novaramarkets|trade24seven)\.com$/.test(h) || !!s[h]; } catch (e) { return false; } };
 async function watchStart(tab) {
-  const old = await getW(tab.id);
-  await setW(tab.id, { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null });
+  const all = await allW();
+  for (const w of Object.values(all)) { // ya hay otra elegida (y sigue abierta en el CRM): no se puede elegir esta
+    if (!w || w.tabId === tab.id) continue;
+    let t = null; try { t = await chrome.tabs.get(w.tabId); } catch (e) {}
+    if (t && await isCrmUrl(t.url)) return { busy: true, tabId: w.tabId, title: t.title || w.title || '' };
+    delete all[w.tabId];
+  }
+  const old = all[tab.id];
+  all[tab.id] = { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null };
+  await chrome.storage.local.set({ watches: all });
   try { await chrome.tabs.update(tab.id, { autoDiscardable: false }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria
   await ensureLoop();
+  return { ok: true };
 }
+async function watchGo() { const w = Object.values(await allW())[0]; if (!w) return; try { const t = await chrome.tabs.get(w.tabId); await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); } catch (e) {} }
+async function watchPrune() { // de la versión anterior (todas las pestañas): queda solo la más reciente
+  const ws = Object.values(await allW()); if (ws.length <= 1) return;
+  const keep = ws.sort((a, b) => (b.lastRefresh || b.since || 0) - (a.lastRefresh || a.since || 0))[0];
+  await chrome.storage.local.set({ watches: { [keep.tabId]: keep } });
+}
+watchPrune();
 async function watchStop(tabId) { await setW(tabId, null); if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); await chrome.alarms.clear('crm-watch'); } }
 async function tickOne(w) {
   let tab = null; try { tab = await chrome.tabs.get(w.tabId); } catch (e) {}
-  if (!tab) return watchStop(w.tabId);
+  if (!tab || !(await isCrmUrl(tab.url))) return watchStop(w.tabId); // se cerró o se fue del CRM
   if (tab.discarded) { try { await chrome.tabs.reload(w.tabId); } catch (e) {} return; }
   let r = null;
   try { r = await withTimeout(chrome.tabs.sendMessage(w.tabId, { type: 'crm-refresh' }), 5000); } catch (e) {}
@@ -342,6 +398,7 @@ async function crmClients(tabId, m) {
   for (const c of m.clients) { if (!seen[c.key]) { if (w.base) fresh.push(c); seen[c.key] = now; } }
   const keys = Object.keys(seen); if (keys.length > 3000) for (const k of keys.sort((a, b) => seen[a] - seen[b]).slice(0, keys.length - 3000)) delete seen[k];
   await setW(tabId, { ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 });
+  for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
   for (const c of fresh.slice(0, 5)) {
     await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
       btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `🆕 Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
@@ -403,7 +460,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true;
   }
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
-  if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(() => reply({ ok: true })); return true; }
+  if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
+  if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }
+  if (msg.type === 'crm-seen' && Array.isArray(msg.rows)) { crmSeen(msg.rows).then(reply).catch(() => reply(null)); return true; }
+  if (msg.type === 'seen-done' && Array.isArray(msg.keys)) { seenDone(msg.keys); return false; }
   if (msg.type === 'crm-watch-stop' && sender.tab) { watchStop(sender.tab.id).then(() => reply({ ok: true })); return true; }
   if (msg.type === 'crm-clients' && sender.tab && Array.isArray(msg.clients)) { crmClients(sender.tab.id, msg).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'test') {

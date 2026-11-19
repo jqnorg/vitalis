@@ -41,6 +41,7 @@ V.inicio={
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
+    crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
     $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
     $('#iHoy').innerHTML=hoyMesaCard();
     this.turno(true);
@@ -51,7 +52,7 @@ V.inicio={
     $('#iaList').innerHTML=(open.length?`<div class="alist">${open.map(p=>pendItem(p,now,true)).join('')}</div>`:'<div class="p-empty" style="padding:10px 0">Nada pendiente para hoy.</div>')+
       (next?`<div class="note">Próximo: ${esc(whenTxt(parseDue(next.due)))}, <b style="color:var(--fg)">${esc(next.id)}</b> ${esc(next.kw)}</div>`:'');
     // conversión
-    $('#iConvBody').innerHTML=convCards(TL?null:me);$('#iConvSub').textContent=TL?'de la mesa: FTDs sobre clientes new':'FTDs sobre clientes new';
+    $('#iConvBody').innerHTML=convCardsX(TL?null:me);$('#iConvSub').textContent=convSubX(TL);
     // FTDs por día
     const [Y,M]=ym.split('-').map(Number),days=new Date(Y,M,0).getDate(),bd={};
     for(const f of (TL?team.filter(x=>x.date.slice(0,7)===ym):s.list)){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
@@ -236,7 +237,7 @@ V.ventas={
     const rows=[...list].sort((a,b)=>-byDate(a,b));
     $('#pCount').textContent=`${plural(rows.length,'venta')} · ${money(R.monto)} USD`;
     $('#pTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>País</th><th>Afiliado</th><th>Campaña</th><th class="r">Monto</th><th>Registro</th><th>Tipo</th><th>Marca</th>${pWho!=='me'?'<th>Vendedor</th>':''}<th class="act"></th></tr></thead><tbody>`+
-      rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td>${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:'<i class="dot n"></i><span class="d">new</span>'}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="Borrar">Borrar</button>`:''}</td></tr>`).join('')+'</tbody></table>'
+      rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td title="${esc(demora(f)?'Depositó a '+demora(f)+' del registro':'')}">${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:`<i class="dot n"></i><span class="d">new${demora(f)?' · '+esc(demora(f)):''}</span>`}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="Borrar">Borrar</button>`:''}</td></tr>`).join('')+'</tbody></table>'
       :'<div class="p-empty">Sin ventas para estos filtros.</div>';
     $('#pMore').hidden=rows.length<=pShow;
   },
@@ -559,6 +560,7 @@ V.config={
     $('#cfDb').textContent=teamInfo?teamInfo.name:'';$('#cfSub').textContent=`Vitalis ${VERSION}`;
     V.cuenta.render();
     $('#cfExt').innerHTML=extOn()?sp('ok b','Extensión conectada')+`: ${plural(extN,'aviso programado','avisos programados')}, ${plural(activeSnips().length,'snippet')}.`:'La extensión no está conectada en esta pestaña. Con ella tenés avisos en cualquier pestaña, el botón del CRM, el registro de clientes new y los snippets.';
+    datosCard();auditCard();
     const lat=ftds.filter(isLate).length;
     $('#cfCount').textContent=`${plural(ftds.length,'venta')} (${lat} late) · ${plural(pend.length,'contacto')} · ${plural(Object.keys(turnos).length,'jornada')} · ${Object.keys(ajustes).length?Object.entries(ajustes).map(([k,v])=>`${mLabel(k)}: ${v} sin detalle`).join(' · '):'sin ajustes'}`;
   },
@@ -590,6 +592,7 @@ V.equipo={
     const k=(lb,v,s2,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`;
     const T=targets[eqYm]||0;
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);
+    crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+
@@ -693,7 +696,8 @@ V.clientes={
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
-      if(b.dataset.cl==='ag')return agendarModal(l.id,l.name);
+      if(b.dataset.cl==='ficha')return openFicha(l.id);
+      if(b.dataset.cl==='ag')return agendarCliente(l.id,l.name);
       if(b.dataset.cl==='del'){if(!await confirmar('Borrar cliente',`¿Sacar a <b>${esc(l.id)}</b> ${esc(l.name)} del registro?`,'Borrar',true))return;if(await B.delLead(l))toast('Cliente borrado del registro.')}});
   },
   render(){
@@ -706,7 +710,10 @@ V.clientes={
     }
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
-    $('#clKpis').innerHTML=convCards(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    crmLoad();$('#clKpis').innerHTML=convCardsX(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    if(crm.ok){const nuevos=crmAll().filter(r=>!isArch(r.brand)&&r.first&&ymd(new Date(r.first))===te).length,fh=team.filter(f=>f.date===te&&!isArch(f.brand)),en=fh.filter(f=>crmStatusOf(f.id)).length;
+      $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
+    else $('#clSeen').hidden=true;
     // gráfico: últimos 30 días
     const start=addDays(te,-29),own=l=>uid==null||l.uid===uid,data=[];
     for(let i=0;i<30;i++){const d=addDays(start,i),L=leads.filter(l=>l.date===d&&own(l)),paid=L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
@@ -722,7 +729,7 @@ V.clientes={
     $('#clCount').textContent=rows.length?`${plural(rows.length,'cliente')}, ${paidN} ${paidN===1?'ya depositó':'ya depositaron'}`:'';
     const many=clWho!=='me';
     $('#clTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th>${many?'<th>Agente</th>':''}<th>Estado</th><th>Origen</th><th class="act"></th></tr></thead><tbody>`+
-      rows.slice(0,clShow).map(l=>{const f=sold.get(norm(l.id));return `<tr><td>${l.date===te?'Hoy':`${DIA[parseYMD(l.date).getDay()]} ${dm(l.date)}`}</td><td><b>${esc(l.id)}</b></td><td class="trunc" title="${esc(l.name)}">${esc(l.name)}</td><td class="d">${esc(l.country)}</td>${many?`<td class="trunc">${esc(memberName(l.uid))}</td>`:''}
+      rows.slice(0,clShow).map(l=>{const f=sold.get(norm(l.id));return `<tr><td>${l.date===te?'Hoy':`${DIA[parseYMD(l.date).getDay()]} ${dm(l.date)}`}</td><td><button type="button" class="lnkp" data-cl="ficha" data-id="${esc(l._id)}" title="Ver la ficha"><b>${esc(l.id)}</b></button></td><td class="trunc" title="${esc(l.name)}">${esc(l.name)}</td><td class="d">${esc(l.country)}</td>${many?`<td class="trunc">${esc(memberName(l.uid))}</td>`:''}
         <td>${f?`<span class="badge paid" title="${esc(money(f.amount))} USD">Depositó ${f.date===te?'hoy':dm(f.date)}</span>`:'<span class="d">Todavía no</span>'}</td><td class="d">${l.source==='manual'?'A mano':'CRM'}</td>
         <td class="act wr">${f?'':`<button type="button" class="ib" data-cl="ag" data-id="${esc(l._id)}">Agendar</button>`}${l.uid===me||isLeader()?`<button type="button" class="ib del" data-cl="del" data-id="${esc(l._id)}">Borrar</button>`:''}</td></tr>`}).join('')+'</tbody></table>'
       :`<div class="p-empty">${clQ?'No hay clientes con esa búsqueda.':clPer==='hoy'?'Todavía no entró ningún cliente hoy.':'Sin clientes en este período.'}</div>`;

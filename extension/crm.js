@@ -1,7 +1,8 @@
 // Vitalis · en el CRM:
 //   1) botón para pasar a Vitalis las ventas aprobadas que todavía no están
 //   2) los clientes en "new" se anotan en el registro de Vitalis (conversión del día)
-//   3) toda página del CRM con tabla se actualiza sola cada 10 s; en la de clientes avisa cuando aparece uno en "new"
+//   3) una sola pestaña del CRM (la que elegís con el botón) se actualiza cada 10 s y avisa cuando entra un cliente en "new";
+//      todas las pestañas mandan al registro de Vitalis los clientes que se ven, con su status
 (() => {
   if (window.__ftdCrm) return;
   window.__ftdCrm = true;
@@ -151,22 +152,26 @@
     first: ['first name'], last: ['last name'],
     country: ['country', 'pais'],
     created: ['registration time', 'registration date', 'created at', 'created', 'registered', 'date'],
+    agent: COLS.agent, camp: ['campaign', 'user source', 'utm campaign', 'source'], aff: ['affiliate', 'affiliate id', 'afiliado', 'aff id'],
   };
-  function scanClients(T) { // tabla con columna de estado que no sea la de FTDs
+  function scanAll(T) { // tabla con columna de estado que no sea la de FTDs: todas las filas, con su status
     const t = T.find((x) => idxOf(x.labels, CL.status) >= 0 && !isFtdTable(mapFtd(x.labels)) && (idxOf(x.labels, CL.id) >= 0 || idxOf(x.labels, CL.name) >= 0 || idxOf(x.labels, CL.first) >= 0));
     if (!t) return null;
     const ix = {}; for (const k in CL) ix[k] = idxOf(t.labels, CL[k]);
     const g = (c, k) => (ix[k] >= 0 ? c[ix[k]] || '' : '');
     const out = [];
     for (const c of t.rows) {
-      if (!/^new\b/i.test(g(c, 'status').trim())) continue;
+      const status = g(c, 'status').trim();
       const name = g(c, 'name') || [g(c, 'first'), g(c, 'last')].filter(Boolean).join(' ');
       const id = g(c, 'id');
-      if (!id && !name) continue;
-      out.push({ key: id ? 'id:' + id : 'n:' + norm(name) + '|' + g(c, 'created'), id, name, country: g(c, 'country'), created: g(c, 'created') });
+      if ((!id && !name) || !status) continue;
+      const r = parseDT(g(c, 'created'));
+      out.push({ key: id ? 'id:' + id : 'n:' + norm(name) + '|' + g(c, 'created'), id, name, country: g(c, 'country'), created: g(c, 'created'), status,
+        reg: r ? r.date + (r.time ? ' ' + r.time : '') : '', agent: g(c, 'agent'), camp: g(c, 'camp'), aff: g(c, 'aff'), brand });
     }
     return out;
   }
+  const scanClients = (all) => (all ? all.filter((c) => /^new\b/i.test(c.status)) : null); // los que están en "new"
   const loginPage = () => !!document.querySelector('input[type=password]');
 
   /* ================= cuáles ya están en el panel ================= */
@@ -184,17 +189,26 @@
   const isKnown = (s) => { if (!known) return false; prep(); const b = norm(s.brand); return (s.tx && known.txSet.has(b + '|' + s.tx)) || known.idSet.has(b + '|' + norm(s.id)); };
   const isQueued = (s) => queued.has(norm(s.brand) + '|' + norm(s.id));
 
-  /* ================= vigilancia de esta pestaña ================= */
-  // toda página del CRM con una tabla (ventas o clientes) se actualiza sola cada 10 s, sin opciones
-  let myTab = null, watches = {}, watch = null, watched = false, asked = false, noTableSince = 0;
+  /* ================= vigilancia: una sola pestaña, la que se elige con el botón ================= */
+  // la elegida se actualiza cada 10 s y avisa de los new; las demás quedan quietas y solo suman clientes al registro
+  let myTab = null, watches = {}, watch = null, watched = false, owner = null, noTableSince = 0;
   send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; setWatch(watches); refresh(); });
-  function setWatch(all) { watches = all || {}; watch = myTab != null ? watches[myTab] || null : null; watched = !!watch; if (!watched) asked = false; }
-  function autoWatch(hasTable) {
-    if (myTab == null) return;
-    if (hasTable) { noTableSince = 0; if (!watched && !asked) { asked = true; send({ type: 'crm-watch-start' }); } return; }
-    if (!watched) return;
+  function setWatch(all) {
+    watches = all || {}; watch = myTab != null ? watches[myTab] || null : null; watched = !!watch;
+    owner = Object.values(watches).find((w) => w && w.tabId !== myTab) || null; // otra pestaña ya tiene la vigilancia
+  }
+  function autoWatch(hasTable) { // si la elegida se queda sin tabla un rato (te fuiste a otra parte del CRM), se libera
+    if (myTab == null || !watched) return;
+    if (hasTable) { noTableSince = 0; return; }
     if (!noTableSince) noTableSince = Date.now();
-    else if (Date.now() - noTableSince > 20000) { noTableSince = 0; send({ type: 'crm-watch-stop' }); } // te fuiste a otra página del CRM sin tabla
+    else if (Date.now() - noTableSince > 20000) { noTableSince = 0; send({ type: 'crm-watch-stop' }); }
+  }
+  async function watchBtn() {
+    if (watched) { await send({ type: 'crm-watch-stop' }); return; }
+    if (owner) { await send({ type: 'crm-watch-go' }); return; }
+    const r = await send({ type: 'crm-watch-start' });
+    if (r && r.busy) setMsg('Ya se actualiza otra pestaña del CRM.', 'warn', 6000);
+    else if (!r) setMsg('La extensión se actualizó: recargá la página.', 'err');
   }
   let lastInput = 0;
   for (const ev of ['keydown', 'pointerdown', 'wheel']) addEventListener(ev, () => { lastInput = Date.now(); }, { capture: true, passive: true });
@@ -227,11 +241,28 @@
   let lastLeads = '';
   function reportLeads(list) {
     if (!list || !list.length) return;
-    const rows = list.filter((c) => c.id || c.name).map((c) => ({ id: c.id, name: c.name, country: c.country }));
+    const rows = list.filter((c) => c.id || c.name).map((c) => ({ id: c.id, name: c.name, country: c.country, reg: c.reg }));
     const sig = rows.map((c) => c.id || c.name).join('|');
     if (sig === lastLeads) return;
     lastLeads = sig;
     send({ type: 'crm-leads', clients: rows.slice(0, 300) });
+  }
+
+  // todos los clientes que se ven en esta pestaña → registro de clientes de Vitalis (status, registro, agente, campaña)
+  const sentSig = new Map((() => { try { return JSON.parse(sessionStorage.getItem('vitalis-seen') || '[]'); } catch (e) { return []; } })());
+  function reportSeen(all) {
+    if (!all || !all.length) return;
+    const rows = [];
+    for (const c of all) {
+      if (!c.id) continue;
+      const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country].join('|');
+      if (sentSig.get(k) === sig) continue;
+      sentSig.set(k, sig);
+      rows.push({ id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff });
+    }
+    if (!rows.length) return;
+    try { sessionStorage.setItem('vitalis-seen', JSON.stringify([...sentSig].slice(-5000))); } catch (e) {}
+    for (let i = 0; i < rows.length; i += 300) send({ type: 'crm-seen', rows: rows.slice(i, i + 300) });
   }
 
   /* ================= de quién es cada venta (columna "Sales Rep" o similar) ================= */
@@ -257,7 +288,7 @@
   const markTried = (list) => { for (const x of list) tried.add(norm(x.brand) + '|' + norm(x.id)); try { sessionStorage.setItem('vitalis-auto', JSON.stringify([...tried].slice(-2000))); } catch (e) {} };
 
   /* ================= botón ================= */
-  let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, whoSel = '';
+  let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, seen = null, whoSel = '';
   const isLeader = () => !!(desk && (desk.role === 'leader' || desk.role === 'admin'));
   function build() {
     const h = document.createElement('div');
@@ -291,8 +322,9 @@
       .min .sec{display:none}
     </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
       <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
-      <div class="sec" id="sWatch"><div class="st" id="wst"></div><div class="ids" id="wids"></div></div></div>`;
+      <div class="sec" id="sWatch"><div class="st" id="wst"></div><button class="go" id="wbtn"></button><div class="ids" id="wids"></div></div></div>`;
     root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales(false)));
+    root.getElementById('wbtn').addEventListener('click', () => watchBtn());
     root.getElementById('who').addEventListener('change', (e) => { whoSel = e.target.value; render(); });
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
     root.getElementById('msg').addEventListener('click', (e) => { if (e.target.closest('[data-open]')) send({ type: 'open-panel' }); });
@@ -338,25 +370,37 @@
     }
     $('msg').className = 'msg ' + (msg ? msg.cls : '');
     $('msg').innerHTML = msg ? msg.html : (sales && !known ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
-    // vigilancia
-    $('sWatch').hidden = !(sales || clients);
-    if (sales || clients) {
-      const n = clients ? clients.length : 0;
+    // vigilancia: una sola pestaña se actualiza; las demás suman clientes
+    $('sWatch').hidden = !(sales || seen);
+    if (sales || seen) {
+      const n = clients ? clients.length : 0, b = $('wbtn');
       if (clients && !sales) head.push(`${n} en new`);
-      $('wst').innerHTML = `<span class="on">Se actualiza sola cada 10 s</span>${clients ? ' · ' + plural(n, 'cliente') + ' en new' : ''}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 8) : ''}`;
-      $('wids').innerHTML = clients && clients.length ? 'En new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
+      const tot = seen && seen.length ? ` · ${plural(seen.length, 'cliente')} a la vista` : '';
+      if (watched) {
+        $('wst').innerHTML = `<span class="on">Esta pestaña se actualiza sola cada 10 s</span>${clients ? ' · ' + plural(n, 'cliente') + ' en new' : ''}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 8) : ''}`;
+        b.textContent = 'Dejar de actualizar'; b.className = 'go alt';
+      } else if (owner) {
+        $('wst').innerHTML = `Se actualiza otra pestaña${owner.title ? ` (${escH(String(owner.title).slice(0, 40))})` : ''}. Esta suma clientes al registro${tot}.`;
+        b.textContent = 'Ir a esa pestaña'; b.className = 'go alt';
+      } else {
+        $('wst').innerHTML = `Ninguna pestaña se actualiza sola. Esta suma clientes al registro${tot}.`;
+        b.textContent = 'Actualizar esta pestaña'; b.className = 'go';
+      }
+      $('wids').innerHTML = watched && clients && clients.length ? 'En new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
     }
     $('t').textContent = head.join(' · ');
   }
   function refresh(force) {
     const T = tables();
     sales = scanSales(T);
-    clients = scanClients(T);
+    seen = scanAll(T);
+    clients = scanClients(seen);
     const looksFtd = !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
-    autoWatch(!!(sales || clients));
+    autoWatch(!!(sales || seen));
     if (watched) report(clients, force);
     reportLeads(clients);
-    if (!sales && !clients && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
+    reportSeen(seen);
+    if (!sales && !seen && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
     render();
     autoSales();

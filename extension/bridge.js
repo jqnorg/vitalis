@@ -1,5 +1,5 @@
 // Vitalis · puente entre la página de Vitalis y la extensión.
-// La página manda la agenda y los snippets (y recibe ventas y clientes new del CRM) con window.postMessage en su misma ventana.
+// La página manda la agenda y los snippets (y recibe ventas, clientes new y todos los clientes vistos en el CRM) con window.postMessage en su misma ventana.
 (() => {
   const isVitalis = () => !!document.querySelector('meta[name="vitalis"]');
   const post = (msg) => { try { window.postMessage(msg, location.origin); return true; } catch (e) { return false; } };
@@ -16,6 +16,14 @@
       waiting[reqId] = reply;
       post({ type: 'ftd-agenda-leads', v: 1, reqId, rows: msg.rows });
       setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ noPanel: true }); delete waiting[reqId]; } }, 9000);
+      return true;
+    }
+    if (msg && msg.type === 'seen') { // todos los clientes que se vieron en el CRM → al registro de clientes de Vitalis
+      if (!alive) { reply({ noPanel: true }); return false; }
+      const reqId = 'K' + Date.now() + Math.random().toString(36).slice(2);
+      waiting[reqId] = reply;
+      post({ type: 'ftd-agenda-seen', v: 1, reqId, rows: msg.rows });
+      setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ noPanel: true }); delete waiting[reqId]; } }, 18000);
       return true;
     }
     if (msg && msg.type === 'import') { // ventas del botón del CRM → a Vitalis
@@ -53,6 +61,12 @@
       else if (String(d.reqId).startsWith('Q')) { try { chrome.runtime.sendMessage({ type: 'leads-done', res }); } catch (x) {} }
       return;
     }
+    if (d.type === 'ftd-agenda-seen-ack' && d.v === 1) {
+      const res = { keys: Array.isArray(d.keys) ? d.keys.slice(0, 1000).map(String) : [], err: d.err || null };
+      if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }
+      else if (String(d.reqId).startsWith('S') && !res.err) { try { chrome.runtime.sendMessage({ type: 'seen-done', keys: res.keys }); } catch (x) {} }
+      return;
+    }
     if (d.type === 'ftd-agenda-social' && d.v === 1 && d.card && typeof d.card.k === 'string') { // aviso social: tarjeta en la pestaña que estés
       const c = d.card, t = (v, n) => String(v ?? '').slice(0, n);
       const card = { k: t(c.k, 80), v: t(c.v, 60), kind: 'social', lvl: ['urg', 'imp', 'info'].includes(c.lvl) ? c.lvl : '', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
@@ -80,6 +94,7 @@
         if (res && res.cmds && res.cmds.length) deliver(res.cmds);
         if (res && res.imports && res.imports.length) post({ type: 'ftd-agenda-import', v: 1, reqId: 'q' + Date.now(), rows: res.imports });
         if (res && res.leads && res.leads.length) post({ type: 'ftd-agenda-leads', v: 1, reqId: 'Q' + Date.now(), rows: res.leads });
+        if (res && res.seen && res.seen.length) post({ type: 'ftd-agenda-seen', v: 1, reqId: 'S' + Date.now(), rows: res.seen });
       });
     } catch (err) { /* la extensión se actualizó: hay que recargar la pestaña */ }
   });

@@ -119,11 +119,11 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
+const VIEWS=['inicio','ahora','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: todas las secciones, en orden de importancia (los números siguen ese orden)
-const NAVKEYS={1:'inicio',2:'filtros',3:'ventas',4:'clientes',5:'agenda',6:'tareas',7:'chat',8:'sueldo',9:'turnos',0:'config'};
+const NAVKEYS={1:'inicio',2:'ahora',3:'filtros',4:'ventas',5:'clientes',6:'agenda',7:'chat',8:'sueldo',9:'turnos',0:'config'}; // Tareas: T
 function go(v,opts){
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
   cur=v;hideTip();document.body.dataset.view=v;
@@ -158,6 +158,7 @@ function status(){
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
+  if(crm.ok){const q=queueOf(tlView()?null:me);$('#nbAh').textContent=q.g1.length||''}
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;

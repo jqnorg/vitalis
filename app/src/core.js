@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.11.0';
+const VERSION='1.12.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -281,7 +281,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);

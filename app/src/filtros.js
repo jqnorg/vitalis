@@ -3,7 +3,7 @@
    Campañas, afiliadores, países y combinaciones que más venden (con tendencia),
    qué campañas y afiliadores convierten lates y a qué hora se cierran.
    ============================================================ */
-let flDays=local.get('flDays',7),flBrand=local.get('flBrand','all'),flMore={};
+let flDays=local.get('flDays',7),flBrand=local.get('flBrand2','Novara Markets'),flMore={}; // Trade24Seven quedó como archivo: Novara por defecto
 const FL_PER=[[1,'Hoy'],[3,'3 días'],[7,'7 días'],[14,'14 días'],[30,'30 días']];
 const flVal=v=>{v=String(v??'').trim().replace(/\s+/g,' ');return !v||/^(null|undefined|-|—|0|n\/a)$/i.test(v)?'':v};
 const flWin=(days,back=0)=>{const to=addDays(todayS(),-back*days);return {from:addDays(to,-(days-1)),to}};
@@ -61,9 +61,9 @@ function flRec(D){ // lo que conviene filtrar ahora
 V.filtros={
   build(){
     $('#flPer').innerHTML=FL_PER.map(([d,l])=>`<button type="button" data-d="${d}">${l}</button>`).join('');
-    $('#flBr').innerHTML=[['all','Todas'],['Trade24Seven','Trade24Seven'],['Novara Markets','Novara']].map(([k,l])=>`<button type="button" data-b="${esc(k)}">${l}</button>`).join('');
+    $('#flBr').innerHTML=[['Novara Markets','Novara'],['all','Todas'],['Trade24Seven','Trade24Seven (archivo)']].map(([k,l])=>`<button type="button" data-b="${esc(k)}">${l}</button>`).join('');
     $('#flPer').addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;flDays=+b.dataset.d;local.set('flDays',flDays);this.render({})});
-    $('#flBr').addEventListener('click',e=>{const b=e.target.closest('[data-b]');if(!b)return;flBrand=b.dataset.b;local.set('flBrand',flBrand);this.render({})});
+    $('#flBr').addEventListener('click',e=>{const b=e.target.closest('[data-b]');if(!b)return;flBrand=b.dataset.b;local.set('flBrand2',flBrand);this.render({})});
     $('#v-filtros').addEventListener('click',async e=>{
       const m=e.target.closest('[data-more]');if(m){flMore[m.dataset.more]=!flMore[m.dataset.more];this.render({});return}
       if(e.target.closest('#flTask')){const D=flData();taskNew({what:'Repasar',camps:D.G.camp.slice(0,3).map(x=>x.k),affs:D.G.aff.slice(0,3).map(x=>x.k)});return}

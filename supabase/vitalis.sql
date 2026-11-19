@@ -983,6 +983,208 @@ grant execute on function public.my_team(), public.my_role() to authenticated;
 revoke execute on function public.my_team(), public.my_role() from public, anon;
 revoke execute on function public.handle_new_user(), public.guard_profile(), public.touch(), public.ping_guard(), public.msg_guard(), public.msg_gone(), public.file_guard(), public.avatar_guard(), public.react_guard() from public, anon, authenticated;
 
+-- ---------- clientes del CRM: todos los que se ven, con su status (no solo los new) ----------
+-- La extensión manda cada fila que ve en cualquier pestaña del CRM; se guarda la última foto y cada cambio de status.
+-- Se escribe solo con crm_seen() (así cualquiera actualiza un cliente que vio primero otro). Fuera del tiempo real: son muchas filas.
+alter table public.teams add column if not exists queue_cap integer not null default 60; -- grupo 3 de la cola: hasta cuántos se llaman todos
+
+create table if not exists public.crm_clients (
+  team_id       uuid not null default public.my_team() references public.teams(id),
+  brand         text not null,
+  client_id     text not null,
+  name          text,
+  country       text,
+  reg           text,                -- 'AAAA-MM-DD HH:MM' como lo muestra el CRM (igual que sales.reg)
+  status        text,                -- tal como lo escribe el CRM
+  status_group  text not null default 'otro',
+  crm_agent     text,
+  camp          text,
+  aff           text,
+  first_seen    timestamptz not null default now(),
+  first_seen_by uuid references public.profiles(id) on delete set null,
+  last_seen     timestamptz not null default now(),
+  last_seen_by  uuid references public.profiles(id) on delete set null,
+  status_since  timestamptz not null default now(),  -- la primera vez que se vio en este status
+  primary key (team_id, brand, client_id)
+);
+create index if not exists crm_clients_grp on public.crm_clients (team_id, status_group);
+create index if not exists crm_clients_reg on public.crm_clients (team_id, reg);
+create index if not exists crm_clients_seen on public.crm_clients (team_id, first_seen);
+create index if not exists crm_clients_camp on public.crm_clients (team_id, camp);
+create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
+  id         bigserial primary key,
+  team_id    uuid not null references public.teams(id),
+  brand      text not null,
+  client_id  text not null,
+  old_status text,
+  new_status text,
+  new_group  text,
+  seen_at    timestamptz not null default now(),
+  seen_by    uuid references public.profiles(id) on delete set null
+);
+create index if not exists crm_status_log_cl on public.crm_status_log (team_id, client_id, seen_at);
+create table if not exists public.crm_status_map ( -- status que el admin clasificó a mano
+  team_id    uuid not null references public.teams(id),
+  status_key text not null,
+  grp        text not null check (grp in ('new','na','call_again','hang_up','low_potential','not_interested','dnc','otro')),
+  primary key (team_id, status_key)
+);
+
+create or replace function public.crm_key(st text) returns text language sql immutable set search_path = ''
+  as $$ select lower(regexp_replace(coalesce(st, ''), '[^A-Za-z0-9]', '', 'g')) $$;
+create or replace function public._clip(v text, n integer) returns text language sql immutable set search_path = ''
+  as $$ select nullif(left(btrim(regexp_replace(coalesce(v, ''), '\s+', ' ', 'g')), n), '') $$;
+-- grupo de cada status: new · na (No Answer, NA-2…NA-5) · call_again · hang_up · low_potential · not_interested · dnc (Do Not Call) · otro
+create or replace function public.crm_group(st text, t uuid) returns text
+  language plpgsql stable security definer set search_path = public as $$
+declare k text := public.crm_key(st); g text;
+begin
+  if k = '' then return 'otro'; end if;
+  select grp into g from public.crm_status_map where team_id = t and status_key = k;
+  if g is not null then return g; end if;
+  return case
+    when k like 'new%' then 'new'
+    when k in ('na', 'noanswer', 'noresponse') or k ~ '^(na|noanswer)[1-9]$' then 'na'
+    when k in ('callagain', 'callback', 'callagainlater') then 'call_again'
+    when k in ('hangup', 'hungup') then 'hang_up'
+    when k = 'lowpotential' then 'low_potential'
+    when k = 'notinterested' then 'not_interested'
+    when k in ('donotcall', 'dnc', 'dontcall') then 'dnc'
+    else 'otro' end;
+end $$;
+
+-- lo que vio la extensión (hasta 500 filas): completa o actualiza cada cliente y anota el cambio de status
+create or replace function public.crm_seen(rows jsonb) returns json
+  language plpgsql security definer set search_path = public as $$
+declare
+  t uuid := public.my_team();
+  r jsonb; cid text; br text; st text; g text; rg text; cur record;
+  n_new integer := 0; n_chg integer := 0; fresh text[] := '{}';
+begin
+  if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  if rows is null or jsonb_typeof(rows) <> 'array' then raise exception 'BAD: se esperaba una lista'; end if;
+  if jsonb_array_length(rows) > 500 then raise exception 'TOO_MANY: de a 500'; end if;
+  for r in select * from jsonb_array_elements(rows) loop
+    cid := public._clip(r->>'id', 60);
+    if cid is null then continue; end if;
+    br := coalesce(public._clip(r->>'brand', 40), 'Novara Markets');
+    st := public._clip(r->>'status', 60);
+    rg := public._clip(r->>'reg', 16);
+    if rg is not null and (rg !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(rg, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then rg := null; end if;
+    g := public.crm_group(st, t);
+    select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
+    if not found then
+      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, first_seen_by, last_seen_by)
+      values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
+              public._clip(r->>'agent', 80), public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), auth.uid(), auth.uid())
+      on conflict do nothing;
+      if st is not null then
+        insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, null, st, g, auth.uid());
+      end if;
+      n_new := n_new + 1;
+      if g = 'new' then fresh := fresh || cid; end if;
+    else
+      update public.crm_clients set
+        name = coalesce(public._clip(r->>'name', 120), name),
+        country = coalesce(public._clip(r->>'country', 60), country),
+        reg = coalesce(rg, reg),
+        crm_agent = coalesce(public._clip(r->>'agent', 80), crm_agent),
+        camp = coalesce(public._clip(r->>'camp', 120), camp),
+        aff = coalesce(public._clip(r->>'aff', 60), aff),
+        status = coalesce(st, status),
+        status_group = case when st is null then status_group else g end,
+        status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
+        last_seen = now(), last_seen_by = auth.uid()
+      where team_id = t and brand = br and client_id = cid;
+      if st is not null and st is distinct from cur.status then
+        insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, cur.status, st, g, auth.uid());
+        n_chg := n_chg + 1;
+      end if;
+    end if;
+  end loop;
+  return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'fresh', to_json(fresh));
+end $$;
+
+-- el admin clasifica un status que no se reconoce (y se reclasifican los clientes que lo tienen)
+create or replace function public.crm_map_status(st text, grp text) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); k text := public.crm_key(st); n integer;
+begin
+  if coalesce(public.my_role(), '') <> 'admin' then raise exception 'Solo el administrador clasifica status'; end if;
+  if k = '' then raise exception 'STATUS: falta el status'; end if;
+  if grp not in ('new','na','call_again','hang_up','low_potential','not_interested','dnc','otro') then raise exception 'GRP: grupo inválido'; end if;
+  insert into public.crm_status_map (team_id, status_key, grp) values (t, k, grp)
+    on conflict (team_id, status_key) do update set grp = excluded.grp;
+  update public.crm_clients set status_group = grp where team_id = t and public.crm_key(status) = k;
+  get diagnostics n = row_count;
+  return json_build_object('ok', true, 'clientes', n);
+end $$;
+
+-- team leader o admin: hasta cuántos del grupo 3 se llaman todos (si hay más, solo los registrados en el mes)
+create or replace function public.set_queue_cap(n integer) returns json
+  language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  if n is null or n < 1 or n > 1000 then raise exception 'CAP: entre 1 y 1000'; end if;
+  update public.teams set queue_cap = n where id = public.my_team();
+  return json_build_object('ok', true, 'cap', n);
+end $$;
+
+-- ---------- registro de accesos: exportaciones y cambios a ventas ajenas (lo ven team leader y admin) ----------
+create table if not exists public.audit_log (
+  id      bigserial primary key,
+  team_id uuid not null references public.teams(id),
+  user_id uuid references public.profiles(id) on delete set null,
+  at      timestamptz not null default now(),
+  action  text not null,
+  detail  jsonb
+);
+create index if not exists audit_log_team_at on public.audit_log (team_id, at desc);
+create or replace function public.audit_sales() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then return coalesce(new, old); end if; -- cambios hechos a mano en la base
+  if tg_op = 'DELETE' and old.user_id <> auth.uid() then
+    insert into public.audit_log (team_id, user_id, action, detail)
+    values (old.team_id, auth.uid(), 'venta ajena borrada', jsonb_build_object('client_id', old.client_id, 'brand', old.brand, 'de', old.user_id, 'date', old.date));
+  elsif tg_op = 'UPDATE' and (old.user_id <> auth.uid() or new.user_id <> old.user_id) then
+    insert into public.audit_log (team_id, user_id, action, detail)
+    values (new.team_id, auth.uid(), 'venta ajena editada', jsonb_build_object('client_id', new.client_id, 'brand', new.brand, 'de', old.user_id, 'a', new.user_id,
+      'campos', (select coalesce(jsonb_agg(e.k), '[]'::jsonb) from jsonb_each(to_jsonb(new)) as e(k, v) where e.k not in ('updated_at', 'created_at') and to_jsonb(old) -> e.k is distinct from e.v)));
+  end if;
+  return coalesce(new, old);
+end $$;
+drop trigger if exists sales_audit on public.sales;
+create trigger sales_audit after update or delete on public.sales for each row execute function public.audit_sales();
+create or replace function public.audit_note(act text, detail jsonb default null) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team();
+begin
+  if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  if act not in ('exportó ventas', 'exportó respaldo', 'exportó clientes') then raise exception 'ACT: acción desconocida'; end if;
+  insert into public.audit_log (team_id, user_id, action, detail) values (t, auth.uid(), act, detail);
+  return json_build_object('ok', true);
+end $$;
+
+alter table public.crm_clients    enable row level security;
+alter table public.crm_status_log enable row level security;
+alter table public.crm_status_map enable row level security;
+alter table public.audit_log      enable row level security;
+drop policy if exists crm_clients_read on public.crm_clients;
+create policy crm_clients_read on public.crm_clients for select to authenticated using (team_id = public.my_team());
+drop policy if exists crm_log_read on public.crm_status_log;
+create policy crm_log_read on public.crm_status_log for select to authenticated using (team_id = public.my_team());
+drop policy if exists crm_map_read on public.crm_status_map;
+create policy crm_map_read on public.crm_status_map for select to authenticated using (team_id = public.my_team());
+drop policy if exists audit_read on public.audit_log;
+create policy audit_read on public.audit_log for select to authenticated using (team_id = public.my_team() and public.my_role() in ('admin', 'leader'));
+grant select on public.crm_clients, public.crm_status_log, public.crm_status_map, public.audit_log to authenticated;
+revoke insert, update, delete, truncate on public.crm_clients, public.crm_status_log, public.crm_status_map, public.audit_log from authenticated;
+revoke all on public.crm_clients, public.crm_status_log, public.crm_status_map, public.audit_log from anon;
+revoke all on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) from public, anon;
+grant execute on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) to authenticated;
+revoke execute on function public.crm_group(text, uuid), public.audit_sales() from public, anon, authenticated;
+
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;

@@ -71,10 +71,10 @@ async def main():
             ok(await A.evaluate('ready'), 'la sesión sigue al recargar')
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
-            order = ['inicio', 'equipo', 'filtros', 'ventas', 'clientes', 'agenda', 'tareas', 'chat', 'sueldo', 'turnos', 'social', 'snippets', 'config']
+            order = ['inicio', 'ahora', 'equipo', 'filtros', 'ventas', 'clientes', 'agenda', 'tareas', 'chat', 'sueldo', 'turnos', 'social', 'snippets', 'config']
             ok(await A.evaluate("[...document.querySelectorAll('#nav [data-v]')].map(b=>b.dataset.v)") == order, 'el menú tiene todas las secciones separadas, en orden de importancia')
             ok(await A.locator('.subnav').count() == 0, 'sin pestañas arriba')
-            for i, v in enumerate(order[2:]):
+            for i, v in enumerate([x for x in order if x not in ('inicio', 'equipo')]):
                 await A.click(f'#nav [data-v={v}]'); await A.wait_for_timeout(500)
                 ok(await A.is_visible(f'#v-{v}') and 'on' in (await A.get_attribute(f'#nav [data-v={v}]', 'class') or ''), f'sección {v}')
                 await A.screenshot(path=OUT / f'c{i+2:02d}_{v}.png')
@@ -89,8 +89,10 @@ async def main():
             await A.select_option('#cfLibDia', '25'); await A.select_option('#cfLibMes', '12'); await A.click('#cfLibAdd'); await A.wait_for_timeout(800)
             ok(await A.evaluate("(cfg.libres||[]).includes('12-25')") and '25/12' in await A.inner_text('#cfLibres'), 'se agrega el 25/12 para todos los años')
             ok(await A.locator('#cfFalD,#cfFalAdd,#cfFaltas').count() == 0, 'en Ajustes ya no se cargan faltas')
-            await A.keyboard.press('4'); await A.wait_for_timeout(300)
-            ok(await A.is_visible('#v-clientes'), 'tecla 4: clientes')
+            await A.keyboard.press('2'); await A.wait_for_timeout(300)
+            ok(await A.is_visible('#v-ahora'), 'tecla 2: ahora')
+            await A.keyboard.press('5'); await A.wait_for_timeout(300)
+            ok(await A.is_visible('#v-clientes'), 'tecla 5: clientes')
             await A.keyboard.press('7'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-chat'), 'tecla 7: chat')
             await A.keyboard.press('1'); await A.wait_for_timeout(300)
@@ -414,6 +416,8 @@ async def main():
             await A.reload(); await A.wait_for_timeout(2500)
             await A.keyboard.press('f'); await A.wait_for_timeout(700)
             ok(await A.is_visible('#v-filtros'), 'la tecla F abre Filtros')
+            ok('on' in (await A.get_attribute('#flBr [data-b="Novara Markets"]', 'class') or ''), 'Filtros arranca en Novara (Trade24Seven es archivo)')
+            await A.click('#flBr [data-b="all"]'); await A.wait_for_timeout(400)
             await A.click('#flPer [data-d="3"]'); await A.wait_for_timeout(500)
             first = (await A.inner_text('#flBody .fl-card:has-text("Campañas") .fl-row >> nth=0')).split('\n')[0]
             ok(first == 'QuboTradeAI', f'la campaña que más vende va primera ({first!r})')
@@ -560,6 +564,94 @@ async def main():
             r = sql("select client_id, (select name from public.profiles where id=user_id) who from public.sales where client_id in ('99001','99002')")
             ok(res.get('added') == 1 and res.get('ajenas') == 1 and [(x['client_id'], x['who']) for x in r] == [('99001', 'Elias Me')], f'un agente solo carga las suyas, aunque vea las de otros ({res}, {r})')
             await E.close()
+
+            # ---------- clientes del CRM: la cola "Ahora", la ficha del new, la agenda conectada ----------
+            te = await A.evaluate('todayS()'); ym = te[:7]; pym = await A.evaluate("ymStep(ymNow(),-1)")
+            await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
+            res = await A.evaluate(f'''()=>crmSeenFromExt([
+              {{id:'500001',brand:'Novara Markets',name:'Nueva Uno',country:'Chile',status:'New',reg:'{te} 09:10',agent:'Joaquín Or',camp:'FB-01',aff:'12',k:'a'}},
+              {{id:'500002',brand:'Novara Markets',name:'Nueva Dos',country:'Peru',status:'New',reg:'{te} 10:20',agent:'Joaquín Or',camp:'GG-UY',k:'b'}},
+              {{id:'500003',name:'Vuelve',country:'Peru',status:'Call Again',reg:'{te} 08:00',agent:'Joaquín Or',k:'c'}},
+              {{id:'500004',name:'No contesta',country:'Mexico',status:'NA-3',reg:'{ym}-02 12:00',agent:'Joaquín Or',k:'d'}},
+              {{id:'500005',name:'Cortó',country:'Peru',status:'Hang Up',reg:'{ym}-03 12:00',agent:'Joaquín Or',k:'e'}},
+              {{id:'500006',name:'No llamar',country:'Peru',status:'Do Not Call',reg:'{te} 07:00',agent:'Joaquín Or',k:'f'}},
+              {{id:'500007',name:'Sin plata',country:'Chile',status:'Low potential',reg:'{te} 07:30',agent:'Joaquín Or',k:'g'}},
+              {{id:'500008',name:'De Sofía',country:'Chile',status:'New',reg:'{te} 11:00',agent:'Sofía Ar',k:'h'}},
+              {{id:'70001',name:'Ya depositó',country:'Peru',status:'New',reg:'2026-11-07 09:00',agent:'Joaquín Or',k:'i'}},
+              {{id:'500009',name:'Del mes pasado',country:'Peru',status:'No Answer',reg:'{pym}-20 10:00',agent:'Joaquín Or',k:'j'}}])''')
+            ok(res.get('keys') == list('abcdefghij') and res.get('added') == 10, f'la app guarda los clientes que manda la extensión ({res})')
+            g = sql("select client_id, status_group g from public.crm_clients order by client_id")
+            ok({x['client_id']: x['g'] for x in g}.get('500006') == 'dnc' and len(g) == 10, 'con su grupo de status')
+            await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900)
+            await A.evaluate("go('ahora')"); await A.wait_for_timeout(600)
+            body = await A.inner_text('#ahBody')
+            g1 = await A.inner_text('#ahBody .ah-g >> nth=0')
+            ok('500002' in g1 and '500001' in g1 and g1.index('500002') < g1.index('500001') and '500008' not in g1 and '70001' not in g1, f'1) new: los míos, el más nuevo primero, sin los que ya depositaron ({g1[:200]!r})')
+            g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
+            ok(g3.index('500003') < g3.index('500005') < g3.index('500009') < g3.index('500004'), f'3) Call Again, Hang Up y después NA (No Answer, NA-2…), en ese orden ({g3[:220]!r})')
+            ok('500006' not in body and '500007' not in body, 'Do Not Call y Low potential no están en la cola')
+            out = await A.inner_text('#ahBody .ah-out')
+            ok('Do Not Call 1' in out and 'Low potential 1' in out, f'y se cuentan aparte ({out[:120]!r})')
+            ok(await A.inner_text('#nbAh') == '2', 'el menú marca los new sin depositar')
+            await A.screenshot(path=OUT / 'q1_ahora.png', full_page=True)
+            # el tope del grupo 3 lo cambia el team leader: con más que el tope, solo los registrados en el mes
+            await D.evaluate("modals.slice().forEach(m=>m.close());go('ahora')"); await D.wait_for_timeout(500)
+            await D.click('#ahBody [data-ah=cap]'); await D.wait_for_timeout(300)
+            await D.fill('#capN', '3'); await D.click('.mbox .mf .pri'); await D.wait_for_timeout(800)
+            ok(sql('select queue_cap from public.teams')[0]['queue_cap'] == 3, 'el team leader cambia el tope del grupo 3')
+            await A.reload(); await A.wait_for_timeout(2500); await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(800)
+            await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
+            g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
+            ok('Son 4' in g3 and '500009' not in g3 and '500003' in g3, f'con más que el tope, solo los registrados en el mes ({g3[:160]!r})')
+            sql('update public.teams set queue_cap = 60')
+            # la ficha del new: después del aviso, se abre sola al volver a Vitalis
+            await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
+            await A.evaluate("document.hasFocus=()=>false")
+            await A.evaluate("window.postMessage({type:'ftd-agenda-cmd',v:1,cmd:'nuevo',k:'500002'},location.origin)"); await A.wait_for_timeout(900)
+            ok(await A.locator('.mbox').count() == 0, 'con Vitalis atrás, la ficha espera')
+            await A.evaluate("document.hasFocus=()=>true;dispatchEvent(new Event('focus'))"); await A.wait_for_timeout(2000)
+            fi = await A.inner_text('.mbox') if await A.locator('.mbox').count() else ''
+            ok('Entró un new' in fi and 'Nueva Dos' in fi and 'GG-UY' in fi and 'Peru' in fi, f'al volver a Vitalis se abre sola la ficha del new, con campaña y país ({fi[:160]!r})')
+            ok('FTDs en 30 días' in fi and 'Hora con más FTDs' in fi, 'con los números de la campaña y del país')
+            await A.screenshot(path=OUT / 'q2_ficha_new.png')
+            await A.keyboard.press('Escape'); await A.wait_for_timeout(300)
+            # agenda conectada: no se agenda a un Do Not Call; el que ya depositó se marca y no suena
+            await A.evaluate("go('agenda')"); await A.wait_for_timeout(300)
+            await A.fill('#agForm [name=pid]', '500006'); await A.fill('#agForm [name=kw]', 'probar'); await A.click('#agForm button[type=submit]'); await A.wait_for_timeout(900)
+            ok(sql("select count(*)::int c from public.agenda where client_id='500006'")[0]['c'] == 0 and await A.locator('#toasts .toast:has-text("Do Not Call")').count() == 1, 'no deja agendar a un Do Not Call')
+            sql(f"insert into public.agenda (user_id,client_id,kw,due) select id,'70001','ver si deposita','{te}T23:58' from public.profiles where name='Joaquín Or'")
+            await A.reload(); await A.wait_for_timeout(2500); await A.evaluate("go('agenda')"); await A.wait_for_timeout(500)
+            ag = await A.inner_text('#agLists')
+            ok('70001' in ag and 'Ya depositó' in ag and 'Cerrar' in ag, f'un contacto de alguien que ya depositó lo dice y se cierra con un toque ({ag[:160]!r})')
+            ok(not await A.evaluate("syncExt.toString().includes('soldOf')") or await A.evaluate("pend.filter(p=>!p.done&&!soldOf(p.id)&&!isDnc(p.id)).every(p=>p.id!=='70001')"), 'y no se avisa')
+            await A.screenshot(path=OUT / 'q3_agenda_conectada.png')
+            # new y late de verdad: de los registrados hoy, cuántos depositaron hoy
+            sql(f"insert into public.sales (team_id,user_id,n,date,time,client_id,country,name,camp,amount,tx,reg,brand) select team_id,id,98,'{te}','09:50','500001','Chile','Nueva Uno','FB-01',100,'TX500001','{te} 09:10','Novara Markets' from public.profiles where name='Joaquín Or'")
+            await A.reload(); await A.wait_for_timeout(2500); await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900)
+            await A.evaluate("go('clientes')"); await A.wait_for_timeout(600)
+            kp = await A.inner_text('#clKpis')
+            ok('1 new de 5 registrados' in kp and '20%' in kp, f'conversión por día de registro: 1 new de 5 registrados hoy ({kp[:160]!r})')
+            ok('entraron al registro' in await A.inner_text('#clSeen'), 'Clientes dice cuántos entraron hoy al registro')
+            await A.screenshot(path=OUT / 'q4_clientes_conversion.png')
+            await A.evaluate("go('ventas',{f:{desde:todayS(),hasta:todayS()}})"); await A.wait_for_timeout(500)
+            ok('new · 40 min' in await A.inner_text('#pTable'), 'cada venta muestra cuánto tardó desde el registro')
+            # el team leader: la cola de cada uno
+            await D.reload(); await D.wait_for_timeout(2500); await D.evaluate("modals.slice().forEach(m=>m.close());crmLoad(true)"); await D.wait_for_timeout(900)
+            await D.evaluate("go('equipo')"); await D.wait_for_timeout(600)
+            cola = await D.inner_text('#eqCola')
+            ok('La cola de cada uno' in cola and 'Joaquín Or' in cola and 'Sofía Ar' in cola, f'equipo: la cola de cada agente ({cola[:160]!r})')
+            await D.locator('#eqCola').scroll_into_view_if_needed(); await D.screenshot(path=OUT / 'q5_equipo_cola.png')
+            # calidad de datos: el admin clasifica un status que no se reconoce; el registro de accesos
+            await A.evaluate("crmSeenFromExt([{id:'500010',name:'Raro',status:'Volver mañana',k:'x'}])"); await A.wait_for_timeout(500)
+            await A.evaluate('exportar()'); await A.wait_for_timeout(800)
+            await A.evaluate("go('config')"); await A.wait_for_timeout(1500)
+            dq = await A.inner_text('#cfDatos')
+            ok('Volver mañana' in dq and 'Ventas sin transacción' in dq, f'calidad de datos: status sin clasificar y ventas sin transacción ({dq[:160]!r})')
+            await A.select_option('#cfDatos [data-dq="Volver mañana"]', 'call_again'); await A.wait_for_timeout(1200)
+            ok(sql("select status_group g from public.crm_clients where client_id='500010'")[0]['g'] == 'call_again', 'el admin le asigna un grupo')
+            await A.evaluate('auditCard(true)'); await A.wait_for_timeout(800)
+            ok('exportó ventas' in await A.inner_text('#cfAudit'), 'exportar queda en el registro de accesos')
+            await A.locator('#cfDatos').scroll_into_view_if_needed(); await A.screenshot(path=OUT / 'q6_calidad_datos.png')
 
             M = await newpage('M', 390, 844)
             await M.goto(URL); await M.wait_for_timeout(1200)

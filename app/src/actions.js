@@ -230,6 +230,7 @@ function bindAgForm(form){
     const R=readAg(form);
     if(R.err){toast(R.err,'err');const el=form.querySelector(`[name=${R.k}]`);el.classList.add('bad');el.focus();return}
     if(parseDue(R.due)<new Date(Date.now()-6e4)){toast('Esa fecha y hora ya pasó.','err');form.querySelector('[name=ptime]').classList.add('bad');return}
+    if(await dncBlock(R.id))return;
     const n=pend.reduce((a,p)=>Math.max(a,p.n||0),0)+1;
     if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false,created:new Date().toISOString()}))return;
     const dd=parseDue(R.due);
@@ -240,12 +241,13 @@ function bindAgForm(form){
   });
 }
 function pendItem(p,now,compact){
-  const d=parseDue(p.due),venc=!p.done&&d<=now;
+  const d=parseDue(p.due),venc=!p.done&&d<=now,f=!p.done&&soldOf(p.id),cs=!p.done&&crmStatusOf(p.id),dn=cs&&cs.grp==='dnc';
   const st=p.done?'hecho'+(p.doneAt?' '+dayLabel(new Date(p.doneAt)):''):venc?'vencido · '+rel(d):rel(d);
+  const tags=(f?`<span class="badge paid" title="${esc(money(f.amount))} USD">Ya depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:'')+(dn?'<span class="badge bad">Do Not Call</span>':cs&&!f?stBadge(cs):'');
   const acts=p.done?`<button type="button" class="ib" data-act="pDeshacer" title="Volver a pendiente">Deshacer</button><button type="button" class="ib del" data-act="pDel" title="Borrar">Borrar</button>`
-    :`<button type="button" class="btn sm pri" data-act="pHecho">Hecho</button><button type="button" class="ib" data-act="pMas" data-m="60" title="Posponer 1 hora">+1 h</button>`+
+    :`<button type="button" class="btn sm pri" data-act="pHecho">${f||dn?'Cerrar':'Hecho'}</button><button type="button" class="ib" data-act="pMas" data-m="60" title="Posponer 1 hora">+1 h</button>`+
      (compact?'':`<button type="button" class="ib" data-act="pManana" title="Pasar a mañana">Mañana</button><button type="button" class="ib" data-act="pEdit" title="Editar">Editar</button><button type="button" class="ib del" data-act="pDel" title="Borrar">Borrar</button>`);
-  return `<div class="ai${venc?' venc':''}${p.done?' done':''}" data-pid="${esc(p._id)}"><span class="wh ${venc?'warn':!p.done&&p.due.slice(0,10)===todayS()?'info':'dim'}">${esc(whenTxt(d))}</span><span class="id">${esc(p.id)}</span><span class="kw" title="${esc(p.kw)}">${esc(p.kw)}<small>${esc(st)}</small></span><span class="ac wr">${acts}</span></div>`;
+  return `<div class="ai${venc?' venc':''}${p.done?' done':''}" data-pid="${esc(p._id)}"><span class="wh ${venc?'warn':!p.done&&p.due.slice(0,10)===todayS()?'info':'dim'}">${esc(whenTxt(d))}</span><span class="id">${esc(p.id)}</span><span class="kw" title="${esc(p.kw)}">${esc(p.kw)}<small>${esc(st)}</small>${tags?' '+tags:''}</span><span class="ac wr">${acts}</span></div>`;
 }
 const pendOf=el=>{const r=el.closest('[data-pid]');return r&&pend.find(p=>p._id===r.dataset.pid)};
 const clearAlert=p=>{const t=$(`#toasts [data-key="p${p._id}"]`);if(t)t.remove()};
@@ -441,7 +443,7 @@ async function importFromExt(rows){
 
 /* ---------- CSV ---------- */
 async function exportar(){
-  const name=`ftds_${todayS()}.csv`,data=csvText();
+  const name=`ftds_${todayS()}.csv`,data=csvText();auditNote('exportó ventas',{filas:ftds.length});
   if(dl){
     try{await dl.save({filename:name,data});toast(`✔ ${name} · ${plural(ftds.length,'FTD')}`);return}
     catch(e){const code=e&&e.code;if(code==='declined')return toast('Descarga cancelada.','warn');if(code==='rate_limited')return toast('Ya hay una descarga esperando que la confirmes.','warn')}
@@ -506,7 +508,7 @@ const extOn=()=>extOk&&Date.now()-extOk<3*6e4;
 function postTop(msg){try{window.postMessage(msg,location.origin);return true}catch(e){return false}} // la extensión escucha en esta misma ventana
 function syncExt(){
   if(!ready)return;
-  const items=pend.filter(p=>!p.done).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
+  const items=pend.filter(p=>!p.done&&!soldOf(p.id)&&!isDnc(p.id)).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
   // ventas que ya están en la mesa: el botón del CRM ofrece solo las nuevas
   const known={ids:team.map(f=>norm(f.brand||'')+'|'+norm(f.id)),txs:team.filter(f=>f.tx).map(f=>norm(f.brand||'')+'|'+f.tx)};
   const snips=activeSnips().map(s=>({s:s.shortcut,t:s.title||'',b:s.body}));
@@ -536,6 +538,12 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='reply'||d.cmd==='quiet')){socialCmd(d);return} // desde la tarjeta social de la extensión
+  if(d&&d.type==='ftd-agenda-seen'&&d.v===1&&Array.isArray(d.rows)){ // todos los clientes que vio la extensión en el CRM
+    const src=e.source;
+    crmSeenFromExt(d.rows).then(res=>{try{src.postMessage({type:'ftd-agenda-seen-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
+    return;
+  }
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
   if(d&&d.type==='ftd-agenda-tick'&&d.v===1){catchUp();return} // la extensión despierta a la pestaña: me pongo al día
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
@@ -603,7 +611,7 @@ function check(){
   const now=new Date();
   for(const p of pend){
     if(p.done||p.notified)continue;
-    const d=parseDue(p.due);if(d<=now){fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true}
+    const d=parseDue(p.due);if(d<=now){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true}
   }
   status();syncExt();
 }
@@ -637,9 +645,13 @@ function ayuda(){
     <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
+  <h4>Ahora</h4><dl>
+    <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer, NA-2 a NA-5). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
+    <dt>Fuera</dt><dd>Not interested y Low potential (estos se pueden agendar). Do Not Call no aparece nunca y no se puede agendar. Los que ya depositaron salen solos.</dd>
+    <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliado y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
-    <dt>Registro</dt><dd>Los clientes en "new" del CRM se anotan solos (con la extensión) el día que aparecen. También se cargan a mano.</dd>
-    <dt>Conversión</dt><dd>FTDs del período sobre clientes new del período. "Depositó" marca a los clientes del registro que ya tienen una venta en la mesa.</dd></dl>
+    <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
+    <dt>Conversión</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
   <h4>Snippets</h4><dl>
     <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página de Chrome (con la extensión) y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
     <dt>Clic derecho</dt><dd>Si en alguna página el /atajo no anda: clic derecho en el campo → <b>Snippets de Vitalis</b> → el que quieras.</dd>
@@ -687,7 +699,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Filtros, Ventas, Clientes, Agenda, Tareas, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Ahora, Filtros, Ventas, Clientes, Agenda, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -704,6 +716,7 @@ const ACT={
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
   ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  fichaCl:el=>openFicha(el.dataset.id),
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),

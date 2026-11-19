@@ -882,3 +882,37 @@ button.fl-k:hover{color:var(--pri)}
 .cb-d.pay .o,.cb-d.pay .w{color:rgba(255,255,255,.85)}
 body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{color:rgba(30,19,0,.75)}
 @media (max-width:600px){.cb-strip{width:100%;justify-content:space-between}.cb-d{min-width:0;flex:1;padding:5px 4px}.cb-n{font-size:56px}}
+
+/* ---------- Ahora: la cola en el orden de la mesa ---------- */
+#nav button.on kbd{display:none}
+.ah-g .card-h{gap:10px}
+.ah-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--pri-soft);color:var(--pri);font-weight:800;font-size:13px;flex:none}
+body.dark .ah-n{color:var(--pri-h)}
+.ah-t td{vertical-align:middle}
+.ah-t .ah-nm{color:var(--dim)}
+.ah-out{background:var(--soft);border-style:dashed}
+.badge.st{background:var(--soft);color:var(--fg)}
+.badge.st-new{background:color-mix(in srgb,var(--s1) 16%,transparent)}
+.badge.st-call_again{background:color-mix(in srgb,var(--pri) 16%,transparent)}
+.badge.st-hang_up,.badge.st-na{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.badge.st-low_potential{background:var(--cuero-soft)}
+.badge.st-dnc{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+.ai .kw .badge{margin-left:6px;vertical-align:1px}
+.ah-card .lst .n small{margin-left:6px}
+.lnkp:hover b{text-decoration:underline}
+.lnkp:focus-visible{outline:2px solid var(--pri);outline-offset:2px;border-radius:4px}
+/* ficha del cliente */
+.fi-h{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.fi-nm{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em}
+.fi-meta{color:var(--dim);font-size:13px;margin-top:2px}
+.fi-b{display:flex;gap:6px;flex-wrap:wrap}
+.fi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.fi-c{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--raised);min-width:0}
+.fi-c h4{margin:0 0 8px;font-size:13px;color:var(--dim);font-weight:700;display:flex;gap:6px;align-items:baseline;min-width:0}
+.fi-v{color:var(--fg);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-r{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13.5px;border-bottom:1px dashed var(--line)}
+.fi-r:last-child{border-bottom:0}
+.fi-r span{color:var(--dim)}.fi-r b{text-align:right;font-weight:600}
+.fi-log{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:12.5px}
+.dq-st .frow{margin:4px 0;align-items:center}
+@media (max-width:640px){.ah-t th:nth-child(6),.ah-t td:nth-child(6){display:none}}

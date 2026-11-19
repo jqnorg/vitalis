@@ -892,6 +892,40 @@ button.fl-k:hover{color:var(--pri)}
 .cb-d.pay .o,.cb-d.pay .w{color:rgba(255,255,255,.85)}
 body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{color:rgba(30,19,0,.75)}
 @media (max-width:600px){.cb-strip{width:100%;justify-content:space-between}.cb-d{min-width:0;flex:1;padding:5px 4px}.cb-n{font-size:56px}}
+
+/* ---------- Ahora: la cola en el orden de la mesa ---------- */
+#nav button.on kbd{display:none}
+.ah-g .card-h{gap:10px}
+.ah-n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--pri-soft);color:var(--pri);font-weight:800;font-size:13px;flex:none}
+body.dark .ah-n{color:var(--pri-h)}
+.ah-t td{vertical-align:middle}
+.ah-t .ah-nm{color:var(--dim)}
+.ah-out{background:var(--soft);border-style:dashed}
+.badge.st{background:var(--soft);color:var(--fg)}
+.badge.st-new{background:color-mix(in srgb,var(--s1) 16%,transparent)}
+.badge.st-call_again{background:color-mix(in srgb,var(--pri) 16%,transparent)}
+.badge.st-hang_up,.badge.st-na{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.badge.st-low_potential{background:var(--cuero-soft)}
+.badge.st-dnc{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+.ai .kw .badge{margin-left:6px;vertical-align:1px}
+.ah-card .lst .n small{margin-left:6px}
+.lnkp:hover b{text-decoration:underline}
+.lnkp:focus-visible{outline:2px solid var(--pri);outline-offset:2px;border-radius:4px}
+/* ficha del cliente */
+.fi-h{display:flex;gap:14px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;margin-bottom:14px}
+.fi-nm{font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:-.02em}
+.fi-meta{color:var(--dim);font-size:13px;margin-top:2px}
+.fi-b{display:flex;gap:6px;flex-wrap:wrap}
+.fi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.fi-c{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--raised);min-width:0}
+.fi-c h4{margin:0 0 8px;font-size:13px;color:var(--dim);font-weight:700;display:flex;gap:6px;align-items:baseline;min-width:0}
+.fi-v{color:var(--fg);font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fi-r{display:flex;justify-content:space-between;gap:10px;padding:3px 0;font-size:13.5px;border-bottom:1px dashed var(--line)}
+.fi-r:last-child{border-bottom:0}
+.fi-r span{color:var(--dim)}.fi-r b{text-align:right;font-weight:600}
+.fi-log{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:12.5px}
+.dq-st .frow{margin:4px 0;align-items:center}
+@media (max-width:640px){.ah-t th:nth-child(6),.ah-t td:nth-child(6){display:none}}
 </style>
 </head>
 <body>
@@ -926,6 +960,7 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
     <symbol id="i-config" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></symbol>
     <symbol id="i-ayuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.5M12 16.8v.1"/></symbol>
     <symbol id="i-salir" viewBox="0 0 24 24"><path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14M10 16.5 5.5 12 10 7.5M5.5 12H15"/></symbol>
+    <symbol id="i-ahora" viewBox="0 0 24 24"><path d="M7.2 3.5h2.6l1.4 3.9-1.9 1.4a10.6 10.6 0 0 0 5.9 5.9l1.4-1.9 3.9 1.4v2.6a2.2 2.2 0 0 1-2.2 2.2A15.3 15.3 0 0 1 5 5.7a2.2 2.2 0 0 1 2.2-2.2z"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   </defs>
 </svg>
@@ -934,12 +969,13 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
+    <button type="button" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Ahora</span><span class="nb hot" id="nbAh"></span><kbd>2</kbd></button>
     <button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
-    <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>2</kbd></button>
-    <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>3</kbd></button>
-    <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>4</kbd></button>
-    <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>5</kbd></button>
-    <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>6</kbd></button>
+    <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>3</kbd></button>
+    <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>4</kbd></button>
+    <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>5</kbd></button>
+    <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>6</kbd></button>
+    <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>T</kbd></button>
     <button type="button" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbCh"></span><kbd>7</kbd></button>
     <button type="button" data-v="sueldo"><svg><use href="#i-sueldo"/></svg><span class="nm">Sueldo</span><kbd>8</kbd></button>
     <button type="button" data-v="turnos"><svg><use href="#i-turnos"/></svg><span class="nm">Turnos</span><kbd>9</kbd></button>
@@ -978,6 +1014,7 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
     <section class="hero" id="iHero" aria-label="Tu mes"></section>
     <div class="side-kpis" id="iKpis"></div>
   </div>
+  <section class="card ah-card" id="iAhora" aria-label="Ahora" hidden></section>
   <section class="card ms" id="iMesa" aria-label="La mesa"></section>
   <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
   <div class="g2">
@@ -1009,6 +1046,12 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
     <div class="card-h"><h3 id="idTitle">FTDs por día</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div></div>
     <div class="chart" id="iChart"></div>
   </section>
+</section>
+
+<section class="view" id="v-ahora" hidden>
+  <div class="vh"><div><h1>Ahora</h1><p class="sub" id="ahSub"></p></div><span class="grow"></span>
+    <div class="tools"><select id="ahWho" aria-label="De quién"></select></div></div>
+  <div id="ahBody"></div>
 </section>
 
 <section class="view" id="v-ventas" hidden>
@@ -1043,6 +1086,7 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
     <div class="chart" id="clChart"></div>
   </section>
   <section class="card">
+    <p class="note" id="clSeen" style="margin:0 0 10px" hidden></p>
     <div class="card-h"><h3 id="clListT">Registro</h3><span class="p-sub" id="clCount"></span><span class="grow"></span><input id="clQ" type="search" placeholder="Buscar nombre o ID" autocomplete="off" aria-label="Buscar cliente"></div>
     <div class="p-tablewrap" id="clTable"></div>
     <button class="btn sm rk-more" type="button" id="clMore" hidden>Ver más</button>
@@ -1182,6 +1226,8 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
         <button type="button" class="btn" data-act="exportar">Exportar CSV</button><button type="button" class="btn wr" data-act="importar">Importar CSV</button><button type="button" class="btn wr" data-act="importarRespaldo">Importar respaldo</button></div>
       <div class="note" id="cfCount"></div>
     </section>
+    <section class="card" id="cfDatos" hidden></section>
+    <section class="card" id="cfAudit" hidden></section>
   </div>
 </section>
 
@@ -1194,6 +1240,7 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
     <section class="card"><div class="card-h"><h3>FTDs por agente</h3><span class="p-sub">Tocá uno para ver sus ventas</span></div><div id="eqRank"></div></section>
     <section class="card"><div class="card-h"><h3>FTDs por día de la mesa</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div></div><div class="chart" id="eqChart"></div></section>
   </div>
+  <section class="card" id="eqCola" aria-label="La cola de cada uno" hidden></section>
   <section class="card"><div class="card-h"><h3>Agentes</h3><span class="p-sub" id="eqCount"></span><span class="grow"></span><span class="p-sub">Tocá <b>Ficha</b> para ver su agenda, turnos, clientes y tareas</span></div><div class="p-tablewrap" id="eqTable"></div></section>
 </section>
 
@@ -1209,7 +1256,7 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.11.0';
+const VERSION='1.12.0';
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -1487,7 +1534,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -2020,11 +2067,11 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
+const VIEWS=['inicio','ahora','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: todas las secciones, en orden de importancia (los números siguen ese orden)
-const NAVKEYS={1:'inicio',2:'filtros',3:'ventas',4:'clientes',5:'agenda',6:'tareas',7:'chat',8:'sueldo',9:'turnos',0:'config'};
+const NAVKEYS={1:'inicio',2:'ahora',3:'filtros',4:'ventas',5:'clientes',6:'agenda',7:'chat',8:'sueldo',9:'turnos',0:'config'}; // Tareas: T
 function go(v,opts){
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
   cur=v;hideTip();document.body.dataset.view=v;
@@ -2059,6 +2106,7 @@ function status(){
   const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
+  if(crm.ok){const q=queueOf(tlView()?null:me);$('#nbAh').textContent=q.g1.length||''}
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
@@ -2314,6 +2362,7 @@ function bindAgForm(form){
     const R=readAg(form);
     if(R.err){toast(R.err,'err');const el=form.querySelector(`[name=${R.k}]`);el.classList.add('bad');el.focus();return}
     if(parseDue(R.due)<new Date(Date.now()-6e4)){toast('Esa fecha y hora ya pasó.','err');form.querySelector('[name=ptime]').classList.add('bad');return}
+    if(await dncBlock(R.id))return;
     const n=pend.reduce((a,p)=>Math.max(a,p.n||0),0)+1;
     if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false,created:new Date().toISOString()}))return;
     const dd=parseDue(R.due);
@@ -2324,12 +2373,13 @@ function bindAgForm(form){
   });
 }
 function pendItem(p,now,compact){
-  const d=parseDue(p.due),venc=!p.done&&d<=now;
+  const d=parseDue(p.due),venc=!p.done&&d<=now,f=!p.done&&soldOf(p.id),cs=!p.done&&crmStatusOf(p.id),dn=cs&&cs.grp==='dnc';
   const st=p.done?'hecho'+(p.doneAt?' '+dayLabel(new Date(p.doneAt)):''):venc?'vencido · '+rel(d):rel(d);
+  const tags=(f?`<span class="badge paid" title="${esc(money(f.amount))} USD">Ya depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:'')+(dn?'<span class="badge bad">Do Not Call</span>':cs&&!f?stBadge(cs):'');
   const acts=p.done?`<button type="button" class="ib" data-act="pDeshacer" title="Volver a pendiente">Deshacer</button><button type="button" class="ib del" data-act="pDel" title="Borrar">Borrar</button>`
-    :`<button type="button" class="btn sm pri" data-act="pHecho">Hecho</button><button type="button" class="ib" data-act="pMas" data-m="60" title="Posponer 1 hora">+1 h</button>`+
+    :`<button type="button" class="btn sm pri" data-act="pHecho">${f||dn?'Cerrar':'Hecho'}</button><button type="button" class="ib" data-act="pMas" data-m="60" title="Posponer 1 hora">+1 h</button>`+
      (compact?'':`<button type="button" class="ib" data-act="pManana" title="Pasar a mañana">Mañana</button><button type="button" class="ib" data-act="pEdit" title="Editar">Editar</button><button type="button" class="ib del" data-act="pDel" title="Borrar">Borrar</button>`);
-  return `<div class="ai${venc?' venc':''}${p.done?' done':''}" data-pid="${esc(p._id)}"><span class="wh ${venc?'warn':!p.done&&p.due.slice(0,10)===todayS()?'info':'dim'}">${esc(whenTxt(d))}</span><span class="id">${esc(p.id)}</span><span class="kw" title="${esc(p.kw)}">${esc(p.kw)}<small>${esc(st)}</small></span><span class="ac wr">${acts}</span></div>`;
+  return `<div class="ai${venc?' venc':''}${p.done?' done':''}" data-pid="${esc(p._id)}"><span class="wh ${venc?'warn':!p.done&&p.due.slice(0,10)===todayS()?'info':'dim'}">${esc(whenTxt(d))}</span><span class="id">${esc(p.id)}</span><span class="kw" title="${esc(p.kw)}">${esc(p.kw)}<small>${esc(st)}</small>${tags?' '+tags:''}</span><span class="ac wr">${acts}</span></div>`;
 }
 const pendOf=el=>{const r=el.closest('[data-pid]');return r&&pend.find(p=>p._id===r.dataset.pid)};
 const clearAlert=p=>{const t=$(`#toasts [data-key="p${p._id}"]`);if(t)t.remove()};
@@ -2525,7 +2575,7 @@ async function importFromExt(rows){
 
 /* ---------- CSV ---------- */
 async function exportar(){
-  const name=`ftds_${todayS()}.csv`,data=csvText();
+  const name=`ftds_${todayS()}.csv`,data=csvText();auditNote('exportó ventas',{filas:ftds.length});
   if(dl){
     try{await dl.save({filename:name,data});toast(`✔ ${name} · ${plural(ftds.length,'FTD')}`);return}
     catch(e){const code=e&&e.code;if(code==='declined')return toast('Descarga cancelada.','warn');if(code==='rate_limited')return toast('Ya hay una descarga esperando que la confirmes.','warn')}
@@ -2590,7 +2640,7 @@ const extOn=()=>extOk&&Date.now()-extOk<3*6e4;
 function postTop(msg){try{window.postMessage(msg,location.origin);return true}catch(e){return false}} // la extensión escucha en esta misma ventana
 function syncExt(){
   if(!ready)return;
-  const items=pend.filter(p=>!p.done).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
+  const items=pend.filter(p=>!p.done&&!soldOf(p.id)&&!isDnc(p.id)).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
   // ventas que ya están en la mesa: el botón del CRM ofrece solo las nuevas
   const known={ids:team.map(f=>norm(f.brand||'')+'|'+norm(f.id)),txs:team.filter(f=>f.tx).map(f=>norm(f.brand||'')+'|'+f.tx)};
   const snips=activeSnips().map(s=>({s:s.shortcut,t:s.title||'',b:s.body}));
@@ -2620,6 +2670,12 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='reply'||d.cmd==='quiet')){socialCmd(d);return} // desde la tarjeta social de la extensión
+  if(d&&d.type==='ftd-agenda-seen'&&d.v===1&&Array.isArray(d.rows)){ // todos los clientes que vio la extensión en el CRM
+    const src=e.source;
+    crmSeenFromExt(d.rows).then(res=>{try{src.postMessage({type:'ftd-agenda-seen-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
+    return;
+  }
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
   if(d&&d.type==='ftd-agenda-tick'&&d.v===1){catchUp();return} // la extensión despierta a la pestaña: me pongo al día
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
@@ -2687,7 +2743,7 @@ function check(){
   const now=new Date();
   for(const p of pend){
     if(p.done||p.notified)continue;
-    const d=parseDue(p.due);if(d<=now){fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true}
+    const d=parseDue(p.due);if(d<=now){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true}
   }
   status();syncExt();
 }
@@ -2721,9 +2777,13 @@ function ayuda(){
     <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
+  <h4>Ahora</h4><dl>
+    <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer, NA-2 a NA-5). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
+    <dt>Fuera</dt><dd>Not interested y Low potential (estos se pueden agendar). Do Not Call no aparece nunca y no se puede agendar. Los que ya depositaron salen solos.</dd>
+    <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliado y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
-    <dt>Registro</dt><dd>Los clientes en "new" del CRM se anotan solos (con la extensión) el día que aparecen. También se cargan a mano.</dd>
-    <dt>Conversión</dt><dd>FTDs del período sobre clientes new del período. "Depositó" marca a los clientes del registro que ya tienen una venta en la mesa.</dd></dl>
+    <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
+    <dt>Conversión</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
   <h4>Snippets</h4><dl>
     <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página de Chrome (con la extensión) y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
     <dt>Clic derecho</dt><dd>Si en alguna página el /atajo no anda: clic derecho en el campo → <b>Snippets de Vitalis</b> → el que quieras.</dd>
@@ -2771,7 +2831,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Filtros, Ventas, Clientes, Agenda, Tareas, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Ahora, Filtros, Ventas, Clientes, Agenda, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -2788,6 +2848,7 @@ const ACT={
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
   ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  fichaCl:el=>openFicha(el.dataset.id),
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
   pEdit:el=>pendEdit(pendOf(el)),pDel:el=>pendDel(pendOf(el)),
@@ -2863,6 +2924,7 @@ V.inicio={
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
+    crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
     $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
     $('#iHoy').innerHTML=hoyMesaCard();
     this.turno(true);
@@ -2873,7 +2935,7 @@ V.inicio={
     $('#iaList').innerHTML=(open.length?`<div class="alist">${open.map(p=>pendItem(p,now,true)).join('')}</div>`:'<div class="p-empty" style="padding:10px 0">Nada pendiente para hoy.</div>')+
       (next?`<div class="note">Próximo: ${esc(whenTxt(parseDue(next.due)))}, <b style="color:var(--fg)">${esc(next.id)}</b> ${esc(next.kw)}</div>`:'');
     // conversión
-    $('#iConvBody').innerHTML=convCards(TL?null:me);$('#iConvSub').textContent=TL?'de la mesa: FTDs sobre clientes new':'FTDs sobre clientes new';
+    $('#iConvBody').innerHTML=convCardsX(TL?null:me);$('#iConvSub').textContent=convSubX(TL);
     // FTDs por día
     const [Y,M]=ym.split('-').map(Number),days=new Date(Y,M,0).getDate(),bd={};
     for(const f of (TL?team.filter(x=>x.date.slice(0,7)===ym):s.list)){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
@@ -3058,7 +3120,7 @@ V.ventas={
     const rows=[...list].sort((a,b)=>-byDate(a,b));
     $('#pCount').textContent=`${plural(rows.length,'venta')} · ${money(R.monto)} USD`;
     $('#pTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>País</th><th>Afiliado</th><th>Campaña</th><th class="r">Monto</th><th>Registro</th><th>Tipo</th><th>Marca</th>${pWho!=='me'?'<th>Vendedor</th>':''}<th class="act"></th></tr></thead><tbody>`+
-      rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td>${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:'<i class="dot n"></i><span class="d">new</span>'}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="Borrar">Borrar</button>`:''}</td></tr>`).join('')+'</tbody></table>'
+      rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td title="${esc(demora(f)?'Depositó a '+demora(f)+' del registro':'')}">${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:`<i class="dot n"></i><span class="d">new${demora(f)?' · '+esc(demora(f)):''}</span>`}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="Borrar">Borrar</button>`:''}</td></tr>`).join('')+'</tbody></table>'
       :'<div class="p-empty">Sin ventas para estos filtros.</div>';
     $('#pMore').hidden=rows.length<=pShow;
   },
@@ -3381,6 +3443,7 @@ V.config={
     $('#cfDb').textContent=teamInfo?teamInfo.name:'';$('#cfSub').textContent=`Vitalis ${VERSION}`;
     V.cuenta.render();
     $('#cfExt').innerHTML=extOn()?sp('ok b','Extensión conectada')+`: ${plural(extN,'aviso programado','avisos programados')}, ${plural(activeSnips().length,'snippet')}.`:'La extensión no está conectada en esta pestaña. Con ella tenés avisos en cualquier pestaña, el botón del CRM, el registro de clientes new y los snippets.';
+    datosCard();auditCard();
     const lat=ftds.filter(isLate).length;
     $('#cfCount').textContent=`${plural(ftds.length,'venta')} (${lat} late) · ${plural(pend.length,'contacto')} · ${plural(Object.keys(turnos).length,'jornada')} · ${Object.keys(ajustes).length?Object.entries(ajustes).map(([k,v])=>`${mLabel(k)}: ${v} sin detalle`).join(' · '):'sin ajustes'}`;
   },
@@ -3412,6 +3475,7 @@ V.equipo={
     const k=(lb,v,s2,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`;
     const T=targets[eqYm]||0;
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);
+    crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+
@@ -3515,7 +3579,8 @@ V.clientes={
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
-      if(b.dataset.cl==='ag')return agendarModal(l.id,l.name);
+      if(b.dataset.cl==='ficha')return openFicha(l.id);
+      if(b.dataset.cl==='ag')return agendarCliente(l.id,l.name);
       if(b.dataset.cl==='del'){if(!await confirmar('Borrar cliente',`¿Sacar a <b>${esc(l.id)}</b> ${esc(l.name)} del registro?`,'Borrar',true))return;if(await B.delLead(l))toast('Cliente borrado del registro.')}});
   },
   render(){
@@ -3528,7 +3593,10 @@ V.clientes={
     }
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
-    $('#clKpis').innerHTML=convCards(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    crmLoad();$('#clKpis').innerHTML=convCardsX(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    if(crm.ok){const nuevos=crmAll().filter(r=>!isArch(r.brand)&&r.first&&ymd(new Date(r.first))===te).length,fh=team.filter(f=>f.date===te&&!isArch(f.brand)),en=fh.filter(f=>crmStatusOf(f.id)).length;
+      $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
+    else $('#clSeen').hidden=true;
     // gráfico: últimos 30 días
     const start=addDays(te,-29),own=l=>uid==null||l.uid===uid,data=[];
     for(let i=0;i<30;i++){const d=addDays(start,i),L=leads.filter(l=>l.date===d&&own(l)),paid=L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
@@ -3544,7 +3612,7 @@ V.clientes={
     $('#clCount').textContent=rows.length?`${plural(rows.length,'cliente')}, ${paidN} ${paidN===1?'ya depositó':'ya depositaron'}`:'';
     const many=clWho!=='me';
     $('#clTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th>${many?'<th>Agente</th>':''}<th>Estado</th><th>Origen</th><th class="act"></th></tr></thead><tbody>`+
-      rows.slice(0,clShow).map(l=>{const f=sold.get(norm(l.id));return `<tr><td>${l.date===te?'Hoy':`${DIA[parseYMD(l.date).getDay()]} ${dm(l.date)}`}</td><td><b>${esc(l.id)}</b></td><td class="trunc" title="${esc(l.name)}">${esc(l.name)}</td><td class="d">${esc(l.country)}</td>${many?`<td class="trunc">${esc(memberName(l.uid))}</td>`:''}
+      rows.slice(0,clShow).map(l=>{const f=sold.get(norm(l.id));return `<tr><td>${l.date===te?'Hoy':`${DIA[parseYMD(l.date).getDay()]} ${dm(l.date)}`}</td><td><button type="button" class="lnkp" data-cl="ficha" data-id="${esc(l._id)}" title="Ver la ficha"><b>${esc(l.id)}</b></button></td><td class="trunc" title="${esc(l.name)}">${esc(l.name)}</td><td class="d">${esc(l.country)}</td>${many?`<td class="trunc">${esc(memberName(l.uid))}</td>`:''}
         <td>${f?`<span class="badge paid" title="${esc(money(f.amount))} USD">Depositó ${f.date===te?'hoy':dm(f.date)}</span>`:'<span class="d">Todavía no</span>'}</td><td class="d">${l.source==='manual'?'A mano':'CRM'}</td>
         <td class="act wr">${f?'':`<button type="button" class="ib" data-cl="ag" data-id="${esc(l._id)}">Agendar</button>`}${l.uid===me||isLeader()?`<button type="button" class="ib del" data-cl="del" data-id="${esc(l._id)}">Borrar</button>`:''}</td></tr>`}).join('')+'</tbody></table>'
       :`<div class="p-empty">${clQ?'No hay clientes con esa búsqueda.':clPer==='hoy'?'Todavía no entró ningún cliente hoy.':'Sin clientes en este período.'}</div>`;
@@ -4499,7 +4567,7 @@ V.tareas={
    Campañas, afiliadores, países y combinaciones que más venden (con tendencia),
    qué campañas y afiliadores convierten lates y a qué hora se cierran.
    ============================================================ */
-let flDays=local.get('flDays',7),flBrand=local.get('flBrand','all'),flMore={};
+let flDays=local.get('flDays',7),flBrand=local.get('flBrand2','Novara Markets'),flMore={}; // Trade24Seven quedó como archivo: Novara por defecto
 const FL_PER=[[1,'Hoy'],[3,'3 días'],[7,'7 días'],[14,'14 días'],[30,'30 días']];
 const flVal=v=>{v=String(v??'').trim().replace(/\s+/g,' ');return !v||/^(null|undefined|-|—|0|n\/a)$/i.test(v)?'':v};
 const flWin=(days,back=0)=>{const to=addDays(todayS(),-back*days);return {from:addDays(to,-(days-1)),to}};
@@ -4557,9 +4625,9 @@ function flRec(D){ // lo que conviene filtrar ahora
 V.filtros={
   build(){
     $('#flPer').innerHTML=FL_PER.map(([d,l])=>`<button type="button" data-d="${d}">${l}</button>`).join('');
-    $('#flBr').innerHTML=[['all','Todas'],['Trade24Seven','Trade24Seven'],['Novara Markets','Novara']].map(([k,l])=>`<button type="button" data-b="${esc(k)}">${l}</button>`).join('');
+    $('#flBr').innerHTML=[['Novara Markets','Novara'],['all','Todas'],['Trade24Seven','Trade24Seven (archivo)']].map(([k,l])=>`<button type="button" data-b="${esc(k)}">${l}</button>`).join('');
     $('#flPer').addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;flDays=+b.dataset.d;local.set('flDays',flDays);this.render({})});
-    $('#flBr').addEventListener('click',e=>{const b=e.target.closest('[data-b]');if(!b)return;flBrand=b.dataset.b;local.set('flBrand',flBrand);this.render({})});
+    $('#flBr').addEventListener('click',e=>{const b=e.target.closest('[data-b]');if(!b)return;flBrand=b.dataset.b;local.set('flBrand2',flBrand);this.render({})});
     $('#v-filtros').addEventListener('click',async e=>{
       const m=e.target.closest('[data-more]');if(m){flMore[m.dataset.more]=!flMore[m.dataset.more];this.render({});return}
       if(e.target.closest('#flTask')){const D=flData();taskNew({what:'Repasar',camps:D.G.camp.slice(0,3).map(x=>x.k),affs:D.G.aff.slice(0,3).map(x=>x.k)});return}
@@ -4836,6 +4904,292 @@ function utModal(ym,focus){ // el team leader fija el target de cada uno
       setTimeout(()=>{const f=(focus&&api.q(`[data-ut="${CSS.escape(focus)}"]`))||api.q('[data-ut]');if(f){f.focus();f.select()}},0)}});
 }
 const utCell=(uid,ym,n)=>{const t=utOf(uid,ym);return `<button type="button" class="ut-c${t?(n>=t?' ok':''):' none'}" data-act="utargets" data-ym="${ym}" data-uid="${esc(uid)}" title="${t?'Cambiar el target':'Fijar un target'}">${t?`${n}/${t}<i style="width:${Math.min(100,n/t*100)}%"></i>`:'Fijar'}</button>`};
+
+/* ============================================================
+   Clientes del CRM: todos los que se ven, con su status (crm_clients).
+   La cola "Ahora" en el orden de la mesa: 1 new, 2 agendas, 3 Call Again · Hang Up · NA
+   (hasta el tope, todos; si hay más, solo los registrados en el mes). Nunca Do Not Call ni depositados.
+   La ficha del cliente (se abre sola cuando entrás a Vitalis después del aviso de un new),
+   la conversión por día de registro, el panel de la cola para el team leader y la calidad de datos.
+   ============================================================ */
+const ARCH='Trade24Seven',isArch=b=>norm(b)===norm(ARCH); // la marca que quedó como archivo
+const GRPS={new:'New',na:'No Answer y NA',call_again:'Call Again',hang_up:'Hang Up',low_potential:'Low potential',not_interested:'Not interested',dnc:'Do Not Call',otro:'Otro'};
+const G3=['call_again','hang_up','na'];
+let crm={ok:null,rows:new Map(),at:0,busy:null};
+const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
+const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:r.status||'',grp:r.status_group||'otro',agent:r.crm_agent||'',
+  camp:r.camp||'',aff:r.aff||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
+const crmAll=()=>[...crm.rows.values()];
+const regDay=r=>r.reg?r.reg.slice(0,10):(r.first?ymd(new Date(r.first)):'');
+const regAt=r=>r.reg?(r.reg.length>10?parseDue(r.reg.slice(0,10)+'T'+r.reg.slice(11,16)):parseYMD(r.reg)):(r.first?new Date(r.first):null);
+function crmOwner(r){if(r.agent){const u=agentUid(r.agent);if(u)return u}return r.firstBy||null} // el agente del CRM; si no hay columna, quien lo vio primero
+function soldIdx(){const m=new Map();for(const f of [...team].sort(byDate)){const k=ckey(f.brand,f.id);if(!m.has(k))m.set(k,f)}return m} // la primera venta de cada cliente
+function soldOf(id,brand){const k=norm(id);let best=null;for(const f of team)if(norm(f.id)===k&&(!brand||norm(f.brand)===norm(brand))&&(!best||byDate(f,best)<0))best=f;return best}
+function crmStatusOf(id){const k=norm(id);let r=crm.rows.get(ckey(DEF_BRAND,id));if(r)return r;for(const x of crm.rows.values())if(norm(x.id)===k&&!isArch(x.brand))return x;return null}
+const isDnc=id=>{const r=crmStatusOf(id);return !!(r&&r.grp==='dnc')};
+// horas desde el registro hasta el depósito (dato: a la empresa le importa new o late, pero se muestra)
+function regHrs(f){const r=String(f.reg||'');if(r.length<16||!/^\d{1,2}:\d{2}/.test(f.time||''))return null;
+  const h=(parseDue(f.date+'T'+f.time.padStart(5,'0'))-parseDue(r.slice(0,10)+'T'+r.slice(11,16)))/36e5;return h>=0?h:null}
+function demora(f){const h=regHrs(f);if(h==null)return isLate(f)?plural(lateDays(f),'día'):'';return h<1?Math.max(1,Math.round(h*60))+' min':h<48?nf(h,1)+' h':plural(Math.round(h/24),'día')}
+const TZ={chile:'America/Santiago',colombia:'America/Bogota',mexico:'America/Mexico_City',peru:'America/Lima','costa rica':'America/Costa_Rica',guatemala:'America/Guatemala',
+  panama:'America/Panama',ecuador:'America/Guayaquil',argentina:'America/Argentina/Buenos_Aires',uruguay:'America/Montevideo',paraguay:'America/Asuncion',bolivia:'America/La_Paz',
+  venezuela:'America/Caracas',brazil:'America/Sao_Paulo',brasil:'America/Sao_Paulo','el salvador':'America/El_Salvador',honduras:'America/Tegucigalpa',nicaragua:'America/Managua',
+  'republica dominicana':'America/Santo_Domingo','dominican republic':'America/Santo_Domingo',spain:'Europe/Madrid','espana':'Europe/Madrid'};
+function cliTime(country){const tz=TZ[norm(country).trim()];if(!tz)return '';try{return new Intl.DateTimeFormat('es-UY',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:tz}).format(new Date())}catch(e){return ''}}
+const stBadge=r=>`<span class="badge st st-${esc(r.grp)}" title="${esc(GRPS[r.grp]||'')}">${esc(r.status||GRPS[r.grp]||'—')}</span>`;
+
+/* ---------- carga: lo que está en la cola, lo registrado este mes y la semana, y los de la agenda ---------- */
+async function crmPage(build,max=20000){const out=[];for(let i=0;i<max;i+=1000){const rows=await Q(build().range(i,i+999));out.push(...rows);if(rows.length<1000)break}return out}
+async function crmLoad(force){
+  if(!ready||!sb)return;
+  if(crm.busy)return crm.busy;
+  if(!force&&Date.now()-crm.at<20e3)return;
+  crm.busy=(async()=>{
+    try{
+      const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromTs=parseYMD(from).toISOString();
+      const base=()=>sb.from('crm_clients').select('*').neq('brand',ARCH);
+      const [act,coh,cohS]=await Promise.all([
+        crmPage(()=>base().in('status_group',['new','na','call_again','hang_up','low_potential']).order('client_id')),
+        crmPage(()=>base().gte('reg',from).order('client_id')),
+        crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
+      ]);
+      const ids=[...new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>String(p.id)))].slice(0,300);
+      const ag=ids.length?await Q(base().in('client_id',ids)):[];
+      const m=new Map();for(const r of [...act,...coh,...cohS,...ag]){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
+      const was=crm.ok;crm.rows=m;crm.ok=true;crm.at=Date.now();
+      if(!was||['ahora','inicio','clientes','equipo','agenda'].includes(cur))refresh();
+    }catch(e){if(/crm_clients|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))crm.ok=false}
+    finally{crm.busy=null}
+  })();
+  return crm.busy;
+}
+let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
+async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}
+async function crmLog(id){return (await QO(sb.from('crm_status_log').select('*').eq('client_id',String(id)).order('seen_at',{ascending:true}).limit(60))).filter(r=>!isArch(r.brand))}
+
+// lo que mandó la extensión: todos los clientes vistos en el CRM
+async function crmSeenFromExt(rows){
+  if(!ready||readOnly)return {err:'Vitalis todavía está cargando'};
+  if(crm.ok===false&&Date.now()-crm.at<5*6e4)return {err:'falta actualizar la base'};
+  const s=v=>String(v??'').replace(/\s+/g,' ').trim(),batch=rows.slice(0,500);
+  const list=batch.filter(r=>r&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
+    reg:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.reg||'')?r.reg:'',agent:s(r.agent).slice(0,80),camp:s(r.camp).slice(0,120),aff:s(r.aff).slice(0,60)}));
+  const keys=batch.map(r=>String(r&&r.k||''));
+  if(!list.length)return {keys};
+  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();return {keys,added:res&&res.new||0}}
+  catch(e){const m=String(e&&(e.message||e.code));if(/crm_seen|PGRST202|42883|crm_clients|does not exist/.test(m)){crm.ok=false;crm.at=Date.now();return {err:'falta actualizar la base'}}return {err:errMsg(e)}}
+}
+
+/* ---------- la cola, en el orden de la mesa ---------- */
+const naNum=s=>{const m=norm(s).match(/(?:^|[^a-z])na\D*([2-9])/);return m?+m[1]:1};
+const g3rank=r=>r.grp==='call_again'?0:r.grp==='hang_up'?10:20+naNum(r.status);
+const byRegDesc=(a,b)=>(regAt(b)||0)-(regAt(a)||0);
+const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
+function queueOf(uid){ // uid: me | null (toda la mesa) | otro
+  const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
+  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id)));
+  const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
+  const ags=uid===me?pend:uid==null?[...pend,...(isLeader()?teamAg:[])]:agOf(uid);
+  const ag=ags.filter(p=>!p.done&&p.due.slice(0,10)<=te&&!soldOf(p.id)&&!isDnc(p.id)).sort(byDue);
+  const all3=live.filter(r=>G3.includes(r.grp)),cap=qCap(),many=all3.length>cap;
+  const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>g3rank(a)-g3rank(b)||byRegDesc(a,b));
+  const cnt=g=>mineAll.filter(r=>r.grp===g).length;
+  return {g1,ag,g3,n3:all3.length,cap,many,low:live.filter(r=>r.grp==='low_potential').sort(byRegDesc),ni:cnt('not_interested'),dnc:cnt('dnc'),otro:cnt('otro')};
+}
+function ahRow(r,i,who){
+  const ra=regAt(r),tz=cliTime(r.country);
+  return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td>
+    <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
+    ${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}<td class="act wr"><button type="button" class="ib" data-ah="ficha" data-id="${esc(r.id)}">Ficha</button><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
+}
+function ahTable(list,who,lim){
+  if(!list.length)return '';
+  return `<div class="p-tablewrap"><table class="pt ah-t"><thead><tr><th></th><th>Cliente</th><th>Status</th><th>Registro</th><th>País</th><th>Campaña</th>${who?'<th>Agente</th>':''}<th class="act"></th></tr></thead><tbody>${list.slice(0,lim||list.length).map((r,i)=>ahRow(r,i+1,who)).join('')}</tbody></table></div>`;
+}
+let ahWho='',ahLow=false,ahMore={};
+V.ahora={
+  build(){
+    $('#ahWho').addEventListener('change',e=>{ahWho=e.target.value;ahMore={};this.render({})});
+    $('#ahBody').addEventListener('click',e=>{
+      const b=e.target.closest('[data-ah]');if(!b)return;
+      const a=b.dataset.ah,id=b.dataset.id;
+      if(a==='ficha')return openFicha(id);
+      if(a==='ag')return agendarCliente(id,b.dataset.nm||'');
+      if(a==='low'){ahLow=!ahLow;this.render({});return}
+      if(a==='more'){ahMore[b.dataset.g]=1;this.render({});return}
+      if(a==='cap')return capModal();
+    });
+  },
+  render(){
+    crmLoad();
+    if(!ahWho)ahWho=tlView()?'all':'me';
+    const sel=$('#ahWho');
+    if(sel!==document.activeElement){
+      const ms=isLeader()?members.filter(m=>m.active&&m.id!==me):[];
+      sel.innerHTML=`<option value="me">Mis clientes</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+      if(![...sel.options].some(o=>o.value===ahWho))ahWho='me';sel.value=ahWho;
+    }
+    const uid=ahWho==='me'?me:ahWho==='all'?null:ahWho,who=uid!==me;
+    if(crm.ok===false){$('#ahSub').textContent='';$('#ahBody').innerHTML='<section class="card"><div class="p-empty">La cola se activa en un rato (falta actualizar la base).</div></section>';return}
+    const q=queueOf(uid),now=new Date();
+    $('#ahSub').innerHTML=`En el orden de la mesa: new, agendas, y después Call Again, Hang Up y NA. ${extOn()?'':sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
+    const sec=(n,t,sub,body,empty)=>`<section class="card ah-g"><div class="card-h"><span class="ah-n">${n}</span><h3>${t}</h3><span class="p-sub">${sub}</span></div>${body||`<div class="p-empty" style="padding:10px 0">${empty}</div>`}</section>`;
+    const lim=g=>ahMore[g]?0:40,more=(g,l)=>l.length>40&&!ahMore[g]?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${g}">Ver los ${l.length}</button>`:'';
+    const agBody=q.ag.length?`<div class="alist">${q.ag.map(p=>uid===me||pend.includes(p)?pendItem(p,now,true):`<div class="ai"><span class="wh">${esc(whenTxt(parseDue(p.due)))}</span><span class="id">${esc(p.id)}</span><span class="kw">${esc(p.kw)}<small>${esc(memberName(p.uid))}</small></span><span></span></div>`).join('')}</div>`:'';
+    const g3sub=q.many?`Son ${q.n3}: más que el tope de ${q.cap}, así que van solo los registrados en ${MES[now.getMonth()]} (${q.g3.length})`:`${plural(q.n3,'cliente')} · hasta ${q.cap} se llaman todos`;
+    $('#ahBody').innerHTML=
+      sec(1,'New',`${q.g1.length} sin depositar`,ahTable(q.g1,who,lim('g1'))+more('g1',q.g1),crm.rows.size?'No hay new sin depositar.':'Todavía no llegaron clientes del CRM.')+
+      sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas'),agBody,'Nada agendado para ahora.')+
+      sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+
+      `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">Low potential ${q.low.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.otro?` · otros status ${q.otro}`:''}</span><span class="grow"></span>${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}</div>
+        ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">Dicen no tener el dinero: candidatos para agendar.</p>`+ahTable(q.low,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p></section>`;
+  },
+};
+function capModal(){
+  if(!isLeader())return;
+  modal({title:'Tope del grupo 3',body:`<p class="mp">Si hay hasta este número de Call Again, Hang Up y NA, se llaman todos. Si hay más, solo los registrados en el mes, hasta que se limpie.</p><label class="fld" style="max-width:160px"><span>Tope</span><input id="capN" inputmode="numeric" value="${qCap()}"></label><div class="ebox" id="capE"></div>`,
+    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{const n=parseInt(api.q('#capN').value,10);if(!(n>=1&&n<=1000)){api.q('#capE').textContent='Entre 1 y 1000.';return false}
+      const r=await B.rpc('set_queue_cap',{n});if(!r)return false;teamInfo.queue_cap=n;toast(`Tope del grupo 3: ${n}.`);refresh()}}]});
+}
+function agendarCliente(id,kw){if(isDnc(id))return toast(`<b>${esc(id)}</b> está en Do Not Call: no se agenda.`,'err');agendarModal(id,kw)}
+async function dncBlock(id){
+  let r=crmStatusOf(id);
+  if(!r&&crm.ok!==false){try{r=await crmOne(id)}catch(e){}}
+  if(r&&r.grp==='dnc'){toast(`<b>${esc(id)}</b> está en Do Not Call: no se agenda.`,'err');return true}
+  return false;
+}
+// lo de ahora, en el inicio (para el team leader, la mesa)
+function ahoraCard(){
+  if(crm.ok===false)return '';
+  const q=queueOf(tlView()?null:me),te=todayS();
+  const top=[...q.g1.slice(0,3).map(r=>({t:'new',r})),...q.ag.slice(0,2).map(p=>({t:'ag',p})),...q.g3.slice(0,3).map(r=>({t:'g3',r}))].slice(0,6);
+  const li=x=>x.t==='ag'?`<div class="li"><span class="t">${esc(whenTxt(parseDue(x.p.due)))}</span><span class="n"><b>${esc(x.p.id)}</b> ${esc(x.p.kw)}<small>agenda</small></span><span></span><span></span><span></span></div>`
+    :`<div class="li"><span class="t">${regAt(x.r)?esc(rel(regAt(x.r))):''}</span><span class="n"><button type="button" class="lnkp" data-act="fichaCl" data-id="${esc(x.r.id)}"><b>${esc(x.r.id)}</b></button> ${esc(x.r.name)}<small>${esc(x.r.country)}${x.r.camp?' · '+esc(x.r.camp):''}</small></span><span></span><span>${stBadge(x.r)}</span><span></span></div>`;
+  return `<div class="card-h"><h3>${tlView()?'La cola de la mesa':'Ahora'}</h3><span class="p-sub">${plural(q.g1.length,'new')} · ${plural(q.ag.length,'agenda')} · ${q.g3.length} para volver a llamar</span><span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button></div>`+
+    (top.length?`<div class="lst">${top.map(li).join('')}</div>`:`<div class="p-empty" style="padding:8px 0">${crm.rows.size?'Nada pendiente en la cola.':'Abrí el CRM con la extensión: los clientes que veas entran solos.'}</div>`);
+}
+
+/* ---------- conversión por día de registro (new = depositó el mismo día; late = después) ---------- */
+function cohort(from,to,uid){
+  const S=soldIdx(),own=r=>uid==null||crmOwner(r)===uid;
+  const rows=crmAll().filter(r=>!isArch(r.brand)&&own(r)&&(()=>{const d=regDay(r);return d>=from&&d<=to})());
+  let nw=0,lt=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){if(isLate(f))lt++;else nw++}}
+  return {n:rows.length,nw,lt,rate:rows.length?nw/rows.length:null,lrate:rows.length?lt/rows.length:null};
+}
+function cohortOn(){const te=todayS();return crm.ok&&crmAll().some(r=>!isArch(r.brand)&&regDay(r)>=te.slice(0,8)+'01')}
+function convCardsX(uid){ // con el registro del CRM: conversión de verdad; sin él, la cuenta vieja
+  if(!cohortOn())return convCards(uid);
+  const te=todayS(),P=[['Hoy',te,te],['Esta semana',weekStart(te),te],['Este mes',te.slice(0,8)+'01',te]];
+  return `<div class="conv3">${P.map(([l,a,b])=>{const c=cohort(a,b,uid);
+    return `<div class="cv"><div class="lb">${l}</div><div class="v${c.rate==null?' none':''}">${c.rate==null?'—':pct(c.rate)}</div><div class="s">${c.nw} new de ${plural(c.n,'registrado')}${c.lt?` · ${c.lt} late`:''}</div><div class="bar"><i style="width:${c.rate==null?0:Math.min(100,c.rate*100)}%"></i></div></div>`}).join('')}</div>`;
+}
+const convSubX=tl=>cohortOn()?(tl?'de la mesa: ':'')+'de los registrados, cuántos depositaron el mismo día (new)':(tl?'de la mesa: ':'')+'FTDs sobre clientes vistos (cuenta aproximada)';
+
+/* ---------- la ficha del cliente: datos, campaña, afiliado y país con sus números ---------- */
+let fichaQ=[],lastKey=0;
+document.addEventListener('keydown',()=>{lastKey=Date.now()},true);
+function fichaNew(id){if(!id)return;if(!fichaQ.includes(id))fichaQ.push(id);setTimeout(fichaTry,400)}
+function fichaTry(){ // se abre cuando entrás a Vitalis (o enseguida si ya estás, salvo que estés escribiendo)
+  if(!ready||!fichaQ.length||modals.length)return;
+  if(document.hidden||!document.hasFocus())return;
+  if(Date.now()-lastKey<4000){toast(`Entró un new: <b>${esc(fichaQ[0])}</b>`,'imp',{key:'ficha',actions:[{l:'Ver ficha',fn:()=>{if(fichaQ.length)openFicha(fichaQ.shift())}}]});return}
+  closeToast('ficha');openFicha(fichaQ.shift(),{auto:1});
+}
+addEventListener('focus',()=>setTimeout(fichaTry,300));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(fichaTry,300)});
+async function dimStats(col,val){
+  const k=norm(val),get=f=>col==='camp'?f.camp:col==='aff'?String(f.aff||''):f.country;
+  const all=team.filter(f=>norm(get(f))===k),sales=all.filter(f=>!isArch(f.brand)),arch=all.length-sales.length;
+  const d30=addDays(todayS(),-29),s30=sales.filter(f=>f.date>=d30),lat=sales.filter(isLate).length;
+  const hrs=Array(24).fill(0);for(const f of s30){const h=parseInt(f.time,10);if(h>=0&&h<24)hrs[h]++}
+  const pk=Math.max(...hrs),hpk=pk?hrs.indexOf(pk):-1,last=sales.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
+  let seen=null;
+  if(crm.ok!==false){try{const rows=(await crmPage(()=>sb.from('crm_clients').select('*').neq('brand',ARCH).eq(col,String(val)).order('client_id'),5000)).map(C2X),S=soldIdx();
+    let dep=0,nw=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){dep++;if(!isLate(f))nw++}}seen={n:rows.length,dep,nw}}catch(e){}}
+  return {n:sales.length,n30:s30.length,lat,last,hpk,arch,seen};
+}
+function statHTML(t,val,s){
+  if(!val)return `<div class="fi-c"><h4>${t}</h4><p class="p-sub" style="margin:0">El CRM no la muestra en la lista.</p></div>`;
+  const rw2=(k,v)=>`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`;
+  return `<div class="fi-c"><h4>${t} <span class="fi-v" title="${esc(val)}">${esc(val)}</span></h4>${s.n?
+    rw2('FTDs en 30 días',s.n30)+rw2('FTDs en total',`${s.n} · ${pct(s.lat/s.n)} late`)+(s.last?rw2('Último FTD',`${esc(s.last.date===todayS()?'hoy':dm(s.last.date))} ${esc(s.last.time||'')}`):'')+(s.hpk>=0?rw2('Hora con más FTDs',`${z(s.hpk)} h`):'')
+    :'<p class="p-sub" style="margin:0 0 6px">Sin FTDs en Novara todavía.</p>'}${s.seen&&s.seen.n?rw2('Clientes vistos',s.seen.n)+rw2('Depositaron',`${s.seen.dep} · ${pct(s.seen.dep/s.seen.n)}`)+rw2('Mismo día (new)',s.seen.nw):''}${s.arch?`<p class="p-sub" style="margin:6px 0 0">En el archivo de Trade24Seven: ${plural(s.arch,'FTD')}.</p>`:''}</div>`;
+}
+async function openFicha(id,o={}){
+  if(!id)return;
+  const ld=leads.find(l=>norm(l.id)===norm(id));
+  const acts=[{l:'Copiar ID',fn:async()=>{try{await navigator.clipboard.writeText(id);toast(`<b>${esc(id)}</b> copiado.`)}catch(e){toast('No pude copiar.','err')}return false}},
+    {l:'Agendar',fn:()=>{setTimeout(()=>agendarCliente(id,r&&r.status||''),0)}},{l:fichaQ.length?`Siguiente (${fichaQ.length})`:'Listo',cls:'pri',fn:()=>{if(fichaQ.length)setTimeout(()=>openFicha(fichaQ.shift()),0)}}];
+  let r=null;
+  const api=modal({title:`${o.auto?'Entró un new · ':''}Cliente ${esc(id)}`,wide:1,body:'<div class="p-empty">Cargando la ficha…</div>',actions:acts});
+  let log=[];
+  try{[r,log]=await Promise.all([crm.ok===false?null:crmOne(id),crm.ok===false?[]:crmLog(id)])}catch(e){}
+  if(!r)r=crmStatusOf(id);
+  const name=r&&r.name||ld&&ld.name||'',country=r&&r.country||ld&&ld.country||'',f=soldOf(id,r&&r.brand),ra=r?regAt(r):null,tz=cliTime(country);
+  const ags=[...pend,...teamAg].filter(p=>norm(p.id)===norm(id)&&!p.done);
+  const [sc,sa,sp_]=await Promise.all([r&&r.camp?dimStats('camp',r.camp):null,r&&r.aff?dimStats('aff',r.aff):null,country?dimStats('country',country):null]);
+  if(!document.body.contains(api.box))return;
+  const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
+  api.mb.innerHTML=`<div class="fi">
+    <div class="fi-h"><div><div class="fi-nm">${esc(name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${country?' · '+esc(country):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
+      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}</div></div>
+    <div class="fi-grid">
+      <div class="fi-c"><h4>Cliente</h4>
+        ${rw2('Status',r?`${esc(r.status||'—')}${r.since?` <span class="d">desde ${esc(rel(new Date(r.since)))}</span>`:''}`:'<span class="d">todavía no se vio en el CRM</span>')}
+        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Marca',r?esc(r.brand):'')}
+        ${rw2('Lo vio primero',r&&r.firstBy?`${esc(first(r.firstBy))}, ${esc(rel(new Date(r.first)))}`:'')}
+        ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
+        ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
+        ${log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${log.map(x=>`<span>${esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
+      </div>
+      ${statHTML('Campaña',r&&r.camp,sc)}${statHTML('Afiliado',r&&r.aff,sa)}${country?statHTML('País',country,sp_):''}
+    </div></div>`;
+}
+
+/* ---------- el team leader: la cola de cada agente ---------- */
+function colaMesaCard(){
+  if(crm.ok===false||!isLeader())return '';
+  const te=todayS(),ym=te.slice(0,7),act=sellers(team.filter(f=>f.date.slice(0,7)===ym));
+  const med=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)]};
+  const rows=act.map(m=>{const q=queueOf(m.id),c=cohort(te,te,m.id),ag=agStats(m.id);
+    const sal=crmAll().filter(r=>!isArch(r.brand)&&crmOwner(r)===m.id&&regDay(r)===te&&r.grp!=='new'&&r.since&&r.first&&new Date(r.since)>new Date(r.first)).map(r=>(new Date(r.since)-new Date(r.first))/6e4);
+    return {m,q,c,ag,t:med(sal),late:team.filter(f=>f.uid===m.id&&f.date.slice(0,7)===ym&&isLate(f)).length}});
+  const sinDueno=crmAll().filter(r=>!isArch(r.brand)&&!crmOwner(r)&&G3.concat('new').includes(r.grp)).length;
+  return `<div class="card-h"><h3>La cola de cada uno</h3><span class="p-sub">hoy, en el orden de la mesa · tope del grupo 3: ${qCap()}</span><span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button></div>
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">New sin depositar</th><th class="r">Agendas vencidas</th><th class="r">Grupo 3</th><th class="r">Registrados hoy</th><th class="r">New hoy</th><th class="r">Late del mes</th><th class="r" title="Mediana del tiempo hasta que el cliente deja New (aprox.: es cuando alguien lo vio cambiar)">Deja New en</th></tr></thead><tbody>`+
+    rows.map(x=>`<tr><td><button type="button" class="who-cell lnkp" data-prof="${esc(x.m.id)}">${avatar(x.m.name)}${esc(x.m.name)}</button></td><td class="r">${x.q.g1.length||'<span class="d">0</span>'}</td><td class="r">${x.ag.venc?`<span class="hot b">${x.ag.venc}</span>`:'<span class="d">0</span>'}</td>
+      <td class="r">${x.q.g3.length}${x.q.many?` <span class="d">de ${x.q.n3}</span>`:''}</td><td class="r">${x.c.n}</td><td class="r">${x.c.n?`${x.c.nw} · ${pct(x.c.nw/x.c.n)}`:'<span class="d">—</span>'}</td><td class="r">${x.late}</td><td class="r d">${x.t==null?'—':x.t<60?Math.round(x.t)+' min':nf(x.t/60,1)+' h'}</td></tr>`).join('')+
+    `</tbody></table></div>${sinDueno?`<p class="note">${plural(sinDueno,'cliente')} de la cola sin agente asignado (la lista del CRM no trae la columna de agente).</p>`:''}`;
+}
+
+/* ---------- calidad de datos y registro de accesos (Ajustes) ---------- */
+let datosAt=0,auditAt=0;
+async function datosCard(force){
+  const el=$('#cfDatos');if(!el)return;
+  el.hidden=!isAdmin();if(!isAdmin())return;
+  if(!force&&Date.now()-datosAt<30e3)return;datosAt=Date.now();
+  const sinTx=team.filter(f=>!f.tx),sinHora=team.filter(f=>String(f.reg||'').length<16),nullC=team.filter(f=>!flVal(f.camp));
+  const byU=l=>{const m={};for(const f of l)m[f.uid]=(m[f.uid]||0)+1;return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([u,n])=>`${esc(memberName(u))} ${n}`).join(' · ')};
+  let otros=[];
+  if(crm.ok!==false){try{const rows=await crmPage(()=>sb.from('crm_clients').select('*').eq('status_group','otro').order('client_id'),3000);const m={};for(const r of rows){const k=r.status||'(vacío)';m[k]=(m[k]||0)+1}otros=Object.entries(m).sort((a,b)=>b[1]-a[1])}catch(e){}}
+  const opts=Object.entries(GRPS).map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join('');
+  el.innerHTML=`<div class="card-h"><h3>Calidad de datos</h3><span class="p-sub">solo el admin</span></div>
+    <div class="fi-r"><span>Ventas sin transacción</span><b>${sinTx.length}</b></div>${sinTx.length?`<p class="p-sub" style="margin:0 0 8px">${byU(sinTx)}</p>`:''}
+    <div class="fi-r"><span>Ventas sin hora de registro</span><b>${sinHora.length}</b></div>
+    <div class="fi-r"><span>Ventas sin campaña (o "null")</span><b>${nullC.length}</b></div>
+    <div class="fld" style="margin-top:12px"><span>Status del CRM sin clasificar</span></div>
+    ${otros.length?`<div class="dq-st">${otros.slice(0,30).map(([s,n])=>`<div class="frow"><span style="flex:1">${esc(s)} <span class="d">· ${n}</span></span><select data-dq="${esc(s)}" aria-label="Grupo de ${esc(s)}"><option value="">Elegí un grupo…</option>${opts}</select></div>`).join('')}</div>`:`<p class="p-sub" style="margin:4px 0 0">${crm.ok===false?'Se activa cuando se actualice la base.':'Ninguno: todos los status tienen grupo.'}</p>`}`;
+  $$('[data-dq]',el).forEach(s=>s.addEventListener('change',async()=>{const g=s.value;if(!g)return;const r=await B.rpc('crm_map_status',{st:s.dataset.dq,grp:g});if(r){toast(`"${esc(s.dataset.dq)}" va como ${esc(GRPS[g])} (${plural(r.clientes||0,'cliente')}).`);crmLoad(true);datosCard(true)}}));
+}
+async function auditCard(force){
+  const el=$('#cfAudit');if(!el)return;
+  el.hidden=!isLeader();if(!isLeader())return;
+  if(!force&&Date.now()-auditAt<30e3)return;auditAt=Date.now();
+  const rows=await QO(sb.from('audit_log').select('*').order('at',{ascending:false}).limit(40));
+  const dt=r=>{const d=r.detail||{};return [d.client_id&&('cliente '+d.client_id),d.de&&d.de!==r.user_id&&('de '+memberName(d.de)),d.a&&d.a!==d.de&&('a '+memberName(d.a)),Array.isArray(d.campos)&&d.campos.length&&d.campos.join(', '),d.filas!=null&&plural(d.filas,'fila')].filter(Boolean).join(' · ')};
+  el.innerHTML=`<div class="card-h"><h3>Registro de accesos</h3><span class="p-sub">exportaciones y cambios a ventas ajenas</span></div>`+(rows.length?`<div class="p-tablewrap"><table class="pt"><tbody>${rows.map(r=>`<tr><td class="d">${esc(whenTxt(new Date(r.at)))}</td><td>${esc(memberName(r.user_id))}</td><td>${esc(r.action)}</td><td class="d">${esc(dt(r))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="p-sub" style="margin:0">Nada registrado todavía.</p>');
+}
+const auditNote=(act,detail)=>{try{sb.rpc('audit_note',{act,detail:detail||null}).then(()=>{},()=>{})}catch(e){}};
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.
