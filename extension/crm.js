@@ -428,10 +428,12 @@
   let curSent = '';
   function currentClient() {
     const m = location.pathname.match(/\/user\/(\d{3,})/) || location.hash.match(/\/users\/user\/(\d{3,})/);
-    if (!m) return null;
-    const id = m[1];
+    // si la ficha se abre como panel adentro de otra página: el "ID 12345" de su encabezado
+    const hd = m ? null : [...document.querySelectorAll('body *')].find((e) => !e.children.length && e.offsetParent && /^ID:?\s*\d{4,}$/.test((e.textContent || '').trim()));
+    if (!m && !hd) return null;
+    const id = m ? m[1] : hd.textContent.match(/\d{4,}/)[0];
     let name = '';
-    const el = [...document.querySelectorAll('body *')].find((e) => !e.children.length && /^ID:?\s*\d{3,}$/.test((e.textContent || '').trim()) && (e.textContent.match(/\d{3,}/) || [])[0] === id);
+    const el = hd || [...document.querySelectorAll('body *')].find((e) => !e.children.length && /^ID:?\s*\d{3,}$/.test((e.textContent || '').trim()) && (e.textContent.match(/\d{3,}/) || [])[0] === id);
     if (el) { const p = el.previousElementSibling || (el.parentElement && el.parentElement.previousElementSibling); if (p) name = cellText(p).replace(/\s+/g, ' ').trim().slice(0, 120); }
     if (!name && document.title && !/crm|novara|login|users/i.test(document.title)) name = document.title.trim().slice(0, 120);
     return { id, name };
@@ -440,7 +442,15 @@
     if (document.visibilityState !== 'visible') return;
     const c = currentClient(); if (!c) return;
     const sig = c.id + '|' + c.name; if (!force && sig === curSent) return; curSent = sig;
-    send({ type: 'crm-current', id: c.id, name: c.name, brand });
+    send({ type: 'crm-current', id: c.id, name: c.name, brand }).then((r) => curPill(c.id, r)); // aviso chico para saber que Vitalis lo tomó
+  }
+  let pillT = null;
+  function curPill(id, r) {
+    let h = document.getElementById('vitalis-cur-pill');
+    if (!h) { h = document.createElement('div'); h.id = 'vitalis-cur-pill'; h.attachShadow({ mode: 'open' }); document.documentElement.appendChild(h); }
+    const ok = r && r.sent, txt = !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
+    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:600 12.5px system-ui,sans-serif;background:${ok ? '#1f7a4d' : '#8a5a1c'};color:#fff;padding:7px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25)}b{font-weight:800}</style><div><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</div>`;
+    clearTimeout(pillT); pillT = setTimeout(() => h.remove(), 4500);
   }
   document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible') reportCurrent(true); });
   function refresh(force) {

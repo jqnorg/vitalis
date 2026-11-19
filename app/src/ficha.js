@@ -99,7 +99,9 @@ function fiCampsHTML(d){
       ${i?(ed?`<button type="button" class="lnk" data-fa="campEdit" data-c="${esc(c.camp)}">Editar</button>`:`<button type="button" class="lnk" data-fa="campReq" data-c="${esc(c.camp)}">Pedir un cambio</button>`):`<button type="button" class="btn sm" data-fa="campAdd" data-c="${esc(c.camp)}">Agregar</button>`}</div>
       ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Sin datos: agregá el monto mínimo y qué ve en el anuncio.</p>'}
       ${ed&&n?`<button type="button" class="lnk hot" data-fa="campReqs" data-c="${esc(c.camp)}">${plural(n,'pedido de cambio','pedidos de cambio')}</button>`:''}</div>`};
-  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${d.camps.length?d.camps.map(row).join(''):'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliado.</p>'}</div>`;
+  // para cargar datos solo aparece la campaña del cliente; las otras sin datos van en una línea
+  const show=d.camps.filter(c=>c.info||c.mine),rest=d.camps.filter(c=>!c.info&&!c.mine);
+  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">${show.length?'Sin datos':'Campañas'}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}${d.camps.length?'':'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliado.</p>'}</div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>

@@ -1005,3 +1005,5 @@ body:not(.dock-on) #dock{position:fixed;top:0;right:0;bottom:0;width:min(420px,1
 .fi-cm{border-top:1px solid var(--line);padding-top:6px}.fi-cm p{margin:2px 0 0;white-space:pre-wrap}
 .fi-cmh{display:flex;align-items:center;gap:8px;font-size:12.5px}
 .dk-h .ib{width:30px;height:30px;display:inline-grid;place-items:center;font-size:15px}
+
+.fi-crest{margin:8px 0 0;font-size:12.5px;line-height:1.45}

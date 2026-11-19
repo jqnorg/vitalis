@@ -200,6 +200,7 @@ async def main():
             Cu = await ctx.new_page(); await Cu.goto('https://ant-crm.crmnovaramarkets.com/user/712345?authToken=x'); await Cu.wait_for_timeout(2500)
             cur = await A2.evaluate("curCl&&[curCl.id,curCl.name,curCl.src]")
             ok(cur == ['712345', 'Fabio Prueba', 'crm'], f'el cliente abierto en el CRM es el cliente actual de Vitalis ({cur})')
+            ok('cliente actual: 712345' in await Cu.evaluate("(document.getElementById('vitalis-cur-pill')||{shadowRoot:{textContent:''}}).shadowRoot.textContent"), 'y en el CRM se ve un aviso chico de que Vitalis lo tomó')
             await Cu.close()
             # al actualizar la extensión, la copia nueva entra en la pestaña abierta y la vieja se apaga (sin recargar el CRM)
             await sw.evaluate("chrome.tabs.query({url:'https://crmnovaramarkets.com/novara'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id,allFrames:true},files:['crm.js']}))"); await Nv.wait_for_timeout(1500)

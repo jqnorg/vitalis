@@ -728,6 +728,7 @@ async def main():
             ok('500001' in dk and 'abierto en el CRM' in dk, 'el cliente abierto en el CRM aparece en el panel de la derecha')
             ok('Cómo hacerlo depositar' in dk and 'Kushki' in dk, 'con cómo hacerlo depositar en su país (lo de Banking)')
             ok(all(x not in dk for x in ['Lo vio primero', 'Marca', 'Clientes vistos', 'Hora con más', 'Trade24Seven', 'País Chile']), 'sin lo que sobraba (lo vio primero, marca, clientes vistos, hora, archivo, país)')
+            ok(await A.locator('#dock [data-fa=campAdd]').count() == 1 and await A.locator('#dock .fi-camp.mine [data-fa=campAdd]').count() == 1, 'para cargar datos solo aparece la campaña del cliente')
             await A.click('#dock [data-fa=campAdd][data-c="FB-01"]'); await A.wait_for_timeout(300)
             await A.fill('#caM', '250 USD'); await A.fill('#caA', 'Invertí con IA desde 250'); await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1500)
             dk = await A.inner_text('#dock')

@@ -1015,6 +1015,8 @@ body:not(.dock-on) #dock{position:fixed;top:0;right:0;bottom:0;width:min(420px,1
 .fi-cm{border-top:1px solid var(--line);padding-top:6px}.fi-cm p{margin:2px 0 0;white-space:pre-wrap}
 .fi-cmh{display:flex;align-items:center;gap:8px;font-size:12.5px}
 .dk-h .ib{width:30px;height:30px;display:inline-grid;place-items:center;font-size:15px}
+
+.fi-crest{margin:8px 0 0;font-size:12.5px;line-height:1.45}
 </style>
 </head>
 <body>
@@ -1356,8 +1358,8 @@ body:not(.dock-on) #dock{position:fixed;top:0;right:0;bottom:0;width:min(420px,1
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.15.0';
-const EXT_VER='1.8.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.15.1';
+const EXT_VER='1.8.1'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -5715,7 +5717,9 @@ function fiCampsHTML(d){
       ${i?(ed?`<button type="button" class="lnk" data-fa="campEdit" data-c="${esc(c.camp)}">Editar</button>`:`<button type="button" class="lnk" data-fa="campReq" data-c="${esc(c.camp)}">Pedir un cambio</button>`):`<button type="button" class="btn sm" data-fa="campAdd" data-c="${esc(c.camp)}">Agregar</button>`}</div>
       ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Sin datos: agregá el monto mínimo y qué ve en el anuncio.</p>'}
       ${ed&&n?`<button type="button" class="lnk hot" data-fa="campReqs" data-c="${esc(c.camp)}">${plural(n,'pedido de cambio','pedidos de cambio')}</button>`:''}</div>`};
-  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${d.camps.length?d.camps.map(row).join(''):'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliado.</p>'}</div>`;
+  // para cargar datos solo aparece la campaña del cliente; las otras sin datos van en una línea
+  const show=d.camps.filter(c=>c.info||c.mine),rest=d.camps.filter(c=>!c.info&&!c.mine);
+  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">${show.length?'Sin datos':'Campañas'}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}${d.camps.length?'':'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliado.</p>'}</div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>

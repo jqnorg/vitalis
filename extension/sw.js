@@ -470,9 +470,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'crm-current' && msg.id) { // el cliente abierto en el CRM: Vitalis lo muestra como cliente actual (en la cola queda solo el último)
     (async () => {
       const c = { cmd: 'actual', k: String(msg.id).slice(0, 60), r: String(msg.name || '').slice(0, 120), at: Date.now() };
-      for (const t of await vitalisTabs()) { try { const r = await chrome.tabs.sendMessage(t.id, { type: 'cmds', cmds: [c] }); if (r && r.ok) return; } catch (e) {} }
+      for (const t of await vitalisTabs()) { try { const r = await chrome.tabs.sendMessage(t.id, { type: 'cmds', cmds: [c] }); if (r && r.ok) return true; } catch (e) {} }
       const st = await state(); await chrome.storage.local.set({ cmds: [...st.cmds.filter((x) => x.cmd !== 'actual'), c] });
-    })().finally(() => reply({ ok: true }));
+      return false;
+    })().then((sent) => reply({ ok: true, sent }), () => reply({ ok: true, sent: false }));
     return true;
   }
   if (msg.type === 'crm-seen' && Array.isArray(msg.rows)) { crmSeen(msg.rows).then(reply).catch(() => reply(null)); return true; }
