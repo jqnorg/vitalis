@@ -670,17 +670,25 @@ async def main():
             await A.fill('#bpN', 'Kushki'); await A.check('.mbox [name=bpC][value="Chile"]')
             for m in ['Tarjeta', 'Transferencia']:
                 await A.fill('#bpNew', m); await A.click('#bpAdd'); await A.wait_for_timeout(600)
+            await A.check('.mbox [name=bpC][value="Colombia"]'); await A.wait_for_timeout(200)
+            tid0 = sql("select id from public.pay_methods where name='Transferencia'")[0]['id']
+            await A.check(f'#bpMC [data-m="{tid0}"][value="Chile"]')
             await A.set_input_files('.mbox [data-bkfiles]', files=[{'name': 'paso.png', 'mimeType': 'image/png', 'buffer': PNG}])
             await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1800)
             ok(sql("select count(*)::int c from public.processor_methods pm join public.processors p on p.id=pm.processor_id where p.name='Kushki'")[0]['c'] == 2, 'banking: el admin carga un procesador con dos métodos')
             ok(sql("select count(*)::int c from public.pay_files where ref_kind='processor'")[0]['c'] == 1, 'con su foto')
+            pmc = {r['name']: r['countries'] for r in sql("select m.name, pm.countries from public.processor_methods pm join public.pay_methods m on m.id=pm.method_id")}
+            ok(pmc.get('Transferencia') == ['Chile'] and pmc.get('Tarjeta') == [], f'un método puede estar solo en algunos países del procesador ({pmc})')
             ok(sql("select string_agg(kind, ',' order by name) k from public.pay_methods")[0]['k'] == 'tarjeta,transferencia', 'cada método con su tipo de pago (se adivina por el nombre)')
             await A.click('#bkBody [data-bkt=efectivo]'); await A.wait_for_timeout(300)
             ok(await A.locator('#bkBody .bk-proc').count() == 0, 'paso anterior: en efectivo no aparece un procesador solo digital')
             await A.click('#bkBody [data-bkt=digital]'); await A.wait_for_timeout(300)
             ok('Kushki' in await A.inner_text('#bkBody') and await A.locator('#bkBody [data-bkt=transferencia]').count() == 1, 'en digital aparece, con transferencia o tarjeta para elegir')
             await A.click('#bkBody [data-bkt=transferencia]'); await A.wait_for_timeout(300)
-            ok(await A.locator('#bkBody .bk-m').all_inner_texts() == ['Transferencia'], 'y en transferencia muestra solo ese método')
+            ok([t.split()[0] for t in await A.locator('#bkBody .bk-m').all_inner_texts()] == ['Transferencia'] and 'CL' in await A.inner_text('#bkBody .bk-m'), 'y en transferencia muestra solo ese método (con el país donde está)')
+            await A.click('#bkBody [data-bkt=""]'); await A.select_option('#bkPais', 'Colombia'); await A.wait_for_timeout(300)
+            ok(await A.locator('#bkBody .bk-m').all_inner_texts() == ['Tarjeta'], 'en Colombia, Kushki muestra solo los métodos que tiene ahí')
+            await A.select_option('#bkPais', ''); await A.wait_for_timeout(200)
             await A.click('#bkBody [data-bkt=""]'); await A.wait_for_timeout(300)
             pid = sql("select id from public.processors where name='Kushki'")[0]['id']; tid = sql("select id from public.pay_methods where name='Transferencia'")[0]['id']
             await A.click('#bkTools [data-bk=bank]'); await A.wait_for_timeout(300)

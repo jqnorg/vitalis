@@ -962,3 +962,5 @@ body.dark .ah-n{color:var(--pri-h)}
 .bk-up{cursor:pointer}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}.chk input{margin:0}
 .bk-paso .seg{margin-right:8px}.bk-paso .seg.sm{margin-top:8px}.bk-paso .seg.sm button{padding:5px 12px;font-size:13px}
+.bk-mc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:6px 0;border-top:1px solid var(--line)}.bk-mc:first-child{border-top:0}.bk-mc b{min-width:110px}
+.bk-m small{opacity:.75;font-size:10.5px;margin-left:2px}

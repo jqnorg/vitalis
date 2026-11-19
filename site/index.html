@@ -972,6 +972,8 @@ body.dark .ah-n{color:var(--pri-h)}
 .bk-up{cursor:pointer}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}.chk input{margin:0}
 .bk-paso .seg{margin-right:8px}.bk-paso .seg.sm{margin-top:8px}.bk-paso .seg.sm button{padding:5px 12px;font-size:13px}
+.bk-mc{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:6px 0;border-top:1px solid var(--line)}.bk-mc:first-child{border-top:0}.bk-mc b{min-width:110px}
+.bk-m small{opacity:.75;font-size:10.5px;margin-left:2px}
 </style>
 </head>
 <body>
@@ -1311,7 +1313,7 @@ body.dark .ah-n{color:var(--pri-h)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.14.1';
+const VERSION='1.14.2';
 const EXT_VER='1.7.1'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -5410,6 +5412,8 @@ function bkPhotoWire(api,kind,getId){
 }
 const paisChecks=(sel,name)=>`<div class="bk-paises">${PAISES.map(p=>`<label class="chk"><input type="checkbox" name="${name}" value="${esc(p)}"${(sel||[]).includes(p)?' checked':''}>${esc(p)}</label>`).join('')}</div>`;
 const paisesTxt=cs=>cs&&cs.length?cs.join(', '):'Todos los países';
+const ISO={Chile:'CL',Colombia:'CO','México':'MX','Perú':'PE',Ecuador:'EC','Costa Rica':'CR',Guatemala:'GT','Panamá':'PA',Argentina:'AR',Uruguay:'UY','España':'ES'};
+const isoTxt=cs=>cs.map(c=>ISO[c]||c).join(' · ');
 
 /* ---------- la vista ---------- */
 const comboTxt=x=>{const pn=x.p?(procOf(x.p)?procOf(x.p).name:'Procesador'):'';
@@ -5458,7 +5462,7 @@ V.banking={
     const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
       return `<article class="bk-proc${p.status==='falla'?' falla':''}"><div class="bk-ph-h"><h4>${esc(p.name)}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>x.status==='falla').length;return p.status==='falla'?'<span class="badge bad">Falla</span>':nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
         <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
-        <div class="bk-ms">${ms.length?ms.map(x=>`<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(x.status==='falla'?' · '+(x.status_note||'Falla'):x.countries&&x.countries.length?' · '+x.countries.join(', '):''))}">${esc(x.m.name)}</span>`).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
+        <div class="bk-ms">${ms.length?ms.map(x=>`<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(x.status==='falla'?' · '+(x.status_note||'Falla'):x.countries&&x.countries.length?' · solo en '+x.countries.join(', '):''))}">${esc(x.m.name)}${!bkPais&&x.countries&&x.countries.length?` <small>${esc(isoTxt(x.countries))}</small>`:''}</span>`).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
         ${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}${bkThumbs('processor',p.id)}
         ${ed?`<div class="bk-act"><button type="button" class="btn sm" data-bka="falla" data-id="${esc(p.id)}">Reportar falla</button>${p.status==='falla'||pmOf(p.id).some(x=>x.status==='falla')?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(p.id)}">Volvió a andar</button>`:''}<button type="button" class="btn sm" data-bka="edit" data-id="${esc(p.id)}">Editar</button></div>`:''}</article>`};
     const banks=bk.banks.filter(b=>(!bkPais||!b.country||b.country===bkPais)&&(hit(b.name)||hit(b.country)));
@@ -5489,14 +5493,27 @@ function procModal(p){
     <div class="fld"><span>Países <small class="dim">(sin marcar: todos)</small></span>${paisChecks(p&&p.countries,'bpC')}</div>
     <div class="fld"><span>Métodos de este procesador</span><div class="bk-paises" id="bpM">${bk.methods.map(m=>`<label class="chk"><input type="checkbox" value="${esc(m.id)}"${have.has(m.id)?' checked':''}>${esc(m.name)}</label>`).join('')||'<span class="dim">No hay métodos: agregá uno abajo.</span>'}</div>
       <div class="bk-row"><input id="bpNew" maxlength="60" placeholder="Método nuevo (ej.: Transferencia, Tarjeta, Boleto)">${kindSel('','bpNewK')}<button type="button" class="btn sm" id="bpAdd">Agregar</button></div></div>
+    <div class="fld"><span>En qué países está cada método <small class="dim">(sin marcar: en todos los del procesador)</small></span><div id="bpMC"></div></div>
     <label class="fld"><span>Notas <small class="dim">(cómo se usa, límites, horarios…)</small></span><textarea id="bpNo" rows="4" maxlength="4000">${esc(p&&p.notes||'')}</textarea></label>
     ${bkPhotoField('processor',p&&p.id)}<div class="ebox" id="bpE"></div>`,
     onOpen:api=>{
       api._up=bkPhotoWire(api,'processor',()=>savedId);
+      // países de cada método: solo los del procesador (o todos si el procesador no tiene)
+      const mc={};for(const x of p?bk.pm.filter(y=>y.processor_id===p.id):[])mc[x.method_id]=new Set(x.countries||[]);
+      api._mc=mc;
+      const drawMC=()=>{
+        api.box.querySelectorAll('#bpMC input:checked').forEach(i=>{(mc[i.dataset.m]||(mc[i.dataset.m]=new Set())).add(i.value)});
+        api.box.querySelectorAll('#bpMC input:not(:checked)').forEach(i=>{if(mc[i.dataset.m])mc[i.dataset.m].delete(i.value)});
+        const base=[...api.box.querySelectorAll('[name=bpC]:checked')].map(i=>i.value),cs=base.length?base:PAISES;
+        const ms=[...api.q('#bpM').querySelectorAll('input:checked')].map(i=>methOf(i.value)||{id:i.value,name:i.parentElement.textContent.trim()});
+        api.q('#bpMC').innerHTML=ms.length?ms.map(m=>`<div class="bk-mc"><b>${esc(m.name)}</b><div class="bk-paises">${cs.map(c=>`<label class="chk"><input type="checkbox" data-m="${esc(m.id)}" value="${esc(c)}"${mc[m.id]&&mc[m.id].has(c)?' checked':''}>${esc(c)}</label>`).join('')}</div></div>`).join(''):'<span class="dim">Marcá los métodos de arriba.</span>';
+      };
+      api._drawMC=drawMC;drawMC();
+      api.box.addEventListener('change',e=>{if(e.target.closest('#bpM')||e.target.name==='bpC')drawMC()});
       api.q('#bpAdd').onclick=async()=>{const n=api.q('#bpNew').value.trim();if(!n)return;
         const r=await bkSave(sb.from('pay_methods').insert({name:n.slice(0,60),kind:api.q('#bpNewK').value||kindGuess(n),sort:bk.methods.length}).select('*'));if(!r)return;api.q('#bpNewK').value='';
         const m=r[0];api.q('#bpNew').value='';const box=api.q('#bpM');if(box.querySelector('.dim'))box.innerHTML='';
-        box.insertAdjacentHTML('beforeend',`<label class="chk"><input type="checkbox" value="${esc(m.id)}" checked>${esc(m.name)}</label>`)};
+        box.insertAdjacentHTML('beforeend',`<label class="chk"><input type="checkbox" value="${esc(m.id)}" checked>${esc(m.name)}</label>`);api._drawMC()};
     },
     actions:[...(p?[{l:'Borrar',cls:'danger',fn:async()=>{if(!await confirmar('Borrar procesador',`¿Borrar <b>${esc(p.name)}</b> con sus métodos, fotos e historial?`,'borrar',true))return false;
         await bkSave(sb.from('pay_files').delete().eq('ref_kind','processor').eq('ref_id',p.id));if(await bkSave(sb.from('processors').delete().eq('id',p.id)))toast('Procesador borrado.')}}]:[]),
@@ -5507,8 +5524,12 @@ function procModal(p){
         const r=await bkSave(p?sb.from('processors').update(row).eq('id',p.id).select('id'):sb.from('processors').insert({...row,sort:bk.procs.length}).select('id'));if(!r)return false;
         savedId=p?p.id:r[0].id;
         const want=new Set([...api.q('#bpM').querySelectorAll('input:checked')].map(i=>i.value));
-        const add=[...want].filter(id=>!have.has(id)).map(method_id=>({processor_id:savedId,method_id})),del=[...have].filter(id=>!want.has(id));
+        api._drawMC();const base=countries.length?countries:PAISES;
+        const csOf=id=>{const s=api._mc[id];const l=s?base.filter(c=>s.has(c)):[];return l.length===base.length?[]:l}; // todos marcados = como el procesador
+        const add=[...want].filter(id=>!have.has(id)).map(method_id=>({processor_id:savedId,method_id,countries:csOf(method_id)})),del=[...have].filter(id=>!want.has(id));
         if(add.length&&!await bkSave(sb.from('processor_methods').insert(add)))return false;
+        for(const id of [...want].filter(id=>have.has(id))){const now=bk.pm.find(x=>x.processor_id===savedId&&x.method_id===id),cs=csOf(id);
+          if(now&&JSON.stringify(now.countries||[])!==JSON.stringify(cs)&&!await bkSave(sb.from('processor_methods').update({countries:cs}).eq('processor_id',savedId).eq('method_id',id)))return false}
         if(del.length&&!await bkSave(sb.from('processor_methods').delete().eq('processor_id',savedId).in('method_id',del)))return false;
         await api._up();await bkLoad(true);toast(p?'Procesador guardado.':`Procesador <b>${esc(name)}</b> cargado.`);
       }}]});
