@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.14.4';
+const VERSION='1.15.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -267,6 +267,7 @@ async function loadAll(){
     loadAvatars(),
     loadReacts(),
     bkLoad(true).catch(()=>{}),
+    ficInit(),
   ]);
   chatsLoaded(ch,cm,rd,ms);tasksLoaded(tk,tp);
   snippets=sn.map(N2S);leads=ld.map(L2C);pings=pg.map(G2P);
@@ -283,7 +284,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll()]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 setInterval(()=>{if(ready&&(!rtOk||Date.now()-lastCatch>60e3))catchUp()},5e3);
@@ -358,6 +359,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
   if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p));
   if(utOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'user_targets'},p=>mesaLive('user_targets',p));
   if(avOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'avatars'},avLive);
+  if(ficOk){for(const t of ['client_comments','campaign_info'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},fichaLive);if(bkEd())chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'campaign_requests'},()=>campReqPoll())} // la ficha: comentarios y campañas en vivo
   if(bk.ok)for(const t of ['pay_incidents','processors','processor_methods','banks','pay_methods'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},()=>bkLoad(true)); // Banking: una falla avisa al instante
   if(reactOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'message_reactions'},reactLive); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
   // el team leader ve en vivo la agenda, los turnos y los FTDs sin detalle de todos

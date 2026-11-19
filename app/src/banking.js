@@ -107,10 +107,12 @@ const ISO={Chile:'CL',Colombia:'CO','México':'MX','Perú':'PE',Ecuador:'EC','Co
 const isoTxt=cs=>cs.map(c=>ISO[c]||c).join(' · ');
 
 /* ---------- las opciones del paso a paso ---------- */
-function bkOptions(){
+const paisOkFor=(pais,cs)=>!pais||!(cs&&cs.length)||cs.includes(pais);
+const kindOkFor=(tipo,k)=>!tipo||(tipo==='digital'?k==='transferencia'||k==='tarjeta':k===tipo);
+function bkOptions(pais=bkPais,tipo=bkTipo){ // procesador + método que sirven para ese país y tipo de pago (también los usa la ficha del cliente)
   const out=[];
-  for(const p of bk.procs){if(p.active===false||!bkPaisOk(p.countries))continue;
-    for(const x of pmOf(p.id))if(bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind))out.push({p,x,falla:p.status==='falla'||x.status==='falla'})}
+  for(const p of bk.procs){if(p.active===false||!paisOkFor(pais,p.countries))continue;
+    for(const x of pmOf(p.id))if(paisOkFor(pais,x.countries&&x.countries.length?x.countries:p.countries)&&kindOkFor(tipo,x.m.kind))out.push({p,x,falla:p.status==='falla'||x.status==='falla'})}
   return out.sort((a,b)=>(a.falla?1:0)-(b.falla?1:0)||a.p.sort-b.p.sort||a.p.name.localeCompare(b.p.name));
 }
 function bkOptHTML(o){

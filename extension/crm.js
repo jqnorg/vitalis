@@ -424,8 +424,28 @@
     $('t').textContent = head.join(' · ');
   }
   function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } }
+  // el cliente que tenés abierto en el CRM (su ficha: /user/123 o #/users/user/123): en Vitalis queda como "cliente actual"
+  let curSent = '';
+  function currentClient() {
+    const m = location.pathname.match(/\/user\/(\d{3,})/) || location.hash.match(/\/users\/user\/(\d{3,})/);
+    if (!m) return null;
+    const id = m[1];
+    let name = '';
+    const el = [...document.querySelectorAll('body *')].find((e) => !e.children.length && /^ID:?\s*\d{3,}$/.test((e.textContent || '').trim()) && (e.textContent.match(/\d{3,}/) || [])[0] === id);
+    if (el) { const p = el.previousElementSibling || (el.parentElement && el.parentElement.previousElementSibling); if (p) name = cellText(p).replace(/\s+/g, ' ').trim().slice(0, 120); }
+    if (!name && document.title && !/crm|novara|login|users/i.test(document.title)) name = document.title.trim().slice(0, 120);
+    return { id, name };
+  }
+  function reportCurrent(force) {
+    if (document.visibilityState !== 'visible') return;
+    const c = currentClient(); if (!c) return;
+    const sig = c.id + '|' + c.name; if (!force && sig === curSent) return; curSent = sig;
+    send({ type: 'crm-current', id: c.id, name: c.name, brand });
+  }
+  document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible') reportCurrent(true); });
   function refresh(force) {
     if (!live()) return retire();
+    reportCurrent();
     for (const e of document.querySelectorAll('#ftd-crm-button')) if (!ui || e !== ui.h) e.remove(); // paneles de copias viejas
     const T = tables();
     sales = scanSales(T);

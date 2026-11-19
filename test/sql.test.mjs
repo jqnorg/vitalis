@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 23, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 26, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -706,6 +706,36 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!q.error, 'fotos: el admin sube una');
   q = await as(B, "insert into public.pay_files (ref_kind, ref_id, mime, data) values ('bank', $1, 'image/webp', 'AAAA') returning 1", [pid]);
   ok(!!q.error, 'un agente no sube fotos');
+}
+
+// ---------- ficha: campañas y comentarios ----------
+{
+  let q = await as(B, "insert into public.campaign_info (aff, camp, country, min_amount, ad_text) values ('108887', 'Nitivalori', 'Colombia', '250 USD', 'Ganá con IA') returning 1");
+  ok(!q.error, 'un agente carga la campaña que falta');
+  q = await as(B, "insert into public.campaign_info (aff, camp, country, min_amount) values ('108887', 'Nitivalori', 'Colombia', '1 USD') returning 1");
+  ok(!!q.error, 'si ya está cargada no se pisa');
+  q = await as(B, "update public.campaign_info set min_amount = '1 USD' where camp = 'Nitivalori' returning 1");
+  ok(!!q.error || q.rows.length === 0, 'el agente no la cambia: pide el cambio');
+  q = await as(B, "insert into public.campaign_requests (aff, camp, country, body) values ('108887', 'Nitivalori', 'Colombia', 'Ahora el mínimo es 300') returning id");
+  ok(!q.error, 'y el pedido de cambio queda');
+  const rid = q.rows[0].id;
+  q = await as(Dh, 'select count(*)::int c from public.campaign_requests');
+  ok(q.rows[0].c === 0, 'otro agente no ve el pedido');
+  q = await as(C, "update public.campaign_info set min_amount = '300 USD', updated_by = auth.uid() where camp = 'Nitivalori' returning 1");
+  ok(!q.error && q.rows.length === 1, 'el team leader la cambia');
+  q = await as(C, 'update public.campaign_requests set done = true, done_by = auth.uid(), done_at = now() where id = $1 returning 1', [rid]);
+  ok(!q.error && q.rows.length === 1, 'y marca el pedido como hecho');
+  q = await as(B, "insert into public.client_comments (client_id, body) values ('70370', 'Paga el viernes') returning id");
+  ok(!q.error, 'un agente comenta un cliente');
+  const cid = q.rows[0].id;
+  q = await as(Dh, "select body from public.client_comments where client_id = '70370'");
+  ok(q.rows.length === 1, 'la mesa ve el comentario');
+  q = await as(Dh, 'delete from public.client_comments where id = $1 returning 1', [cid]);
+  ok(!!q.error || q.rows.length === 0, 'otro agente no lo borra');
+  q = await as(B, "update public.client_comments set body = 'x' where id = $1 returning 1", [cid]);
+  ok(!!q.error, 'los comentarios no se editan');
+  q = await as(B, 'delete from public.client_comments where id = $1 returning 1', [cid]);
+  ok(!q.error && q.rows.length === 1, 'el autor lo borra');
 }
 
 // ---------- baja ----------

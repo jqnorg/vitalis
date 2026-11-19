@@ -1368,12 +1368,76 @@ revoke all on public.pay_incidents from anon;
 revoke all on function public.pay_report(uuid, uuid, boolean, text), public.pay_editor() from public, anon;
 grant execute on function public.pay_report(uuid, uuid, boolean, text), public.pay_editor() to authenticated;
 
+-- ---------- la ficha del cliente: campañas (monto mínimo y qué ve la persona en el anuncio) y comentarios ----------
+-- por afiliado + campaña + país; la carga cualquiera de la mesa si falta; la cambian admin y team leader (los agentes piden el cambio)
+create table if not exists public.campaign_info (
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  aff        text not null check (length(btrim(aff)) between 1 and 60),
+  camp       text not null check (length(btrim(camp)) between 1 and 120),
+  country    text not null default '' check (length(country) <= 60),
+  min_amount text check (length(min_amount) <= 60),
+  ad_text    text check (length(ad_text) <= 2000),
+  created_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (team_id, aff, camp, country)
+);
+create table if not exists public.campaign_requests (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  aff        text not null, camp text not null, country text not null default '',
+  body       text not null check (length(btrim(body)) between 1 and 1000),
+  created_by uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  done       boolean not null default false,
+  done_by    uuid references public.profiles(id) on delete set null,
+  done_at    timestamptz
+);
+create index if not exists campaign_requests_open on public.campaign_requests (team_id, done, created_at);
+create table if not exists public.client_comments (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  brand      text not null default 'Novara Markets' check (length(brand) <= 40),
+  client_id  text not null check (length(btrim(client_id)) between 1 and 60),
+  body       text not null check (length(btrim(body)) between 1 and 1000),
+  created_by uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists client_comments_cl on public.client_comments (team_id, client_id, created_at);
+alter table public.campaign_info enable row level security;
+alter table public.campaign_requests enable row level security;
+alter table public.client_comments enable row level security;
+drop policy if exists campaign_info_read on public.campaign_info;
+create policy campaign_info_read on public.campaign_info for select to authenticated using (team_id = public.my_team());
+drop policy if exists campaign_info_add on public.campaign_info;
+create policy campaign_info_add on public.campaign_info for insert to authenticated with check (team_id = public.my_team() and created_by = auth.uid());
+drop policy if exists campaign_info_edit on public.campaign_info;
+create policy campaign_info_edit on public.campaign_info for update to authenticated using (team_id = public.my_team() and public.pay_editor()) with check (team_id = public.my_team());
+drop policy if exists campaign_info_del on public.campaign_info;
+create policy campaign_info_del on public.campaign_info for delete to authenticated using (team_id = public.my_team() and public.pay_editor());
+drop policy if exists campaign_req_read on public.campaign_requests;
+create policy campaign_req_read on public.campaign_requests for select to authenticated using (team_id = public.my_team() and (created_by = auth.uid() or public.pay_editor()));
+drop policy if exists campaign_req_add on public.campaign_requests;
+create policy campaign_req_add on public.campaign_requests for insert to authenticated with check (team_id = public.my_team() and created_by = auth.uid() and not done);
+drop policy if exists campaign_req_done on public.campaign_requests;
+create policy campaign_req_done on public.campaign_requests for update to authenticated using (team_id = public.my_team() and public.pay_editor()) with check (team_id = public.my_team());
+drop policy if exists client_comments_read on public.client_comments;
+create policy client_comments_read on public.client_comments for select to authenticated using (team_id = public.my_team());
+drop policy if exists client_comments_add on public.client_comments;
+create policy client_comments_add on public.client_comments for insert to authenticated with check (team_id = public.my_team() and created_by = auth.uid());
+drop policy if exists client_comments_del on public.client_comments;
+create policy client_comments_del on public.client_comments for delete to authenticated using (team_id = public.my_team() and (created_by = auth.uid() or public.pay_editor()));
+grant select, insert, update, delete on public.campaign_info, public.campaign_requests, public.client_comments to authenticated;
+revoke update on public.client_comments from authenticated;
+revoke all on public.campaign_info, public.campaign_requests, public.client_comments from anon;
+
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','processor_methods','pay_incidents','banks','pay_methods'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','processor_methods','pay_incidents','banks','pay_methods','client_comments','campaign_info','campaign_requests'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

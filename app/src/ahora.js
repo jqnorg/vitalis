@@ -212,67 +212,7 @@ function convCardsX(uid){ // con el registro del CRM: conversión de verdad; sin
 }
 const convSubX=tl=>cohortOn()?(tl?'de la mesa: ':'')+'de los registrados, cuántos depositaron el mismo día (new)':(tl?'de la mesa: ':'')+'FTDs sobre clientes vistos (cuenta aproximada)';
 
-/* ---------- la ficha del cliente: datos, campaña, afiliado y país con sus números ---------- */
-let fichaQ=[],lastKey=0;
-document.addEventListener('keydown',()=>{lastKey=Date.now()},true);
-function fichaNew(id){if(!id)return;if(!fichaQ.includes(id))fichaQ.push(id);setTimeout(fichaTry,400)}
-function fichaTry(){ // se abre cuando entrás a Vitalis (o enseguida si ya estás, salvo que estés escribiendo)
-  if(!ready||!fichaQ.length||modals.length)return;
-  if(document.hidden||!document.hasFocus())return;
-  if(Date.now()-lastKey<4000){toast(`Entró un new: <b>${esc(fichaQ[0])}</b>`,'imp',{key:'ficha',actions:[{l:'Ver ficha',fn:()=>{if(fichaQ.length)openFicha(fichaQ.shift())}}]});return}
-  closeToast('ficha');openFicha(fichaQ.shift(),{auto:1});
-}
-addEventListener('focus',()=>setTimeout(fichaTry,300));
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(fichaTry,300)});
-async function dimStats(col,val){
-  const k=norm(val),get=f=>col==='camp'?f.camp:col==='aff'?String(f.aff||''):f.country;
-  const all=team.filter(f=>norm(get(f))===k),sales=all.filter(f=>!isArch(f.brand)),arch=all.length-sales.length;
-  const d30=addDays(todayS(),-29),s30=sales.filter(f=>f.date>=d30),lat=sales.filter(isLate).length;
-  const hrs=Array(24).fill(0);for(const f of s30){const h=parseInt(f.time,10);if(h>=0&&h<24)hrs[h]++}
-  const pk=Math.max(...hrs),hpk=pk?hrs.indexOf(pk):-1,last=sales.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
-  let seen=null;
-  if(crm.ok!==false){try{const rows=(await crmPage(()=>sb.from('crm_clients').select('*').neq('brand',ARCH).eq(col,String(val)).order('client_id'),5000)).map(C2X),S=soldIdx();
-    let dep=0,nw=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){dep++;if(!isLate(f))nw++}}seen={n:rows.length,dep,nw}}catch(e){}}
-  return {n:sales.length,n30:s30.length,lat,last,hpk,arch,seen};
-}
-function statHTML(t,val,s){
-  if(!val)return `<div class="fi-c"><h4>${t}</h4><p class="p-sub" style="margin:0">El CRM no la muestra en la lista.</p></div>`;
-  const rw2=(k,v)=>`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`;
-  return `<div class="fi-c"><h4>${t} <span class="fi-v" title="${esc(val)}">${esc(val)}</span></h4>${s.n?
-    rw2('FTDs en 30 días',s.n30)+rw2('FTDs en total',`${s.n} · ${pct(s.lat/s.n)} late`)+(s.last?rw2('Último FTD',`${esc(s.last.date===todayS()?'hoy':dm(s.last.date))} ${esc(s.last.time||'')}`):'')+(s.hpk>=0?rw2('Hora con más FTDs',`${z(s.hpk)} h`):'')
-    :'<p class="p-sub" style="margin:0 0 6px">Sin FTDs en Novara todavía.</p>'}${s.seen&&s.seen.n?rw2('Clientes vistos',s.seen.n)+rw2('Depositaron',`${s.seen.dep} · ${pct(s.seen.dep/s.seen.n)}`)+rw2('Mismo día (new)',s.seen.nw):''}${s.arch?`<p class="p-sub" style="margin:6px 0 0">En el archivo de Trade24Seven: ${plural(s.arch,'FTD')}.</p>`:''}</div>`;
-}
-async function openFicha(id,o={}){
-  if(!id)return;
-  const ld=leads.find(l=>norm(l.id)===norm(id));
-  const acts=[{l:'Copiar ID',fn:async()=>{try{await navigator.clipboard.writeText(id);toast(`<b>${esc(id)}</b> copiado.`)}catch(e){toast('No pude copiar.','err')}return false}},
-    {l:'Agendar',fn:()=>{setTimeout(()=>agendarCliente(id,r&&r.status||''),0)}},{l:fichaQ.length?`Siguiente (${fichaQ.length})`:'Listo',cls:'pri',fn:()=>{if(fichaQ.length)setTimeout(()=>openFicha(fichaQ.shift()),0)}}];
-  let r=null;
-  const api=modal({title:`${o.auto?'Entró un new · ':''}Cliente ${esc(id)}`,wide:1,body:'<div class="p-empty">Cargando la ficha…</div>',actions:acts});
-  let log=[];
-  try{[r,log]=await Promise.all([crm.ok===false?null:crmOne(id),crm.ok===false?[]:crmLog(id)])}catch(e){}
-  if(!r)r=crmStatusOf(id);
-  const name=r&&r.name||ld&&ld.name||'',country=r&&r.country||ld&&ld.country||'',f=soldOf(id,r&&r.brand),ra=r?regAt(r):null,tz=cliTime(country);
-  const ags=[...pend,...teamAg].filter(p=>norm(p.id)===norm(id)&&!p.done);
-  const [sc,sa,sp_]=await Promise.all([r&&r.camp?dimStats('camp',r.camp):null,r&&r.aff?dimStats('aff',r.aff):null,country?dimStats('country',country):null]);
-  if(!document.body.contains(api.box))return;
-  const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
-  api.mb.innerHTML=`<div class="fi">
-    <div class="fi-h"><div><div class="fi-nm">${esc(name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${country?' · '+esc(country):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
-      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}</div></div>
-    <div class="fi-grid">
-      <div class="fi-c"><h4>Cliente</h4>
-        ${rw2('Status',r?`${esc(r.status||'—')}${r.since?` <span class="d">desde ${esc(rel(new Date(r.since)))}</span>`:''}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
-        ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
-        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}${rw2('Desk',r&&r.desk?esc(r.desk):'')}${rw2('Marca',r?esc(r.brand):'')}
-        ${rw2('Lo vio primero',r&&r.firstBy?`${esc(first(r.firstBy))}, ${esc(rel(new Date(r.first)))}`:'')}
-        ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
-        ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
-        ${log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
-      </div>
-      ${statHTML('Campaña',r&&r.camp,sc)}${statHTML('Afiliado',r&&r.aff,sa)}${country?statHTML('País',country,sp_):''}
-    </div></div>`;
-}
+/* la ficha del cliente y el cliente actual viven en ficha.js */
 
 /* ---------- el team leader: la cola de cada agente ---------- */
 function colaMesaCard(){

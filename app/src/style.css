@@ -979,3 +979,29 @@ body.dark .ah-n{color:var(--pri-h)}
 .bk-mini{display:flex;flex-wrap:wrap;gap:6px}
 .bk-ph.ico .bk-img{width:48px;height:48px;border-radius:10px}.bk-ph.ico .bk-img img{object-fit:contain}.bk-ph.ico figure.ed{max-width:none;flex-direction:row;align-items:center}
 .bk-opt summary .bk-ico{width:22px;height:22px;border-radius:6px}
+
+/* ---------- el cliente actual (panel a la derecha) y la ficha ---------- */
+body.dock-on{grid-template-columns:236px minmax(0,1fr) 400px;grid-template-areas:"side bar dock" "side main dock"}
+#dock{grid-area:dock;display:flex;flex-direction:column;min-height:0;background:var(--panel);border-left:1px solid var(--line)}
+body:not(.dock-on) #dock{position:fixed;top:0;right:0;bottom:0;width:min(420px,100vw);z-index:55;box-shadow:-18px 0 40px rgba(0,0,0,.18)}
+.dk-h{display:flex;align-items:center;gap:6px;padding:14px 14px 10px 18px;border-bottom:1px solid var(--line)}
+.dk-t{flex:1;display:flex;flex-direction:column;min-width:0}.dk-k{font-family:var(--display);font-weight:800;font-size:16px}.dk-s{font-size:12px;color:var(--dim)}
+.dk-b{flex:1;overflow:auto;padding:14px 16px 40px;scrollbar-width:thin}
+.fi.dock .fi-grid{grid-template-columns:1fr}
+.fi.dock .fi-h{flex-direction:column;align-items:flex-start;gap:6px}
+.dock-chip{position:fixed;left:252px;bottom:18px;z-index:45;display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel);box-shadow:0 8px 24px rgba(0,0,0,.14);cursor:pointer;font-size:13.5px;max-width:320px}
+.dock-chip svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8}
+.dock-chip:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+@media (max-width:760px){.dock-chip{left:12px;bottom:12px}}
+.fi-pay .fi-pk{display:flex;flex-direction:column;gap:4px;margin:6px 0}.fi-pl{font-size:12px;font-weight:700;color:var(--dim)}
+.fi-pay select{width:100%}
+.fi-bflow .bk-steps{margin-top:6px}
+.fi-camp{padding:8px 0;border-top:1px solid var(--line)}.fi-camp:first-of-type{border-top:0}
+.fi-camp.mine{background:color-mix(in srgb,var(--s1) 7%,transparent);margin:0 -8px;padding:8px;border-radius:10px}
+.fi-ch{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.fi-ad{margin:4px 0 0;white-space:pre-wrap;font-size:13px;color:var(--fg)}
+.fi-cadd{display:flex;gap:6px;align-items:flex-end}.fi-cadd textarea{flex:1;min-height:40px;resize:vertical}
+.fi-cl{display:grid;gap:8px;margin-top:10px}
+.fi-cm{border-top:1px solid var(--line);padding-top:6px}.fi-cm p{margin:2px 0 0;white-space:pre-wrap}
+.fi-cmh{display:flex;align-items:center;gap:8px;font-size:12.5px}
+.dk-h .ib{width:30px;height:30px;display:inline-grid;place-items:center;font-size:15px}
