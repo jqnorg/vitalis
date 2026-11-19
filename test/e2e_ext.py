@@ -330,15 +330,18 @@ async def main():
             ok(await F.locator('#ftd-agenda-overlay .card.social:has-text("campañas")').count() == 1, 'y aparece al pasar a otra pestaña')
             await Vo.close()
 
-            # una sola pestaña del CRM se actualiza: la que elegís; mientras exista, ninguna otra la reemplaza
+            # una sola pestaña del CRM se actualiza: la que elegís; mientras exista, ninguna otra la reemplaza (para un agente)
+            asAgent = "chrome.storage.local.get('desk').then(s=>chrome.storage.local.set({desk:{...(s.desk||{}),role:'agent'}}))"
+            await sw.evaluate(asAgent)
             Wp = await ctx.new_page()
             await Wp.goto('https://crmnovaramarkets.com/clients'); await Wp.wait_for_timeout(2500)
             Wp2 = await ctx.new_page()
             await Wp2.goto('https://crmnovaramarkets.com/clients?b'); await Wp2.wait_for_timeout(2500)
             wpn, wpn2 = Wp.locator('#ftd-crm-button'), Wp2.locator('#ftd-crm-button')
-            await wpn.locator('#wbtn').click(); await Wp.wait_for_timeout(1500)
+            await sw.evaluate(asAgent); await wpn.locator('#wbtn').click(); await Wp.wait_for_timeout(1500)
             t2 = await wpn2.locator('#wst').inner_text()
             ok('otra pestaña' in t2 and 'Ir a esa' in await wpn2.locator('#wbtn').inner_text(), f'la otra pestaña dice que ya se actualiza otra ({t2!r})')
+            await sw.evaluate(asAgent)
             ok((await sw.evaluate(f"chrome.tabs.query({{url:'https://crmnovaramarkets.com/clients?b'}}).then(([t])=>watchStart(t))")).get('busy'), 'y no se puede elegir mientras la primera exista')
             await Wp.evaluate('window.__clicks=0'); await Wp2.evaluate('window.__clicks=0')
             await F.bring_to_front(); await F.wait_for_timeout(22000)  # el clic en el botón cuenta como uso: la primera vuelta se saltea
@@ -351,6 +354,18 @@ async def main():
             await Wp.close(); await F.wait_for_timeout(1500)
             ok('Actualizar esta pestaña' in await wpn2.locator('#wbtn').inner_text(), 'al cerrar la elegida, la otra se puede elegir')
             await Wp2.close(); await F.wait_for_timeout(500)
+            # el team leader puede tener varias pestañas actualizándose (sin avisos de new)
+            desk0 = await sw.evaluate("chrome.storage.local.get('desk').then(s=>s.desk||null)")
+            await sw.evaluate("chrome.storage.local.get('desk').then(s=>chrome.storage.local.set({desk:{...(s.desk||{}),role:'leader'}}))")
+            L1 = await ctx.new_page(); await L1.goto('https://crmnovaramarkets.com/clients?l1'); await L1.wait_for_timeout(2500)
+            L2 = await ctx.new_page(); await L2.goto('https://crmnovaramarkets.com/clients?l2'); await L2.wait_for_timeout(2500)
+            await L1.locator('#ftd-crm-button #wbtn').click(); await L1.wait_for_timeout(1200)
+            ok('también' in await L2.locator('#ftd-crm-button #wbtn').inner_text(), 'team leader: la otra pestaña ofrece actualizarse también')
+            await L2.locator('#ftd-crm-button #wbtn').click(); await L2.wait_for_timeout(1200)
+            ws = await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.keys(s.watches||{}).length)")
+            ok(ws == 2 and '2 pestañas' in await L1.locator('#ftd-crm-button #wst').inner_text(), f'y quedan las dos actualizándose ({ws})')
+            await L1.close(); await L2.close(); await F.wait_for_timeout(800)
+            await sw.evaluate(f"chrome.storage.local.set({{desk:{json.dumps(desk0)}}})")
 
             # la extensión despierta a Vitalis en segundo plano para ponerse al día
             await A2.evaluate("window.__ticks=0;addEventListener('message',e=>{if(e.data&&e.data.type==='ftd-agenda-tick')window.__ticks++})")

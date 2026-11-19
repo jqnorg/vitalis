@@ -220,6 +220,8 @@
     watches = all || {}; watch = myTab != null ? watches[myTab] || null : null; watched = !!watch;
     owner = Object.values(watches).find((w) => w && w.tabId !== myTab) || null; // otra pestaña ya tiene la vigilancia
   }
+  const multiWatch = () => !!(desk && desk.role === 'leader'); // el team leader puede tener varias pestañas actualizándose
+  const nWatch = () => Object.keys(watches).length;
   function autoWatch(hasTable) { // si la elegida se queda sin tabla un rato (te fuiste a otra parte del CRM), se libera
     if (myTab == null || !watched) return;
     if (hasTable) { noTableSince = 0; return; }
@@ -228,9 +230,9 @@
   }
   async function watchBtn() {
     if (watched) { await send({ type: 'crm-watch-stop' }); return; }
-    if (owner) { await send({ type: 'crm-watch-go' }); return; }
+    if (owner && !multiWatch()) { await send({ type: 'crm-watch-go' }); return; }
     const r = await send({ type: 'crm-watch-start' });
-    if (r && r.busy) setMsg('Ya se actualiza otra pestaña del CRM.', 'warn', 6000);
+    if (r && r.busy) setMsg(r.max ? `Ya se actualizan ${r.max} pestañas: es el máximo.` : 'Ya se actualiza otra pestaña del CRM.', 'warn', 6000);
     else if (!r) setMsg('La extensión se actualizó: recargá la página.', 'err');
   }
   let lastInput = 0;
@@ -404,8 +406,11 @@
       if (clients && !sales) head.push(`${n} en new`);
       const tot = seen && seen.length ? ` · ${plural(seen.length, 'cliente')} a la vista` : '';
       if (watched) {
-        $('wst').innerHTML = `<span class="on">Esta pestaña se actualiza sola cada 10 s</span>${clients ? ' · ' + plural(n, 'cliente') + ' en new' : ''}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 8) : ''}`;
+        $('wst').innerHTML = `<span class="on">Esta pestaña se actualiza sola cada 10 s</span>${multiWatch() && nWatch() > 1 ? ` · ${nWatch()} pestañas en total` : ''}${clients ? ' · ' + plural(n, 'cliente') + ' en new' : ''}${watch && watch.lastRefresh ? ' · ' + new Date(watch.lastRefresh).toTimeString().slice(0, 8) : ''}`;
         b.textContent = 'Dejar de actualizar'; b.className = 'go alt';
+      } else if (owner && multiWatch()) {
+        $('wst').innerHTML = `Se ${nWatch() === 1 ? 'actualiza otra pestaña' : `actualizan ${nWatch()} pestañas`}. Esta suma clientes al registro${tot}.`;
+        b.textContent = 'Actualizar esta también'; b.className = 'go';
       } else if (owner) {
         $('wst').innerHTML = `Se actualiza otra pestaña${owner.title ? ` (${escH(String(owner.title).slice(0, 40))})` : ''}. Esta suma clientes al registro${tot}.`;
         b.textContent = 'Ir a esa pestaña'; b.className = 'go alt';

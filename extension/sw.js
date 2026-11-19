@@ -326,14 +326,18 @@ async function allW() { return (await chrome.storage.local.get('watches')).watch
 async function getW(tabId) { return (await allW())[tabId] || null; }
 async function setW(tabId, w) { const all = await allW(); if (w) all[tabId] = w; else delete all[tabId]; await chrome.storage.local.set({ watches: all }); }
 const isCrmUrl = async (url) => { try { const h = new URL(url).hostname, s = (await chrome.storage.local.get('crmSites')).crmSites || {}; return /(^|\.)crm(novaramarkets|trade24seven)\.com$/.test(h) || !!s[h]; } catch (e) { return false; } };
+// el team leader no gestiona clientes: puede tener varias pestañas actualizándose (para el registro, sin avisos de new)
+const deskRole = async () => (((await chrome.storage.local.get('desk')).desk) || {}).role || '';
+const MAX_WATCH = 8;
 async function watchStart(tab) {
-  const all = await allW();
-  for (const w of Object.values(all)) { // ya hay otra elegida (y sigue abierta en el CRM): no se puede elegir esta
+  const all = await allW(), multi = (await deskRole()) === 'leader';
+  for (const w of Object.values(all)) { // ya hay otra elegida (y sigue abierta en el CRM): no se puede elegir esta (salvo el team leader)
     if (!w || w.tabId === tab.id) continue;
     let t = null; try { t = await chrome.tabs.get(w.tabId); } catch (e) {}
-    if (t && await isCrmUrl(t.url)) return { busy: true, tabId: w.tabId, title: t.title || w.title || '' };
-    delete all[w.tabId];
+    if (!(t && await isCrmUrl(t.url))) { delete all[w.tabId]; continue; }
+    if (!multi) return { busy: true, tabId: w.tabId, title: t.title || w.title || '' };
   }
+  if (multi && !all[tab.id] && Object.keys(all).length >= MAX_WATCH) return { busy: true, max: MAX_WATCH };
   const old = all[tab.id];
   all[tab.id] = { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null };
   await chrome.storage.local.set({ watches: all });
@@ -342,8 +346,8 @@ async function watchStart(tab) {
   return { ok: true };
 }
 async function watchGo() { const w = Object.values(await allW())[0]; if (!w) return; try { const t = await chrome.tabs.get(w.tabId); await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); } catch (e) {} }
-async function watchPrune() { // de la versión anterior (todas las pestañas): queda solo la más reciente
-  const ws = Object.values(await allW()); if (ws.length <= 1) return;
+async function watchPrune() { // de la versión anterior (todas las pestañas): queda solo la más reciente (el team leader puede tener varias)
+  const ws = Object.values(await allW()); if (ws.length <= 1 || (await deskRole()) === 'leader') return;
   const keep = ws.sort((a, b) => (b.lastRefresh || b.since || 0) - (a.lastRefresh || a.since || 0))[0];
   await chrome.storage.local.set({ watches: { [keep.tabId]: keep } });
 }
@@ -398,6 +402,7 @@ async function crmClients(tabId, m) {
   for (const c of m.clients) { if (!seen[c.key]) { if (w.base) fresh.push(c); seen[c.key] = now; } }
   const keys = Object.keys(seen); if (keys.length > 3000) for (const k of keys.sort((a, b) => seen[a] - seen[b]).slice(0, keys.length - 3000)) delete seen[k];
   await setW(tabId, { ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 });
+  if ((await deskRole()) === 'leader') return { watched: true, fresh: 0 }; // el team leader no recibe avisos de new: los gestionan los agentes
   for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
   for (const c of fresh.slice(0, 5)) {
     await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
