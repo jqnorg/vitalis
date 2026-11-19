@@ -119,7 +119,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
+const VIEWS=['inicio','ahora','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: todas las secciones, en orden de importancia (los números siguen ese orden)
@@ -158,7 +158,8 @@ function status(){
   const lh=leads.filter(l=>l.date===te&&(isLeadUid(me)||leadOwner(l)===me)).length;$('#nbCl').textContent=lh||'';
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
-  if(crm.ok){const q=queueOf(tlView()?null:me);$('#nbAh').textContent=q.g1.length||''}
+  if(crm.ok){const q=queueOf(tlView()||isLeadUid(me)?null:me);$('#nbAh').textContent=q.g1.length||''}
+  {const f=typeof bkFallas==='function'&&bk.ok?bkFallas().length:0;$('#nbBk').textContent=f?'⚠ '+f:''}
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;

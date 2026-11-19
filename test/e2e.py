@@ -1,6 +1,6 @@
 # Prueba de punta a punta con Chrome headless contra la base de prueba (server.mjs).
 # Uso: cd test && python3 e2e.py   → capturas en test/shots/
-import asyncio, subprocess, time, json, urllib.request, pathlib, sys
+import asyncio, base64, subprocess, time, json, urllib.request, pathlib, sys
 from playwright.async_api import async_playwright
 PORT = 54410
 URL = f'http://localhost:{PORT}/'
@@ -71,7 +71,7 @@ async def main():
             ok(await A.evaluate('ready'), 'la sesión sigue al recargar')
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
-            order = ['inicio', 'ahora', 'equipo', 'filtros', 'ventas', 'clientes', 'agenda', 'tareas', 'chat', 'sueldo', 'turnos', 'social', 'snippets', 'config']
+            order = ['inicio', 'ahora', 'equipo', 'filtros', 'ventas', 'clientes', 'banking', 'agenda', 'tareas', 'chat', 'sueldo', 'turnos', 'social', 'snippets', 'config']
             ok(await A.evaluate("[...document.querySelectorAll('#nav [data-v]')].map(b=>b.dataset.v)") == order, 'el menú tiene todas las secciones separadas, en orden de importancia')
             ok(await A.locator('.subnav').count() == 0, 'sin pestañas arriba')
             for i, v in enumerate([x for x in order if x not in ('inicio', 'equipo')]):
@@ -662,6 +662,45 @@ async def main():
             await A.evaluate('auditCard(true)'); await A.wait_for_timeout(800)
             ok('exportó ventas' in await A.inner_text('#cfAudit'), 'exportar queda en el registro de accesos')
             await A.locator('#cfDatos').scroll_into_view_if_needed(); await A.screenshot(path=OUT / 'q6_calidad_datos.png')
+
+            # Banking: el admin carga procesador, métodos, foto y un banco; reporta una falla y al agente le llega urgente
+            PNG = base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==')
+            await A.evaluate("modals.slice().forEach(m=>m.close());go('banking')"); await A.wait_for_timeout(600)
+            await A.click('#bkTools [data-bk=proc]'); await A.wait_for_timeout(300)
+            await A.fill('#bpN', 'Kushki'); await A.check('.mbox [name=bpC][value="Chile"]')
+            for m in ['Tarjeta', 'Transferencia']:
+                await A.fill('#bpNew', m); await A.click('#bpAdd'); await A.wait_for_timeout(600)
+            await A.set_input_files('.mbox [data-bkfiles]', files=[{'name': 'paso.png', 'mimeType': 'image/png', 'buffer': PNG}])
+            await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1800)
+            ok(sql("select count(*)::int c from public.processor_methods pm join public.processors p on p.id=pm.processor_id where p.name='Kushki'")[0]['c'] == 2, 'banking: el admin carga un procesador con dos métodos')
+            ok(sql("select count(*)::int c from public.pay_files where ref_kind='processor'")[0]['c'] == 1, 'con su foto')
+            pid = sql("select id from public.processors where name='Kushki'")[0]['id']; tid = sql("select id from public.pay_methods where name='Transferencia'")[0]['id']
+            await A.click('#bkTools [data-bk=bank]'); await A.wait_for_timeout(300)
+            await A.fill('#bbN', 'Falabella'); await A.select_option('#bbC', 'Chile'); await A.fill('#bbS', 'Pedile que pague con tarjeta')
+            await A.click('.mbox [data-cadd=avoid]'); await A.select_option('#bbA .bk-combo [data-cm]', tid)
+            await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1500)
+            bq = sql("select country, steps, avoid_pm from public.banks where name='Falabella'")
+            ok(len(bq) == 1 and bq[0]['country'] == 'Chile' and 'tarjeta' in json.dumps(bq[0]['steps']) and tid in json.dumps(bq[0]['avoid_pm']), f'y el flujo de Falabella Chile: no transferencia ({bq})')
+            E = await newpage('E2'); await E.goto(URL); await E.wait_for_timeout(1200)
+            await E.click('.person:has-text("Elias Me")'); await E.keyboard.type('1357'); await E.wait_for_timeout(2500)
+            await E.evaluate("modals.slice().forEach(m=>m.close());go('inicio');bkLoad(true)"); await E.wait_for_timeout(800)
+            await A.click(f'#bkBody [data-bka=falla][data-id="{pid}"]'); await A.wait_for_timeout(300)
+            await A.check('.mbox [name=brW] >> nth=1'); await A.fill('#brN', 'rechaza todas'); await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1200)
+            ok(sql(f"select status from public.processor_methods where processor_id='{pid}' and status='falla'") != [], 'el admin reporta que falla un método')
+            await E.evaluate('bkLoad(true)'); await E.wait_for_timeout(900)
+            t = E.locator('#toasts .toast.alert:has-text("está fallando")')
+            ok(await t.count() == 1 and 'Kushki · Tarjeta' in await t.inner_text(), 'al agente le llega el aviso urgente de la falla')
+            ok(await E.is_visible('#iBank') and 'Kushki' in await E.inner_text('#iBank'), 'y la falla queda arriba del inicio')
+            await E.evaluate("go('banking')"); await E.wait_for_timeout(500)
+            ok(await E.locator('#bkTools button').count() == 0 and 'Falabella' in await E.inner_text('#bkBody'), 'el agente ve Banking sin poder editar')
+            await E.click('#bkBody [data-bka=bank]'); await E.wait_for_timeout(600)
+            ok('Transferencia' in await E.inner_text('.mbox') and 'tarjeta' in await E.inner_text('.mbox'), 'y abre el flujo recomendado del banco')
+            await E.screenshot(path=OUT / 'b2_banco_flujo.png'); await E.evaluate("modals.slice().forEach(m=>m.close())")
+            await A.wait_for_timeout(300); await A.screenshot(path=OUT / 'b1_banking.png', full_page=True)
+            await A.click(f'#bkBody .bk-fallas [data-bka=vuelve]'); await A.wait_for_timeout(300); await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1000)
+            await E.evaluate('bkLoad(true)'); await E.wait_for_timeout(900)
+            ok(await E.locator('#toasts .toast:has-text("volvió a andar")').count() == 1 and not await E.locator('#bkBody .bk-fallas').count(), 'cuando vuelve, aviso normal y sale de las fallas')
+            await E.close()
 
             M = await newpage('M', 390, 844)
             await M.goto(URL); await M.wait_for_timeout(1200)

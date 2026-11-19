@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 18, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 23, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -668,6 +668,42 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   r = await as(A, "select count(*)::int c from public.audit_log where action = 'exportó ventas'");
   ok(r.rows[0].c === 1, 'el admin lo ve');
   await as(B, 'delete from public.sales where id = $1', [sid]);
+}
+
+// ---------- banking ----------
+{
+  let q = await as(B, "insert into public.processors (name) values ('Proc agente') returning id");
+  ok(!!q.error, 'un agente no carga procesadores');
+  q = await as(C, "insert into public.processors (name, countries) values ('Kushki', '{Chile,Colombia}') returning id");
+  ok(!q.error, 'el team leader carga un procesador');
+  const pid = q.rows[0].id;
+  q = await as(A, "insert into public.pay_methods (name) values ('Transferencia'), ('Tarjeta') returning id, name");
+  ok(!q.error && q.rows.length === 2, 'el admin carga métodos');
+  const M = Object.fromEntries(q.rows.map((x) => [x.name, x.id]));
+  q = await as(A, 'insert into public.processor_methods (processor_id, method_id) values ($1, $2) returning 1', [pid, M.Tarjeta]);
+  ok(!q.error, 'y le asigna un método al procesador');
+  q = await as(B, 'select public.pay_report($1, null, true, $2) j', [pid, 'caído']);
+  ok(!!q.error, 'un agente no reporta fallas');
+  q = await as(A, 'select public.pay_report($1, $2, true, $3) j', [pid, M.Transferencia, 'no']);
+  ok(!!q.error && /METODO/.test(q.error), 'no se reporta un método que el procesador no tiene');
+  q = await as(A, 'select public.pay_report($1, $2, true, $3) j', [pid, M.Tarjeta, 'rechaza todas']);
+  ok(!q.error && q.rows[0].j.ok, 'el admin reporta que falla un método');
+  q = await as(C, 'select public.pay_report($1, null, true, null) j', [pid]);
+  q = await as(B, "select status, (select status from public.processor_methods where processor_id = p.id) ms, (select count(*)::int from public.pay_incidents) n, (select array_agg(kind order by created_at) from public.pay_incidents) k from public.processors p where id = $1", [pid]);
+  ok(q.rows[0].status === 'falla' && q.rows[0].ms === 'falla' && q.rows[0].n === 2, 'el agente ve el procesador y el método con falla, y las dos fallas en el historial');
+  await as(A, 'select public.pay_report($1, null, false, null) j', [pid]);
+  q = await as(B, 'select status, status_note from public.processors where id = $1', [pid]);
+  ok(q.rows[0].status === 'ok' && q.rows[0].status_note === null, 'volvió a andar');
+  q = await as(B, "insert into public.pay_incidents (team_id, processor_id, kind) values (public.my_team(), $1, 'falla')", [pid]);
+  ok(!!q.error, 'nadie escribe el historial a mano');
+  q = await as(C, `insert into public.banks (name, country, steps, use_pm, avoid_pm) values ('Falabella', 'Chile', '["Pagar con tarjeta"]', $1::jsonb, $2::jsonb) returning id`, [JSON.stringify([{ p: pid, m: M.Tarjeta }]), JSON.stringify([{ p: null, m: M.Transferencia }])]);
+  ok(!q.error, 'el team leader arma el flujo recomendado de un banco');
+  q = await as(B, "update public.banks set notes = 'x' returning 1");
+  ok(!!q.error || q.rows.length === 0, 'un agente no lo cambia');
+  q = await as(A, "insert into public.pay_files (ref_kind, ref_id, mime, data) values ('bank', $1, 'image/webp', 'AAAA') returning 1", [pid]);
+  ok(!q.error, 'fotos: el admin sube una');
+  q = await as(B, "insert into public.pay_files (ref_kind, ref_id, mime, data) values ('bank', $1, 'image/webp', 'AAAA') returning 1", [pid]);
+  ok(!!q.error, 'un agente no sube fotos');
 }
 
 // ---------- baja ----------

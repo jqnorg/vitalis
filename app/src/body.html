@@ -18,6 +18,7 @@
     <symbol id="i-agenda" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/></symbol>
     <symbol id="i-turnos" viewBox="0 0 24 24"><circle cx="12" cy="12.5" r="8.5"/><path d="M12 8v4.8l3 1.8M9.5 2.5h5"/></symbol>
     <symbol id="i-sueldo" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12.5" rx="3"/><circle cx="12" cy="12.25" r="2.6"/><path d="M6 9.5v.01M18 15v.01"/></symbol>
+    <symbol id="i-banking" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10.5h18M7 15h3"/></symbol>
     <symbol id="i-snippets" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3.5"/><path d="M13.8 8.2 10.2 15.8"/></symbol>
     <symbol id="i-mesa" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3"/><path d="M6.5 19.5a5.5 5.5 0 0 1 11 0"/><circle cx="5" cy="10.2" r="2.1"/><circle cx="19" cy="10.2" r="2.1"/><path d="M1.8 18a3.6 3.6 0 0 1 4.2-3.3M22.2 18a3.6 3.6 0 0 0-4.2-3.3"/></symbol>
     <symbol id="i-filtros" viewBox="0 0 24 24"><path d="M4 5h16l-6.2 7.4v5.4l-3.6 2V12.4z"/></symbol>
@@ -43,6 +44,7 @@
     <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>3</kbd></button>
     <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>4</kbd></button>
     <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>5</kbd></button>
+    <button type="button" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>B</kbd></button>
     <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>6</kbd></button>
     <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>T</kbd></button>
     <button type="button" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbCh"></span><kbd>7</kbd></button>
@@ -83,6 +85,7 @@
     <section class="hero" id="iHero" aria-label="Tu mes"></section>
     <div class="side-kpis" id="iKpis"></div>
   </div>
+  <section class="card bk-alert" id="iBank" aria-label="Fallas de pago" hidden></section>
   <section class="card ah-card" id="iAhora" aria-label="Ahora" hidden></section>
   <section class="card ms" id="iMesa" aria-label="La mesa"></section>
   <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
@@ -195,6 +198,12 @@
     <div class="frow" style="align-items:center;gap:14px"><input type="range" id="siR" min="0" max="50" step="1" style="flex:1;min-width:180px" aria-label="FTDs"><span class="step"><button type="button" id="siMinus" aria-label="menos">−</button><input type="number" id="siN" min="0" max="999" aria-label="FTDs"><button type="button" id="siPlus" aria-label="más">+</button></span><span class="chips" id="siChips"></span></div>
     <div class="grid2" style="margin:14px 0 0"><div id="siOut"></div><div id="siTbl"></div></div>
   </section>
+</section>
+
+<section class="view" id="v-banking" hidden>
+  <div class="vh"><div><h1>Banking</h1><p class="sub">Qué procesadores andan y cómo conviene pagar según el banco del cliente.</p></div><span class="grow"></span>
+    <div class="tools"><select id="bkPais" aria-label="País"></select><input id="bkQ" type="search" placeholder="Buscar banco, procesador o método" autocomplete="off" aria-label="Buscar"><span id="bkTools" class="tools"></span></div></div>
+  <div id="bkBody"></div>
 </section>
 
 <section class="view" id="v-snippets" hidden>

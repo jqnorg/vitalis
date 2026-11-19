@@ -1243,12 +1243,130 @@ revoke all on function public.crm_seen(jsonb), public.crm_map_status(text, text)
 grant execute on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) to authenticated;
 revoke execute on function public.crm_group(text, uuid), public.audit_sales() from public, anon, authenticated;
 
+-- ---------- banking: procesadores, sus métodos de pago y bancos con su flujo recomendado ----------
+-- los métodos se repiten entre procesadores (por eso van aparte); países vacíos = todos
+create table if not exists public.pay_methods (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  name       text not null check (length(btrim(name)) between 1 and 60),
+  sort       integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (team_id, name)
+);
+create table if not exists public.processors (
+  id          uuid primary key default gen_random_uuid(),
+  team_id     uuid not null default public.my_team() references public.teams(id),
+  name        text not null check (length(btrim(name)) between 1 and 60),
+  countries   text[] not null default '{}',
+  notes       text check (length(notes) <= 4000),
+  status      text not null default 'ok' check (status in ('ok', 'falla')),
+  status_note text check (length(status_note) <= 1000),
+  status_at   timestamptz,
+  status_by   uuid references public.profiles(id) on delete set null,
+  active      boolean not null default true,
+  sort        integer not null default 0,
+  updated_at  timestamptz not null default now(),
+  unique (team_id, name)
+);
+create table if not exists public.processor_methods (
+  processor_id uuid not null references public.processors(id) on delete cascade,
+  method_id    uuid not null references public.pay_methods(id) on delete cascade,
+  team_id      uuid not null default public.my_team() references public.teams(id),
+  countries    text[] not null default '{}', -- vacío: los del procesador
+  status       text not null default 'ok' check (status in ('ok', 'falla')),
+  status_note  text check (length(status_note) <= 1000),
+  status_at    timestamptz,
+  status_by    uuid references public.profiles(id) on delete set null,
+  primary key (processor_id, method_id)
+);
+create table if not exists public.banks (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  name       text not null check (length(btrim(name)) between 1 and 80),
+  country    text not null default '' check (length(country) <= 40),
+  steps      jsonb not null default '[]' check (jsonb_typeof(steps) = 'array' and jsonb_array_length(steps) <= 30),
+  use_pm     jsonb not null default '[]' check (jsonb_typeof(use_pm) = 'array' and jsonb_array_length(use_pm) <= 20),   -- [{p: procesador|null, m: método|null}] recomendado
+  avoid_pm   jsonb not null default '[]' check (jsonb_typeof(avoid_pm) = 'array' and jsonb_array_length(avoid_pm) <= 20), -- lo que no conviene
+  notes      text check (length(notes) <= 4000),
+  updated_at timestamptz not null default now(),
+  updated_by uuid references public.profiles(id) on delete set null,
+  unique (team_id, name, country)
+);
+-- cada falla o vuelta (avisa a toda la mesa en vivo); se escribe solo con pay_report()
+create table if not exists public.pay_incidents (
+  id           uuid primary key default gen_random_uuid(),
+  team_id      uuid not null references public.teams(id),
+  processor_id uuid not null references public.processors(id) on delete cascade,
+  method_id    uuid references public.pay_methods(id) on delete set null,
+  kind         text not null check (kind in ('falla', 'vuelve')),
+  note         text check (length(note) <= 1000),
+  created_by   uuid references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+create index if not exists pay_incidents_at on public.pay_incidents (team_id, created_at desc);
+-- fotos de procesadores, bancos y fallas (webp achicado por la app)
+create table if not exists public.pay_files (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  ref_kind   text not null check (ref_kind in ('processor', 'bank', 'incident')),
+  ref_id     uuid not null,
+  mime       text not null check (mime in ('image/webp', 'image/jpeg', 'image/png')),
+  data       text not null check (length(data) <= 1400000),
+  w          integer, h integer,
+  caption    text check (length(caption) <= 200),
+  created_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists pay_files_ref on public.pay_files (team_id, ref_kind, ref_id);
+
+create or replace function public.pay_editor() returns boolean language sql stable security definer set search_path = public
+  as $$ select coalesce(public.my_role(), '') in ('admin', 'leader') $$;
+-- reportar que un procesador (o uno de sus métodos) falla o volvió a andar
+create or replace function public.pay_report(pid uuid, mid uuid, falla boolean, note text default null) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); n text := nullif(left(btrim(coalesce(note, '')), 1000), ''); iid uuid;
+begin
+  if not public.pay_editor() then raise exception 'Solo el administrador o el team leader'; end if;
+  if not exists (select 1 from public.processors where id = pid and team_id = t) then raise exception 'PROC: no existe ese procesador'; end if;
+  if mid is null then
+    update public.processors set status = case when falla then 'falla' else 'ok' end, status_note = case when falla then n end, status_at = now(), status_by = auth.uid(), updated_at = now() where id = pid;
+  else
+    update public.processor_methods set status = case when falla then 'falla' else 'ok' end, status_note = case when falla then n end, status_at = now(), status_by = auth.uid() where processor_id = pid and method_id = mid;
+    if not found then raise exception 'METODO: ese procesador no tiene ese método'; end if;
+  end if;
+  insert into public.pay_incidents (team_id, processor_id, method_id, kind, note, created_by)
+  values (t, pid, mid, case when falla then 'falla' else 'vuelve' end, n, auth.uid()) returning id into iid;
+  return json_build_object('ok', true, 'id', iid);
+end $$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['pay_methods','processors','processor_methods','banks','pay_files'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || '_read', t);
+    execute format('create policy %I on public.%I for select to authenticated using (team_id = public.my_team())', t || '_read', t);
+    execute format('drop policy if exists %I on public.%I', t || '_write', t);
+    execute format('create policy %I on public.%I for all to authenticated using (team_id = public.my_team() and public.pay_editor()) with check (team_id = public.my_team() and public.pay_editor())', t || '_write', t);
+    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+    execute format('revoke all on public.%I from anon', t);
+  end loop;
+end $$;
+alter table public.pay_incidents enable row level security;
+drop policy if exists pay_incidents_read on public.pay_incidents;
+create policy pay_incidents_read on public.pay_incidents for select to authenticated using (team_id = public.my_team());
+grant select on public.pay_incidents to authenticated;
+revoke insert, update, delete, truncate on public.pay_incidents from authenticated;
+revoke all on public.pay_incidents from anon;
+revoke all on function public.pay_report(uuid, uuid, boolean, text), public.pay_editor() from public, anon;
+grant execute on function public.pay_report(uuid, uuid, boolean, text), public.pay_editor() to authenticated;
+
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','processor_methods','pay_incidents','banks','pay_methods'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

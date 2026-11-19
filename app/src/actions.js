@@ -546,6 +546,7 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
   if(d&&d.type==='ftd-agenda-tick'&&d.v===1){catchUp();return} // la extensión despierta a la pestaña: me pongo al día
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
@@ -655,6 +656,9 @@ function ayuda(){
   <h4>Clientes</h4><dl>
     <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
     <dt>Conversión</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
+  <h4>Banking</h4><dl>
+    <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
+    <dt>Bancos</dt><dd>Cómo conviene pagar según el banco del cliente: pasos, qué usar y qué evitar (por ejemplo, Falabella Chile: no transferencia). Lo cargan el administrador y el team leader, con fotos.</dd></dl>
   <h4>Snippets</h4><dl>
     <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página de Chrome (con la extensión) y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
     <dt>Clic derecho</dt><dd>Si en alguna página el /atajo no anda: clic derecho en el campo → <b>Snippets de Vitalis</b> → el que quieras.</dd>
@@ -744,6 +748,7 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='t'){e.preventDefault();go('tareas');return}
+  if(k==='b'){e.preventDefault();go('banking');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}

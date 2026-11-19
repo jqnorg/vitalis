@@ -476,6 +476,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     (async () => {
       await dismiss(msg.k);
       if (msg.k.startsWith('crm:')) { if (msg.a === 'crm') await focusCrm(); return; }
+      if (msg.k.startsWith('so:b:')) { // falla de pago: abrir Vitalis en Banking
+        if (msg.a === 'open') { await openPanel(); await sendCmd({ cmd: 'banking', k: msg.k.slice(5), at: Date.now() }); }
+        return;
+      }
       if (msg.k.startsWith('so:c:')) { // mensaje del chat: abrir Vitalis en ese chat
         if (msg.a === 'open') { await openPanel(); await sendCmd({ cmd: 'chat', k: msg.k.slice(5), at: Date.now() }); }
         return;
