@@ -1,6 +1,6 @@
 // Vitalis · puente entre la página de Vitalis y la extensión.
 // La página manda la agenda y los snippets (y recibe ventas, clientes new y todos los clientes vistos en el CRM) con window.postMessage en su misma ventana.
-(() => {
+(() => { // corre en vitalis.joaquin-or24.workers.dev (y en vitaliscrm.netlify.app mientras dure el cambio)
   const isVitalis = () => !!document.querySelector('meta[name="vitalis"]');
   const post = (msg) => { try { window.postMessage(msg, location.origin); return true; } catch (e) { return false; } };
   const deliver = (cmds) => { for (const c of cmds || []) post({ type: 'ftd-agenda-cmd', v: 1, cmd: c.cmd, k: c.k, r: c.r }); };

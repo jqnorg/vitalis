@@ -1,6 +1,6 @@
 # Vitalis
 
-Asistente de ventas de la mesa **Team Matías** · **https://vitaliscrm.netlify.app**: ventas (FTDs) y clientes new compartidos en la mesa, conversión del día, la semana y el mes, snippets con `/atajo`, un chat (toda la mesa, grupos y privados), una sección social (pedir un mate, salir a los 10 o a la media, perfiles con toques) y sueldo, agenda, turnos y faltas privados de cada agente. Viene con una extensión de Chrome para los avisos, el CRM y los snippets. Se llama así por Vitalis, excompañero de la mesa que siempre cebaba mates (de ahí el logo: un mate torpedo de cuero).
+Asistente de ventas de la mesa **Team Matías** · **https://vitalis.joaquin-or24.workers.dev**: ventas (FTDs) y clientes new compartidos en la mesa, conversión del día, la semana y el mes, snippets con `/atajo`, un chat (toda la mesa, grupos y privados), una sección social (pedir un mate, salir a los 10 o a la media, perfiles con toques) y sueldo, agenda, turnos y faltas privados de cada agente. Viene con una extensión de Chrome para los avisos, el CRM y los snippets. Se llama así por Vitalis, excompañero de la mesa que siempre cebaba mates (de ahí el logo: un mate torpedo de cuero).
 
 ## Cómo está armado
 

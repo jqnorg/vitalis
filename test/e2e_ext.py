@@ -5,7 +5,7 @@ import asyncio, subprocess, time, json, urllib.request, pathlib, sys, tempfile
 from playwright.async_api import async_playwright
 PORT = 54420
 LOCAL = f'http://localhost:{PORT}'
-APP = 'https://vitaliscrm.netlify.app/'
+APP = 'https://vitalis.joaquin-or24.workers.dev/'
 API = 'https://mock.supabase.test'
 EXT = str((pathlib.Path(__file__).parent.parent / 'extension').resolve())
 OUT = pathlib.Path(__file__).parent / 'shots'; OUT.mkdir(exist_ok=True)
