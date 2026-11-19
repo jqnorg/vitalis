@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.13.0';
+const VERSION='1.13.2';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -389,8 +389,11 @@ function enter(){
 /* ---------- conversión: FTDs / clientes new ---------- */
 function weekStart(d){const x=parseYMD(d);return addDays(d,-((x.getDay()+6)%7))}
 function convPeriod(from,to,uid){ // uid: me | null (toda la mesa) | otro
-  const inR=x=>x.date>=from&&x.date<=to,own=x=>uid==null||x.uid===uid;
-  const L=leads.filter(x=>inR(x)&&own(x)),F=team.filter(x=>inR(x)&&own(x));
+  if(typeof cohortCovers==='function'&&cohortCovers(from,to)){ // con el registro del CRM: los registrados del período, del primero que los llamó
+    const c=cohort(from,to,uid);return {leads:c.n,ftd:c.nw,rate:c.rate,conv:c.nw+c.lt,convRate:c.n?(c.nw+c.lt)/c.n:null};
+  }
+  const inR=x=>x.date>=from&&x.date<=to,own=x=>uid==null||x.uid===uid,ownL=x=>uid==null||(typeof leadOwner==='function'?leadOwner(x):x.uid)===uid;
+  const L=leads.filter(x=>inR(x)&&ownL(x)),F=team.filter(x=>inR(x)&&own(x));
   const sold=new Set(team.filter(own).map(f=>norm(f.id)));
   const conv=L.filter(l=>sold.has(norm(l.id))).length; // de los clientes del período, cuántos ya depositaron
   return {leads:L.length,ftd:F.length,rate:L.length?F.length/L.length:null,conv,convRate:L.length?conv/L.length:null};

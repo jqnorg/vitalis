@@ -151,7 +151,7 @@ function fichaModal(uid,tab='mes'){
         const end=x.out||(x.date===te?Date.now():null),br=x.breaks||[],bm=br.reduce((a,b)=>a+((b.e||end||b.s)-b.s),0);
         return `<tr><td>${esc(DIA[parseYMD(x.date).getDay()])} ${dm(x.date)}</td><td>${hhmm(x.in)}</td><td>${x.out?hhmm(x.out):x.date===te?'<span class="ok">en turno</span>':'—'}</td><td class="r">${end?esc(durS(end-x.in)):'—'}</td><td class="r">${br.length?`${br.length} · ${esc(dur(bm))}`:'—'}</td></tr>`}).join('')}</tbody></table>`:'<div class="p-empty">Sin turnos marcados este mes.</div>');
     }else if(t==='clientes'){
-      const C=leads.filter(l=>l.uid===uid&&l.date.slice(0,7)===ym).sort((a,b)=>a.date<b.date?1:-1),hoy=C.filter(l=>l.date===te).length,cv=convPeriod(te,te,uid);
+      const C=leads.filter(l=>leadOwner(l)===uid&&l.date.slice(0,7)===ym).sort((a,b)=>a.date<b.date?1:-1),hoy=C.filter(l=>l.date===te).length,cv=convPeriod(te,te,uid);
       el.innerHTML=`<p class="p-sub">${plural(C.length,'cliente new','clientes new')} este mes · ${hoy} hoy${cv.rate!=null?` · conversión de hoy ${pct(cv.rate)}`:''}</p>`+
         (C.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th></tr></thead><tbody>${C.slice(0,80).map(l=>`<tr><td>${dm(l.date)}</td><td><b>${esc(l.id)}</b></td><td>${esc(l.name)}</td><td>${esc(l.country)}</td></tr>`).join('')}</tbody></table>`:'<div class="p-empty">Sin clientes new este mes.</div>');
     }else if(t==='tareas'){

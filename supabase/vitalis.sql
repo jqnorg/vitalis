@@ -1015,6 +1015,9 @@ alter table public.crm_clients add column if not exists last_call text; -- "Last
 alter table public.crm_clients add column if not exists note text;      -- "Last Note" del CRM
 alter table public.crm_clients add column if not exists ftd_at text;    -- "Time of FTD" del CRM (AAAA-MM-DD HH:MM): ya depositó
 alter table public.crm_clients add column if not exists desk text;      -- "Sales Desk" del CRM
+-- el primero que lo llamó (el Sales Rep cuando se lo vio contactado por primera vez): a ese le suma la conversión del new
+alter table public.crm_clients add column if not exists first_agent text;
+alter table public.crm_clients add column if not exists first_call_at timestamptz;
 create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
   id         bigserial primary key,
   team_id    uuid not null references public.teams(id),
@@ -1086,7 +1089,7 @@ create or replace function public.crm_seen(rows jsonb) returns json
   language plpgsql security definer set search_path = public as $$
 declare
   t uuid := public.my_team();
-  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; fa text; ag text; cur record;
+  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; fa text; ag text; hit boolean; cur record;
   n_new integer := 0; n_chg integer := 0; fresh text[] := '{}';
 begin
   if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
@@ -1106,11 +1109,12 @@ begin
     if fa is not null and (fa !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(fa, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then fa := null; end if;
     ag := public._clip(r->>'agent', 80);
     g := public.crm_group(st, t);
+    hit := public.crm_key(st) = 'talking' or (st is not null and g <> 'new') or lc is not null; -- ya lo contactaron
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
     if not found then
-      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_seen_by, last_seen_by)
+      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_agent, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
-              ag, public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), lc, nt, fa, public._clip(r->>'desk', 80), auth.uid(), auth.uid())
+              ag, public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), lc, nt, fa, public._clip(r->>'desk', 80), case when hit then ag end, auth.uid(), auth.uid())
       on conflict do nothing;
       if st is not null then
         insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, null, st, g, auth.uid());
@@ -1129,6 +1133,8 @@ begin
         note = coalesce(nt, note),
         ftd_at = coalesce(fa, ftd_at),
         desk = coalesce(public._clip(r->>'desk', 80), desk),
+        first_agent = case when first_agent is null and hit then coalesce(ag, cur.crm_agent) else first_agent end,
+        first_call_at = case when first_agent is null and hit and coalesce(ag, cur.crm_agent) is not null then now() else first_call_at end,
         status = coalesce(st, status),
         status_group = case when st is null then status_group else g end,
         status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
@@ -1150,6 +1156,10 @@ end $$;
 -- los que quedaron en "otro" con una versión vieja de crm_group (p. ej. NA - DAY3) pasan a su grupo
 update public.crm_clients c set status_group = public.crm_group(c.status, c.team_id)
   where c.status is not null and c.status_group is distinct from public.crm_group(c.status, c.team_id);
+-- los ya contactados sin primer agente: si lo rotaron estando contactado, lo llamó el de antes; si no, el actual
+update public.crm_clients c set first_agent = coalesce((select case when public.crm_group(l.status, c.team_id) = 'new' and public.crm_key(l.status) <> 'talking' then null else l.old_agent end
+    from public.crm_agent_log l where l.team_id = c.team_id and l.brand = c.brand and l.client_id = c.client_id order by l.seen_at limit 1), c.crm_agent)
+  where c.first_agent is null and (c.status_group <> 'new' or public.crm_key(c.status) = 'talking' or c.last_call is not null);
 
 create or replace function public.crm_map_status(st text, grp text) returns json
   language plpgsql security definer set search_path = public as $$

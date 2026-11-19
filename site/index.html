@@ -931,6 +931,8 @@ body.dark .ah-n{color:var(--pri-h)}
 .fi-log{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:12.5px}
 .dq-st .frow{margin:4px 0;align-items:center}
 @media (max-width:640px){.ah-t th:nth-child(5),.ah-t td:nth-child(5),.ah-t th:nth-child(7),.ah-t td:nth-child(7){display:none}}
+
+.ag-mesa{margin:18px 0 6px;font-size:15px}
 </style>
 </head>
 <body>
@@ -1261,7 +1263,7 @@ body.dark .ah-n{color:var(--pri-h)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.13.0';
+const VERSION='1.13.2';
 const EXT_VER='1.7.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1647,8 +1649,11 @@ function enter(){
 /* ---------- conversión: FTDs / clientes new ---------- */
 function weekStart(d){const x=parseYMD(d);return addDays(d,-((x.getDay()+6)%7))}
 function convPeriod(from,to,uid){ // uid: me | null (toda la mesa) | otro
-  const inR=x=>x.date>=from&&x.date<=to,own=x=>uid==null||x.uid===uid;
-  const L=leads.filter(x=>inR(x)&&own(x)),F=team.filter(x=>inR(x)&&own(x));
+  if(typeof cohortCovers==='function'&&cohortCovers(from,to)){ // con el registro del CRM: los registrados del período, del primero que los llamó
+    const c=cohort(from,to,uid);return {leads:c.n,ftd:c.nw,rate:c.rate,conv:c.nw+c.lt,convRate:c.n?(c.nw+c.lt)/c.n:null};
+  }
+  const inR=x=>x.date>=from&&x.date<=to,own=x=>uid==null||x.uid===uid,ownL=x=>uid==null||(typeof leadOwner==='function'?leadOwner(x):x.uid)===uid;
+  const L=leads.filter(x=>inR(x)&&ownL(x)),F=team.filter(x=>inR(x)&&own(x));
   const sold=new Set(team.filter(own).map(f=>norm(f.id)));
   const conv=L.filter(l=>sold.has(norm(l.id))).length; // de los clientes del período, cuántos ya depositaron
   return {leads:L.length,ftd:F.length,rate:L.length?F.length/L.length:null,conv,convRate:L.length?conv/L.length:null};
@@ -2109,7 +2114,7 @@ function status(){
   const open=pend.filter(p=>!p.done),venc=open.filter(p=>parseDue(p.due)<=now).length,hoy=open.filter(p=>p.due.slice(0,10)===te).length;
   $('#sPend').innerHTML=`Agenda <b>${hoy}</b>`+(venc?` <span class="hot b">${plural(venc,'vencido')}</span>`:'');
   $('#nbAg').textContent=venc||'';
-  const lh=leads.filter(l=>l.uid===me&&l.date===te).length;$('#nbCl').textContent=lh||'';
+  const lh=leads.filter(l=>l.date===te&&(isLeadUid(me)||leadOwner(l)===me)).length;$('#nbCl').textContent=lh||'';
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const q=queueOf(tlView()?null:me);$('#nbAh').textContent=q.g1.length||''}
@@ -3155,6 +3160,15 @@ V.ventas.dias=function(list){
 
 /* ---------- agenda ---------- */
 let agAllDone=false;
+// el team leader ve las agendas de toda la mesa (solo lectura; cada uno maneja las suyas)
+function agMesaHTML(now,te){
+  if(!isLeader())return '';
+  const open=teamAg.filter(p=>!p.done&&p.uid!==me).sort(byDue);if(!open.length)return '';
+  const it=p=>`<div class="ai"><span class="wh">${esc(whenTxt(parseDue(p.due)))}</span><span class="id">${esc(p.id)}</span><span class="kw">${esc(p.kw)}<small>${esc(memberName(p.uid))}</small></span><span></span></div>`;
+  const venc=open.filter(p=>parseDue(p.due)<now),hoy=open.filter(p=>parseDue(p.due)>=now&&p.due.slice(0,10)===te),prox=open.filter(p=>p.due.slice(0,10)>te);
+  const g=(t,l,c='')=>l.length?`<div class="grp"><h4 class="${c}">${t} (${l.length})</h4><div class="alist">${l.slice(0,80).map(it).join('')}</div></div>`:'';
+  return `<h3 class="ag-mesa">Agendas de la mesa</h3>`+g('Vencidas',venc,'warn')+g('Hoy',hoy)+g('Próximas',prox);
+}
 V.agenda={
   build(){bindAgForm($('#agForm'))},
   render(){
@@ -3165,7 +3179,7 @@ V.agenda={
     const grp=(t,list,cls='')=>list.length?`<div class="grp"><h4 class="${cls}">${t} (${list.length})</h4><div class="alist">${list.map(p=>pendItem(p,now)).join('')}</div></div>`:'';
     const shown=agAllDone?done:done.slice(0,10);
     $('#agLists').innerHTML=(open.length?'':'<div class="p-empty">Nada pendiente. Buen momento para un mate.</div>')+grp('Vencidos',venc,'warn')+grp('Hoy',hoy)+grp('Próximos',prox)+
-      (done.length?`<div class="grp"><h4>Hechos (${done.length})</h4><div class="alist">${shown.map(p=>pendItem(p,now)).join('')}</div>${done.length>10?`<button type="button" class="btn sm rk-more" id="agMore">${agAllDone?'Ver menos':'Ver todos'}</button>`:''}</div>`:'');
+      (done.length?`<div class="grp"><h4>Hechos (${done.length})</h4><div class="alist">${shown.map(p=>pendItem(p,now)).join('')}</div>${done.length>10?`<button type="button" class="btn sm rk-more" id="agMore">${agAllDone?'Ver menos':'Ver todos'}</button>`:''}</div>`:'')+agMesaHTML(now,te);
     const mb=$('#agMore');if(mb)mb.onclick=()=>{agAllDone=!agAllDone;this.render({})};
   },
 };
@@ -3596,9 +3610,10 @@ V.clientes={
     $$('[data-clp]',$('#clPer')).forEach(b=>b.classList.toggle('on',b.dataset.clp===clPer));
     const sel=$('#clWho');
     if(sel!==document.activeElement){
-      const ms=members.filter(m=>m.id!==me&&(m.active||leads.some(l=>l.uid===m.id)));
-      sel.innerHTML=`<option value="me">Mis clientes</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
-      if(![...sel.options].some(o=>o.value===clWho))clWho='me';sel.value=clWho;
+      const ms=members.filter(m=>m.id!==me&&!isLeadUid(m.id)&&(m.active||leads.some(l=>leadOwner(l)===m.id)));
+      if(isLeadUid(me)&&clWho==='me')clWho='all'; // el team leader no tiene clientes propios: ve los de la mesa
+      sel.innerHTML=(isLeadUid(me)?'':`<option value="me">Mis clientes</option>`)+`<option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+      if(![...sel.options].some(o=>o.value===clWho))clWho=isLeadUid(me)?'all':'me';sel.value=clWho;
     }
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
@@ -3607,7 +3622,7 @@ V.clientes={
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;
     // gráfico: últimos 30 días
-    const start=addDays(te,-29),own=l=>uid==null||l.uid===uid,data=[];
+    const start=addDays(te,-29),own=l=>uid==null||leadOwner(l)===uid,data=[];
     for(let i=0;i<30;i++){const d=addDays(start,i),L=leads.filter(l=>l.date===d&&own(l)),paid=L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
       data.push({lab:String(+d.slice(8)),a:paid,b:L.length-paid,d,dw,ftd:team.filter(f=>f.date===d&&own(f)).length,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
     $('#clChartSub').textContent='Últimos 30 días';
@@ -4814,7 +4829,7 @@ function fichaModal(uid,tab='mes'){
         const end=x.out||(x.date===te?Date.now():null),br=x.breaks||[],bm=br.reduce((a,b)=>a+((b.e||end||b.s)-b.s),0);
         return `<tr><td>${esc(DIA[parseYMD(x.date).getDay()])} ${dm(x.date)}</td><td>${hhmm(x.in)}</td><td>${x.out?hhmm(x.out):x.date===te?'<span class="ok">en turno</span>':'—'}</td><td class="r">${end?esc(durS(end-x.in)):'—'}</td><td class="r">${br.length?`${br.length} · ${esc(dur(bm))}`:'—'}</td></tr>`}).join('')}</tbody></table>`:'<div class="p-empty">Sin turnos marcados este mes.</div>');
     }else if(t==='clientes'){
-      const C=leads.filter(l=>l.uid===uid&&l.date.slice(0,7)===ym).sort((a,b)=>a.date<b.date?1:-1),hoy=C.filter(l=>l.date===te).length,cv=convPeriod(te,te,uid);
+      const C=leads.filter(l=>leadOwner(l)===uid&&l.date.slice(0,7)===ym).sort((a,b)=>a.date<b.date?1:-1),hoy=C.filter(l=>l.date===te).length,cv=convPeriod(te,te,uid);
       el.innerHTML=`<p class="p-sub">${plural(C.length,'cliente new','clientes new')} este mes · ${hoy} hoy${cv.rate!=null?` · conversión de hoy ${pct(cv.rate)}`:''}</p>`+
         (C.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th></tr></thead><tbody>${C.slice(0,80).map(l=>`<tr><td>${dm(l.date)}</td><td><b>${esc(l.id)}</b></td><td>${esc(l.name)}</td><td>${esc(l.country)}</td></tr>`).join('')}</tbody></table>`:'<div class="p-empty">Sin clientes new este mes.</div>');
     }else if(t==='tareas'){
@@ -4928,12 +4943,18 @@ const G3=['call_again','hang_up','na'],G2=['callback','pending'],DAYS5=['callbac
 let crm={ok:null,rows:new Map(),at:0,busy:null,rot:[]};
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
 const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:r.status||'',grp:r.status_group||'otro',agent:r.crm_agent||'',
-  camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
+  camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',firstAgent:r.first_agent||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
 const crmAll=()=>[...crm.rows.values()];
 const regDay=r=>r.reg?r.reg.slice(0,10):(r.first?ymd(new Date(r.first)):'');
 const callAt=r=>r.call?parseDue(r.call.slice(0,10)+'T'+r.call.slice(11,16)):null; // "Last Communication Time" del CRM
 const regAt=r=>r.reg?(r.reg.length>10?parseDue(r.reg.slice(0,10)+'T'+r.reg.slice(11,16)):parseYMD(r.reg)):(r.first?new Date(r.first):null);
-function crmOwner(r){if(r.agent){const u=agentUid(r.agent);if(u)return u}return r.firstBy||null} // el agente del CRM; si no hay columna, quien lo vio primero
+// el team leader no tiene clientes: no llama ni gestiona; su pool es el de toda la mesa
+const notLead=u=>u&&!isLeadUid(u)?u:null;
+function crmOwner(r){if(r.agent)return notLead(agentUid(r.agent));return notLead(r.firstBy)} // el agente del CRM; si no hay columna, quien lo vio primero
+// la conversión del new es del primero que lo llamó (si lo rotaron antes de llamarlo, del que lo llamó); sin llamar todavía, del agente actual
+function convOwner(r){if(r.firstAgent)return notLead(agentUid(r.firstAgent));return crmOwner(r)}
+// de quién es un cliente del registro de new: el del CRM si se lo vio; si no, quien lo anotó (nunca el team leader)
+function leadOwner(l){const r=crmStatusOf(l.id);if(r&&(r.agent||r.firstAgent))return convOwner(r);return notLead(l.uid)}
 function soldIdx(){const m=new Map();for(const f of [...team].sort(byDate)){const k=ckey(f.brand,f.id);if(!m.has(k))m.set(k,f)}return m} // la primera venta de cada cliente
 function soldOf(id,brand){const k=norm(id);let best=null;for(const f of team)if(norm(f.id)===k&&(!brand||norm(f.brand)===norm(brand))&&(!best||byDate(f,best)<0))best=f;return best}
 function crmStatusOf(id){const k=norm(id);let r=crm.rows.get(ckey(DEF_BRAND,id));if(r)return r;for(const x of crm.rows.values())if(norm(x.id)===k&&!isArch(x.brand))return x;return null}
@@ -5054,12 +5075,12 @@ V.ahora={
   },
   render(){
     crmLoad();
-    if(!ahWho)ahWho=tlView()?'all':'me';
+    if(!ahWho||(ahWho==='me'&&isLeadUid(me)))ahWho=tlView()||isLeadUid(me)?'all':'me';
     const sel=$('#ahWho');
     if(sel!==document.activeElement){
       const ms=isLeader()?members.filter(m=>m.active&&m.id!==me):[];
-      sel.innerHTML=`<option value="me">Mis clientes</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
-      if(![...sel.options].some(o=>o.value===ahWho))ahWho='me';sel.value=ahWho;
+      sel.innerHTML=(isLeadUid(me)?'':`<option value="me">Mis clientes</option>`)+`<option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+      if(![...sel.options].some(o=>o.value===ahWho))ahWho=isLeadUid(me)?'all':'me';sel.value=ahWho;
     }
     const uid=ahWho==='me'?me:ahWho==='all'?null:ahWho,who=uid!==me;
     if(crm.ok===false){$('#ahSub').textContent='';$('#ahBody').innerHTML='<section class="card"><div class="p-empty">La cola se activa en un rato (falta actualizar la base).</div></section>';return}
@@ -5097,7 +5118,7 @@ async function dncBlock(id){
 // lo de ahora, en el inicio (para el team leader, la mesa)
 function ahoraCard(){
   if(crm.ok===false)return '';
-  const q=queueOf(tlView()?null:me),te=todayS();
+  const q=queueOf(tlView()||isLeadUid(me)?null:me),te=todayS();
   const top=[...q.g1.slice(0,3).map(r=>({t:'new',r})),...q.ag.slice(0,2).map(p=>({t:'ag',p})),...q.g3.slice(0,3).map(r=>({t:'g3',r}))].slice(0,6);
   const li=x=>x.t==='ag'?`<div class="li"><span class="t">${esc(whenTxt(parseDue(x.p.due)))}</span><span class="n"><b>${esc(x.p.id)}</b> ${esc(x.p.kw)}<small>agenda</small></span><span></span><span></span><span></span></div>`
     :`<div class="li"><span class="t">${regAt(x.r)?esc(rel(regAt(x.r))):''}</span><span class="n"><button type="button" class="lnkp" data-act="fichaCl" data-id="${esc(x.r.id)}"><b>${esc(x.r.id)}</b></button> ${esc(x.r.name)}<small>${esc(x.r.country)}${x.r.camp?' · '+esc(x.r.camp):''}</small></span><span></span><span>${stBadge(x.r)}</span><span></span></div>`;
@@ -5107,11 +5128,12 @@ function ahoraCard(){
 
 /* ---------- conversión por día de registro (new = depositó el mismo día; late = después) ---------- */
 function cohort(from,to,uid){
-  const S=soldIdx(),own=r=>uid==null||crmOwner(r)===uid;
+  const S=soldIdx(),own=r=>uid==null||convOwner(r)===uid;
   const rows=crmAll().filter(r=>!isArch(r.brand)&&own(r)&&(()=>{const d=regDay(r);return d>=from&&d<=to})());
   let nw=0,lt=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){if(isLate(f))lt++;else nw++}else if(paidCrm(r)&&r.ftd){if(r.ftd.slice(0,10)!==regDay(r))lt++;else nw++}}
   return {n:rows.length,nw,lt,rate:rows.length?nw/rows.length:null,lrate:rows.length?lt/rows.length:null};
 }
+const cohortCovers=(from,to)=>crm.ok&&crmAll().some(r=>!isArch(r.brand)&&(()=>{const d=regDay(r);return d>=from&&d<=to})());
 function cohortOn(){const te=todayS();return crm.ok&&crmAll().some(r=>!isArch(r.brand)&&regDay(r)>=te.slice(0,8)+'01')}
 function convCardsX(uid){ // con el registro del CRM: conversión de verdad; sin él, la cuenta vieja
   if(!cohortOn())return convCards(uid);
@@ -5173,7 +5195,7 @@ async function openFicha(id,o={}){
       <div class="fi-c"><h4>Cliente</h4>
         ${rw2('Status',r?`${esc(r.status||'—')}${r.since?` <span class="d">desde ${esc(rel(new Date(r.since)))}</span>`:''}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
-        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Desk',r&&r.desk?esc(r.desk):'')}${rw2('Marca',r?esc(r.brand):'')}
+        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}${rw2('Desk',r&&r.desk?esc(r.desk):'')}${rw2('Marca',r?esc(r.brand):'')}
         ${rw2('Lo vio primero',r&&r.firstBy?`${esc(first(r.firstBy))}, ${esc(rel(new Date(r.first)))}`:'')}
         ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}

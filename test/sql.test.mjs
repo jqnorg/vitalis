@@ -636,6 +636,12 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(r.rows[0].crm_agent === 'beto dos' && r.rows[0].ftd_at === '2026-11-19 10:15' && r.rows[0].desk === 'Team Matías', 'guarda el agente actual, la hora del FTD y el desk');
   r = await as(B, "select old_agent, new_agent, status from public.crm_agent_log where client_id = 'R1'");
   ok(r.rows.length === 1 && r.rows[0].old_agent === 'Ana Uno' && r.rows[0].new_agent === 'Beto Dos' && r.rows[0].status === 'Call Again', 'una rotación queda anotada una vez (mayúsculas no cuentan)');
+  // la conversión del new es del primero que lo llamó: si lo rotan antes de llamarlo, del que lo llama
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'F1', status: 'New', agent: 'Ana Uno' }, { id: 'F2', status: 'New', agent: 'Ana Uno' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'F1', status: 'New', agent: 'Beto Dos' }, { id: 'F2', status: 'Talking', agent: 'Ana Uno' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'F1', status: 'No Answer', agent: 'Beto Dos' }, { id: 'F2', status: 'No Answer', agent: 'Beto Dos' }])]);
+  r = await as(B, "select client_id, first_agent, first_call_at is not null t from public.crm_clients where client_id in ('F1','F2') order by client_id");
+  ok(r.rows[0].first_agent === 'Beto Dos' && r.rows[1].first_agent === 'Ana Uno' && r.rows[0].t && r.rows[1].t, 'primer agente: rotado antes de llamarlo → el que llamó; llamado y después rotado → el primero');
   r = await as(B, "insert into public.crm_agent_log (team_id, brand, client_id) values (public.my_team(), 'x', 'y')");
   ok(!!r.error, 'nadie escribe las rotaciones a mano');
   R = await rpc(B, 'select public.set_queue_cap(40) j');

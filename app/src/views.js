@@ -263,6 +263,15 @@ V.ventas.dias=function(list){
 
 /* ---------- agenda ---------- */
 let agAllDone=false;
+// el team leader ve las agendas de toda la mesa (solo lectura; cada uno maneja las suyas)
+function agMesaHTML(now,te){
+  if(!isLeader())return '';
+  const open=teamAg.filter(p=>!p.done&&p.uid!==me).sort(byDue);if(!open.length)return '';
+  const it=p=>`<div class="ai"><span class="wh">${esc(whenTxt(parseDue(p.due)))}</span><span class="id">${esc(p.id)}</span><span class="kw">${esc(p.kw)}<small>${esc(memberName(p.uid))}</small></span><span></span></div>`;
+  const venc=open.filter(p=>parseDue(p.due)<now),hoy=open.filter(p=>parseDue(p.due)>=now&&p.due.slice(0,10)===te),prox=open.filter(p=>p.due.slice(0,10)>te);
+  const g=(t,l,c='')=>l.length?`<div class="grp"><h4 class="${c}">${t} (${l.length})</h4><div class="alist">${l.slice(0,80).map(it).join('')}</div></div>`:'';
+  return `<h3 class="ag-mesa">Agendas de la mesa</h3>`+g('Vencidas',venc,'warn')+g('Hoy',hoy)+g('Próximas',prox);
+}
 V.agenda={
   build(){bindAgForm($('#agForm'))},
   render(){
@@ -273,7 +282,7 @@ V.agenda={
     const grp=(t,list,cls='')=>list.length?`<div class="grp"><h4 class="${cls}">${t} (${list.length})</h4><div class="alist">${list.map(p=>pendItem(p,now)).join('')}</div></div>`:'';
     const shown=agAllDone?done:done.slice(0,10);
     $('#agLists').innerHTML=(open.length?'':'<div class="p-empty">Nada pendiente. Buen momento para un mate.</div>')+grp('Vencidos',venc,'warn')+grp('Hoy',hoy)+grp('Próximos',prox)+
-      (done.length?`<div class="grp"><h4>Hechos (${done.length})</h4><div class="alist">${shown.map(p=>pendItem(p,now)).join('')}</div>${done.length>10?`<button type="button" class="btn sm rk-more" id="agMore">${agAllDone?'Ver menos':'Ver todos'}</button>`:''}</div>`:'');
+      (done.length?`<div class="grp"><h4>Hechos (${done.length})</h4><div class="alist">${shown.map(p=>pendItem(p,now)).join('')}</div>${done.length>10?`<button type="button" class="btn sm rk-more" id="agMore">${agAllDone?'Ver menos':'Ver todos'}</button>`:''}</div>`:'')+agMesaHTML(now,te);
     const mb=$('#agMore');if(mb)mb.onclick=()=>{agAllDone=!agAllDone;this.render({})};
   },
 };
@@ -704,9 +713,10 @@ V.clientes={
     $$('[data-clp]',$('#clPer')).forEach(b=>b.classList.toggle('on',b.dataset.clp===clPer));
     const sel=$('#clWho');
     if(sel!==document.activeElement){
-      const ms=members.filter(m=>m.id!==me&&(m.active||leads.some(l=>l.uid===m.id)));
-      sel.innerHTML=`<option value="me">Mis clientes</option><option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
-      if(![...sel.options].some(o=>o.value===clWho))clWho='me';sel.value=clWho;
+      const ms=members.filter(m=>m.id!==me&&!isLeadUid(m.id)&&(m.active||leads.some(l=>leadOwner(l)===m.id)));
+      if(isLeadUid(me)&&clWho==='me')clWho='all'; // el team leader no tiene clientes propios: ve los de la mesa
+      sel.innerHTML=(isLeadUid(me)?'':`<option value="me">Mis clientes</option>`)+`<option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
+      if(![...sel.options].some(o=>o.value===clWho))clWho=isLeadUid(me)?'all':'me';sel.value=clWho;
     }
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
@@ -715,7 +725,7 @@ V.clientes={
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;
     // gráfico: últimos 30 días
-    const start=addDays(te,-29),own=l=>uid==null||l.uid===uid,data=[];
+    const start=addDays(te,-29),own=l=>uid==null||leadOwner(l)===uid,data=[];
     for(let i=0;i<30;i++){const d=addDays(start,i),L=leads.filter(l=>l.date===d&&own(l)),paid=L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
       data.push({lab:String(+d.slice(8)),a:paid,b:L.length-paid,d,dw,ftd:team.filter(f=>f.date===d&&own(f)).length,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
     $('#clChartSub').textContent='Últimos 30 días';

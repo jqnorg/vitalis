@@ -921,3 +921,5 @@ body.dark .ah-n{color:var(--pri-h)}
 .fi-log{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:12.5px}
 .dq-st .frow{margin:4px 0;align-items:center}
 @media (max-width:640px){.ah-t th:nth-child(5),.ah-t td:nth-child(5),.ah-t th:nth-child(7),.ah-t td:nth-child(7){display:none}}
+
+.ag-mesa{margin:18px 0 6px;font-size:15px}
