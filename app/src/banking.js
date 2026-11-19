@@ -1,7 +1,12 @@
 /* ---------- Banking: procesadores, sus métodos de pago y bancos con su flujo recomendado ----------
    Editan admin y team leader; la mesa mira. Una falla avisa a todos (urgente) y la vuelta, normal. */
 const PAISES=['Chile','Colombia','México','Perú','Ecuador','Costa Rica','Guatemala','Panamá','Argentina','Uruguay','España'];
-let bk={ok:null,procs:[],methods:[],pm:[],banks:[],inc:[],files:[],at:0,busy:null},bkPais='',bkQ='';
+let bk={ok:null,procs:[],methods:[],pm:[],banks:[],inc:[],files:[],at:0,busy:null},bkPais='',bkQ='',bkTipo='';
+// el paso anterior: cómo paga el cliente (efectivo, o digital: transferencia o tarjeta)
+const KINDS={efectivo:'Efectivo',transferencia:'Transferencia',tarjeta:'Tarjeta'};
+const kindGuess=n=>/transf|spei|pse|khipu|wire/i.test(n)?'transferencia':/tarjeta|card|cr[eé]dito|d[eé]bito|visa|master/i.test(n)?'tarjeta':/efectivo|boleto|cash|oxxo|efecty|baloto|pagoefectivo|servipag/i.test(n)?'efectivo':null;
+const kindOk=k=>!bkTipo||(bkTipo==='digital'?k==='transferencia'||k==='tarjeta':k===bkTipo);
+const kindSel=(v,id)=>`<select${id?` id="${id}"`:''} data-kind aria-label="Tipo de pago"><option value="">Tipo…</option>${Object.entries(KINDS).map(([k,l])=>`<option value="${k}"${v===k?' selected':''}>${l}</option>`).join('')}</select>`;
 let bkSeenAt=+local.get('bkSeen',0)||0;
 const bkImgs=new Map(); // id → data URL (se piden cuando se muestran)
 const bkEd=()=>!!profile&&['admin','leader'].includes(profile.role);
@@ -97,8 +102,12 @@ const paisChecks=(sel,name)=>`<div class="bk-paises">${PAISES.map(p=>`<label cla
 const paisesTxt=cs=>cs&&cs.length?cs.join(', '):'Todos los países';
 
 /* ---------- la vista ---------- */
-const comboTxt=x=>x.p&&x.m?bkName(x.p,x.m):x.p?(procOf(x.p)?procOf(x.p).name:'Procesador')+' (cualquier método)':x.m?(methOf(x.m)?methOf(x.m).name:'Método')+' (cualquier procesador)':'';
-const comboFails=x=>x.p?bkFails(x.p,x.m):x.m?bk.pm.some(y=>y.method_id===x.m&&(y.status==='falla'||(procOf(y.processor_id)||{}).status==='falla')):false;
+const comboTxt=x=>{const pn=x.p?(procOf(x.p)?procOf(x.p).name:'Procesador'):'';
+  if(x.k)return (KINDS[x.k]||x.k)+(pn?' con '+pn:' (cualquier procesador)');
+  return x.p&&x.m?bkName(x.p,x.m):x.p?pn+' (cualquier método)':x.m?(methOf(x.m)?methOf(x.m).name:'Método')+' (cualquier procesador)':''};
+const comboFails=x=>{
+  if(x.k){const l=bk.pm.filter(y=>(methOf(y.method_id)||{}).kind===x.k&&(!x.p||y.processor_id===x.p));return l.length>0&&l.every(y=>y.status==='falla'||(procOf(y.processor_id)||{}).status==='falla')}
+  return x.p?bkFails(x.p,x.m):x.m?bk.pm.some(y=>y.method_id===x.m&&(y.status==='falla'||(procOf(y.processor_id)||{}).status==='falla')):false};
 function bankChips(b){
   const u=(b.use_pm||[]).map(x=>`<span class="bk-chip use${comboFails(x)?' warn':''}" title="${comboFails(x)?'Ahora está fallando':''}">✓ ${esc(comboTxt(x))}${comboFails(x)?' · ⚠ falla':''}</span>`),
     a=(b.avoid_pm||[]).map(x=>`<span class="bk-chip avoid">✕ ${esc(comboTxt(x))}</span>`);
@@ -111,6 +120,7 @@ V.banking={
     $('#bkTools').addEventListener('click',e=>{const b=e.target.closest('[data-bk]');if(!b)return;
       if(b.dataset.bk==='proc')procModal();else if(b.dataset.bk==='met')methodsModal();else if(b.dataset.bk==='bank')bankModal()});
     $('#bkBody').addEventListener('click',e=>{
+      const t=e.target.closest('[data-bkt]');if(t){bkTipo=t.dataset.bkt;this.render({});return}
       const v=e.target.closest('[data-bkimg]');if(v)return bkLightbox(v.dataset.bkimg);
       const b=e.target.closest('[data-bka]');if(!b)return;const a=b.dataset.bka,id=b.dataset.id;
       if(a==='falla')return reportModal(id,true);
@@ -127,20 +137,25 @@ V.banking={
     const body=$('#bkBody');
     if(bk.ok===false){body.innerHTML='<section class="card"><div class="p-empty">Banking se activa en un rato (falta actualizar la base).</div></section>';return}
     if(bk.ok==null){body.innerHTML='<section class="card"><div class="p-empty">Cargando…</div></section>';return}
-    const q=norm(bkQ).trim(),hit=t=>!q||norm(t).includes(q),ed=bkEd(),F=bkFallas().filter(f=>bkPaisOk(f.cs));
+    const q=norm(bkQ).trim(),hit=t=>!q||norm(t).includes(q),ed=bkEd(),F=bkFallas().filter(f=>bkPaisOk(f.cs)&&(!f.mid||kindOk((methOf(f.mid)||{}).kind)));
+    const tipos=[['','Todos'],['efectivo','Efectivo'],['digital','Digital']],sub=[['digital','Transferencia y tarjeta'],['transferencia','Transferencia'],['tarjeta','Tarjeta']];
+    const dig=['digital','transferencia','tarjeta'].includes(bkTipo);
+    const paso=`<section class="card bk-paso"><div class="card-h"><h3>¿Cómo paga el cliente?</h3><span class="p-sub">primero el tipo de pago, después el procesador</span></div>
+      <div class="seg" role="group" aria-label="Tipo de pago">${tipos.map(([k,l])=>`<button type="button" data-bkt="${k}" class="${(k==='digital'?dig:bkTipo===k)?'on':''}">${l}</button>`).join('')}</div>
+      ${dig?`<div class="seg sm" role="group" aria-label="Digital">${sub.map(([k,l])=>`<button type="button" data-bkt="${k}" class="${bkTipo===k?'on':''}">${l}</button>`).join('')}</div>`:''}</section>`;
     const fallas=F.length?`<section class="card bk-fallas"><div class="card-h"><h3>⚠️ Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
-    const procs=bk.procs.filter(p=>p.active!==false&&bkPaisOk(p.countries)&&(hit(p.name)||pmOf(p.id).some(x=>hit(x.m.name))));
-    const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries));
+    const procs=bk.procs.filter(p=>p.active!==false&&bkPaisOk(p.countries)&&(hit(p.name)||pmOf(p.id).some(x=>hit(x.m.name)))&&(!bkTipo||pmOf(p.id).some(x=>kindOk(x.m.kind))));
+    const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
       return `<article class="bk-proc${p.status==='falla'?' falla':''}"><div class="bk-ph-h"><h4>${esc(p.name)}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>x.status==='falla').length;return p.status==='falla'?'<span class="badge bad">Falla</span>':nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
         <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
-        <div class="bk-ms">${ms.length?ms.map(x=>`<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}" title="${esc(x.status==='falla'?(x.status_note||'Falla'):(x.countries&&x.countries.length?x.countries.join(', '):''))}">${esc(x.m.name)}</span>`).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
+        <div class="bk-ms">${ms.length?ms.map(x=>`<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(x.status==='falla'?' · '+(x.status_note||'Falla'):x.countries&&x.countries.length?' · '+x.countries.join(', '):''))}">${esc(x.m.name)}</span>`).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
         ${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}${bkThumbs('processor',p.id)}
         ${ed?`<div class="bk-act"><button type="button" class="btn sm" data-bka="falla" data-id="${esc(p.id)}">Reportar falla</button>${p.status==='falla'||pmOf(p.id).some(x=>x.status==='falla')?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(p.id)}">Volvió a andar</button>`:''}<button type="button" class="btn sm" data-bka="edit" data-id="${esc(p.id)}">Editar</button></div>`:''}</article>`};
     const banks=bk.banks.filter(b=>(!bkPais||!b.country||b.country===bkPais)&&(hit(b.name)||hit(b.country)));
     const bRow=b=>`<div class="bk-bank"><div class="bk-bn"><b>${esc(b.name)}</b><span class="dim">${esc(b.country||'Todos los países')}</span></div><div class="bk-chips">${bankChips(b)}</div><span class="grow"></span><button type="button" class="btn sm" data-bka="bank" data-id="${esc(b.id)}">Ver flujo</button>${ed?`<button type="button" class="btn sm" data-bka="bankEd" data-id="${esc(b.id)}">Editar</button>`:''}</div>`;
     const hist=bk.inc.slice(0,30);
-    body.innerHTML=fallas+
-      `<section class="card"><div class="card-h"><h3>Procesadores</h3><span class="p-sub">${plural(procs.length,'procesador','procesadores')}${bkPais?' en '+esc(bkPais):''}</span></div>${procs.length?`<div class="bk-grid">${procs.map(pc).join('')}</div>`:`<div class="p-empty">${bk.procs.length?'Nada con ese filtro.':ed?'Cargá el primer procesador con el botón de arriba.':'Todavía no hay procesadores cargados.'}</div>`}</section>`+
+    body.innerHTML=paso+fallas+
+      `<section class="card"><div class="card-h"><h3>Procesadores</h3><span class="p-sub">${plural(procs.length,'procesador','procesadores')}${bkTipo?' para '+esc(bkTipo==='digital'?'pago digital':KINDS[bkTipo].toLowerCase()):''}${bkPais?' en '+esc(bkPais):''}</span></div>${procs.length?`<div class="bk-grid">${procs.map(pc).join('')}</div>`:`<div class="p-empty">${bk.procs.length?'Nada con ese filtro.':ed?'Cargá el primer procesador con el botón de arriba.':'Todavía no hay procesadores cargados.'}</div>`}</section>`+
       `<section class="card"><div class="card-h"><h3>Bancos</h3><span class="p-sub">cómo conviene pagar según el banco del cliente</span></div>${banks.length?banks.map(bRow).join(''):`<div class="p-empty">${bk.banks.length?'Ningún banco con ese filtro.':ed?'Cargá un banco con su flujo recomendado (por ejemplo, Falabella Chile: no transferencia).':'Todavía no hay bancos cargados.'}</div>`}</section>`+
       (hist.length?`<section class="card"><div class="card-h"><h3>Historial</h3><span class="p-sub">fallas y vueltas</span></div><div class="lst">${hist.map(i=>`<div class="li"><span class="t">${esc(whenTxt(new Date(i.created_at)))}</span><span class="n"><b>${esc(bkName(i.processor_id,i.method_id))}</b> ${i.kind==='falla'?'<span class="badge bad">falla</span>':'<span class="badge paid">volvió</span>'}${i.note?`<small>${esc(i.note)}</small>`:''}</span><span class="d">${i.created_by?esc(first(i.created_by)):''}</span><span></span><span></span></div>${bkThumbs('incident',i.id)}`).join('')}</div></section>`:'');
     bkHydrate(body);
@@ -163,13 +178,13 @@ function procModal(p){
   modal({title:p?'Editar procesador':'Nuevo procesador',wide:true,body:`<label class="fld"><span>Nombre</span><input id="bpN" maxlength="60" value="${esc(p&&p.name||'')}" autofocus></label>
     <div class="fld"><span>Países <small class="dim">(sin marcar: todos)</small></span>${paisChecks(p&&p.countries,'bpC')}</div>
     <div class="fld"><span>Métodos de este procesador</span><div class="bk-paises" id="bpM">${bk.methods.map(m=>`<label class="chk"><input type="checkbox" value="${esc(m.id)}"${have.has(m.id)?' checked':''}>${esc(m.name)}</label>`).join('')||'<span class="dim">No hay métodos: agregá uno abajo.</span>'}</div>
-      <div class="bk-row"><input id="bpNew" maxlength="60" placeholder="Método nuevo (ej.: Transferencia, Tarjeta, Efectivo)"><button type="button" class="btn sm" id="bpAdd">Agregar</button></div></div>
+      <div class="bk-row"><input id="bpNew" maxlength="60" placeholder="Método nuevo (ej.: Transferencia, Tarjeta, Boleto)">${kindSel('','bpNewK')}<button type="button" class="btn sm" id="bpAdd">Agregar</button></div></div>
     <label class="fld"><span>Notas <small class="dim">(cómo se usa, límites, horarios…)</small></span><textarea id="bpNo" rows="4" maxlength="4000">${esc(p&&p.notes||'')}</textarea></label>
     ${bkPhotoField('processor',p&&p.id)}<div class="ebox" id="bpE"></div>`,
     onOpen:api=>{
       api._up=bkPhotoWire(api,'processor',()=>savedId);
       api.q('#bpAdd').onclick=async()=>{const n=api.q('#bpNew').value.trim();if(!n)return;
-        const r=await bkSave(sb.from('pay_methods').insert({name:n.slice(0,60),sort:bk.methods.length}).select('*'));if(!r)return;
+        const r=await bkSave(sb.from('pay_methods').insert({name:n.slice(0,60),kind:api.q('#bpNewK').value||kindGuess(n),sort:bk.methods.length}).select('*'));if(!r)return;api.q('#bpNewK').value='';
         const m=r[0];api.q('#bpNew').value='';const box=api.q('#bpM');if(box.querySelector('.dim'))box.innerHTML='';
         box.insertAdjacentHTML('beforeend',`<label class="chk"><input type="checkbox" value="${esc(m.id)}" checked>${esc(m.name)}</label>`)};
     },
@@ -190,12 +205,14 @@ function procModal(p){
 }
 function methodsModal(){
   if(!bkEd())return;
-  const row=m=>`<div class="bk-row" data-mid="${esc(m.id)}"><input value="${esc(m.name)}" maxlength="60" aria-label="Nombre del método"><span class="dim">${plural(bk.pm.filter(x=>x.method_id===m.id).length,'procesador','procesadores')}</span><button type="button" class="ib" data-mdel title="Borrar">✕</button></div>`;
-  modal({title:'Métodos de pago',body:`<p class="mp">Un método puede estar en varios procesadores. Cambiale el nombre acá y se cambia en todos.</p><div id="bmL">${bk.methods.map(row).join('')||'<p class="dim">Todavía no hay métodos.</p>'}</div>
-    <div class="bk-row"><input id="bmN" maxlength="60" placeholder="Método nuevo"><button type="button" class="btn sm" id="bmA">Agregar</button></div>`,
+  const row=m=>`<div class="bk-row" data-mid="${esc(m.id)}"><input value="${esc(m.name)}" maxlength="60" aria-label="Nombre del método">${kindSel(m.kind||'')}<span class="dim">${plural(bk.pm.filter(x=>x.method_id===m.id).length,'procesador','procesadores')}</span><button type="button" class="ib" data-mdel title="Borrar">✕</button></div>`;
+  modal({title:'Métodos de pago',body:`<p class="mp">Un método puede estar en varios procesadores. Cambiale el nombre o el tipo (efectivo, transferencia o tarjeta) acá y se cambia en todos.</p><div id="bmL">${bk.methods.map(row).join('')||'<p class="dim">Todavía no hay métodos.</p>'}</div>
+    <div class="bk-row"><input id="bmN" maxlength="60" placeholder="Método nuevo">${kindSel('','bmK')}<button type="button" class="btn sm" id="bmA">Agregar</button></div>`,
     onOpen:api=>{
-      api.q('#bmA').onclick=async()=>{const n=api.q('#bmN').value.trim();if(!n)return;const r=await bkSave(sb.from('pay_methods').insert({name:n.slice(0,60),sort:bk.methods.length}).select('*'));if(r){api.q('#bmN').value='';const l=api.q('#bmL');if(l.querySelector('p.dim'))l.innerHTML='';l.insertAdjacentHTML('beforeend',row(r[0]))}};
-      api.box.addEventListener('change',async e=>{const w=e.target.closest('[data-mid]');if(!w||e.target.tagName!=='INPUT')return;const n=e.target.value.trim();if(n)await bkSave(sb.from('pay_methods').update({name:n.slice(0,60)}).eq('id',w.dataset.mid))});
+      api.q('#bmA').onclick=async()=>{const n=api.q('#bmN').value.trim();if(!n)return;const r=await bkSave(sb.from('pay_methods').insert({name:n.slice(0,60),kind:api.q('#bmK').value||kindGuess(n),sort:bk.methods.length}).select('*'));if(r){api.q('#bmN').value='';api.q('#bmK').value='';const l=api.q('#bmL');if(l.querySelector('p.dim'))l.innerHTML='';l.insertAdjacentHTML('beforeend',row(r[0]))}};
+      api.box.addEventListener('change',async e=>{const w=e.target.closest('[data-mid]');if(!w)return;
+        if(e.target.matches('[data-kind]'))return bkSave(sb.from('pay_methods').update({kind:e.target.value||null}).eq('id',w.dataset.mid));
+        if(e.target.tagName!=='INPUT')return;const n=e.target.value.trim();if(n)await bkSave(sb.from('pay_methods').update({name:n.slice(0,60)}).eq('id',w.dataset.mid))});
       api.box.addEventListener('click',async e=>{const d=e.target.closest('[data-mdel]');if(!d)return;const w=d.closest('[data-mid]'),m=methOf(w.dataset.mid);
         if(!await confirmar('Borrar método',`¿Borrar <b>${esc(m?m.name:'')}</b> de todos los procesadores?`,'borrar',true))return;if(await bkSave(sb.from('pay_methods').delete().eq('id',w.dataset.mid)))w.remove()});
     },actions:[{l:'Listo',cls:'pri',fn:()=>{refresh()}}]});
@@ -219,7 +236,7 @@ function reportModal(pid,falla,mid0){
 }
 function comboRow(x,kind){
   const po=`<option value="">Cualquier procesador</option>`+bk.procs.map(p=>`<option value="${esc(p.id)}"${x&&x.p===p.id?' selected':''}>${esc(p.name)}</option>`).join('');
-  const mo=`<option value="">Cualquier método</option>`+bk.methods.map(m=>`<option value="${esc(m.id)}"${x&&x.m===m.id?' selected':''}>${esc(m.name)}</option>`).join('');
+  const mo=`<option value="">Cualquier método</option><optgroup label="Por tipo de pago">${Object.entries(KINDS).map(([k,l])=>`<option value="k:${k}"${x&&x.k===k?' selected':''}>${l} (cualquiera)</option>`).join('')}</optgroup><optgroup label="Un método">`+bk.methods.map(m=>`<option value="${esc(m.id)}"${x&&x.m===m.id?' selected':''}>${esc(m.name)}</option>`).join('')+'</optgroup>';
   return `<div class="bk-row bk-combo" data-k="${kind}"><select data-cp aria-label="Procesador">${po}</select><select data-cm aria-label="Método">${mo}</select><button type="button" class="ib" data-cdel title="Sacar">✕</button></div>`;
 }
 function bankModal(b){
@@ -241,7 +258,7 @@ function bankModal(b){
         await bkSave(sb.from('pay_files').delete().eq('ref_kind','bank').eq('ref_id',b.id));if(await bkSave(sb.from('banks').delete().eq('id',b.id)))toast('Banco borrado.')}}]:[]),
       {l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
         const name=api.q('#bbN').value.trim();if(!name){api.q('#bbE').textContent='Poné el nombre del banco.';return false}
-        const combos=sel=>[...api.q(sel).querySelectorAll('.bk-combo')].map(r=>({p:r.querySelector('[data-cp]').value||null,m:r.querySelector('[data-cm]').value||null})).filter(x=>x.p||x.m).slice(0,20);
+        const combos=sel=>[...api.q(sel).querySelectorAll('.bk-combo')].map(r=>{const p=r.querySelector('[data-cp]').value||null,v=r.querySelector('[data-cm]').value||'';return v.startsWith('k:')?{p,m:null,k:v.slice(2)}:{p,m:v||null}}).filter(x=>x.p||x.m||x.k).slice(0,20);
         const row={name:name.slice(0,80),country:api.q('#bbC').value,steps:api.q('#bbS').value.split('\n').map(s=>s.replace(/^\s*\d+[.)-]?\s*/,'').trim()).filter(Boolean).slice(0,30),
           use_pm:combos('#bbU'),avoid_pm:combos('#bbA'),notes:api.q('#bbNo').value.trim()||null,updated_at:new Date().toISOString(),updated_by:me};
         const r=await bkSave(b?sb.from('banks').update(row).eq('id',b.id).select('id'):sb.from('banks').insert(row).select('id'));if(!r)return false;

@@ -1318,6 +1318,13 @@ create table if not exists public.pay_files (
   created_at timestamptz not null default now()
 );
 create index if not exists pay_files_ref on public.pay_files (team_id, ref_kind, ref_id);
+-- el paso anterior: cómo paga el cliente (efectivo, o digital: transferencia o tarjeta)
+alter table public.pay_methods add column if not exists kind text check (kind in ('efectivo', 'transferencia', 'tarjeta'));
+update public.pay_methods set kind = case
+    when name ~* 'transf|spei|pse|khipu|wire' then 'transferencia'
+    when name ~* 'tarjeta|card|cr[eé]dito|d[eé]bito|visa|master' then 'tarjeta'
+    when name ~* 'efectivo|boleto|cash|oxxo|efecty|baloto|pagoefectivo|servipag' then 'efectivo' end
+  where kind is null and name ~* 'transf|spei|pse|khipu|wire|tarjeta|card|cr[eé]dito|d[eé]bito|visa|master|efectivo|boleto|cash|oxxo|efecty|baloto|pagoefectivo|servipag';
 
 create or replace function public.pay_editor() returns boolean language sql stable security definer set search_path = public
   as $$ select coalesce(public.my_role(), '') in ('admin', 'leader') $$;

@@ -961,3 +961,4 @@ body.dark .ah-n{color:var(--pri-h)}
 .bk-alert{border-color:color-mix(in srgb,var(--err) 45%,var(--line))}
 .bk-up{cursor:pointer}
 .chk{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;cursor:pointer}.chk input{margin:0}
+.bk-paso .seg{margin-right:8px}.bk-paso .seg.sm{margin-top:8px}.bk-paso .seg.sm button{padding:5px 12px;font-size:13px}
