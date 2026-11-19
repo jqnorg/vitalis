@@ -1,6 +1,6 @@
 /* ---------- Banking: procesadores, sus métodos de pago y bancos con su flujo recomendado ----------
    Editan admin y team leader; la mesa mira. Una falla avisa a todos (urgente) y la vuelta, normal. */
-const PAISES=['Chile','Colombia','México','Perú','Ecuador','Costa Rica','Guatemala','Panamá','Argentina','Uruguay','España'];
+const PAISES=['Colombia','México','Chile','Panamá','Guatemala','Costa Rica','Perú']; // los países donde trabaja la mesa
 let bk={ok:null,procs:[],methods:[],pm:[],banks:[],inc:[],files:[],at:0,busy:null},bkPais='',bkQ='',bkTipo='';
 // el paso anterior: cómo paga el cliente (efectivo, o digital: transferencia o tarjeta)
 const KINDS={efectivo:'Efectivo',transferencia:'Transferencia',tarjeta:'Tarjeta'};
@@ -60,8 +60,11 @@ function bkNotify(list){
 
 /* ---------- fotos ---------- */
 const bkFilesOf=(kind,id)=>bk.files.filter(f=>f.ref_kind===kind&&f.ref_id===id);
+// la foto de un procesador va chica, como un ícono (la primera, al lado del nombre; las demás, en miniatura)
+const bkIcon=pid=>{const f=bkFilesOf('processor',pid)[0];return f?`<button type="button" class="bk-ico" data-bkimg="${esc(f.id)}" title="${esc(f.caption||'Ver la foto')}"><img alt=""></button>`:''};
+const bkMini=pid=>{const fs=bkFilesOf('processor',pid).slice(1);return fs.length?`<div class="bk-mini">${fs.map(f=>`<button type="button" class="bk-ico sm" data-bkimg="${esc(f.id)}" title="${esc(f.caption||'Ver la foto')}"><img alt=""></button>`).join('')}</div>`:''};
 const bkThumbs=(kind,id,edit)=>{const fs=bkFilesOf(kind,id);if(!fs.length)return '';
-  return `<div class="bk-ph">${fs.map(f=>`<figure${edit?' class="ed"':''}><button type="button" class="bk-img" data-bkimg="${esc(f.id)}" title="${esc(f.caption||'Ver la foto')}"><img alt="${esc(f.caption||'Foto')}"></button>${edit?`<input class="bk-cap" data-bkcap="${esc(f.id)}" value="${esc(f.caption||'')}" placeholder="Para qué es" maxlength="200"><button type="button" class="ib" data-bkdelimg="${esc(f.id)}" title="Borrar la foto">✕</button>`:f.caption?`<figcaption>${esc(f.caption)}</figcaption>`:''}</figure>`).join('')}</div>`};
+  return `<div class="bk-ph${kind==='processor'?' ico':''}">${fs.map(f=>`<figure${edit?' class="ed"':''}><button type="button" class="bk-img" data-bkimg="${esc(f.id)}" title="${esc(f.caption||'Ver la foto')}"><img alt="${esc(f.caption||'Foto')}"></button>${edit?`<input class="bk-cap" data-bkcap="${esc(f.id)}" value="${esc(f.caption||'')}" placeholder="Para qué es" maxlength="200"><button type="button" class="ib" data-bkdelimg="${esc(f.id)}" title="Borrar la foto">✕</button>`:f.caption?`<figcaption>${esc(f.caption)}</figcaption>`:''}</figure>`).join('')}</div>`};
 async function bkHydrate(root){
   const need=[...root.querySelectorAll('[data-bkimg]')].map(b=>b.dataset.bkimg).filter(id=>!bkImgs.has(id));
   if(need.length){try{for(const r of await Q(sb.from('pay_files').select('id,mime,data').in('id',[...new Set(need)].slice(0,60))))bkImgs.set(r.id,`data:${r.mime};base64,${r.data}`)}catch(e){}}
@@ -103,6 +106,20 @@ const paisesTxt=cs=>cs&&cs.length?cs.join(', '):'Todos los países';
 const ISO={Chile:'CL',Colombia:'CO','México':'MX','Perú':'PE',Ecuador:'EC','Costa Rica':'CR',Guatemala:'GT','Panamá':'PA',Argentina:'AR',Uruguay:'UY','España':'ES'};
 const isoTxt=cs=>cs.map(c=>ISO[c]||c).join(' · ');
 
+/* ---------- las opciones del paso a paso ---------- */
+function bkOptions(){
+  const out=[];
+  for(const p of bk.procs){if(p.active===false||!bkPaisOk(p.countries))continue;
+    for(const x of pmOf(p.id))if(bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind))out.push({p,x,falla:p.status==='falla'||x.status==='falla'})}
+  return out.sort((a,b)=>(a.falla?1:0)-(b.falla?1:0)||a.p.sort-b.p.sort||a.p.name.localeCompare(b.p.name));
+}
+function bkOptHTML(o){
+  const {p,x}=o,note=p.status==='falla'?p.status_note:x.status_note,otros=pmOf(p.id).filter(y=>y.method_id!==x.method_id&&bkPaisOk(y.countries&&y.countries.length?y.countries:p.countries));
+  return `<details class="bk-opt${o.falla?' falla':''}"><summary>${bkIcon(p.id)}<span><b>${esc(x.m.name)}</b> con ${esc(p.name)}</span><span class="grow"></span>${o.falla?`<span class="badge bad">Falla</span>`:'<span class="badge paid">Anda</span>'}</summary>
+    <div class="bk-od">${o.falla?`<p class="hot">⚠ ${esc(note||'Está fallando: no lo ofrezcas por ahora.')}</p>`:''}${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}
+      ${otros.length?`<p class="dim">${esc(p.name)} también tiene: ${otros.map(y=>esc(y.m.name)).join(', ')}</p>`:''}${bkMini(p.id)}</div></details>`;
+}
+
 /* ---------- la vista ---------- */
 const comboTxt=x=>{const pn=x.p?(procOf(x.p)?procOf(x.p).name:'Procesador'):'';
   if(x.k)return (KINDS[x.k]||x.k)+(pn?' con '+pn:' (cualquier procesador)');
@@ -117,11 +134,11 @@ function bankChips(b){
 }
 V.banking={
   build(){
-    $('#bkPais').addEventListener('change',e=>{bkPais=e.target.value;this.render({})});
     $('#bkQ').addEventListener('input',e=>{bkQ=e.target.value;this.render({})});
     $('#bkTools').addEventListener('click',e=>{const b=e.target.closest('[data-bk]');if(!b)return;
       if(b.dataset.bk==='proc')procModal();else if(b.dataset.bk==='met')methodsModal();else if(b.dataset.bk==='bank')bankModal()});
     $('#bkBody').addEventListener('click',e=>{
+      const pa=e.target.closest('[data-bkp]');if(pa){bkPais=pa.dataset.bkp;if(!bkPais)bkTipo='';this.render({});return} // paso 1: el país
       const t=e.target.closest('[data-bkt]');if(t){bkTipo=t.dataset.bkt;this.render({});return}
       const v=e.target.closest('[data-bkimg]');if(v)return bkLightbox(v.dataset.bkimg);
       const b=e.target.closest('[data-bka]');if(!b)return;const a=b.dataset.bka,id=b.dataset.id;
@@ -134,24 +151,27 @@ V.banking={
   },
   render(){
     bkLoad();
-    const sel=$('#bkPais');if(sel!==document.activeElement){sel.innerHTML=`<option value="">Todos los países</option>`+PAISES.map(p=>`<option${p===bkPais?' selected':''}>${esc(p)}</option>`).join('')}
     $('#bkTools').innerHTML=bkEd()?`<button type="button" class="btn sm" data-bk="met">Métodos</button><button type="button" class="btn sm" data-bk="bank">Banco</button><button type="button" class="btn sm pri" data-bk="proc">Procesador</button>`:'';
     const body=$('#bkBody');
     if(bk.ok===false){body.innerHTML='<section class="card"><div class="p-empty">Banking se activa en un rato (falta actualizar la base).</div></section>';return}
     if(bk.ok==null){body.innerHTML='<section class="card"><div class="p-empty">Cargando…</div></section>';return}
     const q=norm(bkQ).trim(),hit=t=>!q||norm(t).includes(q),ed=bkEd(),F=bkFallas().filter(f=>bkPaisOk(f.cs)&&(!f.mid||kindOk((methOf(f.mid)||{}).kind)));
-    const tipos=[['','Todos'],['efectivo','Efectivo'],['digital','Digital']],sub=[['digital','Transferencia y tarjeta'],['transferencia','Transferencia'],['tarjeta','Tarjeta']];
-    const dig=['digital','transferencia','tarjeta'].includes(bkTipo);
-    const paso=`<section class="card bk-paso"><div class="card-h"><h3>¿Cómo paga el cliente?</h3><span class="p-sub">primero el tipo de pago, después el procesador</span></div>
-      <div class="seg" role="group" aria-label="Tipo de pago">${tipos.map(([k,l])=>`<button type="button" data-bkt="${k}" class="${(k==='digital'?dig:bkTipo===k)?'on':''}">${l}</button>`).join('')}</div>
-      ${dig?`<div class="seg sm" role="group" aria-label="Digital">${sub.map(([k,l])=>`<button type="button" data-bkt="${k}" class="${bkTipo===k?'on':''}">${l}</button>`).join('')}</div>`:''}</section>`;
+    // ¿Cómo paga el cliente? 1) país · 2) efectivo o digital · 3) tarjeta o transferencia · y después, las opciones (se despliegan)
+    const dig=['digital','transferencia','tarjeta'].includes(bkTipo),fin=bkPais&&(bkTipo==='efectivo'||bkTipo==='transferencia'||bkTipo==='tarjeta');
+    const seg=(lab,items,on,attr)=>`<div class="bk-step"><span class="bk-sn">${lab}</span><div class="seg" role="group" aria-label="${esc(lab)}">${items.map(([k,l])=>`<button type="button" ${attr}="${esc(k)}" class="${on(k)?'on':''}">${esc(l)}</button>`).join('')}</div></div>`;
+    const opts=fin?bkOptions():[];
+    const paso=`<section class="card bk-paso"><div class="card-h"><h3>¿Cómo paga el cliente?</h3></div>
+      ${seg('1. País',[['','Todos'],...PAISES.map(p=>[p,p])],k=>k===bkPais,'data-bkp')}
+      ${bkPais?seg('2. ¿Efectivo o digital?',[['efectivo','Efectivo'],['digital','Digital']],k=>k==='digital'?dig:bkTipo===k,'data-bkt'):''}
+      ${bkPais&&dig?seg('3. ¿Tarjeta o transferencia?',[['tarjeta','Tarjeta'],['transferencia','Transferencia']],k=>bkTipo===k,'data-bkt'):''}
+      ${fin?`<div class="bk-opts"><span class="bk-sn">Opciones en ${esc(bkPais)}</span>${opts.length?opts.map(bkOptHTML).join(''):`<div class="p-empty" style="padding:8px 0">No hay ${esc(KINDS[bkTipo].toLowerCase())} cargado para ${esc(bkPais)}.</div>`}</div>`:''}</section>`;
     const fallas=F.length?`<section class="card bk-fallas"><div class="card-h"><h3>⚠️ Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
     const procs=bk.procs.filter(p=>p.active!==false&&bkPaisOk(p.countries)&&(hit(p.name)||pmOf(p.id).some(x=>hit(x.m.name)))&&(!bkTipo||pmOf(p.id).some(x=>kindOk(x.m.kind))));
     const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
-      return `<article class="bk-proc${p.status==='falla'?' falla':''}"><div class="bk-ph-h"><h4>${esc(p.name)}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>x.status==='falla').length;return p.status==='falla'?'<span class="badge bad">Falla</span>':nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
+      return `<article class="bk-proc${p.status==='falla'?' falla':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(p.name)}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>x.status==='falla').length;return p.status==='falla'?'<span class="badge bad">Falla</span>':nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
         <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
         <div class="bk-ms">${ms.length?ms.map(x=>`<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(x.status==='falla'?' · '+(x.status_note||'Falla'):x.countries&&x.countries.length?' · solo en '+x.countries.join(', '):''))}">${esc(x.m.name)}${!bkPais&&x.countries&&x.countries.length?` <small>${esc(isoTxt(x.countries))}</small>`:''}</span>`).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
-        ${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}${bkThumbs('processor',p.id)}
+        ${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}${bkMini(p.id)}
         ${ed?`<div class="bk-act"><button type="button" class="btn sm" data-bka="falla" data-id="${esc(p.id)}">Reportar falla</button>${p.status==='falla'||pmOf(p.id).some(x=>x.status==='falla')?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(p.id)}">Volvió a andar</button>`:''}<button type="button" class="btn sm" data-bka="edit" data-id="${esc(p.id)}">Editar</button></div>`:''}</article>`};
     const banks=bk.banks.filter(b=>(!bkPais||!b.country||b.country===bkPais)&&(hit(b.name)||hit(b.country)));
     const bRow=b=>`<div class="bk-bank"><div class="bk-bn"><b>${esc(b.name)}</b><span class="dim">${esc(b.country||'Todos los países')}</span></div><div class="bk-chips">${bankChips(b)}</div><span class="grow"></span><button type="button" class="btn sm" data-bka="bank" data-id="${esc(b.id)}">Ver flujo</button>${ed?`<button type="button" class="btn sm" data-bka="bankEd" data-id="${esc(b.id)}">Editar</button>`:''}</div>`;
