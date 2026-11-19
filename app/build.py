@@ -10,7 +10,8 @@ fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"+re.sub(r'
 (D/'mate.svg').write_text(fav_svg.replace("'",'"'))
 fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
 js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','auth.js'])
-js=js.replace('\nboot();\n','\n')+'\nboot();\n'   # boot() al final, después de auth.js
+js=js.replace('\nboot();\n','\n')+'\nboot();\n'
+js=js.replace('__EXT_VER__', json.loads((ROOT/'extension'/'manifest.json').read_text())['version'])   # la versión de la extensión que se descarga   # boot() al final, después de auth.js
 html=f'''<!DOCTYPE html>
 <html lang="es">
 <head>

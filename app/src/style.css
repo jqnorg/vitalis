@@ -890,6 +890,7 @@ body.dark .cb-d.pay{color:#1e1300}body.dark .cb-d.pay .o,body.dark .cb-d.pay .w{
 body.dark .ah-n{color:var(--pri-h)}
 .ah-t td{vertical-align:middle}
 .ah-t .ah-nm{color:var(--dim)}
+.ah-t .ah-nt{font-size:12px;max-width:170px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ah-out{background:var(--soft);border-style:dashed}
 .badge.st{background:var(--soft);color:var(--fg)}
 .badge.st-new{background:color-mix(in srgb,var(--s1) 16%,transparent)}
@@ -915,4 +916,4 @@ body.dark .ah-n{color:var(--pri-h)}
 .fi-r span{color:var(--dim)}.fi-r b{text-align:right;font-weight:600}
 .fi-log{display:flex;flex-direction:column;gap:2px;margin-top:8px;font-size:12.5px}
 .dq-st .frow{margin:4px 0;align-items:center}
-@media (max-width:640px){.ah-t th:nth-child(6),.ah-t td:nth-child(6){display:none}}
+@media (max-width:640px){.ah-t th:nth-child(5),.ah-t td:nth-child(5),.ah-t th:nth-child(7),.ah-t td:nth-child(7){display:none}}

@@ -1011,6 +1011,8 @@ create index if not exists crm_clients_grp on public.crm_clients (team_id, statu
 create index if not exists crm_clients_reg on public.crm_clients (team_id, reg);
 create index if not exists crm_clients_seen on public.crm_clients (team_id, first_seen);
 create index if not exists crm_clients_camp on public.crm_clients (team_id, camp);
+alter table public.crm_clients add column if not exists last_call text; -- "Last Communication Time" del CRM (AAAA-MM-DD HH:MM)
+alter table public.crm_clients add column if not exists note text;      -- "Last Note" del CRM
 create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
   id         bigserial primary key,
   team_id    uuid not null references public.teams(id),
@@ -1034,7 +1036,7 @@ create or replace function public.crm_key(st text) returns text language sql imm
   as $$ select lower(regexp_replace(coalesce(st, ''), '[^A-Za-z0-9]', '', 'g')) $$;
 create or replace function public._clip(v text, n integer) returns text language sql immutable set search_path = ''
   as $$ select nullif(left(btrim(regexp_replace(coalesce(v, ''), '\s+', ' ', 'g')), n), '') $$;
--- grupo de cada status: new · na (No Answer, NA-2…NA-5) · call_again · hang_up · low_potential · not_interested · dnc (Do Not Call) · otro
+-- grupo de cada status: new · na (No Answer, NA - DAY2…DAY5, NA-2…) · call_again · hang_up · low_potential · not_interested · dnc (Do Not Call) · otro
 create or replace function public.crm_group(st text, t uuid) returns text
   language plpgsql stable security definer set search_path = public as $$
 declare k text := public.crm_key(st); g text;
@@ -1044,7 +1046,7 @@ begin
   if g is not null then return g; end if;
   return case
     when k like 'new%' then 'new'
-    when k in ('na', 'noanswer', 'noresponse') or k ~ '^(na|noanswer)[1-9]$' then 'na'
+    when k in ('na', 'noanswer', 'noresponse') or k ~ '^(na|noanswer)(day)?[0-9]{1,2}$' then 'na'
     when k in ('callagain', 'callback', 'callagainlater') then 'call_again'
     when k in ('hangup', 'hungup') then 'hang_up'
     when k = 'lowpotential' then 'low_potential'
@@ -1058,7 +1060,7 @@ create or replace function public.crm_seen(rows jsonb) returns json
   language plpgsql security definer set search_path = public as $$
 declare
   t uuid := public.my_team();
-  r jsonb; cid text; br text; st text; g text; rg text; cur record;
+  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; cur record;
   n_new integer := 0; n_chg integer := 0; fresh text[] := '{}';
 begin
   if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
@@ -1071,12 +1073,15 @@ begin
     st := public._clip(r->>'status', 60);
     rg := public._clip(r->>'reg', 16);
     if rg is not null and (rg !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(rg, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then rg := null; end if;
+    lc := public._clip(r->>'call', 16);
+    if lc is not null and (lc !~ '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$' or left(lc, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then lc := null; end if;
+    nt := public._clip(r->>'note', 200);
     g := public.crm_group(st, t);
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
     if not found then
-      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, first_seen_by, last_seen_by)
+      insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
-              public._clip(r->>'agent', 80), public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), auth.uid(), auth.uid())
+              public._clip(r->>'agent', 80), public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), lc, nt, auth.uid(), auth.uid())
       on conflict do nothing;
       if st is not null then
         insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, null, st, g, auth.uid());
@@ -1091,6 +1096,8 @@ begin
         crm_agent = coalesce(public._clip(r->>'agent', 80), crm_agent),
         camp = coalesce(public._clip(r->>'camp', 120), camp),
         aff = coalesce(public._clip(r->>'aff', 60), aff),
+        last_call = coalesce(lc, last_call),
+        note = coalesce(nt, note),
         status = coalesce(st, status),
         status_group = case when st is null then status_group else g end,
         status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
@@ -1106,6 +1113,10 @@ begin
 end $$;
 
 -- el admin clasifica un status que no se reconoce (y se reclasifican los clientes que lo tienen)
+-- los que quedaron en "otro" con una versión vieja de crm_group (p. ej. NA - DAY3) pasan a su grupo
+update public.crm_clients c set status_group = public.crm_group(c.status, c.team_id)
+  where c.status_group = 'otro' and public.crm_group(c.status, c.team_id) <> 'otro';
+
 create or replace function public.crm_map_status(st text, grp text) returns json
   language plpgsql security definer set search_path = public as $$
 declare t uuid := public.my_team(); k text := public.crm_key(st); n integer;

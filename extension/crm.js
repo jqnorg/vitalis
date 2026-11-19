@@ -26,6 +26,7 @@
   const cellText = (el) => (el ? (el.innerText || el.textContent || '') : '').replace(/\s+/g, ' ').trim();
   const escH = (s) => String(s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
   const plural = (n, a, b) => n + ' ' + (n === 1 ? a : (b || a + 's'));
+  const VER = (() => { try { return chrome.runtime.getManifest().version; } catch (e) { return ''; } })();
   const send = (msg) => new Promise((res) => { try { chrome.runtime.sendMessage(msg, (r) => res(chrome.runtime.lastError ? null : r)); } catch (e) { res(null); } });
 
   /* ================= tablas de la página ================= */
@@ -35,6 +36,10 @@
     for (const a of al) { const i = labels.findIndex((l) => l.startsWith(a + ' ')); if (i >= 0) return i; }
     return -1;
   };
+  // la fila de filtros del CRM (Search…, Filter…, el rango de fechas) no es un cliente
+  const FORM = 'input:not([type=checkbox]):not([type=radio]):not([type=hidden]),select,textarea';
+  const filterRow = (r, cells) => /filter/i.test(String(r.className || '')) || (r.querySelectorAll(FORM).length >= 2 && cells.filter((c) => cellText(c)).length <= Math.max(2, Math.floor(cells.length / 3)));
+  const dataRow = (r, cells) => !filterRow(r, cells) && cells.filter((c) => cellText(c)).length >= 2;
   function tables() { // [{labels, rows: [[texto de cada celda]]}]
     const out = [];
     for (const t of document.querySelectorAll('table')) {
@@ -42,19 +47,19 @@
       let hdr = null;
       for (const r of rows.slice(0, 5)) {
         const labels = [...r.cells].map((c) => lab(cellText(c)));
-        if (labels.filter(Boolean).length >= 3) { hdr = { r, labels }; break; }
+        if (labels.filter(Boolean).length >= 3 && !filterRow(r, [...r.cells])) { hdr = { r, labels }; break; }
       }
       if (!hdr) continue;
       const n = hdr.labels.length;
-      let data = rows.filter((r) => r !== hdr.r && !(r.parentElement && r.parentElement.tagName === 'THEAD'));
-      if (!data.some((r) => r.cells.length >= n - 1)) { // encabezado fijo: los datos están en otra tabla al lado
+      let data = rows.filter((r) => r !== hdr.r && !(r.parentElement && r.parentElement.tagName === 'THEAD') && dataRow(r, [...r.cells]));
+      if (!data.some((r) => r.cells.length >= n - 1)) { // encabezado fijo: los datos están en otra tabla al lado (la que tenga más filas)
         data = [];
         let box = t.parentElement;
         for (let i = 0; i < 6 && box && !data.length; i++, box = box.parentElement) {
           for (const t2 of box.querySelectorAll('table')) {
-            if (t2 === t) continue;
-            const rr = [...t2.rows].filter((r) => Math.abs(r.cells.length - n) <= 1);
-            if (rr.length) { data = rr; break; }
+            if (t2 === t || t2.contains(t) || t.contains(t2)) continue;
+            const rr = [...t2.rows].filter((r) => Math.abs(r.cells.length - n) <= 1 && dataRow(r, [...r.cells]));
+            if (rr.length > data.length) data = rr;
           }
         }
       }
@@ -65,7 +70,7 @@
       const hr = first.closest('[role=row]') || first.parentElement;
       const hc = [...hr.querySelectorAll('[role=columnheader]')];
       const byIdx = hc.every((c) => c.hasAttribute('aria-colindex')), idx = hc.map((c) => c.getAttribute('aria-colindex'));
-      const rows = [...document.querySelectorAll('[role=row]')].filter((r) => r.querySelector('[role=gridcell],[role=cell]'));
+      const rows = [...document.querySelectorAll('[role=row]')].filter((r) => r !== hr && r.querySelector('[role=gridcell],[role=cell]') && dataRow(r, [...r.querySelectorAll('[role=gridcell],[role=cell]')]));
       out.push({ labels: hc.map((c) => lab(cellText(c))), rows: rows.map((r) => {
         const cs = [...r.querySelectorAll('[role=gridcell],[role=cell]')];
         if (!byIdx) return cs.map(cellText);
@@ -129,11 +134,8 @@
     return { date: dt.date, time: dt.time, id, name: g('name'), country: g('country'), aff: g('aff'), camp: g('camp'), amount, tx: g('tx'), reg, brand: b ? brandOf(b) : brand, agent: g('agent') };
   }
   let agentHead = '';
-  function scanSales(T) {
-    const t = T.find((x) => isFtdTable(mapFtd(x.labels)));
-    if (!t) return null;
+  function salesOf(t) {
     const m = mapFtd(t.labels);
-    agentHead = m.agent >= 0 ? String(t.labels[m.agent] || '').replace(/\b\w/g, (c) => c.toUpperCase()) : '';
     let best = [];
     for (const off of [0, 1, -1]) { // por si las filas tienen una columna de más o de menos que el encabezado
       const sales = t.rows.map((c) => toSale(c, m, off)).filter(Boolean);
@@ -142,6 +144,15 @@
     }
     const seen = new Set();
     return best.filter((s) => { const k = s.id + '|' + s.tx; if (seen.has(k)) return false; seen.add(k); return true; });
+  }
+  function scanSales(T) {
+    const C = T.filter((x) => isFtdTable(mapFtd(x.labels)));
+    if (!C.length) return null;
+    let t = C[0], best = null;
+    for (const x of C) { const s = salesOf(x); if (!best || s.length > best.length) { best = s; t = x; } }
+    const m = mapFtd(t.labels);
+    agentHead = m.agent >= 0 ? String(t.labels[m.agent] || '').replace(/\b\w/g, (c) => c.toUpperCase()) : '';
+    return best;
   }
 
   /* ================= 2) clientes en "new" ================= */
@@ -153,10 +164,19 @@
     country: ['country', 'pais'],
     created: ['registration time', 'registration date', 'created at', 'created', 'registered', 'date'],
     agent: COLS.agent, camp: ['campaign', 'user source', 'utm campaign', 'source'], aff: ['affiliate', 'affiliate id', 'afiliado', 'aff id'],
+    call: ['last communication time', 'last communication', 'last call time', 'last call', 'last contact', 'ultima comunicacion', 'ultimo contacto'],
+    note: ['last note', 'note', 'notes', 'last comment', 'comment', 'nota', 'notas'],
   };
+  let clHead = null; // la tabla de clientes que encontré (para el diagnóstico)
   function scanAll(T) { // tabla con columna de estado que no sea la de FTDs: todas las filas, con su status
-    const t = T.find((x) => idxOf(x.labels, CL.status) >= 0 && !isFtdTable(mapFtd(x.labels)) && (idxOf(x.labels, CL.id) >= 0 || idxOf(x.labels, CL.name) >= 0 || idxOf(x.labels, CL.first) >= 0));
-    if (!t) return null;
+    const C = T.filter((x) => idxOf(x.labels, CL.status) >= 0 && !isFtdTable(mapFtd(x.labels)) && (idxOf(x.labels, CL.id) >= 0 || idxOf(x.labels, CL.name) >= 0 || idxOf(x.labels, CL.first) >= 0));
+    clHead = C.length ? C[0].labels : null;
+    if (!C.length) return null;
+    let best = null;
+    for (const x of C) { const r = clientsOf(x); if (!best || r.length > best.length) best = r; }
+    return best;
+  }
+  function clientsOf(t) {
     const ix = {}; for (const k in CL) ix[k] = idxOf(t.labels, CL[k]);
     const g = (c, k) => (ix[k] >= 0 ? c[ix[k]] || '' : '');
     const out = [];
@@ -165,9 +185,10 @@
       const name = g(c, 'name') || [g(c, 'first'), g(c, 'last')].filter(Boolean).join(' ');
       const id = g(c, 'id');
       if ((!id && !name) || !status) continue;
-      const r = parseDT(g(c, 'created'));
+      const r = parseDT(g(c, 'created')), lc = parseDT(g(c, 'call'));
       out.push({ key: id ? 'id:' + id : 'n:' + norm(name) + '|' + g(c, 'created'), id, name, country: g(c, 'country'), created: g(c, 'created'), status,
-        reg: r ? r.date + (r.time ? ' ' + r.time : '') : '', agent: g(c, 'agent'), camp: g(c, 'camp'), aff: g(c, 'aff'), brand });
+        reg: r ? r.date + (r.time ? ' ' + r.time : '') : '', agent: g(c, 'agent'), camp: g(c, 'camp'), aff: g(c, 'aff'), brand,
+        call: lc && lc.time ? lc.date + ' ' + lc.time : '', note: g(c, 'note').slice(0, 200) });
     }
     return out;
   }
@@ -255,10 +276,10 @@
     const rows = [];
     for (const c of all) {
       if (!c.id) continue;
-      const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country].join('|');
+      const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country, c.call, c.note].join('|');
       if (sentSig.get(k) === sig) continue;
       sentSig.set(k, sig);
-      rows.push({ id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff });
+      rows.push({ id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note });
     }
     if (!rows.length) return;
     try { sessionStorage.setItem('vitalis-seen', JSON.stringify([...sentSig].slice(-5000))); } catch (e) {}
@@ -320,13 +341,15 @@
       .ok{color:#1b874a}.warn{color:#b0620a}.err{color:#cf3049}
       .lnk{all:unset;cursor:pointer;color:#2f7fd0;text-decoration:underline;margin-left:6px}
       .min .sec{display:none}
-    </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
+      .vv{color:#5b685f;font-size:11px;font-weight:600;margin-left:-3px}
+    </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="vv">${escH(VER)}</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
       <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
       <div class="sec" id="sWatch"><div class="st" id="wst"></div><button class="go" id="wbtn"></button><div class="ids" id="wids"></div></div></div>`;
     root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales(false)));
     root.getElementById('wbtn').addEventListener('click', () => watchBtn());
     root.getElementById('who').addEventListener('change', (e) => { whoSel = e.target.value; render(); });
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
+    root.getElementById('wids').addEventListener('click', (e) => { if (e.target.closest('[data-diag]')) diagClients(); });
     root.getElementById('msg').addEventListener('click', (e) => { if (e.target.closest('[data-open]')) send({ type: 'open-panel' }); });
     document.documentElement.appendChild(h);
     return { h, root, $: (id) => root.getElementById(id), diag: false };
@@ -386,7 +409,8 @@
         $('wst').innerHTML = `Ninguna pestaña se actualiza sola. Esta suma clientes al registro${tot}.`;
         b.textContent = 'Actualizar esta pestaña'; b.className = 'go';
       }
-      $('wids').innerHTML = watched && clients && clients.length ? 'En new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
+      $('wids').innerHTML = unread() ? '<span class="warn">Veo la tabla de clientes pero no leo las filas.</span><button class="lnk" data-diag>Copiar diagnóstico</button>'
+        : watched && clients && clients.length ? 'En new: ' + clients.slice(0, 10).map((c) => `<b>${escH(c.id || c.name)}</b>`).join(', ') + (clients.length > 10 ? '…' : '') : '';
     }
     $('t').textContent = head.join(' · ');
   }
@@ -439,6 +463,16 @@
     if (Array.isArray(auto)) markTried(nuevas);
     const r = await send({ type: 'crm-import', rows: nuevas });
     result(r || { err: 'La extensión se actualizó: recargá la página.' });
+  }
+  // hay filas en la página pero no saqué ningún cliente (la tabla del CRM cambió)
+  const unread = () => !!(seen && !seen.length && [...document.querySelectorAll('tr')].filter((r) => r.cells.length >= 4 && dataRow(r, [...r.cells])).length >= 3);
+  function diagClients() { // solo la forma de las tablas (encabezados, clases, cantidad de celdas): ningún dato de clientes
+    const sh = (r) => { const cs = r.cells ? [...r.cells] : [...r.querySelectorAll('[role=gridcell],[role=cell]')];
+      return { cls: String(r.className || '').slice(0, 80), role: r.getAttribute('role') || '', cells: cs.length, ctl: r.querySelectorAll(FORM).length, txt: cs.filter((c) => cellText(c)).length }; };
+    const out = { v: VER, page: location.pathname, head: clHead, roleRows: document.querySelectorAll('[role=row]').length,
+      headers: [...document.querySelectorAll('[role=columnheader]')].slice(0, 25).map((c) => lab(cellText(c))),
+      tables: [...document.querySelectorAll('table')].slice(0, 12).map((t) => ({ cls: String(t.className || '').slice(0, 80), box: String((t.parentElement && t.parentElement.className) || '').slice(0, 80), rows: t.rows.length, first: [...t.rows].slice(0, 4).map(sh) })) };
+    navigator.clipboard.writeText(JSON.stringify(out)).then(() => setMsg('Copiado (sin datos de clientes). Mandáselo a quien mantiene Vitalis.', 'ok', 10000), () => setMsg('No pude copiar.', 'err'));
   }
   function diagnostic() { // si el CRM cambia y no encuentro la tabla: copia el HTML del encabezado para poder ajustarlo
     const el = [...document.querySelectorAll('th,td,div,span')].find((e) => /^transaction id$/i.test(cellText(e)));

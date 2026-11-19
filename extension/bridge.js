@@ -90,7 +90,7 @@
       chrome.runtime.sendMessage({ type: 'sync', items, known, snips, leadIds, desk, url: location.origin + location.pathname, user: String(d.user || '').slice(0, 60) }, (res) => {
         if (chrome.runtime.lastError) return;
         alive = true;
-        post({ type: 'ftd-agenda-ack', v: 1, scheduled: (res && res.scheduled) || 0 });
+        post({ type: 'ftd-agenda-ack', v: 1, scheduled: (res && res.scheduled) || 0, ver: chrome.runtime.getManifest().version });
         if (res && res.cmds && res.cmds.length) deliver(res.cmds);
         if (res && res.imports && res.imports.length) post({ type: 'ftd-agenda-import', v: 1, reqId: 'q' + Date.now(), rows: res.imports });
         if (res && res.leads && res.leads.length) post({ type: 'ftd-agenda-leads', v: 1, reqId: 'Q' + Date.now(), rows: res.leads });

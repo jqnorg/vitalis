@@ -258,7 +258,7 @@ async function crmSeen(rows) {
   for (const r of rows.slice(0, 1000)) {
     const id = cl(r.id, 60); if (!id) continue;
     const row = { id, brand: cl(r.brand, 40), name: cl(r.name, 120), country: cl(r.country, 60), status: cl(r.status, 60), reg: REG_RE.test(r.reg || '') ? r.reg : '',
-      agent: cl(r.agent, 80), camp: cl(r.camp, 120), aff: cl(r.aff, 60) };
+      agent: cl(r.agent, 80), camp: cl(r.camp, 120), aff: cl(r.aff, 60), call: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call || '') ? r.call : '', note: cl(r.note, 200) };
     row.k = seenKey(row) + '@' + now;
     q.set(seenKey(row), row);
   }

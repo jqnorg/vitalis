@@ -503,8 +503,10 @@ function importar(){
 
 
 /* ---------- puente con la extensión de Chrome (avisos de agenda) ---------- */
-let extSig='',extOk=0,extN=0,extBeat=0;
+let extSig='',extOk=0,extN=0,extBeat=0,extVer='',extWarned=0;
 const extOn=()=>extOk&&Date.now()-extOk<3*6e4;
+const vcmp=(a,b)=>{const x=String(a).split('.').map(Number),y=String(b).split('.').map(Number);for(let i=0;i<3;i++){const d=(x[i]||0)-(y[i]||0);if(d)return d}return 0};
+const extOld=()=>extOn()&&/^\d/.test(EXT_VER)&&vcmp(extVer||'0',EXT_VER)<0; // la extensión instalada es más vieja que la que se baja
 function postTop(msg){try{window.postMessage(msg,location.origin);return true}catch(e){return false}} // la extensión escucha en esta misma ventana
 function syncExt(){
   if(!ready)return;
@@ -552,7 +554,8 @@ window.addEventListener('message',e=>{
     return;
   }
   if(!d||d.type!=='ftd-agenda-ack'||d.v!==1)return;
-  const was=extOn();extOk=Date.now();extN=+d.scheduled||0;
+  const was=extOn();extOk=Date.now();extN=+d.scheduled||0;extVer=String(d.ver||'').slice(0,12);
+  if(extOld()&&!extWarned){extWarned=1;toast(`Tu extensión de Chrome es vieja${extVer?' ('+esc(extVer)+')':''}: bajá la ${esc(EXT_VER)} en Ajustes, cargala de nuevo y recargá el CRM.`,'warn')}
   if(!was){status();if(cur==='config'||cur==='agenda')V[cur].render({})}
 });
 

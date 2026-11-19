@@ -613,6 +613,16 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900006', status: 'RARO RARO' }])]);
   r = await as(B, "select status_group g from public.crm_clients where client_id = '900006'");
   ok(r.rows[0].g === 'low_potential', 'y los nuevos con ese status ya entran clasificados');
+  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([
+    { id: '70936', status: 'NA - DAY3', call: '2026-11-19 09:45', note: 'NA 3.1' }, { id: '70916', status: 'NA - DAY2' }, { id: '70759', status: 'Hang Up', call: '19/11/2026 09:46' },
+    { id: '70604', status: 'Call Again', note: 'x'.repeat(300) }])]);
+  r = await as(B, "select client_id, status_group g, last_call, note from public.crm_clients where client_id in ('70936','70916','70759','70604') order by client_id");
+  const N = Object.fromEntries(r.rows.map((x) => [x.client_id, x]));
+  ok(N['70936'].g === 'na' && N['70916'].g === 'na' && N['70759'].g === 'hang_up' && N['70604'].g === 'call_again', 'los status de Novara: NA - DAY2, NA - DAY3, Hang Up, Call Again');
+  ok(N['70936'].last_call === '2026-11-19 09:45' && N['70936'].note === 'NA 3.1' && N['70759'].last_call === null && N['70604'].note.length === 200, 'guarda el último contacto y la última nota (otro formato de fecha queda vacío; la nota, hasta 200)');
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '70936', status: 'NA - DAY3', call: '2026-11-19 11:02' }])]);
+  r = await as(B, "select last_call, note from public.crm_clients where client_id = '70936'");
+  ok(r.rows[0].last_call === '2026-11-19 11:02' && r.rows[0].note === 'NA 3.1', 'un contacto nuevo actualiza la hora y no borra la nota');
   R = await rpc(B, 'select public.set_queue_cap(40) j');
   ok(!!R.error, 'un agente no cambia el tope del grupo 3');
   R = await rpc(M, 'select public.set_queue_cap(40) j');

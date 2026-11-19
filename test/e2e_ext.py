@@ -43,6 +43,26 @@ T24_SINREP = '''<!doctype html><meta charset="utf-8"><title>CRM · FTDs</title><
 <tr><td>Success</td><td>17/11/2026 14:15</td><td>777101</td><td>Marta Gil</td><td>Peru</td><td>180</td><td>TX777101</td></tr>
 </tbody></table></body>'''
 
+# como el CRM de Novara: encabezado y fila de filtros en una tabla, las filas en otra, y la columna Actions fija aparte
+def _nv_row(i, c):
+    tds = ''.join(f'<td role="gridcell" aria-colindex="{j+1}">{v}</td>' for j, v in enumerate(['<div class="dx-select-checkbox"></div>'] + c + ['<i class="ic"></i>']))
+    return f'<tr class="dx-row dx-data-row" role="row" aria-rowindex="{i+1}">{tds}</tr>'
+_NV_H = ['', 'User ID', 'Country', 'Full Name', 'Affiliate', 'User Source', 'Sales Status', 'Last Communication Time', 'Registration Time', 'Last Note', 'Actions']
+_NV = [['880101', 'Mexico', 'Rosa Ibarra', '109028', 'App Uno', 'NA - DAY3', '19/11/2026 09:45', '17/11/2026 18:48', 'NA 3.1'],
+       ['880102', 'Chile', 'Tomás Vera', '108887', 'Capital Dos', 'NA - DAY2', '18/11/2026 12:33', '17/11/2026 18:35', 'vm 2.3'],
+       ['880103', 'Colombia', 'Inés Lara', '97285', 'Capital Dos', 'Hang Up', '19/11/2026 09:46', '17/11/2026 16:32', 'NA 2-2'],
+       ['880104', 'Colombia', 'Raúl Peña', '108887', 'App Tres', 'Call Again', '18/11/2026 15:19', '17/11/2026 14:42', 'The number is out of service'],
+       ['880105', 'Mexico', 'Eva Ruiz', '109028', 'App Uno', 'No Answer', '', '16/11/2026 18:38', '']]
+NOVARA = ('''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body style="font:12px system-ui;padding:10px"><button class="refresh-btn">⟳</button>
+<div class="dx-datagrid" role="grid"><div class="dx-datagrid-headers"><div class="dx-datagrid-content"><table class="dx-datagrid-table"><tbody>
+<tr class="dx-row dx-column-lines dx-header-row" role="row">''' + ''.join(f'<td role="columnheader" aria-colindex="{j+1}">{h}</td>' for j, h in enumerate(_NV_H)) + '''</tr>
+<tr class="dx-row dx-column-lines dx-datagrid-filter-row" role="row">''' + ''.join(f'<td role="gridcell" aria-colindex="{j+1}">{v}</td>' for j, v in enumerate(
+    ['', '<input placeholder="Search...">', '<input placeholder="Filter..."><select></select>', '<input placeholder="Search...">', '<input placeholder="Filter...">', '<input placeholder="Search...">',
+     '<div class="tag">No Answer, ... (8)</div>', '<input placeholder="Search...">', '<div>16/11/2026 - 20/11/2026</div><input type="text">', '<input placeholder="Search...">', ''])) + '''</tr>
+</tbody></table></div></div><div class="dx-datagrid-rowsview"><div class="dx-datagrid-content"><table class="dx-datagrid-table"><tbody>''' + ''.join(_nv_row(i, c) for i, c in enumerate(_NV)) + '''
+<tr class="dx-row dx-freespace-row"><td colspan="11"></td></tr></tbody></table></div>
+<div class="dx-datagrid-content dx-datagrid-content-fixed"><table class="dx-datagrid-table"><tbody>''' + ''.join('<tr class="dx-row dx-data-row"><td colspan="10" class="dx-pointer-events-none"></td><td><i class="ic"></i></td></tr>' for _ in _NV) + '''</tbody></table></div></div></div></body>''')
+
 async def main():
     srv = subprocess.Popen(['node', 'server.mjs', str(PORT)], cwd=pathlib.Path(__file__).parent, stdout=subprocess.PIPE, stderr=subprocess.STDOUT); time.sleep(5)
     errs = []
@@ -66,6 +86,7 @@ async def main():
             await ctx.route('https://cc-dal01.voiso.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body='<html><body><h1>Agent Workspace</h1></body></html>'))
             await ctx.route('https://crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=CRM))
             await ctx.route('https://crmtrade24seven.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=T24))
+            await ctx.route('https://crmnovaramarkets.com/novara', lambda r: r.fulfill(status=200, content_type='text/html', body=NOVARA))
             await ctx.route('https://crmtrade24seven.com/sinrep', lambda r: r.fulfill(status=200, content_type='text/html', body=T24_SINREP))
             sw = ctx.service_workers[0] if ctx.service_workers else await ctx.wait_for_event('serviceworker')
             ok('chrome-extension://' in sw.url, 'la extensión cargó')
@@ -157,6 +178,28 @@ async def main():
             await C.evaluate("()=>{const td=[...document.querySelectorAll('td')].find(t=>t.textContent==='No answer');td.textContent='NA-2'}"); await C.wait_for_timeout(3000)
             r = sql("select new_status from public.crm_status_log where client_id='555003' order by id")
             ok([x['new_status'] for x in r] == ['No answer', 'NA-2'], f'un cambio de status en el CRM queda en el historial ({r})')
+            # la lista de Novara (NA, Call Again y Hang Up), con fila de filtros, filas en otra tabla y la columna Actions fija
+            Nv = await ctx.new_page(); await Nv.goto('https://crmnovaramarkets.com/novara'); await Nv.wait_for_timeout(4000)
+            rows = sql("select client_id, status_group g, last_call, note, camp, aff, reg, country from public.crm_clients where client_id like '8801%' order by client_id")
+            G = {x['client_id']: x for x in rows}
+            ok(len(rows) == 5 and [G[k]['g'] for k in sorted(G)] == ['na', 'na', 'hang_up', 'call_again', 'na'], f'la lista de Novara llega entera y cada status en su grupo ({[(x["client_id"], x["g"]) for x in rows]})')
+            ok(G.get('880101', {}).get('last_call') == '2026-11-19 09:45' and G['880101']['note'] == 'NA 3.1' and G['880101']['camp'] == 'App Uno' and G['880101']['aff'] == '109028' and G['880101']['reg'] == '2026-11-17 18:48' and G['880105']['last_call'] is None,
+               f'con último contacto, última nota, campaña, afiliado y registro ({G.get("880101")})')
+            ok(sql("select count(*)::int c from public.crm_clients where status ilike '%no answer, %' or client_id ilike 'search%'")[0]['c'] == 0, 'la fila de filtros no es un cliente')
+            nvp = Nv.locator('#ftd-crm-button')
+            ok(await nvp.locator('.vv').inner_text() == json.loads((pathlib.Path(EXT) / 'manifest.json').read_text())['version'], 'el panel del CRM muestra la versión de la extensión')
+            ok('5 clientes a la vista' in await nvp.locator('#wst').inner_text() and await nvp.locator('[data-diag]').count() == 0, 'y cuántos clientes ve, sin pedir diagnóstico')
+            await Nv.screenshot(path=OUT / 'x2b_crm_novara.png')
+            await A2.evaluate("go('ahora')"); await A2.wait_for_timeout(1500)
+            t = await A2.locator('#ahBody').inner_text()
+            ok('880104' in t and '880101' in t and t.index('880104') < t.index('880103') < t.index('880102') < t.index('880101'), 'en Ahora: Call Again, Hang Up y después NA por día')
+            ok('NA 3.1' in t, 'con la última nota a la vista')
+            await A2.screenshot(path=OUT / 'x2c_ahora_novara.png')
+            # si la tabla cambia y no leo las filas, el panel ofrece copiar un diagnóstico sin datos de clientes
+            await Nv.evaluate("()=>document.querySelectorAll('.dx-datagrid-rowsview .dx-data-row').forEach(r=>{r.querySelectorAll('td').forEach(c=>c.removeAttribute('role'));r.insertAdjacentHTML('beforeend','<td>a</td><td>b</td><td>c</td>')})"); await Nv.wait_for_timeout(1500)
+            ok(await nvp.locator('[data-diag]').count() == 1 and 'no leo las filas' in await nvp.locator('#wids').inner_text(), 'si la tabla cambia y no leo las filas, el panel ofrece copiar un diagnóstico')
+            await Nv.screenshot(path=OUT / 'x2d_crm_diagnostico.png')
+            await Nv.close()
             # se actualiza solo la pestaña que elegís; esa avisa de los new y Vitalis abre la ficha cuando volvés
             cpn = C.locator('#ftd-crm-button')
             ok('Actualizar esta pestaña' in await cpn.locator('#wbtn').inner_text(), 'ninguna pestaña se actualiza sola hasta que elegís una')
