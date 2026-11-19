@@ -11,10 +11,11 @@ function ago(ms) {
   return m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`;
 }
 async function render() {
-  const { items = [], lastSync = 0, snips = [], leadQ = [], me = '' } = await chrome.storage.local.get(['items', 'lastSync', 'snips', 'leadQ', 'me']);
+  const { items = [], lastSync = 0, snips = [], leadQ = [], me = '', curLast = null } = await chrome.storage.local.get(['items', 'lastSync', 'snips', 'leadQ', 'me', 'curLast']);
   const st = document.getElementById('st'), ul = document.getElementById('list');
   document.getElementById('who').textContent = me;
-  st.textContent = lastSync ? `Sincronizado ${ago(lastSync)}.` : 'Abrí Vitalis en este Chrome para sincronizar.';
+  st.textContent = (lastSync ? `Sincronizado ${ago(lastSync)}.` : 'Abrí Vitalis en este Chrome para sincronizar.') + ` Versión ${chrome.runtime.getManifest().version}.`
+    + (curLast ? ` Cliente actual: ${curLast.id} (${ago(curLast.at)}${curLast.sent ? ', en Vitalis' : ', Vitalis no estaba abierto'}).` : ' Todavía no vi un cliente abierto en el CRM.');
   const stats = document.getElementById('stats'); stats.textContent = '';
   for (const [n, l] of [[items.length, items.length === 1 ? 'pendiente' : 'pendientes'], [snips.length, 'snippets'], [leadQ.length, 'clientes en cola']]) {
     const d = document.createElement('div'); const b = document.createElement('b'); b.textContent = n; const sm = document.createElement('small'); sm.textContent = l; d.append(b, sm); stats.appendChild(d);

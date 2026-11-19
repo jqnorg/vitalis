@@ -426,16 +426,42 @@
   function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } }
   // el cliente que tenés abierto en el CRM (su ficha: /user/123 o #/users/user/123): en Vitalis queda como "cliente actual"
   let curSent = '';
+  // el ID puede estar en la dirección (/user/123, #/users/user/123, ?userId=123) o en el encabezado de la ficha abierta
+  // como panel arriba de la lista ("ID 70370", aunque el número esté en otro elemento o al lado haya un ícono)
+  const ID_RE = /^\s*id\s*[:#]?\s*#?\s*(\d{4,})\s*$/i;
+  function idInUrl() {
+    const m = (location.pathname + ' ' + location.hash).match(/\/users?\/(?:user\/)?(\d{3,})(?=[/?#\s]|$)/i)
+      || (location.search + ' ' + location.hash).match(/[?&#](?:user_?id|client_?id|lead_?id)=(\d{3,})/i);
+    return m ? m[1] : '';
+  }
+  function idInPage() {
+    const root = document.body; if (!root) return null;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) {
+      const t = n.nodeValue; if (!t || t.length > 40 || !/(^|[^a-z])id([^a-z]|$)/i.test(t)) continue;
+      let el = n.parentElement;
+      for (let k = 0; el && k < 3; k++, el = el.parentElement) {
+        const tx = el.textContent || ''; if (tx.length > 48) break;
+        const m = tx.match(ID_RE); if (!m) continue;
+        if ((ui && ui.h.contains(el)) || !el.getClientRects().length) break;
+        return { id: m[1], el };
+      }
+    }
+    return null;
+  }
+  function nameNear(el) {
+    for (let e = el, k = 0; e && k < 3; k++, e = e.parentElement) {
+      const p = e.previousElementSibling; if (!p) continue;
+      const t = cellText(p).replace(/\s+/g, ' ').trim();
+      if (t && t.length <= 120 && !/\d{4,}/.test(t)) return t;
+    }
+    return '';
+  }
   function currentClient() {
-    const m = location.pathname.match(/\/user\/(\d{3,})/) || location.hash.match(/\/users\/user\/(\d{3,})/);
-    // si la ficha se abre como panel adentro de otra página: el "ID 12345" de su encabezado
-    const hd = m ? null : [...document.querySelectorAll('body *')].find((e) => !e.children.length && e.offsetParent && /^ID:?\s*\d{4,}$/.test((e.textContent || '').trim()));
-    if (!m && !hd) return null;
-    const id = m ? m[1] : hd.textContent.match(/\d{4,}/)[0];
-    let name = '';
-    const el = hd || [...document.querySelectorAll('body *')].find((e) => !e.children.length && /^ID:?\s*\d{3,}$/.test((e.textContent || '').trim()) && (e.textContent.match(/\d{3,}/) || [])[0] === id);
-    if (el) { const p = el.previousElementSibling || (el.parentElement && el.parentElement.previousElementSibling); if (p) name = cellText(p).replace(/\s+/g, ' ').trim().slice(0, 120); }
-    if (!name && document.title && !/crm|novara|login|users/i.test(document.title)) name = document.title.trim().slice(0, 120);
+    const uid = idInUrl(), hd = idInPage();
+    const id = uid || (hd && hd.id); if (!id) return null;
+    let name = hd && hd.id === id ? nameNear(hd.el) : '';
+    if (!name && uid && document.title && !/crm|novara|login|users/i.test(document.title)) name = document.title.trim().slice(0, 120);
     return { id, name };
   }
   function reportCurrent(force) {
