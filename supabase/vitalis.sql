@@ -1771,3 +1771,23 @@ drop trigger if exists sales_cheer on public.sales;
 create trigger sales_cheer after insert on public.sales for each row execute function public.sale_cheer();
 revoke all on function public.sale_cheer() from public, anon, authenticated; -- es de un trigger: nadie la llama
 create index if not exists messages_user on public.messages (user_id, created_at);
+
+-- el admin o el team leader mandan un mensaje por Vitalis (comando /vitalis en el chat). Solo texto.
+create or replace function public.vitalis_say(txt text, cid uuid default null) returns json
+  language plpgsql security definer set search_path = public, extensions as $$
+declare t uuid := public.my_team(); b uuid; c uuid; mid uuid;
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el administrador o el team leader manda mensajes por Vitalis'; end if;
+  txt := left(btrim(coalesce(txt, '')), 2000);
+  if txt = '' then raise exception 'Escribí el mensaje'; end if;
+  if txt like '[img:%' or txt like '[card:%' then raise exception 'Vitalis manda solo texto'; end if;
+  if cid is not null then select id into c from public.chats where id = cid and team_id = t and public.in_chat(id); end if;
+  if c is null then select id into c from public.chats where team_id = t and kind = 'team' limit 1; end if; -- por defecto, a toda la mesa
+  if c is null then raise exception 'No encontré el chat'; end if;
+  b := public.vitalis_bot(t);
+  if (select count(*) from public.messages where user_id = b and created_at > now() - interval '30 seconds') >= 8 then raise exception 'Muchos mensajes seguidos por Vitalis, esperá unos segundos'; end if;
+  insert into public.messages (chat_id, user_id, body) values (c, b, txt) returning id into mid;
+  return json_build_object('ok', true, 'id', mid, 'chat', c);
+end $$;
+grant execute on function public.vitalis_say(text, uuid) to authenticated;
+revoke all on function public.vitalis_say(text, uuid) from public, anon;

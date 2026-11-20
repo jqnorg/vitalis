@@ -308,6 +308,15 @@ async def main():
             await A.fill('#chIn', '@matias mirá esto'); await A.keyboard.press('Enter'); await A.wait_for_timeout(700)
             await D.evaluate('catchUp(true)'); await D.wait_for_timeout(600)
             ok(await D.locator('#toasts .toast:has-text("mirá esto")').count() == 1, 'pero si lo nombran, le llega igual')
+            # /vitalis: el team leader (o admin) manda un mensaje por Vitalis (el rechazo a agentes se prueba en sql.test)
+            await D.evaluate("go('chat')"); await D.wait_for_timeout(300)
+            await D.fill('#chIn', '/vitalis Disculpen la joda, ya lo arreglamos'); await D.keyboard.press('Enter'); await D.wait_for_timeout(900)
+            ok(sql("select count(*)::int c from public.messages m join public.profiles p on p.id=m.user_id where p.bot and m.body='Disculpen la joda, ya lo arreglamos'")[0]['c'] == 1, 'el team leader manda un mensaje por Vitalis con /vitalis')
+            ok(await D.input_value('#chIn') == '', 'y se limpia el campo')
+            await A.evaluate('catchUp(true)'); await A.wait_for_timeout(700)
+            ok('Disculpen la joda' in await A.inner_text('#chMsgs'), 'a la mesa le llega como mensaje de Vitalis')
+            sql("delete from public.messages where body='Disculpen la joda, ya lo arreglamos'")
+            await A.evaluate("go('social')"); await D.evaluate("go('social')")
             # responder y reaccionar
             await A.evaluate("go('chat')"); await A.wait_for_timeout(300)
             mm = A.locator('#chMsgs .ch-m:has-text("invito el mate")').first

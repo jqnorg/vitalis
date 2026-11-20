@@ -874,6 +874,27 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("delete from public.sales where client_id in ('88001','88002','88003')");
 }
 
+// ---------- /vitalis: admin o team leader mandan un mensaje por Vitalis ----------
+{
+  R = await rpc(C, "select public.vitalis_say('Mensaje de un agente') j"); // C es team leader ahora
+  const bot = (await db.query('select id from public.profiles where bot limit 1')).rows[0].id;
+  let m = (await db.query('select body, chat_id, user_id from public.messages where user_id = $1 order by created_at desc limit 1', [bot])).rows[0];
+  ok(!R.error && R.ok && m.body === 'Mensaje de un agente' && m.chat_id === TC, 'el team leader manda un mensaje por Vitalis, y va al chat de la mesa');
+  R = await rpc(A, "select public.vitalis_say('Hola desde el admin') j");
+  ok(!R.error && R.ok, 'el admin también');
+  r = await as(B, "select public.vitalis_say('No deberían') j"); // B es agente
+  ok(!!r.error && /administrador o el team leader/.test(r.error), `un agente no puede (${r.error})`);
+  ok((await db.query("select count(*)::int c from public.messages where body = 'No deberían'")).rows[0].c === 0, 'y no quedó nada');
+  R = await rpc(A, "select public.vitalis_say('   ') j");
+  ok(!!R.error, 'un mensaje vacío no va');
+  R = await rpc(A, "select public.vitalis_say('[img:x] trucho') j");
+  ok(!!R.error && /solo texto/.test(R.error), 'Vitalis manda solo texto (no imágenes ni tarjetas)');
+  R = await rpc(A, `select public.vitalis_say('A un grupo', '${G}') j`); // A está en el grupo G
+  m = (await db.query('select chat_id from public.messages where body = $1', ['A un grupo'])).rows[0];
+  ok(!R.error && m && m.chat_id === G, 'puede mandarlo a un chat puntual donde esté');
+  await db.query("delete from public.messages where user_id = (select id from public.profiles where bot limit 1) and body in ('Mensaje de un agente','Hola desde el admin','A un grupo')");
+}
+
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');

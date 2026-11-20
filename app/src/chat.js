@@ -210,6 +210,10 @@ Object.assign(B,{
       return await B.sendMsg(cid,`[img:${f.id}:${att.w}x${att.h}]`+(text?' '+text.slice(0,1900):''),reply);
     }catch(e){if(/chat_files|PGRST205|42P01/.test(String(e&&(e.message||e.code))))toast('Las imágenes se activan en un rato (falta actualizar la base).','warn');else dbErr(e);return false}
   },
+  async vitalisSay(cid,txt){ // admin / team leader: mandar por Vitalis (el mensaje llega a todos por tiempo real)
+    try{await Q(sb.rpc('vitalis_say',{txt,cid}));return true}
+    catch(e){if(/vitalis_say|PGRST202|42883|does not exist/.test(String(e&&(e.message||e.code))))toast('El comando /vitalis se activa en un rato (falta actualizar la base).','warn');else toast(esc(errMsg(e)),'err');return false}
+  },
   async sendMsg(cid,body,reply){
     try{const row=await Q(sb.from('messages').insert(reply?{chat_id:cid,body,reply_to:reply}:{chat_id:cid,body}).select().single());msgIn(M2X(row));markRead(cid);return true}
     catch(e){toast(esc(errMsg(e)),/^SLOW/.test(String(e.message||''))?'warn':'err');return false}
@@ -338,6 +342,15 @@ V.chat={
   },
   async send(){
     const i=$('#chIn'),v=i.value.trim(),cid=chatCur,att=chatAtt,rep=chatReply&&chatReply.chat===cid?chatReply._id:null;if((!v&&!att)||!cid)return;
+    if(!att&&/^\/vitalis\b/i.test(v)){ // mandar por Vitalis (solo admin / team leader)
+      const txt=v.replace(/^\/vitalis\b\s*/i,'').trim();
+      if(!isLeader())return toast('El comando /vitalis es solo para administradores y team leaders.','warn');
+      if(!txt)return toast('Escribí el mensaje: <b>/vitalis tu mensaje</b>','warn');
+      i.value='';chatDrafts[cid]='';growIn(i);this.men(true);
+      const ok=await B.vitalisSay(cid,txt);
+      if(!ok){i.value=v;chatDrafts[cid]=v;growIn(i)}
+      return;
+    }
     i.value='';chatDrafts[cid]='';growIn(i);this.men(true);const back=chatReply;this.reply(null);
     if(att){this.att(null,true);const sb_=$('#chForm .pri');sb_.disabled=true;
       const ok=await B.sendImg(cid,att,v,rep);sb_.disabled=false;

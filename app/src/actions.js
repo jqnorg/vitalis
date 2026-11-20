@@ -655,6 +655,7 @@ function ayuda(){
     <dt>@</dt><dd>Escribí @ y elegí a quién nombrar (flechas y Enter). El team leader tiene @todos.</dd>
     <dt>Compartir datos</dt><dd>Cada tarjeta con datos tiene el botón <svg class="ic" aria-hidden="true"><use href="#i-share"/></svg> arriba a la derecha: va al chat que elijas una foto de la tarjeta tal como la ves, con la hora, y un comentario si querés.</dd>
     <dt>Avisos del team leader</dt><dd>El team leader y los administradores pueden mandar lo que comparten como aviso: a todos los de ese chat les queda hasta que lo cierren, aunque lo tengan silenciado.</dd>
+    <dt>/vitalis <small class="dim">(admin y team leader)</small></dt><dd>Escribí <b>/vitalis</b> y tu mensaje en el chat para que lo mande Vitalis. Sin elegir chat va a toda la mesa.</dd>
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciar un chat (desde su encabezado) solo calla ese chat. Si te nombran o te responden, el aviso llega igual; si es el team leader con @todos o @vos, llega aunque tengas todo silenciado.</dd>
     <dt>Colores</dt><dd>Rojo: urgente (agenda, descansos). Cuero: importante (tareas, clientes new, el team leader). Celeste: chat y social. Verde: logros.</dd></dl>
   <h4>Filtros</h4><dl>
