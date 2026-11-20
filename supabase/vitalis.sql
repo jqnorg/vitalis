@@ -1459,6 +1459,7 @@ alter table public.calls enable row level security;
 drop policy if exists calls_read on public.calls;
 create policy calls_read on public.calls for select to authenticated using (team_id = public.my_team());
 grant select on public.calls to authenticated;
+revoke insert, update, delete, truncate on public.calls from authenticated;
 revoke all on public.calls from anon;
 -- se escriben solo por acá: de a 500, con la hora del toque (la extensión las guarda si Vitalis está cerrado)
 create or replace function public.calls_add(rows jsonb) returns json
