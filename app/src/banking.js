@@ -124,7 +124,7 @@ function bkOptions(pais=bkPais,tipo=bkTipo){ // procesador + método que sirven 
 function bkOptHTML(o){
   const {p,x}=o,note=p.status==='falla'?p.status_note:x.status_note,otros=pmOf(p.id).filter(y=>y.method_id!==x.method_id&&bkPaisOk(y.countries&&y.countries.length?y.countries:p.countries));
   return `<details class="bk-opt${o.falla?' falla':''}" data-k="${esc(p.id+'|'+x.method_id)}"><summary>${bkIcon(p.id)}<span><b>${esc(x.m.name)}</b> con ${esc(p.name)}</span><span class="grow"></span>${o.falla?`<span class="badge bad">Falla</span>`:'<span class="badge paid">Anda</span>'}</summary>
-    <div class="bk-od">${o.falla?`<p class="hot">⚠ ${esc(note||'Está fallando: no lo ofrezcas por ahora.')}</p>`:''}${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}
+    <div class="bk-od">${o.falla?`<p class="hot">⚠ ${esc(note||'Está fallando: no lo ofrezcas por ahora.')}</p>`:''}${x.note?`<div class="bk-mnote"><div class="bk-mnh"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><b>${esc(x.m.name)}</b></div><p>${esc(x.note)}</p></div>`:''}${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}
       ${otros.length?`<p class="dim">${esc(p.name)} también tiene: ${otros.map(y=>esc(y.m.name)).join(', ')}</p>`:''}${bkMini(p.id)}</div></details>`;
 }
 
@@ -140,6 +140,7 @@ function bankChips(b){
     a=(b.avoid_pm||[]).map(x=>`<span class="bk-chip avoid">✕ ${esc(comboTxt(x))}</span>`);
   return u.concat(a).join('');
 }
+let bkMiOpen=''; // la nota de método abierta: procesador|método
 V.banking={
   build(){
     $('#bkQ').addEventListener('input',e=>{bkQ=e.target.value;this.render({})});
@@ -149,6 +150,7 @@ V.banking={
       const pa=e.target.closest('[data-bkp]');if(pa){bkPais=pa.dataset.bkp;if(!bkPais)bkTipo='';this.render({});return} // paso 1: el país
       const t=e.target.closest('[data-bkt]');if(t){bkTipo=t.dataset.bkt;this.render({});return}
       const v=e.target.closest('[data-bkimg]');if(v)return bkLightbox(v.dataset.bkimg);
+      const mi=e.target.closest('[data-bkmi]');if(mi){bkMiOpen=bkMiOpen===mi.dataset.bkmi?'':mi.dataset.bkmi;this.render({});return} // la ⓘ: abre o cierra la nota del método
       const b=e.target.closest('[data-bka]');if(!b)return;const a=b.dataset.bka,id=b.dataset.id;
       if(a==='falla')return reportModal(id,true);
       if(a==='vuelve')return reportModal(id,false,b.dataset.m||'');
@@ -178,7 +180,8 @@ V.banking={
     const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
       return `<article class="bk-proc${p.status==='falla'?' falla':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(p.name)}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>x.status==='falla').length;return p.status==='falla'?'<span class="badge bad">Falla</span>':nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
         <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
-        <div class="bk-ms">${ms.length?ms.map(x=>`<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(x.status==='falla'?' · '+(x.status_note||'Falla'):x.countries&&x.countries.length?' · solo en '+x.countries.join(', '):''))}">${esc(x.m.name)}${!bkPais&&x.countries&&x.countries.length?` <small>${esc(isoTxt(x.countries))}</small>`:''}</span>`).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
+        <div class="bk-ms">${ms.length?ms.map(x=>{const k=p.id+'|'+x.method_id,on=bkMiOpen===k;return `<span class="bk-m ${x.status==='falla'||p.status==='falla'?'falla':'ok'}${on?' open':''}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(x.status==='falla'?' · '+(x.status_note||'Falla'):x.countries&&x.countries.length?' · solo en '+x.countries.join(', '):''))}">${esc(x.m.name)}${!bkPais&&x.countries&&x.countries.length?` <small>${esc(isoTxt(x.countries))}</small>`:''}${x.note?`<button type="button" class="bk-mi" data-bkmi="${esc(k)}" aria-expanded="${on}" aria-label="${on?'Cerrar':'Ver'} la nota de ${esc(x.m.name)}"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button>`:''}</span>`}).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
+        ${(x=>x&&x.note?`<div class="bk-mnote"><div class="bk-mnh"><b>${esc(x.m.name)}</b><span class="dim">${esc(p.name)}</span><span class="grow"></span><button type="button" class="ib" data-bkmi="${esc(p.id+'|'+x.method_id)}" aria-label="Cerrar la nota">✕</button></div><p>${esc(x.note)}</p></div>`:'')(ms.find(x=>bkMiOpen===p.id+'|'+x.method_id))}
         ${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}${bkMini(p.id)}
         ${ed?`<div class="bk-act"><button type="button" class="btn sm" data-bka="falla" data-id="${esc(p.id)}">Reportar falla</button>${p.status==='falla'||pmOf(p.id).some(x=>x.status==='falla')?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(p.id)}">Volvió a andar</button>`:''}<button type="button" class="btn sm" data-bka="edit" data-id="${esc(p.id)}">Editar</button></div>`:''}</article>`};
     const banks=bk.banks.filter(b=>(!bkPais||!b.country||b.country===bkPais)&&(hit(b.name)||hit(b.country)));
@@ -210,20 +213,22 @@ function procModal(p){
     <div class="fld"><span>Países <small class="dim">(sin marcar: todos)</small></span>${paisChecks(p&&p.countries,'bpC')}</div>
     <div class="fld"><span>Métodos de este procesador</span><div class="bk-paises" id="bpM">${bk.methods.map(m=>`<label class="chk"><input type="checkbox" value="${esc(m.id)}"${have.has(m.id)?' checked':''}>${esc(m.name)}</label>`).join('')||'<span class="dim">No hay métodos: agregá uno abajo.</span>'}</div>
       <div class="bk-row"><input id="bpNew" maxlength="60" placeholder="Método nuevo (ej.: Transferencia, Tarjeta, Boleto)">${kindSel('','bpNewK')}<button type="button" class="btn sm" id="bpAdd">Agregar</button></div></div>
-    <div class="fld"><span>En qué países está cada método <small class="dim">(sin marcar: en todos los del procesador)</small></span><div id="bpMC"></div></div>
+    <div class="fld"><span>Cada método: en qué países está <small class="dim">(sin marcar: en todos los del procesador)</small> y su nota</span><div id="bpMC"></div></div>
     <label class="fld"><span>Notas <small class="dim">(cómo se usa, límites, horarios…)</small></span><textarea id="bpNo" rows="4" maxlength="4000">${esc(p&&p.notes||'')}</textarea></label>
     ${bkPhotoField('processor',p&&p.id)}<div class="ebox" id="bpE"></div>`,
     onOpen:api=>{
       api._up=bkPhotoWire(api,'processor',()=>savedId);
       // países de cada método: solo los del procesador (o todos si el procesador no tiene)
-      const mc={};for(const x of p?bk.pm.filter(y=>y.processor_id===p.id):[])mc[x.method_id]=new Set(x.countries||[]);
-      api._mc=mc;
+      const mc={},mn={};for(const x of p?bk.pm.filter(y=>y.processor_id===p.id):[]){mc[x.method_id]=new Set(x.countries||[]);mn[x.method_id]=x.note||''}
+      api._mc=mc;api._mn=mn;
       const drawMC=()=>{
         api.box.querySelectorAll('#bpMC input:checked').forEach(i=>{(mc[i.dataset.m]||(mc[i.dataset.m]=new Set())).add(i.value)});
         api.box.querySelectorAll('#bpMC input:not(:checked)').forEach(i=>{if(mc[i.dataset.m])mc[i.dataset.m].delete(i.value)});
+        api.box.querySelectorAll('#bpMC [data-mnote]').forEach(t=>{mn[t.dataset.mnote]=t.value}); // lo escrito no se pierde al redibujar
         const base=[...api.box.querySelectorAll('[name=bpC]:checked')].map(i=>i.value),cs=base.length?base:PAISES;
         const ms=[...api.q('#bpM').querySelectorAll('input:checked')].map(i=>methOf(i.value)||{id:i.value,name:i.parentElement.textContent.trim()});
-        api.q('#bpMC').innerHTML=ms.length?ms.map(m=>`<div class="bk-mc"><b>${esc(m.name)}</b><div class="bk-paises">${cs.map(c=>`<label class="chk"><input type="checkbox" data-m="${esc(m.id)}" value="${esc(c)}"${mc[m.id]&&mc[m.id].has(c)?' checked':''}>${esc(c)}</label>`).join('')}</div></div>`).join(''):'<span class="dim">Marcá los métodos de arriba.</span>';
+        api.q('#bpMC').innerHTML=ms.length?ms.map(m=>`<div class="bk-mc"><b>${esc(m.name)}</b><div class="bk-paises">${cs.map(c=>`<label class="chk"><input type="checkbox" data-m="${esc(m.id)}" value="${esc(c)}"${mc[m.id]&&mc[m.id].has(c)?' checked':''}>${esc(c)}</label>`).join('')}</div>
+          <textarea class="bk-mnin" data-mnote="${esc(m.id)}" rows="2" maxlength="1000" placeholder="Nota de ${esc(m.name)} (opcional): cómo se usa, qué le pide al cliente…" aria-label="Nota de ${esc(m.name)}">${esc(mn[m.id]||'')}</textarea></div>`).join(''):'<span class="dim">Marcá los métodos de arriba.</span>';
       };
       api._drawMC=drawMC;drawMC();
       api.box.addEventListener('change',e=>{if(e.target.closest('#bpM')||e.target.name==='bpC')drawMC()});
@@ -243,10 +248,11 @@ function procModal(p){
         const want=new Set([...api.q('#bpM').querySelectorAll('input:checked')].map(i=>i.value));
         api._drawMC();const base=countries.length?countries:PAISES;
         const csOf=id=>{const s=api._mc[id];const l=s?base.filter(c=>s.has(c)):[];return l.length===base.length?[]:l}; // todos marcados = como el procesador
-        const add=[...want].filter(id=>!have.has(id)).map(method_id=>({processor_id:savedId,method_id,countries:csOf(method_id)})),del=[...have].filter(id=>!want.has(id));
+        const noteOf=id=>(api._mn[id]||'').trim().slice(0,1000)||null;
+        const add=[...want].filter(id=>!have.has(id)).map(method_id=>({processor_id:savedId,method_id,countries:csOf(method_id),note:noteOf(method_id)})),del=[...have].filter(id=>!want.has(id));
         if(add.length&&!await bkSave(sb.from('processor_methods').insert(add)))return false;
         for(const id of [...want].filter(id=>have.has(id))){const now=bk.pm.find(x=>x.processor_id===savedId&&x.method_id===id),cs=csOf(id);
-          if(now&&JSON.stringify(now.countries||[])!==JSON.stringify(cs)&&!await bkSave(sb.from('processor_methods').update({countries:cs}).eq('processor_id',savedId).eq('method_id',id)))return false}
+          if(now&&(JSON.stringify(now.countries||[])!==JSON.stringify(cs)||(now.note||null)!==noteOf(id))&&!await bkSave(sb.from('processor_methods').update({countries:cs,note:noteOf(id)}).eq('processor_id',savedId).eq('method_id',id)))return false}
         if(del.length&&!await bkSave(sb.from('processor_methods').delete().eq('processor_id',savedId).in('method_id',del)))return false;
         await api._up();await bkLoad(true);toast(p?'Procesador guardado.':`Procesador <b>${esc(name)}</b> cargado.`);
       }}]});

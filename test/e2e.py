@@ -742,6 +742,9 @@ async def main():
             await A.check('.mbox [name=bpC][value="Colombia"]'); await A.wait_for_timeout(200)
             tid0 = sql("select id from public.pay_methods where name='Transferencia'")[0]['id']
             await A.check(f'#bpMC [data-m="{tid0}"][value="Chile"]')
+            await A.fill(f'#bpMC [data-mnote="{tid0}"]', 'Pide el RUT del titular.\nSolo cuentas a su nombre.')
+            await A.check('.mbox [name=bpC][value="Perú"]'); await A.uncheck('.mbox [name=bpC][value="Perú"]'); await A.wait_for_timeout(200)
+            ok('Pide el RUT' in await A.input_value(f'#bpMC [data-mnote="{tid0}"]'), 'la nota del método no se pierde al cambiar los países')
             await A.set_input_files('.mbox [data-bkfiles]', files=[{'name': 'paso.png', 'mimeType': 'image/png', 'buffer': PNG}])
             await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1800)
             ok(sql("select count(*)::int c from public.processor_methods pm join public.processors p on p.id=pm.processor_id where p.name='Kushki'")[0]['c'] == 2, 'banking: el admin carga un procesador con dos métodos')
@@ -749,6 +752,13 @@ async def main():
             pmc = {r['name']: r['countries'] for r in sql("select m.name, pm.countries from public.processor_methods pm join public.pay_methods m on m.id=pm.method_id")}
             ok(pmc.get('Transferencia') == ['Chile'] and pmc.get('Tarjeta') == [], f'un método puede estar solo en algunos países del procesador ({pmc})')
             ok(sql("select string_agg(kind, ',' order by name) k from public.pay_methods")[0]['k'] == 'tarjeta,transferencia', 'cada método con su tipo de pago (se adivina por el nombre)')
+            ok(sql("select pm.note from public.processor_methods pm join public.pay_methods m on m.id=pm.method_id where m.name='Transferencia'")[0]['note'] == 'Pide el RUT del titular.\nSolo cuentas a su nombre.', 'cada método guarda su nota')
+            ok(await A.locator('#bkBody .bk-m:has-text("Transferencia") [data-bkmi]').count() == 1 and await A.locator('#bkBody .bk-m:has-text("Tarjeta") [data-bkmi]').count() == 0, 'la ⓘ aparece solo en el método con nota')
+            await A.click('#bkBody .bk-m:has-text("Transferencia") [data-bkmi]'); await A.wait_for_timeout(300)
+            ok(await A.locator('#bkBody .bk-mnote').count() == 1 and 'Solo cuentas a su nombre' in await A.inner_text('#bkBody .bk-mnote'), 'al tocarla se despliega el cuadro con la nota entera')
+            await A.locator('#bkBody .bk-proc').first.screenshot(path=OUT / 'b2b_nota_metodo.png')
+            await A.click('#bkBody .bk-m:has-text("Transferencia") [data-bkmi]'); await A.wait_for_timeout(300)
+            ok(await A.locator('#bkBody .bk-mnote').count() == 0, 'y al tocarla de nuevo se cierra')
             # ¿Cómo paga el cliente?: país → efectivo o digital → tarjeta o transferencia → opciones que se despliegan
             ok(await A.locator('#bkBody [data-bkt]').count() == 0, 'paso a paso: primero el país')
             await A.click('#bkBody [data-bkp="Chile"]'); await A.wait_for_timeout(300)
@@ -760,6 +770,7 @@ async def main():
             ok(await A.locator('#bkBody .bk-opt').count() == 1 and 'Transferencia con Kushki' in await A.inner_text('#bkBody .bk-opt summary'), 'y muestra las opciones: transferencia con Kushki')
             await A.click('#bkBody .bk-opt summary'); await A.wait_for_timeout(300)
             ok(await A.locator('#bkBody .bk-opt[open]').count() == 1, 'la opción se despliega')
+            ok('Pide el RUT' in await A.inner_text('#bkBody .bk-opt[open] .bk-od'), 'y en la opción también está la nota del método')
             await A.locator('#bkBody .bk-paso').screenshot(path=OUT / 'b3_como_paga.png')
             await A.click('#bkBody [data-bkp="Colombia"]'); await A.wait_for_timeout(300)
             ok(await A.locator('#bkBody .bk-opt').count() == 0, 'en Colombia Kushki no tiene transferencia')

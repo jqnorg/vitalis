@@ -1329,6 +1329,8 @@ create table if not exists public.pay_files (
   created_at timestamptz not null default now()
 );
 create index if not exists pay_files_ref on public.pay_files (team_id, ref_kind, ref_id);
+-- nota de cada método en cada procesador (cómo se usa, qué pide…): se abre con la ⓘ de la tarjeta verde
+alter table public.processor_methods add column if not exists note text check (length(note) <= 1000);
 -- el paso anterior: cómo paga el cliente (efectivo, o digital: transferencia o tarjeta)
 alter table public.pay_methods add column if not exists kind text check (kind in ('efectivo', 'transferencia', 'tarjeta'));
 update public.pay_methods set kind = case

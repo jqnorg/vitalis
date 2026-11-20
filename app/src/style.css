@@ -1186,3 +1186,20 @@ details[data-k=seg]>summary{cursor:pointer;list-style:none}
 details[data-k=seg]>summary::-webkit-details-marker{display:none}
 details[data-k=seg][open]>summary{margin-bottom:10px}
 @media(max-width:640px){.rd-2{grid-template-columns:1fr}}
+
+/* Banking: la ⓘ de cada método y el cuadro con su nota */
+.bk-m{display:inline-flex;align-items:center;gap:4px}
+.bk-mi{display:inline-grid;place-items:center;width:18px;height:18px;margin:-2px -5px -2px 1px;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;opacity:.75}
+.bk-mi:hover,.bk-m.open .bk-mi{opacity:1;background:color-mix(in srgb,currentColor 14%,transparent)}
+.bk-mi:focus-visible{outline:2px solid var(--pri);outline-offset:1px}
+.bk-mi svg.ic{width:14px;height:14px}
+.bk-m.open{box-shadow:0 0 0 1.5px var(--pri)}
+.bk-mnote{border:1px solid color-mix(in srgb,var(--pri) 35%,var(--line));background:color-mix(in srgb,var(--pri) 6%,var(--panel));border-radius:12px;padding:9px 12px;animation:bkmn .16s ease-out}
+.bk-mnh{display:flex;align-items:center;gap:6px;font-size:13px;margin-bottom:4px}
+.bk-mnh svg.ic{width:15px;height:15px;color:var(--pri)}
+.bk-mnh .ib{padding:0 4px}
+.bk-mnote p{margin:0;white-space:pre-wrap;font-size:13.5px;line-height:1.45}
+.bk-od .bk-mnote{margin:4px 0 8px}
+.bk-mc .bk-mnin{width:100%;margin-top:6px;font:inherit;font-size:13px;resize:vertical}
+@keyframes bkmn{from{opacity:0;transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.bk-mnote{animation:none}}
