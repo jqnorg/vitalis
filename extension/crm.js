@@ -327,6 +327,7 @@
     if (!m) return;
     const id = idNear(b) || idInUrl() || ((idInPage() || {}).id || ''); if (!id) return;
     sendSure({ type: 'crm-seen', rows: [{ id, brand, ln: m[1].toLowerCase(), at: new Date().toISOString() }] });
+    { const c = currentClient(); sendCurrent(id, c && c.id === id ? c.name : '', true); } // a quien llamás es tu cliente actual
   }, true);
 
   // en la pestaña que se actualiza: un Talking que desaparece de la lista ya cambió de status en el CRM.
@@ -528,11 +529,16 @@
     if (!name && uid && document.title && !/crm|novara|login|users/i.test(document.title)) name = document.title.trim().slice(0, 120);
     return { id, name };
   }
+  // el cliente actual sale de las pestañas donde el agente trabaja y llama, nunca de la que se actualiza sola para los news
   function reportCurrent(force) {
-    if (document.visibilityState !== 'visible') return;
+    if (watched || document.visibilityState !== 'visible') return;
     const c = currentClient(); if (!c) return;
-    const sig = c.id + '|' + c.name; if (!force && sig === curSent) return; curSent = sig;
-    send({ type: 'crm-current', id: c.id, name: c.name, brand }).then((r) => curPill(c.id, r)); // aviso chico para saber que Vitalis lo tomó
+    sendCurrent(c.id, c.name, force);
+  }
+  function sendCurrent(id, name, force) {
+    if (watched || !id) return;
+    const sig = id + '|' + (name || ''); if (!force && sig === curSent) return; curSent = sig;
+    send({ type: 'crm-current', id, name: name || '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
   }
   let pillT = null;
   function curPill(id, r) {

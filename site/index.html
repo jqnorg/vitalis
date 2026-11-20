@@ -1218,6 +1218,20 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
 @media (prefers-reduced-motion:reduce){.bk-mnote{animation:none}}
 
 .bk-m .bk-fc{color:var(--err);opacity:1;font-weight:600}
+
+/* Cliente en el menú: verde vivo, con un brillo que respira y un destello que pasa (lo pidió el dueño) */
+#nav button.nv-cli{position:relative;overflow:hidden;color:#fff;background:linear-gradient(135deg,#19c48a,#0f7a55 70%);box-shadow:0 0 0 1px rgba(25,196,138,.45),0 4px 14px rgba(16,185,129,.35);animation:cliGlow 2.4s ease-in-out infinite;margin:2px 0}
+#nav button.nv-cli svg{color:#fff;position:relative;z-index:1}
+#nav button.nv-cli .nm,#nav button.nv-cli .nb,#nav button.nv-cli kbd{position:relative;z-index:1}
+#nav button.nv-cli::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.42) 50%,transparent 65%);transform:translateX(-120%);animation:cliShine 4.2s ease-in-out infinite;pointer-events:none}
+#nav button.nv-cli:hover{color:#fff;background:linear-gradient(135deg,#1fd497,#0f7a55 70%)}
+#nav button.nv-cli.on{color:#fff;background:linear-gradient(135deg,#19c48a,#0f7a55 70%);outline:2px solid #19c48a;outline-offset:2px}
+body.dark #nav button.nv-cli.on{color:#fff}
+#nav button.nv-cli kbd{color:#0f3d2b;background:rgba(255,255,255,.85);border-color:transparent}
+#nav .nb.cli{background:rgba(255,255,255,.22);color:#fff;font-weight:600;font-variant-numeric:tabular-nums;max-width:9ch;overflow:hidden;text-overflow:ellipsis}
+@keyframes cliGlow{0%,100%{box-shadow:0 0 0 1px rgba(25,196,138,.45),0 3px 10px rgba(16,185,129,.28)}50%{box-shadow:0 0 0 1px rgba(25,196,138,.75),0 6px 24px rgba(16,185,129,.62)}}
+@keyframes cliShine{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+@media (prefers-reduced-motion:reduce){#nav button.nv-cli{animation:none}#nav button.nv-cli::after{display:none}}
 </style>
 </head>
 <body class="auth">
@@ -1260,6 +1274,7 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
+    <button type="button" data-g="cliente" data-v="cliente" class="nv-cli" title="Cliente actual (L)"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><span class="nb cli" id="nbCli"></span><kbd>L</kbd></button>
     <button type="button" data-g="panel" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Panel</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
@@ -1542,8 +1557,8 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.0';
-const EXT_VER='1.9.1'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.23.1';
+const EXT_VER='1.9.2'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2449,9 +2464,11 @@ const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
+function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.title=curCl?'Cliente actual: '+(curCl.name||curCl.id):''}} // el cliente actual, en el botón del menú
 const GROUPS=[
   {g:'inicio',views:['inicio','sueldo','turnos'],tabs:['Hoy','Sueldo','Turnos']},
-  {g:'panel',views:['ahora','cliente','agenda'],tabs:['Cola','Cliente','Agenda']},
+  {g:'cliente',views:['cliente']}, // el cliente con el que estás hablando: botón propio en el menú, que brilla
+  {g:'panel',views:['ahora','agenda'],tabs:['Cola','Agenda']},
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
@@ -2462,7 +2479,7 @@ const GROUPS=[
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
 function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.views[0])} // Inicio siempre vuelve a Hoy
-const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo
+const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
@@ -2511,6 +2528,7 @@ function status(){
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const q=queueOf(tlView()||isLeadUid(me)?null:me);$('#nbAh').textContent=q.g1.length||''}
   // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
+  cliBadge();
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
    const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
   {const f=typeof bkFallas==='function'&&bk.ok?bkFallas().length:0;$('#nbBk').textContent=f?'⚠ '+f:''}
@@ -6263,7 +6281,7 @@ function setCurrent(id,name,src){
   id=String(id||'').trim();if(!id)return;
   const same=curCl&&curCl.id===id;
   curCl={id,name:name||(same&&curCl.name)||'',src,at:Date.now()};local.set('curCl',curCl);
-  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);
+  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);cliBadge();
   if(src!=='lista'&&!same)cuShow(src);
   else if(cur==='cliente')cuRender(!same);
 }

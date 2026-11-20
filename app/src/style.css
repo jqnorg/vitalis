@@ -1205,3 +1205,17 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
 @media (prefers-reduced-motion:reduce){.bk-mnote{animation:none}}
 
 .bk-m .bk-fc{color:var(--err);opacity:1;font-weight:600}
+
+/* Cliente en el menú: verde vivo, con un brillo que respira y un destello que pasa (lo pidió el dueño) */
+#nav button.nv-cli{position:relative;overflow:hidden;color:#fff;background:linear-gradient(135deg,#19c48a,#0f7a55 70%);box-shadow:0 0 0 1px rgba(25,196,138,.45),0 4px 14px rgba(16,185,129,.35);animation:cliGlow 2.4s ease-in-out infinite;margin:2px 0}
+#nav button.nv-cli svg{color:#fff;position:relative;z-index:1}
+#nav button.nv-cli .nm,#nav button.nv-cli .nb,#nav button.nv-cli kbd{position:relative;z-index:1}
+#nav button.nv-cli::after{content:'';position:absolute;inset:0;background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.42) 50%,transparent 65%);transform:translateX(-120%);animation:cliShine 4.2s ease-in-out infinite;pointer-events:none}
+#nav button.nv-cli:hover{color:#fff;background:linear-gradient(135deg,#1fd497,#0f7a55 70%)}
+#nav button.nv-cli.on{color:#fff;background:linear-gradient(135deg,#19c48a,#0f7a55 70%);outline:2px solid #19c48a;outline-offset:2px}
+body.dark #nav button.nv-cli.on{color:#fff}
+#nav button.nv-cli kbd{color:#0f3d2b;background:rgba(255,255,255,.85);border-color:transparent}
+#nav .nb.cli{background:rgba(255,255,255,.22);color:#fff;font-weight:600;font-variant-numeric:tabular-nums;max-width:9ch;overflow:hidden;text-overflow:ellipsis}
+@keyframes cliGlow{0%,100%{box-shadow:0 0 0 1px rgba(25,196,138,.45),0 3px 10px rgba(16,185,129,.28)}50%{box-shadow:0 0 0 1px rgba(25,196,138,.75),0 6px 24px rgba(16,185,129,.62)}}
+@keyframes cliShine{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+@media (prefers-reduced-motion:reduce){#nav button.nv-cli{animation:none}#nav button.nv-cli::after{display:none}}

@@ -288,7 +288,7 @@ function setCurrent(id,name,src){
   id=String(id||'').trim();if(!id)return;
   const same=curCl&&curCl.id===id;
   curCl={id,name:name||(same&&curCl.name)||'',src,at:Date.now()};local.set('curCl',curCl);
-  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);
+  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);cliBadge();
   if(src!=='lista'&&!same)cuShow(src);
   else if(cur==='cliente')cuRender(!same);
 }

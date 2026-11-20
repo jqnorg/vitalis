@@ -78,10 +78,11 @@ async def main():
             ok(time.time() - t0 < 1.5, f'al volver a abrir, Vitalis se dibuja al instante con lo guardado ({time.time()-t0:.2f}s)')
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
-            order = ['inicio', 'panel', 'tareas', 'chat', 'banking', 'analisis', 'ajustes', 'equipo']
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, Panel, Tareas, Chat, Banking, Análisis (y Equipo); Ajustes abajo')
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 7, 'en la compu se ven 7 botones (Ajustes va abajo, junto a tu nombre)')
-            tabs = {'inicio': ['inicio', 'sueldo', 'turnos'], 'panel': ['ahora', 'cliente', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'filtros']}
+            order = ['inicio', 'cliente', 'panel', 'tareas', 'chat', 'banking', 'analisis', 'ajustes', 'equipo']
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, Cliente, Panel, Tareas, Chat, Banking, Análisis (y Equipo); Ajustes abajo')
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 8, 'en la compu se ven 8 botones (Ajustes va abajo, junto a tu nombre)')
+            ok(await A.evaluate("getComputedStyle(document.querySelector('#nav .nv-cli')).animationName.includes('cliGlow')"), 'Cliente está en el menú, en verde vivo y brillando')
+            tabs = {'inicio': ['inicio', 'sueldo', 'turnos'], 'cliente': ['cliente'], 'panel': ['ahora', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'filtros']}
             i = 0
             for g, vs in tabs.items():
                 await A.click(f'#nav [data-g={g}]'); await A.wait_for_timeout(400)

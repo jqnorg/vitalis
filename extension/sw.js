@@ -360,6 +360,8 @@ const updW = (tabId, fn) => lock('w', async () => { // fn recibe la vigilancia d
   await chrome.storage.local.set({ watches: all }); return w;
 });
 const setW = (tabId, w) => updW(tabId, () => w);
+let wCache = {}; chrome.storage.local.get('watches').then((s) => { wCache = s.watches || {}; }); chrome.storage.onChanged.addListener((ch) => { if (ch.watches) wCache = ch.watches.newValue || {}; });
+const watchedTab = (id) => !!wCache[id];
 const isCrmUrl = async (url) => { try { const h = new URL(url).hostname, s = (await chrome.storage.local.get('crmSites')).crmSites || {}; return /(^|\.)crm(novaramarkets|trade24seven)\.com$/.test(h) || !!s[h]; } catch (e) { return false; } };
 // el team leader no gestiona clientes: puede tener varias pestañas actualizándose (para el registro, sin avisos de new)
 const deskRole = async () => (((await chrome.storage.local.get('desk')).desk) || {}).role || '';
@@ -512,6 +514,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }
+  if (msg.type === 'crm-current' && msg.id && sender.tab && watchedTab(sender.tab.id)) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news no cuenta (copias viejas de crm.js)
   if (msg.type === 'crm-current' && msg.id) { // el cliente abierto en el CRM: Vitalis lo muestra como cliente actual (en la cola queda solo el último)
     (async () => {
       const c = { cmd: 'actual', k: String(msg.id).slice(0, 60), r: String(msg.name || '').slice(0, 120), at: Date.now() };
