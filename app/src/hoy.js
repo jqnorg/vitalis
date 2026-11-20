@@ -1,8 +1,7 @@
 /* ============================================================
-   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y el cielo.
+   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y la franja de news por repasar.
    Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader), cada NA (1 a 4), CA, HU, CallBack y Pending
    llamado al menos una vez en el día, y los news del día repasados cada menos de 2 h. Un intento completo es por las tres líneas.
-   El pool de hoy (la joya, chiquita): cada cliente es una estrella; apagada sin llamar hoy, a medias por una o dos líneas, encendida por las tres.
    ============================================================ */
 let calls=[],callsOk=null,callsDay='';
 const LINES={omega:'Omega',gizat:'Gizat',voiso:'Voiso'};
@@ -85,63 +84,21 @@ function hoyBand(){
     <span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button>`;
 }
 
-/* ---------- el cielo ---------- */
-const fnv=s=>{let h=2166136261;for(const c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
-const rnd=seed=>()=>{seed=Math.imul(seed^seed>>>15,2246822507)^Math.imul(seed^seed>>>13,3266489909);return ((seed^=seed>>>16)>>>0)/4294967296};
-const linesTxt=k=>k.lines.size?[...k.lines].map(l=>LINES[l]).join(' · '):k.today?'en el CRM':'sin llamar hoy';
-function skySVG(P,uid,o={}){
-  const W=o.w||1000,H=o.h||250,mini=!!o.mini,pad=mini?6:18;
-  const R=rnd(fnv(uid||'mesa')),dust=Array.from({length:mini?18:70},()=>`<circle cx="${(R()*W).toFixed(1)}" cy="${(R()*H).toFixed(1)}" r="${(R()*.9+.25).toFixed(2)}" class="dust"/>`).join('');
-  const pos=x=>{const h=fnv(norm(x.r.id)),h2=fnv(x.r.id+'·');return [pad+(h%10007)/10007*(W-2*pad),pad+(h2%10009)/10009*(H-2*pad)]};
-  const sz=x=>(mini?{news:3.2,cb:2.6,g3:2.1}:{news:6.5,cb:5,g3:4})[x.g];
-  const st=x=>x.k.full?'full':x.k.today?'half':'off';
-  // el recorrido del día: las estrellas en el orden en que las llamaste
-  const trail=!mini&&P.items.filter(x=>isFinite(x.k.first)).sort((a,b)=>a.k.first-b.k.first).map(x=>pos(x).map(v=>v.toFixed(1)).join(',')).join(' ');
-  const stars=P.items.map(x=>{const [cx,cy]=pos(x),r=sz(x),s=st(x);
-    const tip=`${x.r.id} ${x.r.name||''} · ${x.r.status||''} · ${x.g==='news'?'new de hoy · ':''}${linesTxt(x.k)}${x.k.last?' · '+rel(new Date(x.k.last)):''}`;
-    return `<g class="st ${s} ${x.g}${x.due?' due':''}" data-id="${esc(x.r.id)}" transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)})"${mini?'':` tabindex="0" role="button" aria-label="${esc(tip)}"`}><title>${esc(tip)}</title>
-      ${s!=='off'?`<circle class="halo" r="${(r*(s==='full'?3.4:2.2)).toFixed(1)}"/>`:''}${x.due?`<circle class="ring" r="${(r*2.1).toFixed(1)}"/>`:''}<circle class="core" r="${r}"/>${s==='half'&&!mini?`<circle class="part" r="${(r+2.2).toFixed(1)}" pathLength="3" stroke-dasharray="${x.k.lines.size} 3"/>`:''}</g>`}).join('');
-  return `<svg class="sky${mini?' mini':''}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(`${P.done} de ${P.total} clientes llamados hoy`)}">
-    <defs><radialGradient id="skg"><stop offset="0" stop-color="currentColor" stop-opacity=".55"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></radialGradient></defs>
-    ${dust}${trail?`<polyline class="trail" points="${trail}"/>`:''}${stars}</svg>`;
-}
-const pctOf=(a,b)=>b?Math.round(a/b*100):0;
-function meter(lb,v,max,sub,mark){const p=Math.min(100,pctOf(v,max));return `<div class="hm"><div class="hm-l"><span>${lb}</span><b>${v}<small>/${max}</small></b></div><div class="hm-b"><i style="width:${p}%"></i>${mark!=null?`<s style="left:${Math.min(100,pctOf(mark,max))}%" title="A esta altura de tu jornada"></s>`:''}</div><div class="hm-s">${sub}</div></div>`}
-function paceTxt(pc){if(pc.exp==null)return 'marcá Entrada para medir tu ritmo';if(pc.n>=pc.min)return 'mínimo cumplido';if(pc.exp<10)return 'recién empieza tu jornada';return pc.ok?`vas bien · a esta altura, ${pc.exp}`:`vas atrasado · a esta altura, ${pc.exp}`}
-// el pool de hoy: en el inicio, el tuyo (chico); el de cada uno, solo en Equipo
-const skyLegend=`<div class="sky-leg"><span><i class="lg off"></i>sin llamar hoy</span><span><i class="lg half"></i>a medias</span><span><i class="lg full"></i>las 3 líneas</span><span><i class="lg news"></i>new de hoy</span></div>`;
-function poolCard(){
-  if(crm.ok===false||!meNeedsDay())return '';
-  const P=dayPool(me),pc=dayPace(me);
-  const halfTxt=P.half.length?`<div class="sky-half"><span class="d">A medias:</span>${P.half.slice(0,5).map(x=>`<button type="button" class="chip" data-hy="ficha" data-id="${esc(x.r.id)}" title="Te falta ${esc(Object.keys(LINES).filter(l=>!x.k.lines.has(l)).map(l=>LINES[l]).join(' y '))}"><b>${esc(x.r.id)}</b> ${esc([...x.k.lines].map(l=>LINES[l]).join(' · '))}</button>`).join('')}${P.half.length>5?`<span class="d">y ${P.half.length-5} más</span>`:''}</div>`:'';
-  return `<div class="pool-h"><h3>Pool de hoy</h3>
-      <span class="pool-k" title="${esc(paceTxt(pc))}"><b>${pc.n}</b>/${pc.min} llamadas${pc.exp!=null&&pc.n<pc.min&&pc.exp>=10?` <span class="${pc.ok?'d':'hot'}">· ${pc.ok?'vas bien':'atrasado'}</span>`:''}</span>
-      <span class="pool-k"><b>${P.done}</b>/${P.total} llamados</span>
-      ${P.due.length?`<span class="pool-k hot"><b>${P.due.length}</b> por repasar</span>`:''}</div>
-    <div class="sky-wrap" data-hy="sky">${skySVG(P,me,{h:110})}</div>${halfTxt}`;
-}
-// en Equipo: el pool de hoy de cada agente
-function poolMesaCard(){
-  if(crm.ok===false)return '';
-  const ag=sellers(team).filter(m=>!isLeadUid(m.id)),act=m=>{const P=dayPool(m.id);return P.total||P.n};
-  const on=ag.filter(act),off=ag.filter(m=>!act(m));
-  const tot=ag.reduce((a,m)=>{const P=dayPool(m.id);a.d+=P.done;a.t+=P.total;a.n+=P.n;a.r+=P.due.length;return a},{d:0,t:0,n:0,r:0});
-  const mini=m=>{const P=dayPool(m.id),pc=dayPace(m.id);return `<button type="button" class="sky-mini" data-hy="ver" data-uid="${esc(m.id)}" title="Ver el pool de hoy de ${esc(m.name)}">
-      <span class="smh">${avatar(m.name)}<b>${esc(first(m.id))}</b><span class="d" title="Llamadas">${pc.n}/${pc.min}</span><span class="d" title="Llamados del pool">${P.done}/${P.total}</span>${P.due.length?`<span class="badge bad" title="News por repasar">${P.due.length}</span>`:''}</span>${skySVG(P,m.id,{mini:true,w:320,h:70})}</button>`};
-  return `<div class="card-h"><h3>Pool de hoy</h3><span class="p-sub">${tot.n} llamadas · ${tot.d}/${tot.t} llamados${tot.r?` · ${sp('hot',plural(tot.r,'new por repasar','news por repasar'))}`:''}</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="sky-grid">${on.map(mini).join('')}</div>`:'<div class="p-empty">Todavía nadie tiene pool ni llamadas hoy.</div>'}
-    ${off.length&&on.length?`<p class="sky-off">Sin pool ni llamadas todavía: ${off.map(m=>`<button type="button" class="lnkp" data-hy="ver" data-uid="${esc(m.id)}">${esc(first(m.id))}</button>`).join(', ')}</p>`:''}${on.length?skyLegend:''}`;
-}
-function cieloModal(uid){
-  const m=members.find(x=>x.id===uid);if(!m)return;
-  const P=dayPool(uid),pc=dayPace(uid);
-  modal({title:`Pool de hoy · ${esc(m.name)}`,wide:true,body:`<div class="hmeters">${meter('Llamadas',pc.n,pc.min,esc(paceTxt(pc)),pc.exp)}${meter('Pool de hoy',P.done,P.total,'llamados hoy')}${meter('News por repasar',P.due.length,P.items.filter(x=>x.g==='news').length,'cada menos de 2 h')}</div>
-    <div class="sky-wrap" data-hy="sky">${skySVG(P,uid,{h:200})}</div>${skyLegend}`,
-    onOpen:api=>api.box.addEventListener('click',e=>{const s=e.target.closest('.st[data-id]');if(s){api.close();openFicha(s.dataset.id)}}),actions:[{l:'Cerrar'}]});
+/* ---------- en Equipo: las llamadas de hoy de cada agente (texto; el team leader fija el mínimo) ---------- */
+function paceTxt(pc){if(pc.exp==null)return 'sin Entrada marcada';if(pc.n>=pc.min)return 'mínimo cumplido';if(pc.exp<10)return 'recién empieza su jornada';return pc.ok?`va bien · a esta altura, ${pc.exp}`:`va atrasado · a esta altura, ${pc.exp}`}
+function callsMesaCard(){
+  if(callsOk===false)return '';
+  const all=sellers(team).filter(m=>!isLeadUid(m.id)).map(m=>({m,pc:dayPace(m.id),P:crm.ok?dayPool(m.id):null})).sort((a,b)=>b.pc.n-a.pc.n||a.m.name.localeCompare(b.m.name));
+  const on=all.filter(x=>x.pc.n||(x.P&&x.P.total)),off=all.filter(x=>!(x.pc.n||(x.P&&x.P.total)));
+  const row=({m,pc,P})=>`<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td title="${esc(paceTxt(pc))}"><b class="${pc.n>=pc.min?'ok':pc.ok===false?'hot':''}">${pc.n}</b><span class="d">/${pc.min}</span></td>
+    <td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`;
+  return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">toques en Omega, Gizat o Voiso (estimado)</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Pool llamado hoy</th><th>News por repasar</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+    ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){
   if(!isLeader())return;
-  modal({title:'Llamadas mínimas por día',body:`<p class="mp">Cada toque en Omega, Gizat o Voiso cuenta una (es un estimado). La meta de cada agente en su pool de hoy.</p><label class="fld" style="max-width:160px"><span>Mínimo</span><input id="mcN" inputmode="numeric" value="${minCalls()}"></label><div class="ebox" id="mcE"></div>`,
+  modal({title:'Llamadas mínimas por día',body:`<p class="mp">Cada toque en Omega, Gizat o Voiso cuenta una (es un estimado). La meta de cada agente.</p><label class="fld" style="max-width:160px"><span>Mínimo</span><input id="mcN" inputmode="numeric" value="${minCalls()}"></label><div class="ebox" id="mcE"></div>`,
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{const n=parseInt(api.q('#mcN').value,10);if(!(n>=1&&n<=2000)){api.q('#mcE').textContent='Entre 1 y 2000.';return false}
       const r=await B.rpc('set_min_calls',{n});if(!r)return false;teamInfo.min_calls=n;toast(`Mínimo de llamadas: ${n} por día.`);refresh()}}]});
 }
@@ -149,8 +106,5 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-hy],[data-hb]');if(!b||!ready)return;
   const a=b.dataset.hy||b.dataset.hb;
   if(a==='ficha')return openFicha(b.dataset.id);
-  if(a==='ver')return cieloModal(b.dataset.uid);
   if(a==='min')return minModal();
-  if(a==='sky'){const s=e.target.closest('.st[data-id]');if(s)openFicha(s.dataset.id)}
 });
-document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.sky .st[data-id]')){e.preventDefault();openFicha(e.target.dataset.id)}});
