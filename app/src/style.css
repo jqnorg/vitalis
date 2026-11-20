@@ -301,6 +301,10 @@ table.pt{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;f
 .pt .r{text-align:right}
 .pt .d{color:var(--dim)}
 .pt .act{text-align:right;width:1%;padding-right:2px}
+.ah-t td.act,.ah-t th.act{position:sticky;right:0;background:var(--panel)}
+.ah-t th.act{z-index:3}
+.ah-t tbody tr:hover td.act{background:var(--raised)}
+.ah-t tr.cur td.act{background:var(--pri-soft)}
 .pt tr.cur td{background:var(--pri-soft)}
 .pt tr.warn td{color:var(--acc)}
 .pt td.trunc{max-width:240px;overflow:hidden;text-overflow:ellipsis}
@@ -1008,6 +1012,13 @@ body.dark .ah-n{color:var(--pri-h)}
 .fi-ch{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .fi-ad{margin:4px 0 0;white-space:pre-wrap;font-size:13px;color:var(--fg)}
 .fi-cadd{display:flex;gap:6px;align-items:flex-end}.fi-cadd textarea{flex:1;min-height:40px;resize:vertical}
+.badge.warn{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
+.fck{display:flex;align-items:center;gap:8px;font-size:14px;margin:6px 0;cursor:pointer}
+.fck input{width:16px;height:16px;margin:0}
+.fi-prof.fp-falta{border-color:color-mix(in srgb,var(--acc) 38%,var(--line))}
+.fi-ptext{white-space:pre-line;font-size:13.5px;line-height:1.5;margin:0 0 8px;color:var(--fg)}
+.fi-pfalta{color:var(--acc);font-size:13px;font-weight:600;margin:0 0 8px}
+.fi-prow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .fi-cl{display:grid;gap:8px;margin-top:10px}
 .fi-cm{border-top:1px solid var(--line);padding-top:6px}.fi-cm p{margin:2px 0 0;white-space:pre-wrap}
 .fi-cmh{display:flex;align-items:center;gap:8px;font-size:12.5px}

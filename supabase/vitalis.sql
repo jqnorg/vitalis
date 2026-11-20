@@ -1441,6 +1441,62 @@ grant select, insert, update, delete on public.campaign_info, public.campaign_re
 revoke update on public.client_comments from authenticated;
 revoke all on public.campaign_info, public.campaign_requests, public.client_comments from anon;
 
+-- perfil del cliente: lo que la gerencia exige saber de cada uno (edad, ocupación, objetivo) + si tiene el dinero y por qué no depositó.
+-- Lo ve toda la mesa; se escribe solo por prof_save (un perfil por cliente). Sirve para armar el comentario estándar que se pega en el CRM.
+create table if not exists public.client_profiles (
+  team_id          uuid not null default public.my_team() references public.teams(id),
+  brand            text not null default 'Novara Markets' check (length(brand) <= 40),
+  client_id        text not null check (length(btrim(client_id)) between 1 and 60),
+  edad             integer check (edad is null or edad between 16 and 110),
+  ocupacion        text check (ocupacion is null or length(ocupacion) <= 120),
+  desocupado       boolean not null default false,
+  desocupado_desde text check (desocupado_desde is null or length(desocupado_desde) <= 60),
+  objetivo         text check (objetivo is null or length(objetivo) <= 200),
+  anuncio          text check (anuncio is null or length(anuncio) <= 300),  -- qué vio en el anuncio
+  vio_min          boolean,                                                 -- vio el monto mínimo (null = no se sabe)
+  tiene            boolean,                                                 -- tiene el dinero (null = no se sabe)
+  motivo           text check (motivo is null or length(motivo) <= 400),    -- por qué no depositó / qué se intentó
+  updated_by       uuid references public.profiles(id) on delete set null,
+  updated_at       timestamptz not null default now(),
+  primary key (team_id, brand, client_id)
+);
+create index if not exists client_profiles_cl on public.client_profiles (team_id, client_id);
+alter table public.client_profiles enable row level security;
+drop policy if exists client_profiles_read on public.client_profiles;
+create policy client_profiles_read on public.client_profiles for select to authenticated using (team_id = public.my_team());
+grant select on public.client_profiles to authenticated;
+revoke insert, update, delete, truncate on public.client_profiles from authenticated;
+revoke all on public.client_profiles from anon;
+-- se escribe solo por acá: un perfil por cliente, de la mesa de quien lo guarda
+create or replace function public.prof_save(p_client text, p_brand text, p_data jsonb) returns text
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team();
+begin
+  if t is null then raise exception 'sin mesa'; end if;
+  if length(btrim(coalesce(p_client,''))) = 0 then raise exception 'sin cliente'; end if;
+  insert into public.client_profiles as cp
+    (team_id, brand, client_id, edad, ocupacion, desocupado, desocupado_desde, objetivo, anuncio, vio_min, tiene, motivo, updated_by, updated_at)
+  values (t, coalesce(nullif(btrim(p_brand), ''), 'Novara Markets'), btrim(p_client),
+    nullif(p_data->>'edad', '')::integer,
+    nullif(btrim(p_data->>'ocupacion'), ''),
+    coalesce((p_data->>'desocupado')::boolean, false),
+    nullif(btrim(p_data->>'desocupado_desde'), ''),
+    nullif(btrim(p_data->>'objetivo'), ''),
+    nullif(btrim(p_data->>'anuncio'), ''),
+    (p_data->>'vio_min')::boolean,
+    (p_data->>'tiene')::boolean,
+    nullif(btrim(p_data->>'motivo'), ''),
+    auth.uid(), now())
+  on conflict (team_id, brand, client_id) do update set
+    edad = excluded.edad, ocupacion = excluded.ocupacion, desocupado = excluded.desocupado,
+    desocupado_desde = excluded.desocupado_desde, objetivo = excluded.objetivo, anuncio = excluded.anuncio,
+    vio_min = excluded.vio_min, tiene = excluded.tiene, motivo = excluded.motivo,
+    updated_by = auth.uid(), updated_at = now();
+  return 'ok';
+end $$;
+revoke all on function public.prof_save(text, text, jsonb) from public, anon;
+grant execute on function public.prof_save(text, text, jsonb) to authenticated;
+
 -- ---------- llamadas: cada toque en Omega, Gizat o Voiso desde la ficha del cliente en el CRM (estimado) ----------
 -- solo agente, cliente, línea y hora (ni teléfonos ni internos). Dos toques a la misma línea y cliente en menos de 30 s cuentan uno.
 alter table public.teams add column if not exists min_calls integer not null default 250; -- llamadas mínimas por día (lo fija team leader/admin)

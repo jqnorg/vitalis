@@ -627,9 +627,19 @@ async def main():
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
             await A.evaluate("window.postMessage({type:'ftd-agenda-cmd',v:1,cmd:'nuevo',k:'500002'},location.origin)"); await A.wait_for_timeout(2200)
             fi = await A.inner_text('#v-cliente') if await A.is_visible('#v-cliente') else ''
-            ok(await A.evaluate('cur') == 'cliente' and 'entró un new' in fi and 'Nueva Dos' in fi and 'GG-UY' in fi and 'Peru' in fi, f'cuando entra un new, Vitalis pasa a la sección Cliente, con su campaña ({fi[:160]!r})')
+            ok(await A.evaluate('cur') == 'cliente' and 'entró un new' in fi and 'Nueva Dos' in fi and 'GG-UY' in fi and 'Perú' in fi, f'cuando entra un new, Vitalis pasa a la sección Cliente, con su campaña ({fi[:160]!r})')
             ok('Cómo hacerlo depositar' in fi and 'Comentarios' in fi, 'con cómo hacerlo depositar y los comentarios')
+            ok('Perfil del cliente' in fi and 'faltan datos' in fi, 'la ficha pide el perfil que exige la gerencia (edad, ocupación, objetivo)')
             await A.screenshot(path=OUT / 'q2_ficha_new.png')
+            # el armador de comentario: se completan los campos y arma el comentario estándar para el CRM
+            await A.evaluate("document.querySelector('[data-fa=profEdit]').click()"); await A.wait_for_timeout(400)
+            await A.fill('#pfE', '29'); await A.fill('#pfO', 'comerciante'); await A.fill('#pfG', 'ahorrar')
+            await A.select_option('#pfT', '0'); await A.fill('#pfMo', 'se le ofreció efectivo y transferencia')
+            await A.evaluate("document.querySelector('.mbox .mf .pri').click()"); await A.wait_for_timeout(1000)
+            prof = await A.inner_text('.fi-prof')
+            ok('completo' in prof and 'Edad 29' in prof and 'ahorrar' in prof and 'No tiene el dinero' in prof and 'se finalizó la llamada' in prof, f'armador: guarda el perfil y arma el comentario estándar ({prof[:200]!r})')
+            ok(sql("select edad, tiene from public.client_profiles where client_id='500002'")[0]['edad'] == 29, 'el perfil queda guardado, uno por cliente')
+            await A.screenshot(path=OUT / 'q2b_perfil.png')
             await A.keyboard.press('Escape'); await A.wait_for_timeout(300)
             # agenda conectada: no se agenda a un Do Not Call; el que ya depositó se marca y no suena
             await A.evaluate("go('agenda')"); await A.wait_for_timeout(300)
