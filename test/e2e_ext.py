@@ -222,6 +222,45 @@ async def main():
             ok([(x['client_id'], x['line']) for x in cl] == [('70370', 'gizat'), ('70370', 'omega')], f'los toques en Omega y Gizat llegan como llamadas a 70370 (el doble toque cuenta uno; el teléfono no) ({cl})')
             ok(not sql("select 1 from public.calls where client_id like '%9944418%' or client_id like '%1371%'"), 'sin el interno del agente')
             await Nv.evaluate("document.getElementById('drw').remove()"); await Nv.wait_for_timeout(800)
+            # la ficha como en el CRM de verdad (nombre, "ID 68636", Server, teléfono tapado, Omega/Gizat/Voiso, país...). La dirección quedó
+            # vieja (?userId= de hace rato) y hay una ficha vieja fuera de la pantalla, primera en la página: gana la que se ve, y Vitalis cambia solo
+            await A2.evaluate("go('inicio')"); await Nv.bring_to_front()
+            await Nv.evaluate("""()=>{history.replaceState(null,'',location.pathname+'?userId=51234');
+              window.__mk=(id,name)=>'<div class=hd><div class=nm><span class=dot></span><span>'+name+'</span></div><div class=uid><span class=tag>ID '+id+'</span><span class=cp></span></div></div><div class=row><span>Server:</span><span></span></div><div class=row>+57312*****</div><div class=calls><button>☎ Omega - 9944418</button><button>☎ Gizat - 1371</button><button>☎ Voiso LATAM - 3262</button></div><div>Colombia</div><div>Spanish; Castilian</div><div>Apx Time 09:43 (UTC -5)</div><div>Source: trade ai</div><div>Novara Markets</div><div>INDIVIDUAL</div>';
+              const old=document.createElement('div');old.id='oldDrw';old.style.cssText='position:fixed;top:0;left:100%;width:320px';old.innerHTML=__mk('60001','Vieja Ficha');document.body.prepend(old);
+              const d=document.createElement('div');d.id='fic';d.innerHTML=__mk('68636','Lucio Diaz');document.body.prepend(d)}"""); await Nv.wait_for_timeout(1800)
+            cur = await A2.evaluate("curCl&&[curCl.id,curCl.name,curCl.src]")
+            ok(cur == ['68636', 'Lucio Diaz', 'crm'], f'la ficha a la vista del CRM es el cliente actual, aunque la dirección haya quedado vieja y haya otra ficha escondida ({cur})')
+            ok(await A2.evaluate("cur") == 'cliente' and await A2.locator('#nbCli').inner_text() == '68636', 'Vitalis pasa solo a la sección Cliente, con el ID en el menú')
+            ok('cliente actual: 68636' in await Nv.evaluate("(document.getElementById('vitalis-cur-pill')||{shadowRoot:{textContent:''}}).shadowRoot.textContent"), 'y el CRM avisa que lo tomó')
+            t0 = await Nv.evaluate("performance.now()")
+            await Nv.evaluate("document.getElementById('fic').innerHTML=__mk('68700','Marta Gomez')")
+            await A2.wait_for_function("curCl&&curCl.id==='68700'", timeout=4000)
+            dt = await Nv.evaluate("performance.now()") - t0
+            ok(await A2.evaluate("[curCl.name,cur,document.getElementById('nbCli').textContent]") == ['Marta Gomez', 'cliente', '68700'], 'al abrir otro cliente en el CRM, Vitalis cambia solo, sin refrescar')
+            ok(dt < 2500, f'enseguida ({dt:.0f} ms)')
+            # el ID en una tabla de datos ("ID" en una celda y el número en la de al lado) y el "ID" puesto por el estilo
+            await Nv.evaluate("document.getElementById('fic').innerHTML='<table class=desc><tr><th>Name</th><td>Rosa Prueba</td></tr><tr><th>ID</th><td>68801</td><th>Server</th><td>Stock</td></tr></table><div class=calls><button>Omega - 9944418</button></div>'")
+            await A2.wait_for_function("curCl&&curCl.id==='68801'", timeout=4000)
+            ok(True, 'el ID en una tabla de datos de la ficha')
+            await Nv.evaluate("document.getElementById('fic').innerHTML='<style>.uidb::before{content:\"ID \"}</style><div class=hd><b>Pedro Prueba</b><div class=uidb>68902</div></div><div class=calls><button>Gizat - 1371</button></div>'")
+            await A2.wait_for_function("curCl&&curCl.id==='68902'", timeout=4000)
+            ok(await A2.evaluate("curCl.name") == 'Pedro Prueba', 'y el "ID" puesto por el estilo, con su nombre')
+            # se cierra la ficha: no vuelve a la vieja escondida ni al de la dirección vieja
+            await Nv.evaluate("document.getElementById('fic').remove()"); await Nv.wait_for_timeout(2200)
+            ok(await A2.evaluate("curCl.id") == '68902', f'al cerrar la ficha queda el último (no la vieja escondida ni el de la dirección vieja) ({await A2.evaluate("curCl.id")})')
+            # sin encontrar el ID de una ficha con botones: el CRM ofrece copiar un diagnóstico sin datos del cliente
+            await Nv.evaluate("()=>{const d=document.createElement('div');d.id='fic';d.innerHTML='<div class=hd><b>Juan Raro</b><div>Ref 12</div></div><div class=calls><button>Voiso LATAM - 3262</button></div>';document.body.prepend(d)}"); await Nv.wait_for_timeout(4500)
+            pill = await Nv.evaluate("(document.getElementById('vitalis-cur-pill')||{shadowRoot:{textContent:''}}).shadowRoot.textContent")
+            ok('no encuentro el ID' in pill and 'Copiar diagnóstico' in pill, f'si no encuentra el ID de la ficha, ofrece copiar un diagnóstico ({pill!r})')
+            try:
+                await ctx.grant_permissions(['clipboard-read', 'clipboard-write'], origin='https://crmnovaramarkets.com')
+                await Nv.evaluate("document.getElementById('vitalis-cur-pill').shadowRoot.querySelector('button').click()"); await Nv.wait_for_timeout(500)
+                dg = await Nv.evaluate("navigator.clipboard.readText()")
+            except Exception as e:
+                dg = f'ERR {e}'
+            ok('Voiso' in dg and 'calls' in dg and 'Juan' not in dg and 'Raro' not in dg and 'xxxx' in dg, f'el diagnóstico tiene la forma de la ficha y ningún dato del cliente ({dg[:160]!r})')
+            await Nv.evaluate("()=>{document.getElementById('fic').remove();document.getElementById('oldDrw').remove();history.replaceState(null,'',location.pathname);document.getElementById('vitalis-cur-pill')&&document.getElementById('vitalis-cur-pill').remove()}"); await Nv.wait_for_timeout(800)
             # al actualizar la extensión, la copia nueva entra en la pestaña abierta y la vieja se apaga (sin recargar el CRM)
             await sw.evaluate("chrome.tabs.query({url:'https://crmnovaramarkets.com/novara'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id,allFrames:true},files:['crm.js']}))"); await Nv.wait_for_timeout(1500)
             ok(await Nv.locator('#ftd-crm-button').count() == 1, 'al actualizar, la copia nueva reemplaza a la vieja: un solo panel')

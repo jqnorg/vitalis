@@ -309,11 +309,10 @@
   // cada toque en Omega, Gizat o Voiso (lo que va después del guión es el interno de cada agente: no se lee) = una llamada al cliente de esa ficha.
   // Se guarda solo cliente, línea y hora. La misma línea al mismo cliente en menos de 30 s cuenta una (lo resuelve la base).
   const LINE_RE = /^[^a-z0-9]*(omega|gizat|voiso)\b/i; // el ícono del teléfono adelante no importa
-  function idNear(el) { // el "ID 70370" del encabezado de la ficha donde está el botón
+  function idNear(el) { // el ID de la ficha donde está el botón (el de la ficha a la vista, si hay varias)
+    const { ids } = scanCur(); for (const c of ids) c.v = onTop(c.el);
     for (let e = el, k = 0; e && k < 14; e = e.parentElement, k++) {
-      const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); let n;
-      while ((n = w.nextNode())) { const t = n.nodeValue; if (!t || t.length > 40 || !/(^|[^a-z])id([^a-z]|$)/i.test(t)) continue;
-        for (let p = n.parentElement, j = 0; p && j < 3; p = p.parentElement, j++) { const tx = p.textContent || ''; if (tx.length > 48) break; const m = tx.match(ID_RE); if (m) return m[1]; } }
+      const h = ids.filter((c) => c.v && e.contains(c.el)); if (h.length) return h.sort((a, b) => b.v - a.v)[0].id;
     }
     return '';
   }
@@ -325,9 +324,9 @@
       for (let e = t0, k = 0; e && k < 4 && !m; e = e.parentElement, k++) { const tx = (e.textContent || '').replace(/\s+/g, ' ').trim(); if (tx.length <= 40 && (m = tx.match(LINE_RE))) b = e; }
     }
     if (!m) return;
-    const id = idNear(b) || idInUrl() || ((idInPage() || {}).id || ''); if (!id) return;
+    const pc = panelClient().pick, id = idNear(b) || (pc && pc.id) || idInUrl(); if (!id) return;
     sendSure({ type: 'crm-seen', rows: [{ id, brand, ln: m[1].toLowerCase(), at: new Date().toISOString() }] });
-    { const c = currentClient(); sendCurrent(id, c && c.id === id ? c.name : '', true); } // a quien llamás es tu cliente actual
+    curFrom = 'panel'; sendCurrent(id, pc && pc.id === id ? pc.name : '', true); // a quien llamás es tu cliente actual
   }, true);
 
   // en la pestaña que se actualiza: un Talking que desaparece de la lista ya cambió de status en el CRM.
@@ -489,64 +488,161 @@
     $('t').textContent = head.join(' · ');
   }
   function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } }
-  // el cliente que tenés abierto en el CRM (su ficha: /user/123 o #/users/user/123): en Vitalis queda como "cliente actual"
-  let curSent = '';
-  // el ID puede estar en la dirección (/user/123, #/users/user/123, ?userId=123) o en el encabezado de la ficha abierta
-  // como panel arriba de la lista ("ID 70370", aunque el número esté en otro elemento o al lado haya un ícono)
-  const ID_RE = /^\s*id\s*[:#]?\s*#?\s*(\d{4,})\s*$/i;
+  // ---- el cliente actual: la ficha abierta en el CRM ----
+  // La ficha (panel arriba de la lista o página propia) tiene el nombre, "ID 68636" y los botones para llamar (Omega/Gizat/Voiso).
+  // Gana el ID que está junto a esos botones y a la vista. Si hay varias fichas (una vieja escondida, un cajón abajo de otro), la que
+  // está arriba de todo y, si no se sabe, la que apareció última. La dirección (/user/123) cuenta solo cuando cambia: si quedó vieja,
+  // no le gana a la ficha abierta ni hace volver a un cliente de hace rato.
+  let curSent = '', curName = '', curFrom = '', urlSeen = '', curMs = 0, missAt = 0, diagAt = 0;
+  const ID_RE = /^\s*(?:client|user|lead)?\s*id\s*[:#.]?\s*#?\s*(\d{4,9})(?!\d)/i; // "ID 68636", "ID: 68636", "ID68636" (el número puede estar en otro elemento)
+  const ID_LBL = /^\s*(?:client|user|lead)?\s*id\s*[:#.]?\s*$/i, ID_NUM = /^\s*#?\s*(\d{4,9})\s*$/;
+  const NO_TXT = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|OPTION|TITLE)$/;
   function idInUrl() {
     const m = (location.pathname + ' ' + location.hash).match(/\/users?\/(?:user\/)?(\d{3,})(?=[/?#\s]|$)/i)
       || (location.search + ' ' + location.hash).match(/[?&#](?:user_?id|client_?id|lead_?id)=(\d{3,})/i);
     return m ? m[1] : '';
   }
-  function idInPage() {
-    const root = document.body; if (!root) return null;
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n;
+  const isMine = (e) => !!(e && ((ui && (e === ui.h || ui.h.contains(e))) || e.id === 'vitalis-cur-pill' || e.id === 'ftd-agenda-overlay'));
+  function onTop(el) { // 0 no se ve · 1 está pero fuera de la pantalla · 2 tapado por otra cosa · 3 a la vista
+    if (!el || !el.isConnected) return 0;
+    try { if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, opacityProperty: true, visibilityProperty: true })) return 0; } catch (e) {}
+    const r = el.getBoundingClientRect(); if (r.width < 1 && r.height < 1) return 0;
+    const W = innerWidth, H = innerHeight;
+    if (r.bottom <= 0 || r.right <= 0 || r.top >= H || r.left >= W) return 1;
+    const x = Math.min(W - 1, Math.max(0, r.left + Math.min(r.width / 2, 12))), y = Math.min(H - 1, Math.max(0, r.top + r.height / 2));
+    const e = document.elementFromPoint(x, y);
+    return !e || e === el || el.contains(e) || e.contains(el) || isMine(e) ? 3 : 2;
+  }
+  // una sola pasada por el texto de la página: los "ID 12345", los botones para llamar y los números sueltos
+  function scanCur() {
+    const ids = [], lines = [], nums = [], root = document.body; if (!root) return { ids, lines, nums };
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n, lbl = null;
+    const pair = (a, n) => { for (let e = a, k = 0; e && k < 3; e = e.parentElement, k++) { if (/^(TABLE|TBODY|THEAD|TFOOT)$/.test(e.tagName) || /^(table|grid|rowgroup)$/.test(e.getAttribute('role') || '')) return false; if (e.contains(n)) return true; } return false; };
     while ((n = w.nextNode())) {
-      const t = n.nodeValue; if (!t || t.length > 40 || !/(^|[^a-z])id([^a-z]|$)/i.test(t)) continue;
-      let el = n.parentElement;
-      for (let k = 0; el && k < 3; k++, el = el.parentElement) {
-        const tx = el.textContent || ''; if (tx.length > 48) break;
-        const m = tx.match(ID_RE); if (!m) continue;
-        if ((ui && ui.h.contains(el)) || !el.getClientRects().length) break;
-        return { id: m[1], el };
+      const t = n.nodeValue; if (!t || t.length > 60) { if (t && t.trim()) lbl = null; continue; }
+      if (!t.trim()) continue;
+      const p0 = n.parentElement; if (!p0 || NO_TXT.test(p0.tagName) || isMine(p0)) { lbl = null; continue; }
+      const nm = t.match(ID_NUM);
+      if (lbl && nm && pair(lbl, n)) { ids.push({ id: nm[1], el: p0 }); lbl = null; continue; } // "ID" en una celda y el número en la de al lado (no el encabezado de una lista)
+      lbl = null;
+      if (nm) { if (nums.length < 400) nums.push({ id: nm[1], el: p0 }); continue; }
+      if (/(^|[^a-z])id([^a-z]|$)/i.test(t)) {
+        let hit = null;
+        for (let el = p0, k = 0; el && k < 3 && !hit; k++, el = el.parentElement) {
+          const tx = el.textContent || ''; if (tx.length > 48) break;
+          const m = tx.match(ID_RE); if (m) hit = { id: m[1], el };
+        }
+        if (hit) { if (ids.length < 300) ids.push(hit); } else if (ID_LBL.test(t)) lbl = p0;
+        continue;
+      }
+      if (/omega|gizat|voiso/i.test(t)) {
+        const b = p0.closest('button,a,[role=button]') || p0;
+        if (lines.some((x) => x.el === b)) continue;
+        const tx = (b.textContent || '').replace(/\s+/g, ' ').trim();
+        if (tx.length <= 60 && LINE_RE.test(tx)) lines.push({ el: b, v: onTop(b) });
       }
     }
-    return null;
+    return { ids, lines, nums };
   }
-  function nameNear(el) {
-    for (let e = el, k = 0; e && k < 3; k++, e = e.parentElement) {
-      const p = e.previousElementSibling; if (!p) continue;
-      const t = cellText(p).replace(/\s+/g, ' ').trim();
-      if (t && t.length <= 120 && !/\d{4,}/.test(t)) return t;
+  const pseudoId = (el) => { // el "ID" lo pone el estilo (::before), no está en el texto
+    try {
+      for (let e = el, k = 0; e && k < 2; e = e.parentElement, k++) for (const ps of ['::before', '::after']) if (/(^|[^a-z])id([^a-z]|$)/i.test(getComputedStyle(e, ps).content || '')) return true;
+      const p = el.previousElementSibling; return !!(p && ID_LBL.test(cellText(p) || (getComputedStyle(p, '::before').content || '').replace(/["']/g, '')));
+    } catch (e) { return false; }
+  };
+  const firstSeen = new Map(); // ID → cuándo apareció su ficha en esta pestaña
+  function panelClient() {
+    const { ids, lines, nums } = scanCur(), B = lines.filter((b) => b.v >= 1), now = Date.now();
+    for (const c of ids) c.v = onTop(c.el);
+    const C = ids.filter((c) => c.v), here = new Set(C.map((c) => c.id));
+    for (const k of [...firstSeen.keys()]) if (!here.has(k)) firstSeen.delete(k);
+    for (const k of here) if (!firstSeen.has(k)) firstSeen.set(k, now);
+    const fs = (c) => firstSeen.get(c.id) || 0;
+    // la ficha de cada botón es lo más cerca que tenga un ID, y la de cada ID lo más cerca que tenga un botón: van juntos si se eligen los dos
+    // (así un botón de la ficha abierta no se queda con el ID de una ficha vieja que está en otra parte de la página)
+    const nearest = (el, list) => { for (let e = el.parentElement, k = 0; e && k < 14; e = e.parentElement, k++) { const h = list.filter((x) => e.contains(x.el)); if (h.length) return h; } return []; };
+    const nb = new Map();
+    for (const c of C) c.near = 0;
+    for (const b of B) for (const c of nearest(b.el, C)) { if (!nb.has(c)) nb.set(c, nearest(c.el, B)); if (nb.get(c).includes(b)) c.near = Math.max(c.near, b.v); }
+    const rank = (L) => L.sort((a, b) => (b.near * 10 + b.v) - (a.near * 10 + a.v) || fs(b) - fs(a))[0] || null;
+    let pick = rank(C.filter((c) => c.near && Math.max(c.near, c.v) >= 2)); // la ficha o sus botones tienen que estar a la vista (no una ficha vieja fuera de la pantalla)
+    if (!pick && B.some((b) => b.v >= 2)) { // hay botones para llamar pero el ID no dice "ID" al lado: un número solo arriba de los botones
+      for (const b of B.filter((x) => x.v >= 2)) {
+        for (let e = b.el.parentElement, k = 0; e && k < 8 && !pick; e = e.parentElement, k++) {
+          const h = nums.filter((x) => e.contains(x.el) && !B.some((y) => y.el.contains(x.el)) && (x.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING));
+          if (!h.length) continue;
+          if (h.length > 6 || B.filter((y) => e.contains(y.el)).length > 9) break; // ya es la página entera (la lista), no la ficha
+          const x = h.find((y) => pseudoId(y.el)) || h[0], v = onTop(x.el); if (v) pick = { id: x.id, el: x.el, v, near: b.v };
+          break;
+        }
+        if (pick) break;
+      }
+    }
+    if (!pick && !B.some((b) => b.v >= 2)) { // sin botones a la vista: el único ID de la página o, si hay varios, el que apareció último
+      const vis = C.filter((c) => c.v >= 2), L = vis.length ? vis : B.length ? [] : C, ds = [...new Set(L.map((c) => c.id))];
+      if (ds.length === 1) pick = L[0];
+      else if (ds.length > 1) { L.sort((a, b) => fs(b) - fs(a)); const o = L.find((c) => c.id !== L[0].id); if (fs(L[0]) > fs(o)) pick = L[0]; }
+    }
+    return { pick: pick ? { id: pick.id, name: nameNear(pick.el) } : null, calls: B.some((b) => b.v >= 2) };
+  }
+  const NOT_NAME = /^(server|status|estado|id|phone|tel[eé]fono|email|e-mail|country|pa[ií]s|language|idioma|source|apx|time|balance|desk|campaign|affiliate|individual|corporate)\b/i;
+  const nameOk = (t) => !!t && t.length >= 3 && t.length <= 60 && /\p{L}{2}/u.test(t) && !/\d{3,}|[:@/]/.test(t) && !NOT_NAME.test(t) && !LINE_RE.test(t);
+  function nameNear(el) { // el nombre que está arriba del ID en la ficha
+    for (let e = el, k = 0; e && k < 4; k++, e = e.parentElement) {
+      for (let p = e.previousElementSibling, j = 0; p && j < 2; p = p.previousElementSibling, j++) {
+        const t = cellText(p); if (nameOk(t)) return t; if (t) break;
+      }
     }
     return '';
   }
-  function currentClient() {
-    const uid = idInUrl(), hd = idInPage();
-    const id = uid || (hd && hd.id); if (!id) return null;
-    let name = hd && hd.id === id ? nameNear(hd.el) : '';
-    if (!name && uid && document.title && !/crm|novara|login|users/i.test(document.title)) name = document.title.trim().slice(0, 120);
-    return { id, name };
-  }
   // el cliente actual sale de las pestañas donde el agente trabaja y llama, nunca de la que se actualiza sola para los news
   function reportCurrent(force) {
-    if (watched || document.visibilityState !== 'visible') return;
-    const c = currentClient(); if (!c) return;
-    sendCurrent(c.id, c.name, force);
+    if (watched || document.visibilityState !== 'visible' || !document.body) return;
+    const t0 = performance.now();
+    try {
+      const uid = idInUrl(), { pick, calls } = panelClient(), urlNew = !!uid && uid !== urlSeen; urlSeen = uid;
+      if (!calls || pick) missAt = 0;
+      if (pick) { curFrom = 'panel'; return sendCurrent(pick.id, pick.name, force); }
+      if (uid && (urlNew || (force && curFrom === 'url' && curSent === uid))) { curFrom = 'url'; return sendCurrent(uid, document.title && !/crm|novara|trade|login|users/i.test(document.title) ? document.title.trim().slice(0, 120) : '', force); }
+      if (calls && Date.now() - diagAt > 600000) { // hay una ficha con botones para llamar pero no encuentro su ID: a los 3 s, el aviso para copiar el diagnóstico
+        if (!missAt) { missAt = Date.now(); setTimeout(() => { if (live() && missAt) reportCurrent(); }, 3200); }
+        else if (Date.now() - missAt >= 3000) { missAt = 0; diagAt = Date.now(); curPill('', { diag: 1 }); }
+      }
+    } finally { curMs = performance.now() - t0; }
   }
   function sendCurrent(id, name, force) {
     if (watched || !id) return;
-    const sig = id + '|' + (name || ''); if (!force && sig === curSent) return; curSent = sig;
+    if (!force && id === curSent && (curName || !name)) return; // ya lo mandé (salvo que recién aparezca el nombre)
+    curName = name || (id === curSent ? curName : ''); curSent = id;
     send({ type: 'crm-current', id, name: name || '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
+  }
+  function diagCur() { // solo la forma de la ficha (etiquetas, clases y textos tapados): ningún dato del cliente
+    const b = scanCur().lines.find((x) => x.v >= 2); if (!b) return '';
+    let box = b.el; for (let i = 0; i < 7 && box.parentElement && box.parentElement !== document.body; i++) box = box.parentElement;
+    const cl = box.cloneNode(true), O = [box, ...box.querySelectorAll('*')].slice(0, 800), K = [cl, ...cl.querySelectorAll('*')].slice(0, 800);
+    O.forEach((o, i) => { try { const c = getComputedStyle(o, '::before').content; if (c && !/^(none|normal|""|'')$/.test(c)) K[i].setAttribute('data-before', c.slice(0, 30)); } catch (e) {} });
+    for (const s of cl.querySelectorAll('script,style,svg,img')) s.replaceWith(document.createElement(s.tagName.toLowerCase()));
+    const w = document.createTreeWalker(cl, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) n.nodeValue = n.nodeValue.replace(/[\p{L}\d]+/gu, (s) => /^(id|omega|gizat|voiso|latam|server)$/i.test(s) ? s : s.replace(/\p{L}/gu, 'x').replace(/\d/g, '9'));
+    for (const e of [cl, ...cl.querySelectorAll('*')]) for (const a of [...e.attributes]) { if (!/^(class|role|id|data-before)$/i.test(a.name)) e.removeAttribute(a.name); else if (a.name !== 'data-before') e.setAttribute(a.name, a.value.replace(/\d/g, '9').slice(0, 120)); }
+    return JSON.stringify({ v: VER, page: location.pathname.replace(/\d/g, '9'), html: cl.outerHTML.slice(0, 14000) });
   }
   let pillT = null;
   function curPill(id, r) {
     let h = document.getElementById('vitalis-cur-pill');
     if (!h) { h = document.createElement('div'); h.id = 'vitalis-cur-pill'; h.attachShadow({ mode: 'open' }); document.documentElement.appendChild(h); }
-    const ok = r && r.sent, txt = !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
-    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:600 12.5px system-ui,sans-serif;background:${ok ? '#1f7a4d' : '#8a5a1c'};color:#fff;padding:7px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25)}b{font-weight:800}</style><div><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</div>`;
-    clearTimeout(pillT); pillT = setTimeout(() => h.remove(), 4500);
+    const diag = r && r.diag, ok = r && r.sent;
+    const txt = diag ? 'no encuentro el ID de esta ficha' : !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
+    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:600 12.5px system-ui,sans-serif;background:${ok ? '#1f7a4d' : '#8a5a1c'};color:#fff;padding:7px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center}b{font-weight:800}button{font:inherit;color:#fff;background:rgba(255,255,255,.18);border:0;border-radius:999px;padding:3px 9px;cursor:pointer}</style><div><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
+    const btn = h.shadowRoot.querySelector('button');
+    if (btn) btn.onclick = () => navigator.clipboard.writeText(diagCur()).then(() => { btn.textContent = 'Copiado: mandáselo a quien mantiene Vitalis'; }, () => { btn.textContent = 'No pude copiar'; });
+    clearTimeout(pillT); pillT = setTimeout(() => h.remove(), diag ? 20000 : 4500);
+  }
+  // la ficha cambió: lo miro enseguida (aparte de la lectura de la lista, que espera a que la página se quede quieta), como mucho ~1 vez por segundo
+  let curT = null, curLast = 0;
+  function schedCur() {
+    if (watched || curT || document.visibilityState !== 'visible') return;
+    curT = setTimeout(() => { curT = null; curLast = Date.now(); if (live()) reportCurrent(); }, Math.max(120, Math.max(700, curMs * 25) - (Date.now() - curLast)));
   }
   document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible') { reportCurrent(true); } });
   let lastMs = 0, againT = null;
@@ -557,7 +653,7 @@
     try { refresh0(force); } finally { lastMs = performance.now() - t0; }
   }
   function refresh0(force) {
-    reportCurrent();
+    schedCur();
     for (const e of document.querySelectorAll('#ftd-crm-button')) if (!ui || e !== ui.h) e.remove(); // paneles de copias viejas
     const T = tables();
     sales = scanSales(T);
@@ -633,6 +729,7 @@
   const obs = new MutationObserver((muts) => {
     if (muts.every((m) => mine(m.target) || (m.type === 'childList' && [...m.addedNodes, ...m.removedNodes].length > 0 && [...m.addedNodes, ...m.removedNodes].every(mine)))) return; // lo que cambió es de Vitalis
     const now = Date.now(), quiet = Math.min(3000, Math.max(600, lastMs * 4)), cap = Math.max(2000, quiet * 2);
+    schedCur();
     if (!firstMut) firstMut = now;
     clearTimeout(t);
     t = setTimeout(() => { firstMut = 0; refresh(); }, Math.max(0, Math.min(quiet, firstMut + cap - now)));
@@ -640,4 +737,5 @@
   const start = () => { obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true }); refresh(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
   addEventListener('hashchange', () => setTimeout(refresh, 300));
+  addEventListener('popstate', () => schedCur());
 })();
