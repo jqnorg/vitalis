@@ -13,7 +13,7 @@ const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url),
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
 ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
-ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 26, 'tablas en tiempo real');
+ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 28, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
   await db.exec('reset role');
@@ -743,6 +743,33 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!!q.error, 'los comentarios no se editan');
   q = await as(B, 'delete from public.client_comments where id = $1 returning 1', [cid]);
   ok(!q.error && q.rows.length === 1, 'el autor lo borra');
+}
+
+// ---------- llamadas (toques en Omega, Gizat, Voiso) ----------
+{
+  const now = new Date(), iso = (ms) => new Date(now.getTime() + ms).toISOString();
+  let q = await as(B, "insert into public.calls (client_id, line) values ('70370', 'omega') returning 1");
+  ok(!!q.error, 'nadie escribe directo en calls');
+  let R = await rpc(B, 'select public.calls_add($1::jsonb) j', [JSON.stringify([
+    { id: '70370', line: 'omega', at: iso(0) }, { id: '70370', line: 'omega', at: iso(10000) }, { id: '70370', line: 'gizat', at: iso(12000) },
+    { id: '70370', line: 'Voiso', at: iso(15000) }, { id: '70370', line: 'skype' }, { id: '', line: 'omega' }, { id: '70371', line: 'omega', at: '2001-01-01T00:00:00Z' }])]);
+  ok(R.ok && R.added === 4, `calls_add guarda cada línea; el mismo toque a la misma línea en menos de 30 s cuenta uno; otra línea sí cuenta (${JSON.stringify(R)})`);
+  R = await rpc(B, 'select public.calls_add($1::jsonb) j', [JSON.stringify([{ id: '70370', line: 'omega', at: iso(60000) }])]);
+  ok(R.added === 1, 'pasados los 30 s, otra llamada a la misma línea cuenta');
+  q = await as(B, "select at > now() - interval '1 minute' reciente from public.calls where client_id = '70371'");
+  ok(q.rows.length === 1 && q.rows[0].reciente, 'una hora imposible queda como ahora');
+  q = await as(Dh, "select user_id = $1 mio, line from public.calls where client_id = '70370'", [B]);
+  ok(q.rows.length === 4 && q.rows.every((x) => x.mio), 'la mesa ve las llamadas de cada uno');
+  q = await as(X, 'select * from public.calls');
+  ok(q.rows.length === 0, 'otra mesa no las ve');
+  q = await as(B, 'delete from public.calls returning 1');
+  ok(!!q.error || q.rows.length === 0, 'no se borran');
+  R = await rpc(B, 'select public.set_min_calls(200) j');
+  ok(!!R.error, 'un agente no cambia el mínimo de llamadas');
+  R = await rpc(M, 'select public.set_min_calls(200) j');
+  q = await as(B, 'select min_calls from public.teams');
+  ok(R.ok && q.rows[0].min_calls === 200, 'el team leader fija el mínimo de llamadas');
+  await rpc(M, 'select public.set_min_calls(250) j');
 }
 
 // ---------- baja ----------

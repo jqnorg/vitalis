@@ -291,6 +291,25 @@
     for (let i = 0; i < rows.length; i += 300) send({ type: 'crm-seen', rows: rows.slice(i, i + 300) });
   }
 
+  // cada toque en Omega, Gizat o Voiso (lo que va después del guión es el interno de cada agente: no se lee) = una llamada al cliente de esa ficha.
+  // Se guarda solo cliente, línea y hora. La misma línea al mismo cliente en menos de 30 s cuenta una (lo resuelve la base).
+  const LINE_RE = /^[^a-z0-9]*(omega|gizat|voiso)\b/i; // el ícono del teléfono adelante no importa
+  function idNear(el) { // el "ID 70370" del encabezado de la ficha donde está el botón
+    for (let e = el, k = 0; e && k < 14; e = e.parentElement, k++) {
+      const w = document.createTreeWalker(e, NodeFilter.SHOW_TEXT); let n;
+      while ((n = w.nextNode())) { const t = n.nodeValue; if (!t || t.length > 40 || !/(^|[^a-z])id([^a-z]|$)/i.test(t)) continue;
+        for (let p = n.parentElement, j = 0; p && j < 3; p = p.parentElement, j++) { const tx = p.textContent || ''; if (tx.length > 48) break; const m = tx.match(ID_RE); if (m) return m[1]; } }
+    }
+    return '';
+  }
+  document.addEventListener('click', (ev) => {
+    if (!live()) return;
+    const b = ev.target && ev.target.closest && ev.target.closest('button,a,[role=button]'); if (!b || (ui && ui.h.contains(b))) return;
+    const m = (b.textContent || '').replace(/\s+/g, ' ').match(LINE_RE); if (!m) return;
+    const id = idNear(b) || idInUrl() || ((idInPage() || {}).id || ''); if (!id) return;
+    send({ type: 'crm-seen', rows: [{ id, brand, ln: m[1].toLowerCase(), at: new Date().toISOString() }] });
+  }, true);
+
   // en la pestaña que se actualiza: un Talking que desaparece de la lista ya cambió de status en el CRM.
   // Cuenta si sigue sin estar 12 s (más de una vuelta de actualización), en la misma lista, y no lo empujaron a la página siguiente los que entraron.
   let gPrev = null; const gCand = new Map(), gSent = new Set();

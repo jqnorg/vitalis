@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.17.1';
+const VERSION='1.18.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -142,7 +142,7 @@ async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, p
 /* ---------- lo último que cargué, guardado en esta computadora (IndexedDB) ----------
    Al abrir Vitalis con la sesión abierta se dibuja al instante con eso y en paralelo se pide lo nuevo.
    Uno por persona; se borra al salir. */
-const SNAP_V=1;
+const SNAP_V=2;
 const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',1);r.onupgradeneeded=()=>r.result.createObjectStore('snap');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
 async function snapOp(mode,fn){try{const db=await snapDb();return await new Promise((ok,no)=>{const t=db.transaction('snap',mode),q=fn(t.objectStore('snap'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
 const snapGet=k=>snapOp('readonly',s=>s.get(k));
@@ -263,7 +263,7 @@ const B={ // todas las escrituras pasan por acá
 // el arranque: todo en paralelo (las reglas de la base ya filtran por mesa), y se guarda para la próxima vez
 async function bootFetch(hint={}){
   const lead=!!hint.lead,ago=ms=>new Date(Date.now()-ms).toISOString();
-  const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic]=await Promise.all([
+  const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl]=await Promise.all([
     Q(sb.from('profiles').select('*').eq('id',me)),
     Q(sb.from('teams').select('*').limit(1)),
     Q(sb.from('profiles').select('*').order('name')),
@@ -286,8 +286,9 @@ async function bootFetch(hint={}){
     reactFetch(),
     bkFetch().catch(()=>null),
     ficFetch(),
+    callsFetch(),
   ]);
-  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic};
+  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl};
   if(raw.prof&&['admin','leader'].includes(raw.prof.role)!==lead)raw.mesa=await mesaFetch(!lead).catch(()=>null); // adiviné mal el rol
   return raw;
 }
@@ -304,7 +305,7 @@ function bootApply(R,quiet){
   turnos=Object.fromEntries(R.sh.map(r=>{const t={...r.data};t.date=t.date||r.date;t.breaks=t.breaks||[];return [r.date,t]}));
   cfg={...DEF,...((R.st[0]&&R.st[0].cfg)||{})};
   if(R.mesa)mesaApply(R.mesa);else mesaOk=false;
-  avApply(R.av);reactApply(R.rx);bkApply(R.bkx,quiet);ficOk=R.fic;
+  avApply(R.av);reactApply(R.rx);bkApply(R.bkx,quiet);ficOk=R.fic;callsApply(R.cl);
 }
 async function loadAll(first){
   const snap=me?await snapGet('boot:'+me):null,h=snap&&snap.raw?{lead:snap.raw.prof&&['admin','leader'].includes(snap.raw.prof.role),nSales:snap.raw.sales.length,nLeads:snap.raw.ld.length}:{lead:!!(authPerson&&['admin','leader'].includes(authPerson.role))};
@@ -319,7 +320,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll(),callsFetch().then(x=>{if(x){const n=calls.length;callsApply(x);if(calls.length!==n)refresh()}})]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 // con el tiempo real andando todo llega solo: ponerse al día es solo una red de seguridad (cada 5 min, o al volver después de un rato).
@@ -398,6 +399,8 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
   if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p));
   if(utOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'user_targets'},p=>mesaLive('user_targets',p));
   if(avOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'avatars'},avLive);
+  if(callsOk)chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'calls'},callLive); // las llamadas de la mesa, en vivo (el cielo)
+  chan.on('postgres_changes',{event:'UPDATE',schema:'public',table:'teams'},p=>{if(p.new&&teamInfo&&p.new.id===teamInfo.id){teamInfo={...teamInfo,...p.new};refresh()}}); // tope de la cola, mínimo de llamadas
   if(ficOk){for(const t of ['client_comments','campaign_info'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},fichaLive);if(bkEd())chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'campaign_requests'},()=>campReqPoll())} // la ficha: comentarios y campañas en vivo
   if(bk.ok)for(const t of ['pay_incidents','processors','processor_methods','banks','pay_methods'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},()=>bkLoad(true)); // Banking: una falla avisa al instante
   if(reactOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'message_reactions'},reactLive); // si la base todavía no tiene la tabla, no la pido (se caería el canal)

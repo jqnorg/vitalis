@@ -1027,6 +1027,53 @@ body.dark .ah-n{color:var(--pri-h)}
 .dk-h .ib{width:30px;height:30px;display:inline-grid;place-items:center;font-size:15px}
 
 .fi-crest{margin:8px 0 0;font-size:12.5px;line-height:1.45}
+
+/* ---------- el día: la franja de news por repasar y el cielo ---------- */
+.hoy-band{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 16px;padding:9px 14px;border-radius:14px;
+  background:color-mix(in srgb,var(--acc) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--acc) 45%,var(--line));box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.hoy-band>b{font-size:14px}
+.hb-dot{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 60%,transparent);animation:hbp 1.8s infinite}
+@keyframes hbp{70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.hb-list{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.hb-list .chip small{margin-left:6px;opacity:.75;font-size:11px}
+.cielo{--night:#0c1d14;--night2:#163a25;--c-news:#8cc9ff;--c-cb:#f0b67d;--c-g3:#9be3a9}
+.hmeters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:2px 0 14px}
+.hm-l{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--dim)}.hm-l b{font-family:var(--display);font-size:20px;color:var(--fg)}.hm-l small{font-size:12px;color:var(--dim);font-weight:600}
+.hm-b{position:relative;height:7px;border-radius:99px;background:var(--soft);margin:6px 0 5px;overflow:visible}
+.hm-b i{display:block;height:100%;border-radius:99px;background:var(--pri)}
+.hm-b s{position:absolute;top:-3px;width:2px;height:13px;background:var(--fg);opacity:.55;border-radius:2px}
+.hm-s{font-size:12px;color:var(--dim)}
+.sky-wrap{border-radius:16px;overflow:hidden;background:radial-gradient(120% 140% at 15% 0%,var(--night2),var(--night) 60%);cursor:default}
+.sky{display:block;width:100%;height:auto;color:#fff}
+.sky .dust{fill:#fff;opacity:.22}
+.sky .trail{fill:none;stroke:#fff;stroke-opacity:.16;stroke-width:1;stroke-dasharray:2 5}
+.sky .st{color:var(--c-g3)}.sky .st.cb{color:var(--c-cb)}.sky .st.news{color:var(--c-news)}
+.sky .st .core{fill:currentColor}
+.sky .st.off .core{fill:#fff;opacity:.2}
+.sky .st.off.news .core{fill:var(--c-news);opacity:.45}
+.sky .st.half .core{opacity:.8}
+.sky .st .halo{fill:url(#skg)}
+.sky .st.full .core{filter:drop-shadow(0 0 3px currentColor)}
+.sky .st .part{fill:none;stroke:currentColor;stroke-width:1.4;opacity:.8}
+.sky .st .ring{fill:none;stroke:var(--c-news);stroke-width:1.5;opacity:.9;transform-box:fill-box;transform-origin:center;animation:skr 2.2s ease-out infinite}
+@keyframes skr{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+.sky:not(.mini) .st{cursor:pointer;outline:none}
+.sky:not(.mini) .st:hover .core,.sky:not(.mini) .st:focus-visible .core{stroke:#fff;stroke-width:1.5}
+.sky-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 2px 0;font-size:12px;color:var(--dim)}
+.sky-leg span{display:inline-flex;align-items:center;gap:6px}
+.lg{width:9px;height:9px;border-radius:50%;display:inline-block;background:#9be3a9}
+.lg.off{background:color-mix(in srgb,var(--dim) 35%,transparent)}.lg.half{background:transparent;border:2px solid #6fcf86;border-right-color:transparent;border-bottom-color:transparent;width:7px;height:7px}.lg.full{background:#6fcf86;box-shadow:0 0 7px #6fcf86}.lg.news{background:#5fa9ea}
+.sky-off{margin:10px 2px 0;font-size:12.5px;color:var(--dim)}.sky-off .lnkp{font-size:12.5px}
+.sky-half{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.sky-h{margin:18px 0 8px;font-size:14px}
+.sky-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.sky-grid.big{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.sky-mini{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;cursor:pointer;border-radius:14px;padding:8px;background:radial-gradient(120% 140% at 15% 0%,var(--night2),var(--night) 60%);color:#e8f2ea}
+.sky-mini:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.sky-mini:hover{filter:brightness(1.12)}
+.smh{display:flex;align-items:center;gap:8px;font-size:12.5px}.smh .av{width:22px;height:22px;font-size:10px}.smh .d{color:#a8c5b0}.smh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:760px){.hmeters{grid-template-columns:minmax(0,1fr)}.hoy-band{margin-top:0}}
+@media (prefers-reduced-motion:reduce){.sky .st .ring,.hb-dot{animation:none}}
 </style>
 </head>
 <body class="auth">
@@ -1114,6 +1161,7 @@ body.dark .ah-n{color:var(--pri-h)}
 </header>
 
 <main id="main">
+<div id="hoyBand" class="hoy-band" role="status" hidden></div>
 
 <section class="view" id="v-inicio">
   <div class="vh"><div><h1 id="iHola">Hola</h1><p class="sub" id="iFecha"></p></div></div>
@@ -1122,6 +1170,7 @@ body.dark .ah-n{color:var(--pri-h)}
     <div class="side-kpis" id="iKpis"></div>
   </div>
   <section class="card bk-alert" id="iBank" aria-label="Fallas de pago" hidden></section>
+  <section class="card cielo" id="iCielo" aria-label="El cielo del día" hidden></section>
   <section class="card ah-card" id="iAhora" aria-label="Ahora" hidden></section>
   <section class="card ms" id="iMesa" aria-label="La mesa"></section>
   <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
@@ -1375,8 +1424,8 @@ body.dark .ah-n{color:var(--pri-h)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.17.1';
-const EXT_VER='1.8.3'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.18.0';
+const EXT_VER='1.8.4'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -1514,7 +1563,7 @@ async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, p
 /* ---------- lo último que cargué, guardado en esta computadora (IndexedDB) ----------
    Al abrir Vitalis con la sesión abierta se dibuja al instante con eso y en paralelo se pide lo nuevo.
    Uno por persona; se borra al salir. */
-const SNAP_V=1;
+const SNAP_V=2;
 const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',1);r.onupgradeneeded=()=>r.result.createObjectStore('snap');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
 async function snapOp(mode,fn){try{const db=await snapDb();return await new Promise((ok,no)=>{const t=db.transaction('snap',mode),q=fn(t.objectStore('snap'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
 const snapGet=k=>snapOp('readonly',s=>s.get(k));
@@ -1635,7 +1684,7 @@ const B={ // todas las escrituras pasan por acá
 // el arranque: todo en paralelo (las reglas de la base ya filtran por mesa), y se guarda para la próxima vez
 async function bootFetch(hint={}){
   const lead=!!hint.lead,ago=ms=>new Date(Date.now()-ms).toISOString();
-  const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic]=await Promise.all([
+  const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl]=await Promise.all([
     Q(sb.from('profiles').select('*').eq('id',me)),
     Q(sb.from('teams').select('*').limit(1)),
     Q(sb.from('profiles').select('*').order('name')),
@@ -1658,8 +1707,9 @@ async function bootFetch(hint={}){
     reactFetch(),
     bkFetch().catch(()=>null),
     ficFetch(),
+    callsFetch(),
   ]);
-  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic};
+  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl};
   if(raw.prof&&['admin','leader'].includes(raw.prof.role)!==lead)raw.mesa=await mesaFetch(!lead).catch(()=>null); // adiviné mal el rol
   return raw;
 }
@@ -1676,7 +1726,7 @@ function bootApply(R,quiet){
   turnos=Object.fromEntries(R.sh.map(r=>{const t={...r.data};t.date=t.date||r.date;t.breaks=t.breaks||[];return [r.date,t]}));
   cfg={...DEF,...((R.st[0]&&R.st[0].cfg)||{})};
   if(R.mesa)mesaApply(R.mesa);else mesaOk=false;
-  avApply(R.av);reactApply(R.rx);bkApply(R.bkx,quiet);ficOk=R.fic;
+  avApply(R.av);reactApply(R.rx);bkApply(R.bkx,quiet);ficOk=R.fic;callsApply(R.cl);
 }
 async function loadAll(first){
   const snap=me?await snapGet('boot:'+me):null,h=snap&&snap.raw?{lead:snap.raw.prof&&['admin','leader'].includes(snap.raw.prof.role),nSales:snap.raw.sales.length,nLeads:snap.raw.ld.length}:{lead:!!(authPerson&&['admin','leader'].includes(authPerson.role))};
@@ -1691,7 +1741,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
   lastCatch=Date.now();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll()]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll(),callsFetch().then(x=>{if(x){const n=calls.length;callsApply(x);if(calls.length!==n)refresh()}})]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 // con el tiempo real andando todo llega solo: ponerse al día es solo una red de seguridad (cada 5 min, o al volver después de un rato).
@@ -1770,6 +1820,8 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
   if(mesaOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'targets'},p=>mesaLive('targets',p));
   if(utOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'user_targets'},p=>mesaLive('user_targets',p));
   if(avOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'avatars'},avLive);
+  if(callsOk)chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'calls'},callLive); // las llamadas de la mesa, en vivo (el cielo)
+  chan.on('postgres_changes',{event:'UPDATE',schema:'public',table:'teams'},p=>{if(p.new&&teamInfo&&p.new.id===teamInfo.id){teamInfo={...teamInfo,...p.new};refresh()}}); // tope de la cola, mínimo de llamadas
   if(ficOk){for(const t of ['client_comments','campaign_info'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},fichaLive);if(bkEd())chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'campaign_requests'},()=>campReqPoll())} // la ficha: comentarios y campañas en vivo
   if(bk.ok)for(const t of ['pay_incidents','processors','processor_methods','banks','pay_methods'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},()=>bkLoad(true)); // Banking: una falla avisa al instante
   if(reactOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'message_reactions'},reactLive); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
@@ -2304,7 +2356,7 @@ function status(){
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
   $('#sMe').innerHTML=profile?`${avatar(profile.name)}<span style="min-width:0"><span class="nm">${esc(profile.name)}</span><span class="rl">${esc(roleTxt(profile.role))}</span></span>`:'';
-  turnoBar();
+  turnoBar();hoyBand();
 }
 let turnoKey='';
 function turnoState(){const t=openTurno(),b=breakAbierto(t),h=turnos[todayS()];return {t,b,h,key:!t?('f'+(h?.out||'')):b?('b'+b.k+b.s):('w'+t.in)}}
@@ -3128,6 +3180,7 @@ V.inicio={
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
     {const bc=bkCard();$('#iBank').hidden=!bc;$('#iBank').innerHTML=bc} // si un procesador falla, primero eso
+    {const cc=cieloCard();$('#iCielo').hidden=!cc;$('#iCielo').innerHTML=cc} // el día: llamadas, pool y el cielo
     crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
     $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
     $('#iHoy').innerHTML=hoyMesaCard();
@@ -5184,7 +5237,7 @@ async function crmLoad(force){
         crmPage(()=>base().gte('reg',from).order('client_id')),
         crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
         ids.length?Q(base().in('client_id',ids)):Promise.resolve([]),
-        isLeader()?QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)):Promise.resolve([]),
+        QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)), // las rotaciones de hoy (el team leader las ve en Equipo; el cielo saca de tu meta a los que te rotaron ya llamados)
       ]);
       const rows=[...act,...coh,...cohS,...ag];crmApply(rows,rot);snapCrm(rows,rot);
     }catch(e){if(/crm_clients|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))crm.ok=false}
@@ -5209,9 +5262,13 @@ async function crmLog(id){ // status y rotaciones, en orden
 // lo que mandó la extensión: todos los clientes vistos en el CRM
 async function crmSeenFromExt(rows){
   if(!ready||readOnly)return {err:'Vitalis todavía está cargando'};
+  // las llamadas (toques en Omega, Gizat, Voiso) van aparte
+  const callR=rows.slice(0,500).filter(r=>r&&r.ln);
+  if(callR.length){try{await callsFromExt(callR)}catch(e){return {err:/calls_add|PGRST202|42883/.test(String(e&&(e.message||e.code)))?'falta actualizar la base':errMsg(e)}}}
+  if(callR.length===rows.slice(0,500).length)return {keys:callR.map(r=>String(r.k||''))};
   if(crm.ok===false&&Date.now()-crm.at<5*6e4)return {err:'falta actualizar la base'};
   const s=v=>String(v??'').replace(/\s+/g,' ').trim(),batch=rows.slice(0,500);
-  const list=batch.filter(r=>r&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
+  const list=batch.filter(r=>r&&!r.ln&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
     reg:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.reg||'')?r.reg:'',agent:s(r.agent).slice(0,80),camp:s(r.camp).slice(0,120),aff:s(r.aff).slice(0,60),
     call:/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call||'')?r.call:'',note:s(r.note).slice(0,200),
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
@@ -5234,14 +5291,16 @@ const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
 function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
   const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
-  const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
+  // dentro de cada grupo, primero los que no se llamaron hoy (los news: los que piden repaso)
+  const hoyRank=r=>{const k=contactOf(r);return k.today?1:0},repRank=r=>{const k=contactOf(r);return !k.last||Date.now()-k.last>REPASO?0:1};
+  const g1=live.filter(r=>r.grp==='new').sort((a,b)=>repRank(a)-repRank(b)||byRegDesc(a,b));
   const ags=uid===me?pend:uid==null?[...pend,...(isLeader()?teamAg:[])]:agOf(uid);
   const ag=ags.filter(p=>!p.done&&p.due.slice(0,10)<=te&&!soldOf(p.id)&&!isDnc(p.id)).sort(byDue);
   const agIds=new Set(ags.filter(p=>!p.done).map(p=>norm(p.id)));
-  const cb=live.filter(r=>G2.includes(r.grp)&&!agIds.has(norm(r.id))).sort((a,b)=>(a.grp==='pending'?0:1)-(b.grp==='pending'?0:1)||byRegDesc(a,b)); // con cita en el CRM y sin agenda en Vitalis
+  const cb=live.filter(r=>G2.includes(r.grp)&&!agIds.has(norm(r.id))).sort((a,b)=>hoyRank(a)-hoyRank(b)||(a.grp==='pending'?0:1)-(b.grp==='pending'?0:1)||byRegDesc(a,b)); // con cita en el CRM y sin agenda en Vitalis
   const rep=live.filter(r=>r.grp==='na'&&naNum(r.status)>NA_MAX).sort(byRegDesc);
   const all3=live.filter(r=>G3.includes(r.grp)&&!(r.grp==='na'&&naNum(r.status)>NA_MAX)),cap=qCap(),many=all3.length>cap;
-  const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>g3rank(a)-g3rank(b)||byRegDesc(a,b));
+  const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>hoyRank(a)-hoyRank(b)||g3rank(a)-g3rank(b)||byRegDesc(a,b));
   const cnt=g=>mineAll.filter(r=>r.grp===g).length;
   const low=live.filter(r=>r.grp==='low_potential').sort(byRegDesc);
   return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
@@ -5945,6 +6004,163 @@ async function ficInit(){ficOk=await ficFetch()}
 
 /* ---------- cuando entra un new ---------- */
 function fichaNew(id){if(id)setCurrent(id,'','new')}
+
+/* ============================================================
+   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y el cielo.
+   Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader), cada NA (1 a 4), CA, HU, CallBack y Pending
+   llamado al menos una vez en el día, y los news del día repasados cada menos de 2 h. Un intento completo es por las tres líneas.
+   El cielo: cada cliente de tu pool es una estrella; apagada sin llamar hoy, a medias por una o dos líneas, encendida por las tres.
+   ============================================================ */
+let calls=[],callsOk=null,callsDay='';
+const LINES={omega:'Omega',gizat:'Gizat',voiso:'Voiso'};
+const C2C=r=>({uid:r.user_id,id:String(r.client_id),brand:r.brand,line:r.line,at:+new Date(r.at)});
+const REPASO=105*6e4; // un new del día pide repaso a la 1 h 45 sin llamada
+const minCalls=()=>+(teamInfo&&teamInfo.min_calls)||250;
+async function callsFetch(){ // las de hoy de toda la mesa
+  const day=todayS(),from=parseYMD(day).toISOString();
+  const page=i=>Q(sb.from('calls').select('user_id,client_id,brand,line,at').gte('at',from).order('at').order('id').range(i*1000,i*1000+999));
+  try{const pages=await Promise.all([page(0),page(1)]);while(pages[pages.length-1].length===1000)pages.push(await page(pages.length));return {day,rows:pages.flat()}}
+  catch(e){return null}
+}
+function callsApply(x){if(!x){callsOk=false;return}callsOk=true;callsDay=x.day;calls=x.day===todayS()?x.rows.map(C2C):[]}
+const sameCall=(a,b)=>a.uid===b.uid&&norm(a.id)===norm(b.id)&&a.line===b.line&&Math.abs(a.at-b.at)<30e3;
+function callAdd(c){if(calls.some(x=>sameCall(x,c)))return false;calls.push(c);return true}
+function callLive(p){if(p.eventType!=='INSERT'||!p.new||p.new.team_id!==profile.team_id)return;if(callAdd(C2C(p.new)))refresh()}
+// lo que mandó la extensión: los toques (pueden venir atrasados si Vitalis estaba cerrado)
+async function callsFromExt(rows){
+  const list=rows.filter(r=>r&&/^(omega|gizat|voiso)$/.test(r.ln)&&String(r.id||'').trim()).slice(0,500).map(r=>({id:String(r.id).trim().slice(0,60),brand:String(r.brand||'').slice(0,40),line:r.ln,at:r.at}));
+  if(!list.length)return true;
+  await Q(sb.rpc('calls_add',{rows:list}));
+  let ch=false;for(const c of list){const t=+new Date(c.at);if(isFinite(t)&&t>=+parseYMD(todayS()))ch=callAdd({uid:me,id:c.id,brand:c.brand||DEF_BRAND,line:c.line,at:t})||ch}
+  if(ch)refresh();return true;
+}
+
+/* ---------- cuentas del día ---------- */
+const callIdx=perPass(()=>{
+  const te=todayS();if(callsDay!==te){calls=[];callsDay=te}
+  const by=new Map(),n=new Map();
+  for(const c of calls){const k=norm(c.id);let o=by.get(k);if(!o)by.set(k,o={lines:new Set(),last:0,first:Infinity,uids:new Set()});o.lines.add(c.line);o.last=Math.max(o.last,c.at);o.first=Math.min(o.first,c.at);o.uids.add(c.uid);n.set(c.uid,(n.get(c.uid)||0)+1)}
+  return {by,n};
+});
+const callsOf=uid=>callIdx().n.get(uid)||0;
+// contacto de hoy: las llamadas registradas y, de respaldo, el último contacto que muestra el CRM
+function contactOf(r){
+  const c=callIdx().by.get(norm(r.id)),ca=callAt(r),crmHoy=!!ca&&ymd(ca)===todayS();
+  return {lines:c?c.lines:new Set(),last:Math.max(c?c.last:0,ca?+ca:0),first:c?c.first:Infinity,today:!!c||crmHoy,full:!!c&&c.lines.size>=3};
+}
+const NEWS_OUT=['dnc','invalid','not_interested','ftd','crm','failed','otro','low_potential'];
+// el pool del día de alguien: news registrados hoy + NA 1 a 4, CA, HU, CallBack y Pending (sin los depositados)
+const poolMemo={p:-1,m:new Map()};
+function dayPool(uid){
+  if(poolMemo.p!==pass){poolMemo.p=pass;poolMemo.m.clear()}
+  if(poolMemo.m.has(uid))return poolMemo.m.get(uid);
+  const S=soldIdx(),te=todayS(),now=Date.now();
+  const rotIn=new Set((crm.rot||[]).filter(x=>agentUid(x.new_agent)===uid).map(x=>norm(x.client_id)));
+  const items=[];
+  for(const r of crm.rows.values()){
+    if(isArch(r.brand)||crmOwner(r)!==uid||paidCrm(r)||S.has(ckey(r.brand,r.id)))continue;
+    const news=regDay(r)===te&&!NEWS_OUT.includes(r.grp);
+    const g=news?'news':['callback','pending'].includes(r.grp)?'cb':(['call_again','hang_up'].includes(r.grp)||(r.grp==='na'&&naNum(r.status)<=NA_MAX))?'g3':null;
+    if(!g)continue;
+    const k=contactOf(r);
+    if(!news&&rotIn.has(norm(r.id))&&k.today)continue; // te lo rotaron hoy y ya lo llamó alguien: no entra en tu meta
+    items.push({r,k,g,due:news&&(!k.last||now-k.last>REPASO)});
+  }
+  const done=items.filter(x=>x.k.today).length,half=items.filter(x=>x.k.today&&!x.k.full&&x.k.lines.size&&now-x.k.last>3*6e4);
+  const P={items,done,total:items.length,due:items.filter(x=>x.due).sort((a,b)=>(a.k.last||0)-(b.k.last||0)),half,n:callsOf(uid)};
+  poolMemo.m.set(uid,P);return P;
+}
+// el ritmo: desde tu entrada (o tu primera llamada) hasta el fin de tu jornada
+function dayPace(uid){
+  const n=callsOf(uid),min=minCalls(),te=todayS();
+  const t=uid===me?(openTurno()||turnos[te]):(teamSh[uid]||{})[te];
+  let start=t&&t.in;if(!start){for(const c of calls)if(c.uid===uid)start=Math.min(start||Infinity,c.at)}
+  if(!start||!isFinite(start))return {n,min,exp:null,ok:null};
+  const end=t&&t.out?t.out:Date.now(),f=Math.max(0,Math.min(1,(end-start)/jorMs())),exp=Math.round(min*f);
+  return {n,min,exp,ok:n>=exp*.9,f};
+}
+const meNeedsDay=()=>!!profile&&!isLeadUid(me)&&crm.ok;
+
+/* ---------- la franja: los news del día que piden repaso (sin sonido; se ve estando en Vitalis) ---------- */
+function hoyBand(){
+  const el=$('#hoyBand');if(!el)return;
+  const due=meNeedsDay()?dayPool(me).due:[];
+  if(!due.length){el.hidden=true;el.innerHTML='';return}
+  el.hidden=false;
+  el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'Falta 1 new por repasar':`Faltan ${due.length} news por repasar`}</b>
+    <span class="hb-list">${due.slice(0,5).map(x=>`<button type="button" class="chip" data-hb="ficha" data-id="${esc(x.r.id)}" title="${esc(x.k.last?'Último contacto '+rel(new Date(x.k.last)):'Sin llamar todavía')}"><b>${esc(x.r.id)}</b> ${esc(clip(x.r.name||'',18))}<small>${x.k.last?esc(rel(new Date(x.k.last))):'sin llamar'}</small></button>`).join('')}${due.length>5?`<span class="d">y ${due.length-5} más</span>`:''}</span>
+    <span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button>`;
+}
+
+/* ---------- el cielo ---------- */
+const fnv=s=>{let h=2166136261;for(const c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0};
+const rnd=seed=>()=>{seed=Math.imul(seed^seed>>>15,2246822507)^Math.imul(seed^seed>>>13,3266489909);return ((seed^=seed>>>16)>>>0)/4294967296};
+const linesTxt=k=>k.lines.size?[...k.lines].map(l=>LINES[l]).join(' · '):k.today?'en el CRM':'sin llamar hoy';
+function skySVG(P,uid,o={}){
+  const W=o.w||1000,H=o.h||250,mini=!!o.mini,pad=mini?6:18;
+  const R=rnd(fnv(uid||'mesa')),dust=Array.from({length:mini?18:70},()=>`<circle cx="${(R()*W).toFixed(1)}" cy="${(R()*H).toFixed(1)}" r="${(R()*.9+.25).toFixed(2)}" class="dust"/>`).join('');
+  const pos=x=>{const h=fnv(norm(x.r.id)),h2=fnv(x.r.id+'·');return [pad+(h%10007)/10007*(W-2*pad),pad+(h2%10009)/10009*(H-2*pad)]};
+  const sz=x=>(mini?{news:3.2,cb:2.6,g3:2.1}:{news:6.5,cb:5,g3:4})[x.g];
+  const st=x=>x.k.full?'full':x.k.today?'half':'off';
+  // el recorrido del día: las estrellas en el orden en que las llamaste
+  const trail=!mini&&P.items.filter(x=>isFinite(x.k.first)).sort((a,b)=>a.k.first-b.k.first).map(x=>pos(x).map(v=>v.toFixed(1)).join(',')).join(' ');
+  const stars=P.items.map(x=>{const [cx,cy]=pos(x),r=sz(x),s=st(x);
+    const tip=`${x.r.id} ${x.r.name||''} · ${x.r.status||''} · ${x.g==='news'?'new de hoy · ':''}${linesTxt(x.k)}${x.k.last?' · '+rel(new Date(x.k.last)):''}`;
+    return `<g class="st ${s} ${x.g}${x.due?' due':''}" data-id="${esc(x.r.id)}" transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)})"${mini?'':` tabindex="0" role="button" aria-label="${esc(tip)}"`}><title>${esc(tip)}</title>
+      ${s!=='off'?`<circle class="halo" r="${(r*(s==='full'?3.4:2.2)).toFixed(1)}"/>`:''}${x.due?`<circle class="ring" r="${(r*2.1).toFixed(1)}"/>`:''}<circle class="core" r="${r}"/>${s==='half'&&!mini?`<circle class="part" r="${(r+2.2).toFixed(1)}" pathLength="3" stroke-dasharray="${x.k.lines.size} 3"/>`:''}</g>`}).join('');
+  return `<svg class="sky${mini?' mini':''}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(`${P.done} de ${P.total} clientes llamados hoy`)}">
+    <defs><radialGradient id="skg"><stop offset="0" stop-color="currentColor" stop-opacity=".55"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></radialGradient></defs>
+    ${dust}${trail?`<polyline class="trail" points="${trail}"/>`:''}${stars}</svg>`;
+}
+const pctOf=(a,b)=>b?Math.round(a/b*100):0;
+function meter(lb,v,max,sub,mark){const p=Math.min(100,pctOf(v,max));return `<div class="hm"><div class="hm-l"><span>${lb}</span><b>${v}<small>/${max}</small></b></div><div class="hm-b"><i style="width:${p}%"></i>${mark!=null?`<s style="left:${Math.min(100,pctOf(mark,max))}%" title="A esta altura de tu jornada"></s>`:''}</div><div class="hm-s">${sub}</div></div>`}
+function paceTxt(pc){if(pc.exp==null)return 'marcá Entrada para medir tu ritmo';if(pc.n>=pc.min)return 'mínimo cumplido';if(pc.exp<10)return 'recién empieza tu jornada';return pc.ok?`vas bien · a esta altura, ${pc.exp}`:`vas atrasado · a esta altura, ${pc.exp}`}
+// en el inicio: tu cielo arriba y el de cada uno de la mesa; el team leader ve la mesa entera
+function cieloCard(){
+  if(crm.ok===false)return '';
+  const TL=isLeadUid(me),ag=sellers(team).filter(m=>!isLeadUid(m.id));
+  const minBtn=isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:'';
+  const legend=`<div class="sky-leg"><span><i class="lg off"></i>sin llamar hoy</span><span><i class="lg half"></i>a medias (1 o 2 líneas)</span><span><i class="lg full"></i>las 3 líneas</span><span><i class="lg news"></i>new de hoy</span></div>`;
+  // los que todavía no tienen pool ni llamadas van en una línea (sin cielos vacíos)
+  const act=m=>{const P=dayPool(m.id);return P.total||P.n},grid=L=>{const on=L.filter(act),off=L.filter(m=>!act(m));
+    return (on.length?`<div class="sky-grid${TL?' big':''}">${on.map(mini).join('')}</div>`:'')+(off.length?`<p class="sky-off">Sin pool ni llamadas todavía: ${off.map(m=>`<button type="button" class="lnkp" data-hy="ver" data-uid="${esc(m.id)}">${esc(first(m.id))}</button>`).join(', ')}</p>`:'')};
+  const mini=m=>{const P=dayPool(m.id),pc=dayPace(m.id);return `<button type="button" class="sky-mini" data-hy="ver" data-uid="${esc(m.id)}" title="Ver el cielo de ${esc(m.name)}">
+      <span class="smh">${avatar(m.name)}<b>${esc(first(m.id))}</b><span class="d">${pc.n}/${pc.min}</span><span class="d">${P.done}/${P.total}</span>${P.due.length?`<span class="badge bad" title="News por repasar">${P.due.length}</span>`:''}</span>${skySVG(P,m.id,{mini:true,w:320,h:90})}</button>`};
+  if(TL){
+    const tot=ag.reduce((a,m)=>{const P=dayPool(m.id);a.d+=P.done;a.t+=P.total;a.n+=P.n;a.r+=P.due.length;return a},{d:0,t:0,n:0,r:0});
+    return `<div class="card-h"><h3>El cielo de la mesa</h3><span class="p-sub">${tot.n} llamadas · ${tot.d}/${tot.t} del pool llamados hoy${tot.r?` · ${sp('hot',plural(tot.r,'new por repasar','news por repasar'))}`:''}</span><span class="grow"></span>${minBtn}</div>
+      ${grid(ag)||'<div class="p-empty">Todavía no hay agentes con clientes.</div>'}${legend}`;
+  }
+  const P=dayPool(me),pc=dayPace(me);
+  const halfTxt=P.half.length?`<div class="sky-half"><span class="d">Quedaron a medias:</span>${P.half.slice(0,6).map(x=>`<button type="button" class="chip" data-hy="ficha" data-id="${esc(x.r.id)}" title="Te falta ${esc(Object.keys(LINES).filter(l=>!x.k.lines.has(l)).map(l=>LINES[l]).join(' y '))}"><b>${esc(x.r.id)}</b> ${esc([...x.k.lines].map(l=>LINES[l]).join(' · '))}</button>`).join('')}${P.half.length>6?`<span class="d">y ${P.half.length-6} más</span>`:''}</div>`:'';
+  const others=ag.filter(m=>m.id!==me);
+  return `<div class="card-h"><h3>Tu cielo de hoy</h3><span class="p-sub">${P.total?`${P.done} de ${P.total} encendidas`:'Tu pool aparece cuando la extensión ve tus clientes en el CRM'}</span><span class="grow"></span>${minBtn}</div>
+    <div class="hmeters">${meter('Llamadas',pc.n,pc.min,esc(paceTxt(pc)),pc.exp)}${meter('Pool del día',P.done,P.total||0,'NA 1 a 4, CA, HU, CallBack y Pending: una vez por día')}${meter('News por repasar',P.due.length,P.items.filter(x=>x.g==='news').length,'cada menos de 2 h')}</div>
+    <div class="sky-wrap" data-hy="sky">${skySVG(P,me)}</div>${legend}${halfTxt}
+    ${others.length?`<h4 class="sky-h">La mesa hoy</h4>${grid(others)}`:''}`;
+}
+function cieloModal(uid){
+  const m=members.find(x=>x.id===uid);if(!m)return;
+  const P=dayPool(uid),pc=dayPace(uid);
+  modal({title:`El cielo de ${esc(m.name)}`,wide:true,body:`<div class="hmeters">${meter('Llamadas',pc.n,pc.min,esc(paceTxt(pc)),pc.exp)}${meter('Pool del día',P.done,P.total,'llamados hoy')}${meter('News por repasar',P.due.length,P.items.filter(x=>x.g==='news').length,'cada menos de 2 h')}</div>
+    <div class="sky-wrap" data-hy="sky">${skySVG(P,uid)}</div>`,
+    onOpen:api=>api.box.addEventListener('click',e=>{const s=e.target.closest('.st[data-id]');if(s){api.close();openFicha(s.dataset.id)}}),actions:[{l:'Cerrar'}]});
+}
+function minModal(){
+  if(!isLeader())return;
+  modal({title:'Llamadas mínimas por día',body:`<p class="mp">Cada toque en Omega, Gizat o Voiso cuenta una (es un estimado). La meta de cada agente en su cielo de hoy.</p><label class="fld" style="max-width:160px"><span>Mínimo</span><input id="mcN" inputmode="numeric" value="${minCalls()}"></label><div class="ebox" id="mcE"></div>`,
+    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{const n=parseInt(api.q('#mcN').value,10);if(!(n>=1&&n<=2000)){api.q('#mcE').textContent='Entre 1 y 2000.';return false}
+      const r=await B.rpc('set_min_calls',{n});if(!r)return false;teamInfo.min_calls=n;toast(`Mínimo de llamadas: ${n} por día.`);refresh()}}]});
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-hy],[data-hb]');if(!b||!ready)return;
+  const a=b.dataset.hy||b.dataset.hb;
+  if(a==='ficha')return openFicha(b.dataset.id);
+  if(a==='ver')return cieloModal(b.dataset.uid);
+  if(a==='min')return minModal();
+  if(a==='sky'){const s=e.target.closest('.st[data-id]');if(s)openFicha(s.dataset.id)}
+});
+document.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.matches&&e.target.matches('.sky .st[data-id]')){e.preventDefault();openFicha(e.target.dataset.id)}});
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.

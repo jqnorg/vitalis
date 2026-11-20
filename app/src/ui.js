@@ -172,7 +172,7 @@ function status(){
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
   $('#sMe').innerHTML=profile?`${avatar(profile.name)}<span style="min-width:0"><span class="nm">${esc(profile.name)}</span><span class="rl">${esc(roleTxt(profile.role))}</span></span>`:'';
-  turnoBar();
+  turnoBar();hoyBand();
 }
 let turnoKey='';
 function turnoState(){const t=openTurno(),b=breakAbierto(t),h=turnos[todayS()];return {t,b,h,key:!t?('f'+(h?.out||'')):b?('b'+b.k+b.s):('w'+t.in)}}

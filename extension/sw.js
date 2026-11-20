@@ -253,10 +253,14 @@ async function leadsDone(keys) {
 const seenKey = (r) => nrm(r.brand) + '|' + nrm(r.id);
 const REG_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/;
 async function crmSeen(rows) {
-  const st = await state(), q = new Map(st.crmQ.map((r) => [seenKey(r), r])), now = Date.now();
+  const st = await state(), q = new Map(st.crmQ.map((r) => [r.ln ? r.k : seenKey(r), r])), now = Date.now(); // las llamadas tienen su propia clave
   const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
   for (const r of rows.slice(0, 1000)) {
     const id = cl(r.id, 60); if (!id) continue;
+    if (/^(omega|gizat|voiso)$/.test(r.ln || '')) { // una llamada: va aparte, cada una con su clave
+      const at = new Date(r.at); const row = { id, brand: cl(r.brand, 40), ln: r.ln, at: isFinite(at) ? at.toISOString() : new Date(now).toISOString() };
+      row.k = 'call|' + seenKey(row) + '|' + row.ln + '|' + row.at; q.set(row.k, row); continue;
+    }
     const row = { id, brand: cl(r.brand, 40), name: cl(r.name, 120), country: cl(r.country, 60), status: cl(r.status, 60), reg: REG_RE.test(r.reg || '') ? r.reg : '',
       agent: cl(r.agent, 80), camp: cl(r.camp, 120), aff: cl(r.aff, 60), call: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call || '') ? r.call : '', note: cl(r.note, 200), ftd: /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd || '') ? r.ftd : '', desk: cl(r.desk, 80) };
     if (r.gone) row.gone = 1; // salió de Talking en la pestaña que se actualiza

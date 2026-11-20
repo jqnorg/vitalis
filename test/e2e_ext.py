@@ -48,9 +48,9 @@ def _nv_row(i, c):
     tds = ''.join(f'<td role="gridcell" aria-colindex="{j+1}">{v}</td>' for j, v in enumerate(['<div class="dx-select-checkbox"></div>'] + c + ['<i class="ic"></i>']))
     return f'<tr class="dx-row dx-data-row" role="row" aria-rowindex="{i+1}">{tds}</tr>'
 _NV_H = ['', 'User ID', 'Country', 'Full Name', 'Affiliate', 'User Source', 'Sales Status', 'Last Communication Time', 'Registration Time', 'Last Note', 'Actions']
-_NV = [['880101', 'Mexico', 'Rosa Ibarra', '109028', 'App Uno', 'NA - DAY3', '19/11/2026 09:45', '17/11/2026 18:48', 'NA 3.1'],
+_NV = [['880101', 'Mexico', 'Rosa Ibarra', '109028', 'App Uno', 'NA - DAY3', '18/11/2026 09:45', '17/11/2026 18:48', 'NA 3.1'],
        ['880102', 'Chile', 'Tomás Vera', '108887', 'Capital Dos', 'NA - DAY2', '18/11/2026 12:33', '17/11/2026 18:35', 'vm 2.3'],
-       ['880103', 'Colombia', 'Inés Lara', '97285', 'Capital Dos', 'Hang Up', '19/11/2026 09:46', '17/11/2026 16:32', 'NA 2-2'],
+       ['880103', 'Colombia', 'Inés Lara', '97285', 'Capital Dos', 'Hang Up', '18/11/2026 09:46', '17/11/2026 16:32', 'NA 2-2'],
        ['880104', 'Colombia', 'Raúl Peña', '108887', 'App Tres', 'Call Again', '18/11/2026 15:19', '17/11/2026 14:42', 'The number is out of service'],
        ['880105', 'Mexico', 'Eva Ruiz', '109028', 'App Uno', 'No Answer', '', '16/11/2026 18:38', '']]
 NOVARA = ('''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body style="font:12px system-ui;padding:10px"><button class="refresh-btn">⟳</button>
@@ -188,7 +188,7 @@ async def main():
             rows = sql("select client_id, status_group g, last_call, note, camp, aff, reg, country from public.crm_clients where client_id like '8801%' order by client_id")
             G = {x['client_id']: x for x in rows}
             ok(len(rows) == 5 and [G[k]['g'] for k in sorted(G)] == ['na', 'na', 'hang_up', 'call_again', 'na'], f'la lista de Novara llega entera y cada status en su grupo ({[(x["client_id"], x["g"]) for x in rows]})')
-            ok(G.get('880101', {}).get('last_call') == '2026-11-19 09:45' and G['880101']['note'] == 'NA 3.1' and G['880101']['camp'] == 'App Uno' and G['880101']['aff'] == '109028' and G['880101']['reg'] == '2026-11-17 18:48' and G['880105']['last_call'] is None,
+            ok(G.get('880101', {}).get('last_call') == '2026-11-18 09:45' and G['880101']['note'] == 'NA 3.1' and G['880101']['camp'] == 'App Uno' and G['880101']['aff'] == '109028' and G['880101']['reg'] == '2026-11-17 18:48' and G['880105']['last_call'] is None,
                f'con último contacto, última nota, campaña, afiliado y registro ({G.get("880101")})')
             ok(sql("select count(*)::int c from public.crm_clients where status ilike '%no answer, %' or client_id ilike 'search%'")[0]['c'] == 0, 'la fila de filtros no es un cliente')
             nvp = Nv.locator('#ftd-crm-button')
@@ -211,6 +211,12 @@ async def main():
             await Nv.evaluate("()=>{const d=document.createElement('div');d.id='drw';d.innerHTML='<div class=hd><div><span class=dot></span> Ana Panel</div><div class=sub>ID <span>70370</span><i class=ic></i></div></div><p>Server: Stock</p>';document.body.appendChild(d)}"); await Nv.wait_for_timeout(2500)
             cur = await A2.evaluate("curCl&&[curCl.id,curCl.name]")
             ok(cur == ['70370', 'Ana Panel'], f'también la ficha abierta como panel arriba de la lista del CRM ({cur})')
+            # cada toque en Omega, Gizat o Voiso es una llamada a ese cliente (el interno después del guión no se guarda)
+            await Nv.evaluate("()=>{const d=document.getElementById('drw');d.insertAdjacentHTML('beforeend','<div class=btns><button class=vb>☎ Omega - 9944418</button><button class=vb>☎ Gizat - 1371</button><button class=vb>☎ Voiso LATAM - 3262</button><a href=\"#\">+57312547XXXX</a></div>')}")
+            await Nv.click('text=Omega - 9944418'); await Nv.click('text=Omega - 9944418'); await Nv.click('text=Gizat - 1371'); await Nv.click('text=+57312547XXXX'); await Nv.wait_for_timeout(3000)
+            cl = sql("select client_id, line from public.calls where client_id='70370' order by line")
+            ok([(x['client_id'], x['line']) for x in cl] == [('70370', 'gizat'), ('70370', 'omega')], f'los toques en Omega y Gizat llegan como llamadas a 70370 (el doble toque cuenta uno; el teléfono no) ({cl})')
+            ok(not sql("select 1 from public.calls where client_id like '%9944418%' or client_id like '%1371%'"), 'sin el interno del agente')
             await Nv.evaluate("document.getElementById('drw').remove()"); await Nv.wait_for_timeout(800)
             # al actualizar la extensión, la copia nueva entra en la pestaña abierta y la vieja se apaga (sin recargar el CRM)
             await sw.evaluate("chrome.tabs.query({url:'https://crmnovaramarkets.com/novara'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id,allFrames:true},files:['crm.js']}))"); await Nv.wait_for_timeout(1500)

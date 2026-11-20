@@ -59,7 +59,7 @@ async function crmLoad(force){
         crmPage(()=>base().gte('reg',from).order('client_id')),
         crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
         ids.length?Q(base().in('client_id',ids)):Promise.resolve([]),
-        isLeader()?QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)):Promise.resolve([]),
+        QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)), // las rotaciones de hoy (el team leader las ve en Equipo; el cielo saca de tu meta a los que te rotaron ya llamados)
       ]);
       const rows=[...act,...coh,...cohS,...ag];crmApply(rows,rot);snapCrm(rows,rot);
     }catch(e){if(/crm_clients|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))crm.ok=false}
@@ -84,9 +84,13 @@ async function crmLog(id){ // status y rotaciones, en orden
 // lo que mandó la extensión: todos los clientes vistos en el CRM
 async function crmSeenFromExt(rows){
   if(!ready||readOnly)return {err:'Vitalis todavía está cargando'};
+  // las llamadas (toques en Omega, Gizat, Voiso) van aparte
+  const callR=rows.slice(0,500).filter(r=>r&&r.ln);
+  if(callR.length){try{await callsFromExt(callR)}catch(e){return {err:/calls_add|PGRST202|42883/.test(String(e&&(e.message||e.code)))?'falta actualizar la base':errMsg(e)}}}
+  if(callR.length===rows.slice(0,500).length)return {keys:callR.map(r=>String(r.k||''))};
   if(crm.ok===false&&Date.now()-crm.at<5*6e4)return {err:'falta actualizar la base'};
   const s=v=>String(v??'').replace(/\s+/g,' ').trim(),batch=rows.slice(0,500);
-  const list=batch.filter(r=>r&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
+  const list=batch.filter(r=>r&&!r.ln&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
     reg:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.reg||'')?r.reg:'',agent:s(r.agent).slice(0,80),camp:s(r.camp).slice(0,120),aff:s(r.aff).slice(0,60),
     call:/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call||'')?r.call:'',note:s(r.note).slice(0,200),
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
@@ -109,14 +113,16 @@ const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
 function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
   const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
-  const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
+  // dentro de cada grupo, primero los que no se llamaron hoy (los news: los que piden repaso)
+  const hoyRank=r=>{const k=contactOf(r);return k.today?1:0},repRank=r=>{const k=contactOf(r);return !k.last||Date.now()-k.last>REPASO?0:1};
+  const g1=live.filter(r=>r.grp==='new').sort((a,b)=>repRank(a)-repRank(b)||byRegDesc(a,b));
   const ags=uid===me?pend:uid==null?[...pend,...(isLeader()?teamAg:[])]:agOf(uid);
   const ag=ags.filter(p=>!p.done&&p.due.slice(0,10)<=te&&!soldOf(p.id)&&!isDnc(p.id)).sort(byDue);
   const agIds=new Set(ags.filter(p=>!p.done).map(p=>norm(p.id)));
-  const cb=live.filter(r=>G2.includes(r.grp)&&!agIds.has(norm(r.id))).sort((a,b)=>(a.grp==='pending'?0:1)-(b.grp==='pending'?0:1)||byRegDesc(a,b)); // con cita en el CRM y sin agenda en Vitalis
+  const cb=live.filter(r=>G2.includes(r.grp)&&!agIds.has(norm(r.id))).sort((a,b)=>hoyRank(a)-hoyRank(b)||(a.grp==='pending'?0:1)-(b.grp==='pending'?0:1)||byRegDesc(a,b)); // con cita en el CRM y sin agenda en Vitalis
   const rep=live.filter(r=>r.grp==='na'&&naNum(r.status)>NA_MAX).sort(byRegDesc);
   const all3=live.filter(r=>G3.includes(r.grp)&&!(r.grp==='na'&&naNum(r.status)>NA_MAX)),cap=qCap(),many=all3.length>cap;
-  const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>g3rank(a)-g3rank(b)||byRegDesc(a,b));
+  const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>hoyRank(a)-hoyRank(b)||g3rank(a)-g3rank(b)||byRegDesc(a,b));
   const cnt=g=>mineAll.filter(r=>r.grp===g).length;
   const low=live.filter(r=>r.grp==='low_potential').sort(byRegDesc);
   return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),

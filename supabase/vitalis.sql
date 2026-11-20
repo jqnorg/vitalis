@@ -1441,12 +1441,64 @@ grant select, insert, update, delete on public.campaign_info, public.campaign_re
 revoke update on public.client_comments from authenticated;
 revoke all on public.campaign_info, public.campaign_requests, public.client_comments from anon;
 
+-- ---------- llamadas: cada toque en Omega, Gizat o Voiso desde la ficha del cliente en el CRM (estimado) ----------
+-- solo agente, cliente, línea y hora (ni teléfonos ni internos). Dos toques a la misma línea y cliente en menos de 30 s cuentan uno.
+alter table public.teams add column if not exists min_calls integer not null default 250; -- llamadas mínimas por día (lo fija team leader/admin)
+create table if not exists public.calls (
+  id        bigserial primary key,
+  team_id   uuid not null default public.my_team() references public.teams(id),
+  user_id   uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  brand     text not null default 'Novara Markets' check (length(brand) <= 40),
+  client_id text not null check (length(btrim(client_id)) between 1 and 60),
+  line      text not null check (line in ('omega', 'gizat', 'voiso')),
+  at        timestamptz not null default now()
+);
+create index if not exists calls_day on public.calls (team_id, at);
+create index if not exists calls_cl on public.calls (team_id, client_id, at);
+alter table public.calls enable row level security;
+drop policy if exists calls_read on public.calls;
+create policy calls_read on public.calls for select to authenticated using (team_id = public.my_team());
+grant select on public.calls to authenticated;
+revoke all on public.calls from anon;
+-- se escriben solo por acá: de a 500, con la hora del toque (la extensión las guarda si Vitalis está cerrado)
+create or replace function public.calls_add(rows jsonb) returns json
+  language plpgsql security definer set search_path = public as $$
+declare
+  t uuid := public.my_team(); u uuid := auth.uid();
+  r jsonb; cid text; br text; ln text; ts timestamptz; n integer := 0;
+begin
+  if t is null or u is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  if rows is null or jsonb_typeof(rows) <> 'array' then raise exception 'BAD: se esperaba una lista'; end if;
+  if jsonb_array_length(rows) > 500 then raise exception 'TOO_MANY: de a 500'; end if;
+  for r in select * from jsonb_array_elements(rows) loop
+    cid := public._clip(r->>'id', 60); ln := lower(coalesce(r->>'line', ''));
+    if cid is null or ln not in ('omega', 'gizat', 'voiso') then continue; end if;
+    br := coalesce(public._clip(r->>'brand', 40), 'Novara Markets');
+    begin ts := (r->>'at')::timestamptz; exception when others then ts := null; end;
+    if ts is null or ts > now() + interval '1 minute' or ts < now() - interval '2 days' then ts := now(); end if;
+    if exists (select 1 from public.calls c where c.team_id = t and c.user_id = u and c.client_id = cid and c.line = ln and c.at between ts - interval '30 seconds' and ts + interval '30 seconds') then continue; end if;
+    insert into public.calls (team_id, user_id, brand, client_id, line, at) values (t, u, br, cid, ln, ts);
+    n := n + 1;
+  end loop;
+  return json_build_object('ok', true, 'added', n);
+end $$;
+create or replace function public.set_min_calls(n integer) returns json
+  language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  if n is null or n < 1 or n > 2000 then raise exception 'MIN: entre 1 y 2000'; end if;
+  update public.teams set min_calls = n where id = public.my_team();
+  return json_build_object('ok', true, 'min', n);
+end $$;
+revoke all on function public.calls_add(jsonb), public.set_min_calls(integer) from public, anon;
+grant execute on function public.calls_add(jsonb), public.set_min_calls(integer) to authenticated;
+
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','processor_methods','pay_incidents','banks','pay_methods','client_comments','campaign_info','campaign_requests'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','processor_methods','pay_incidents','banks','pay_methods','client_comments','campaign_info','campaign_requests','calls','teams'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;

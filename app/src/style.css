@@ -1014,3 +1014,50 @@ body.dark .ah-n{color:var(--pri-h)}
 .dk-h .ib{width:30px;height:30px;display:inline-grid;place-items:center;font-size:15px}
 
 .fi-crest{margin:8px 0 0;font-size:12.5px;line-height:1.45}
+
+/* ---------- el día: la franja de news por repasar y el cielo ---------- */
+.hoy-band{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-4px 0 16px;padding:9px 14px;border-radius:14px;
+  background:color-mix(in srgb,var(--acc) 14%,var(--panel));border:1px solid color-mix(in srgb,var(--acc) 45%,var(--line));box-shadow:0 6px 18px rgba(0,0,0,.08)}
+.hoy-band>b{font-size:14px}
+.hb-dot{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 60%,transparent);animation:hbp 1.8s infinite}
+@keyframes hbp{70%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.hb-list{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.hb-list .chip small{margin-left:6px;opacity:.75;font-size:11px}
+.cielo{--night:#0c1d14;--night2:#163a25;--c-news:#8cc9ff;--c-cb:#f0b67d;--c-g3:#9be3a9}
+.hmeters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:2px 0 14px}
+.hm-l{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--dim)}.hm-l b{font-family:var(--display);font-size:20px;color:var(--fg)}.hm-l small{font-size:12px;color:var(--dim);font-weight:600}
+.hm-b{position:relative;height:7px;border-radius:99px;background:var(--soft);margin:6px 0 5px;overflow:visible}
+.hm-b i{display:block;height:100%;border-radius:99px;background:var(--pri)}
+.hm-b s{position:absolute;top:-3px;width:2px;height:13px;background:var(--fg);opacity:.55;border-radius:2px}
+.hm-s{font-size:12px;color:var(--dim)}
+.sky-wrap{border-radius:16px;overflow:hidden;background:radial-gradient(120% 140% at 15% 0%,var(--night2),var(--night) 60%);cursor:default}
+.sky{display:block;width:100%;height:auto;color:#fff}
+.sky .dust{fill:#fff;opacity:.22}
+.sky .trail{fill:none;stroke:#fff;stroke-opacity:.16;stroke-width:1;stroke-dasharray:2 5}
+.sky .st{color:var(--c-g3)}.sky .st.cb{color:var(--c-cb)}.sky .st.news{color:var(--c-news)}
+.sky .st .core{fill:currentColor}
+.sky .st.off .core{fill:#fff;opacity:.2}
+.sky .st.off.news .core{fill:var(--c-news);opacity:.45}
+.sky .st.half .core{opacity:.8}
+.sky .st .halo{fill:url(#skg)}
+.sky .st.full .core{filter:drop-shadow(0 0 3px currentColor)}
+.sky .st .part{fill:none;stroke:currentColor;stroke-width:1.4;opacity:.8}
+.sky .st .ring{fill:none;stroke:var(--c-news);stroke-width:1.5;opacity:.9;transform-box:fill-box;transform-origin:center;animation:skr 2.2s ease-out infinite}
+@keyframes skr{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.5);opacity:0}}
+.sky:not(.mini) .st{cursor:pointer;outline:none}
+.sky:not(.mini) .st:hover .core,.sky:not(.mini) .st:focus-visible .core{stroke:#fff;stroke-width:1.5}
+.sky-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 2px 0;font-size:12px;color:var(--dim)}
+.sky-leg span{display:inline-flex;align-items:center;gap:6px}
+.lg{width:9px;height:9px;border-radius:50%;display:inline-block;background:#9be3a9}
+.lg.off{background:color-mix(in srgb,var(--dim) 35%,transparent)}.lg.half{background:transparent;border:2px solid #6fcf86;border-right-color:transparent;border-bottom-color:transparent;width:7px;height:7px}.lg.full{background:#6fcf86;box-shadow:0 0 7px #6fcf86}.lg.news{background:#5fa9ea}
+.sky-off{margin:10px 2px 0;font-size:12.5px;color:var(--dim)}.sky-off .lnkp{font-size:12.5px}
+.sky-half{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}
+.sky-h{margin:18px 0 8px;font-size:14px}
+.sky-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.sky-grid.big{grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.sky-mini{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:6px;cursor:pointer;border-radius:14px;padding:8px;background:radial-gradient(120% 140% at 15% 0%,var(--night2),var(--night) 60%);color:#e8f2ea}
+.sky-mini:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+.sky-mini:hover{filter:brightness(1.12)}
+.smh{display:flex;align-items:center;gap:8px;font-size:12.5px}.smh .av{width:22px;height:22px;font-size:10px}.smh .d{color:#a8c5b0}.smh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:760px){.hmeters{grid-template-columns:minmax(0,1fr)}.hoy-band{margin-top:0}}
+@media (prefers-reduced-motion:reduce){.sky .st .ring,.hb-dot{animation:none}}
