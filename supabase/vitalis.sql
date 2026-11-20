@@ -1062,6 +1062,18 @@ create or replace function public.crm_key(st text) returns text language sql imm
   as $$ select lower(regexp_replace(coalesce(st, ''), '[^A-Za-z0-9]', '', 'g')) $$;
 create or replace function public._clip(v text, n integer) returns text language sql immutable set search_path = ''
   as $$ select nullif(left(btrim(regexp_replace(coalesce(v, ''), '\s+', ' ', 'g')), n), '') $$;
+-- lo que no es un status de venta: el de registro (Full Registration) o el de una transacción (Success, Failure, TimeOut, Approved…).
+-- Algunas pestañas del CRM tienen una columna "Status" que es eso: no le cambia el status a nadie (si no, el cliente va y viene)
+create or replace function public.crm_not_sales(st text) returns boolean language sql immutable set search_path = ''
+  as $$ select public.crm_key(st) in ('fullregistration', 'partialregistration', 'registration', 'registered', 'success', 'successful', 'failure', 'failed',
+    'timeout', 'approved', 'rejected', 'canceled', 'cancelled', 'pending', 'processing', 'completed', 'error', 'active', 'inactive', 'verified', 'unverified') $$;
+-- el CRM en español dice lo mismo con otro nombre: se guarda con el de la tabla de la mesa (si no, cambia de status sin cambiar)
+create or replace function public.crm_canon(st text) returns text language sql immutable set search_path = ''
+  as $$ select case public.crm_key(st)
+    when 'nuevo' then 'New' when 'hablando' then 'Talking' when 'llamardenuevo' then 'Call Again' when 'volverallamar' then 'Call Again'
+    when 'sinrespuesta' then 'No Answer' when 'nocontesta' then 'No Answer' when 'colgo' then 'Hang Up' when 'nointeresado' then 'Not Interested'
+    when 'bajopotencial' then 'Low Potential' when 'nollamar' then 'Do Not Call' when 'numeroinvalido' then 'Invalid Number' when 'pagopendiente' then 'Pending Payment'
+    else st end $$;
 -- grupo de cada status: new · na (No Answer, NA - DAY2…DAY5, NA-2…) · call_again · hang_up · low_potential · not_interested · dnc (Do Not Call) · otro
 create or replace function public.crm_group(st text, t uuid) returns text
   language plpgsql stable security definer set search_path = public as $$
@@ -1109,7 +1121,8 @@ begin
       if found then n_chg := n_chg + 1; end if;
       continue;
     end if;
-    st := public._clip(r->>'status', 60);
+    st := public.crm_canon(public._clip(r->>'status', 60));
+    if public.crm_not_sales(st) then st := null; end if; -- la columna "Status" de registro o de una transacción: no es su status
     rg := public._clip(r->>'reg', 16);
     if rg is not null and (rg !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(rg, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then rg := null; end if;
     lc := public._clip(r->>'call', 16);
@@ -1121,6 +1134,7 @@ begin
     g := public.crm_group(st, t);
     hit := public.crm_key(st) = 'talking' or (st is not null and g <> 'new') or lc is not null; -- ya lo contactaron
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
+    if not found and st is null then continue; end if; -- sin su status de venta, se lo anota cuando se lo vea en la lista que lo tiene
     if not found then
       insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_agent, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
@@ -1162,6 +1176,35 @@ begin
   end loop;
   return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'fresh', to_json(fresh));
 end $$;
+
+-- una vez: el status de registro o de transacción que se coló (Full Registration, Success…) y los nombres en español.
+-- Se sacan del historial los cambios a esos status, se arregla el "de" de los que venían de ahí, se borran los que quedan sin cambio,
+-- y cada cliente vuelve a su último status de venta con la hora en que entró en él. Re-ejecutable: si no hay nada que arreglar, no toca nada.
+do $$
+begin
+  update public.crm_status_log set new_status = public.crm_canon(new_status) where new_status is distinct from public.crm_canon(new_status);
+  update public.crm_status_log set old_status = public.crm_canon(old_status) where old_status is distinct from public.crm_canon(old_status);
+  update public.crm_clients set status = public.crm_canon(status) where status is distinct from public.crm_canon(status);
+  drop table if exists _ruido;
+  create temp table _ruido on commit drop as
+    select distinct team_id, brand, client_id from public.crm_status_log where public.crm_not_sales(new_status) or public.crm_not_sales(old_status)
+    union select team_id, brand, client_id from public.crm_status_log group by 1, 2, 3 having count(*) filter (where old_status is not distinct from new_status) > 0;
+  if not exists (select 1 from _ruido) then return; end if;
+  delete from public.crm_status_log where public.crm_not_sales(new_status);
+  update public.crm_status_log l set old_status = (select p.new_status from public.crm_status_log p
+      where p.team_id = l.team_id and p.brand = l.brand and p.client_id = l.client_id and (p.seen_at, p.id) < (l.seen_at, l.id) order by p.seen_at desc, p.id desc limit 1)
+    where public.crm_not_sales(l.old_status);
+  delete from public.crm_status_log l using _ruido r
+    where l.team_id = r.team_id and l.brand = r.brand and l.client_id = r.client_id and l.old_status is not distinct from l.new_status;
+  update public.crm_clients c set status = x.new_status, status_group = public.crm_group(x.new_status, c.team_id), status_since = x.seen_at
+    from (select distinct on (team_id, brand, client_id) team_id, brand, client_id, new_status, seen_at from public.crm_status_log
+          order by team_id, brand, client_id, seen_at desc, id desc) x, _ruido r
+    where x.team_id = c.team_id and x.brand = c.brand and x.client_id = c.client_id
+      and r.team_id = c.team_id and r.brand = c.brand and r.client_id = c.client_id
+      and (public.crm_not_sales(c.status) or c.status = x.new_status);
+end $$;
+update public.crm_clients c set status_group = public.crm_group(c.status, c.team_id)
+  where c.status is not null and c.status_group is distinct from public.crm_group(c.status, c.team_id);
 
 -- el admin clasifica un status que no se reconoce (y se reclasifican los clientes que lo tienen)
 -- los que quedaron en "otro" con una versión vieja de crm_group (p. ej. NA - DAY3) pasan a su grupo

@@ -161,7 +161,7 @@
 
   /* ================= 2) clientes en "new" ================= */
   const CL = {
-    status: ['status', 'estado', 'sales status', 'lead status', 'retention status'],
+    status: ['sales status', 'retention status', 'lead status', 'status', 'estado'], // si hay "Sales Status" y "Status" (el de registro), el de venta
     id: ['client id', 'user id', 'lead id', 'customer id', 'account id', 'id', 'cid'],
     name: ['full name', 'client name', 'lead name', 'name', 'client', 'nombre'],
     first: ['first name'], last: ['last name'],
@@ -172,21 +172,25 @@
     note: ['last note', 'note', 'notes', 'last comment', 'comment', 'nota', 'notas'],
     ftd: ['time of ftd', 'ftd time', 'ftd date', 'fecha ftd'], desk: ['sales desk', 'desk'],
   };
+  // la columna "Status" de algunas pestañas es la del registro (Full Registration) o la de una transacción (Success, TimeOut…): no es su status
+  const NOT_SALES = /^(full|partial)?\s*registration$|^(registered|success|successful|failure|failed|time ?out|approved|rejected|cancell?ed|pending|processing|completed|error|active|inactive|verified|unverified)$/i;
+  const CANON = { nuevo: 'New', hablando: 'Talking', 'llamar de nuevo': 'Call Again', 'volver a llamar': 'Call Again', 'sin respuesta': 'No Answer', 'no contesta': 'No Answer', 'colgó': 'Hang Up', colgo: 'Hang Up', 'no interesado': 'Not Interested', 'bajo potencial': 'Low Potential', 'no llamar': 'Do Not Call', 'número inválido': 'Invalid Number', 'numero invalido': 'Invalid Number', 'pago pendiente': 'Pending Payment' }; // el CRM en español
+  const canon = (st) => CANON[st.toLowerCase().replace(/\s+/g, ' ')] || st;
   let clHead = null; // la tabla de clientes que encontré (para el diagnóstico)
   function scanAll(T) { // tabla con columna de estado que no sea la de FTDs: todas las filas, con su status
     const C = T.filter((x) => idxOf(x.labels, CL.status) >= 0 && !isFtdTable(mapFtd(x.labels)) && (idxOf(x.labels, CL.id) >= 0 || idxOf(x.labels, CL.name) >= 0 || idxOf(x.labels, CL.first) >= 0));
     clHead = C.length ? C[0].labels : null;
     if (!C.length) return null;
     let best = null;
-    for (const x of C) { const r = clientsOf(x); if (!best || r.length > best.length) best = r; }
+    for (const x of C) { const r = clientsOf(x); if (!r.length && r.ns) continue; if (!best || r.length > best.length) best = r; } // una tabla de transacciones o de registros no es una lista de clientes
     return best;
   }
   function clientsOf(t) {
     const ix = {}; for (const k in CL) ix[k] = idxOf(t.labels, CL[k]);
     const g = (c, k) => (ix[k] >= 0 ? c[ix[k]] || '' : '');
-    const out = [];
+    const out = []; out.ns = 0;
     for (const c of t.rows) {
-      const status = g(c, 'status').trim();
+      let status = canon(g(c, 'status').trim()); if (NOT_SALES.test(status)) { status = ''; out.ns++; }
       const name = g(c, 'name') || [g(c, 'first'), g(c, 'last')].filter(Boolean).join(' ');
       const id = g(c, 'id');
       if ((!id && !name) || !status) continue;

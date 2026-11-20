@@ -93,6 +93,11 @@ async def main():
             await ctx.route('https://crmtrade24seven.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=T24))
             await ctx.route('https://ant-crm.crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body='<!doctype html><meta charset="utf-8"><title>CRM</title><body><div class="hdr"><div><h2>Fabio Prueba</h2><div>ID 712345</div></div></div><p>Server: Stock</p></body>'))
             await ctx.route('https://crmnovaramarkets.com/novara', lambda r: r.fulfill(status=200, content_type='text/html', body=NOVARA))
+            _t = lambda hs, rows: '<!doctype html><meta charset="utf-8"><title>CRM</title><body><table class="ant-table"><thead><tr>' + ''.join(f'<th>{h}</th>' for h in hs) + '</tr></thead><tbody>' + ''.join('<tr>' + ''.join(f'<td>{v}</td>' for v in r) + '</tr>' for r in rows) + '</tbody></table></body>'
+            DOS = _t(['User ID', 'Full Name', 'Status', 'Sales Status', 'Registration Time'], [['880201', 'Ana Dos', 'Full Registration', 'Call Again', '17/11/2026 10:00'], ['880202', 'Beto Dos', 'Full Registration', 'Llamar de nuevo', '17/11/2026 10:05'], ['880203', 'Caro Dos', 'Partial Registration', 'NA - DAY2', '17/11/2026 10:09']])
+            TRX = _t(['User ID', 'Full Name', 'Status', 'Amount'], [['880301', 'Dani Tres', 'Success', '250'], ['880302', 'Eli Tres', 'TimeOut', '250'], ['880303', 'Fede Tres', 'Failure', '300'], ['880304', 'Gabi Tres', 'Approved', '300']])
+            await ctx.route('https://crmnovaramarkets.com/novara-dos', lambda r: r.fulfill(status=200, content_type='text/html', body=DOS))
+            await ctx.route('https://crmnovaramarkets.com/novara-trx', lambda r: r.fulfill(status=200, content_type='text/html', body=TRX))
             await ctx.route('https://crmnovaramarkets.com/tl', lambda r: r.fulfill(status=200, content_type='text/html', body=TLCRM))
             await ctx.route('https://crmtrade24seven.com/sinrep', lambda r: r.fulfill(status=200, content_type='text/html', body=T24_SINREP))
             sw = ctx.service_workers[0] if ctx.service_workers else await ctx.wait_for_event('serviceworker')
@@ -261,6 +266,14 @@ async def main():
                 dg = f'ERR {e}'
             ok('Voiso' in dg and 'calls' in dg and 'Juan' not in dg and 'Raro' not in dg and 'xxxx' in dg, f'el diagnóstico tiene la forma de la ficha y ningún dato del cliente ({dg[:160]!r})')
             await Nv.evaluate("()=>{document.getElementById('fic').remove();document.getElementById('oldDrw').remove();history.replaceState(null,'',location.pathname);document.getElementById('vitalis-cur-pill')&&document.getElementById('vitalis-cur-pill').remove()}"); await Nv.wait_for_timeout(800)
+            # una pestaña con "Status" (el de registro) y "Sales Status": vale el de venta; el CRM en español es el mismo status.
+            # Una tabla de transacciones (Success, TimeOut…) no es una lista de clientes: no entra nadie ni pide diagnóstico
+            Nd = await ctx.new_page(); await Nd.goto('https://crmnovaramarkets.com/novara-dos'); Nt = await ctx.new_page(); await Nt.goto('https://crmnovaramarkets.com/novara-trx')
+            await Nd.wait_for_timeout(4500)
+            st = {x['client_id']: x['status'] for x in sql("select client_id, status from public.crm_clients where client_id like '8802%' or client_id like '8803%'")}
+            ok(st == {'880201': 'Call Again', '880202': 'Call Again', '880203': 'NA - DAY2'}, f'con "Status" de registro y "Sales Status", vale el de venta, y "Llamar de nuevo" es Call Again ({st})')
+            ok(await Nt.locator('#ftd-crm-button').count() == 0, 'la tabla de transacciones no es una lista de clientes (ni pide diagnóstico)')
+            await Nd.close(); await Nt.close()
             # al actualizar la extensión, la copia nueva entra en la pestaña abierta y la vieja se apaga (sin recargar el CRM)
             await sw.evaluate("chrome.tabs.query({url:'https://crmnovaramarkets.com/novara'}).then(([t])=>chrome.scripting.executeScript({target:{tabId:t.id,allFrames:true},files:['crm.js']}))"); await Nv.wait_for_timeout(1500)
             ok(await Nv.locator('#ftd-crm-button').count() == 1, 'al actualizar, la copia nueva reemplaza a la vieja: un solo panel')

@@ -598,6 +598,23 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].g === 'na' && r.rows[0].camp === 'Google ES' && r.rows[0].reg === '2026-11-19 10:02' && r.rows[0].b && r.rows[0].d, 'otro agente actualiza el status de un cliente que vio otro, sin perder campaña ni registro');
   r = await as(Dh, "select old_status, new_status from public.crm_status_log where client_id = '900001' order by id");
   ok(r.rows.length === 2 && r.rows[1].old_status === 'New' && r.rows[1].new_status === 'No Answer', 'el cambio de status queda en el historial');
+  // la columna "Status" de registro o de una transacción (Full Registration, Success…) no le cambia el status a nadie
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Full Registration', camp: 'Google ES' }, { id: '900050', brand: 'Novara Markets', status: 'Success' }])]);
+  r = await as(Dh, "select (select status from public.crm_clients where client_id = '900001') s, (select count(*)::int from public.crm_clients where client_id = '900050') n, (select count(*)::int from public.crm_status_log where client_id in ('900001','900050')) l");
+  ok(R.changed === 0 && R.new === 0 && r.rows[0].s === 'No Answer' && r.rows[0].n === 0 && r.rows[0].l === 2, `"Full Registration" o "Success" no son su status: no cambia, no se anota, y uno nuevo así no entra (${JSON.stringify(R)})`);
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Llamar de nuevo' }])]);
+  const R2 = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Call Again' }])]);
+  r = await as(Dh, "select status, status_group g from public.crm_clients where client_id = '900001'");
+  ok(R.changed === 1 && R2.changed === 0 && r.rows[0].status === 'Call Again' && r.rows[0].g === 'call_again', 'el CRM en español ("Llamar de nuevo") es el mismo status que en inglés: no cambia de uno a otro');
+  // lo que ya se había colado se limpia: el historial queda con los cambios de verdad y el cliente vuelve a su status, con la hora en que entró
+  await db.exec(`insert into public.crm_clients (team_id, brand, client_id, status, status_group, status_since) select team_id, 'Novara Markets', '900060', 'Full Registration', 'otro', now() from public.profiles where id = '${B}';
+    insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_at) select team_id, 'Novara Markets', '900060', o, n, 'x', now() - (k || ' minutes')::interval from public.profiles,
+      (values (50, null, 'Full Registration'), (40, 'Full Registration', 'NA - DAY2'), (30, 'NA - DAY2', 'Full Registration'), (20, 'Full Registration', 'NA - DAY2'), (10, 'NA - DAY2', 'Full Registration')) v(k, o, n) where profiles.id = '${B}';`);
+  await db.exec(sql.slice(sql.indexOf('-- una vez: el status de registro'), sql.indexOf('-- el admin clasifica un status')));
+  r = await db.query("select old_status o, new_status n, round(extract(epoch from now() - seen_at) / 60)::int m from public.crm_status_log where client_id = '900060' order by seen_at");
+  const c60 = (await db.query("select status, status_group g, round(extract(epoch from now() - status_since) / 60)::int m from public.crm_clients where client_id = '900060'")).rows[0];
+  ok(r.rows.length === 1 && r.rows[0].o === null && r.rows[0].n === 'NA - DAY2' && r.rows[0].m === 40, `el historial queda con el cambio de verdad (${JSON.stringify(r.rows)})`);
+  ok(c60.status === 'NA - DAY2' && c60.g === 'na' && c60.m === 40, `y el cliente vuelve a NA - DAY2 desde que entró, no desde el último ida y vuelta (${JSON.stringify(c60)})`);
   await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', status: 'Talking' }])]);
   R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', gone: 1 }, { id: '900002', brand: 'Novara Markets', gone: 1 }])]);
   r = await as(B, "select client_id, status, status_group g, left_new_at is not null salio from public.crm_clients where client_id in ('900009','900002') order by client_id");
