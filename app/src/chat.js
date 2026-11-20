@@ -100,14 +100,14 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
-// una venta: Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
+// Vitalis escribe en "Toda la mesa" (felicita una venta o anuncia algo): avisa a todos aunque el chat esté silenciado.
 let botAsk=0;
 function cheerEvent(m,c){
   if(Date.now()-m.t>10*6e4)return;
   const txt=clip(msgTxt(m.body),160);
   toast(`<b>${esc(memberName(m.uid))}</b>: ${esc(txt)}`,'win',{ms:9000,key:'venta'+m._id,actions:chatViewing(c.id)?[]:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();pop()}
-  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:'info',title:'Venta nueva',id:memberName(m.uid),kw:txt,meta:'',btns:[['open','Abrir chat',1],['close','Ok']]});
+  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:'info',title:'Vitalis en el chat',id:'Toda la mesa',kw:txt,meta:'',btns:[['open','Abrir chat',1],['close','Ok']]});
 }
 function chatEvent(m){
   if(m.uid===me)return;
