@@ -705,6 +705,14 @@ async def main():
             g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
             ok('Son 4' in g3 and '500009' not in g3 and '500003' in g3, f'con más que el tope, solo los registrados en el mes ({g3[:160]!r})')
             sql('update public.teams set queue_cap = 60')
+            # datos viejos: un cliente que la extensión no ve hace +12 h sale de la cola (lo del 70604) y se avisa
+            sql("update public.crm_clients set last_seen = now() - interval '13 hours' where client_id='500005'")
+            await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(800)
+            await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
+            body = await A.inner_text('#ahBody')
+            ok('500005' not in body and '1 cliente oculto por datos viejos' in body, f'un cliente con datos viejos sale de la cola y se avisa ({body[-220:]!r})')
+            sql("update public.crm_clients set last_seen = now() where client_id='500005'")
+            await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(600)
             # la ficha del new: después del aviso, se abre sola al volver a Vitalis
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
             await A.evaluate("window.postMessage({type:'ftd-agenda-cmd',v:1,cmd:'nuevo',k:'500002'},location.origin)"); await A.wait_for_timeout(2200)

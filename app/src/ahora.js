@@ -115,6 +115,8 @@ async function crmSeenFromExt(rows){
 const naNum=s=>{const m=norm(s).match(/(?:^|[^a-z])na\D*([2-9])/);return m?+m[1]:1};
 const NA_MAX=4; // los NA se llaman del día 1 al 4; el 5 queda para repasos
 const paidCrm=r=>r.grp==='ftd'||!!r.ftd; // el CRM ya lo marca con FTD
+const STALE_MS=12*3600e3; // la extensión no lo ve hace +12 h: dato viejo (seguro ya rotó o cambió en el CRM), fuera de la cola
+const stale=r=>{const t=r.last?Date.parse(r.last):0;return t>0&&Date.now()-t>STALE_MS};
 // día del status para los de "5 días seguidos" (cuenta desde que Vitalis lo vio cambiar)
 const statusDay=r=>{if(!DAYS5.includes(r.grp)||!r.since)return 0;return Math.max(1,Math.round((parseYMD(todayS())-parseYMD(ymd(new Date(r.since))))/864e5)+1)};
 const dayTag=r=>{const n=statusDay(r);return n?` <span class="d${n>=5?' hot b':''}" title="Al 5º día seguido pasa a Not interested">día ${Math.min(n,5)}/5</span>`:''};
@@ -123,7 +125,8 @@ const byRegDesc=(a,b)=>(regAt(b)||0)-(regAt(a)||0);
 const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
 function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
-  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
+  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
+  const nStale=mineAll.filter(r=>stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r)).length; // viejos, ocultos de la cola
   // dentro de cada grupo, primero los que no se llamaron hoy (los news: los que piden repaso)
   const hoyRank=r=>{const k=contactOf(r);return k.today?1:0},repRank=r=>{const k=contactOf(r);return !k.last||Date.now()-k.last>REPASO?0:1};
   const g1=live.filter(r=>r.grp==='new').sort((a,b)=>repRank(a)-repRank(b)||byRegDesc(a,b));
@@ -136,7 +139,7 @@ function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>hoyRank(a)-hoyRank(b)||g3rank(a)-g3rank(b)||byRegDesc(a,b));
   const cnt=g=>mineAll.filter(r=>r.grp===g).length;
   const low=live.filter(r=>r.grp==='low_potential').sort(byRegDesc);
-  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
+  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,nStale,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
     ni:cnt('not_interested'),dnc:cnt('dnc'),inv:cnt('invalid'),otro:cnt('otro')+cnt('crm')};
 }
 function ahRow(r,i,who){
@@ -194,7 +197,7 @@ V.ahora={
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}
         ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">No tienen el dinero ahora: van agendados para el día que dijeron.${q.lowSin?` <span class="hot">${plural(q.lowSin,'está','están')} sin agenda: sin cita, CRM los puede mover.</span>`:''}</p>`+ahTable(q.low,who):''}
-        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p></section>`;
+        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p>${q.nStale?`<p class="note" style="margin-top:6px">${plural(q.nStale,'cliente oculto','clientes ocultos')} por datos viejos: la extensión no los ve hace rato (seguro ya rotaron o cambiaron en el CRM). Abrí el CRM con la extensión para refrescarlos.</p>`:''}</section>`;
   },
 };
 function capModal(){

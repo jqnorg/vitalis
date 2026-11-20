@@ -1595,7 +1595,7 @@ body.dark #nav button.nv-cli.on{color:#fff}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.5';
+const VERSION='1.23.6';
 const EXT_VER='1.9.4'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1948,7 +1948,7 @@ async function catchUp(force){
 // con el tiempo real andando todo llega solo: ponerse al día es solo una red de seguridad (cada 5 min, o al volver después de un rato).
 // Sin tiempo real: cada 5 s con la pestaña a la vista, cada minuto escondida. Los clientes del CRM no van en tiempo real: cada 45 s a la vista.
 let hidAt=0;
-const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:5e3):Date.now()-lastCatch>5*6e4;
+const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:10e3):Date.now()-lastCatch>5*6e4;
 setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad()},5e3);
 addEventListener('online',()=>catchUp(true));
 addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
@@ -5603,6 +5603,8 @@ async function crmSeenFromExt(rows){
 const naNum=s=>{const m=norm(s).match(/(?:^|[^a-z])na\D*([2-9])/);return m?+m[1]:1};
 const NA_MAX=4; // los NA se llaman del día 1 al 4; el 5 queda para repasos
 const paidCrm=r=>r.grp==='ftd'||!!r.ftd; // el CRM ya lo marca con FTD
+const STALE_MS=12*3600e3; // la extensión no lo ve hace +12 h: dato viejo (seguro ya rotó o cambió en el CRM), fuera de la cola
+const stale=r=>{const t=r.last?Date.parse(r.last):0;return t>0&&Date.now()-t>STALE_MS};
 // día del status para los de "5 días seguidos" (cuenta desde que Vitalis lo vio cambiar)
 const statusDay=r=>{if(!DAYS5.includes(r.grp)||!r.since)return 0;return Math.max(1,Math.round((parseYMD(todayS())-parseYMD(ymd(new Date(r.since))))/864e5)+1)};
 const dayTag=r=>{const n=statusDay(r);return n?` <span class="d${n>=5?' hot b':''}" title="Al 5º día seguido pasa a Not interested">día ${Math.min(n,5)}/5</span>`:''};
@@ -5611,7 +5613,8 @@ const byRegDesc=(a,b)=>(regAt(b)||0)-(regAt(a)||0);
 const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
 function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
-  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
+  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
+  const nStale=mineAll.filter(r=>stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r)).length; // viejos, ocultos de la cola
   // dentro de cada grupo, primero los que no se llamaron hoy (los news: los que piden repaso)
   const hoyRank=r=>{const k=contactOf(r);return k.today?1:0},repRank=r=>{const k=contactOf(r);return !k.last||Date.now()-k.last>REPASO?0:1};
   const g1=live.filter(r=>r.grp==='new').sort((a,b)=>repRank(a)-repRank(b)||byRegDesc(a,b));
@@ -5624,7 +5627,7 @@ function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>hoyRank(a)-hoyRank(b)||g3rank(a)-g3rank(b)||byRegDesc(a,b));
   const cnt=g=>mineAll.filter(r=>r.grp===g).length;
   const low=live.filter(r=>r.grp==='low_potential').sort(byRegDesc);
-  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
+  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,nStale,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
     ni:cnt('not_interested'),dnc:cnt('dnc'),inv:cnt('invalid'),otro:cnt('otro')+cnt('crm')};
 }
 function ahRow(r,i,who){
@@ -5682,7 +5685,7 @@ V.ahora={
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}
         ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">No tienen el dinero ahora: van agendados para el día que dijeron.${q.lowSin?` <span class="hot">${plural(q.lowSin,'está','están')} sin agenda: sin cita, CRM los puede mover.</span>`:''}</p>`+ahTable(q.low,who):''}
-        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p></section>`;
+        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p>${q.nStale?`<p class="note" style="margin-top:6px">${plural(q.nStale,'cliente oculto','clientes ocultos')} por datos viejos: la extensión no los ve hace rato (seguro ya rotaron o cambiaron en el CRM). Abrí el CRM con la extensión para refrescarlos.</p>`:''}</section>`;
   },
 };
 function capModal(){
@@ -5853,8 +5856,11 @@ const bkMini=pid=>{const fs=bkFilesOf('processor',pid).slice(1);return fs.length
 const bkThumbs=(kind,id,edit)=>{const fs=bkFilesOf(kind,id);if(!fs.length)return '';
   return `<div class="bk-ph${kind==='processor'?' ico':''}">${fs.map(f=>`<figure${edit?' class="ed"':''}><button type="button" class="bk-img" data-bkimg="${esc(f.id)}" title="${esc(f.caption||'Ver la foto')}"><img alt="${esc(f.caption||'Foto')}"></button>${edit?`<input class="bk-cap" data-bkcap="${esc(f.id)}" value="${esc(f.caption||'')}" placeholder="Para qué es" maxlength="200"><button type="button" class="ib" data-bkdelimg="${esc(f.id)}" title="Borrar la foto">✕</button>`:f.caption?`<figcaption>${esc(f.caption)}</figcaption>`:''}</figure>`).join('')}</div>`};
 async function bkHydrate(root){
-  const need=[...root.querySelectorAll('[data-bkimg]')].map(b=>b.dataset.bkimg).filter(id=>!bkImgs.has(id));
-  if(need.length){try{for(const r of await Q(sb.from('pay_files').select('id,mime,data').in('id',[...new Set(need)].slice(0,60))))bkImgs.set(r.id,`data:${r.mime};base64,${r.data}`)}catch(e){}}
+  let need=[...new Set([...root.querySelectorAll('[data-bkimg]')].map(b=>b.dataset.bkimg).filter(id=>!bkImgs.has(id)))];
+  if(need.length){const miss=[]; // primero las que ya bajé antes en esta compu
+    for(const id of need){try{const c=await imgCacheGet(id);if(c&&c.data){bkImgs.set(id,`data:${c.mime};base64,${c.data}`);continue}}catch(e){}miss.push(id)}
+    need=miss;}
+  if(need.length){try{for(const r of await Q(sb.from('pay_files').select('id,mime,data').in('id',need.slice(0,60)))){bkImgs.set(r.id,`data:${r.mime};base64,${r.data}`);imgCachePut(r.id,{mime:r.mime,data:r.data,at:Date.now()})}}catch(e){}}
   root.querySelectorAll('[data-bkimg]').forEach(b=>{const u=bkImgs.get(b.dataset.bkimg),im=b.querySelector('img');if(u&&im&&im.src!==u)im.src=u});
 }
 function bkLightbox(id){const u=bkImgs.get(id),f=bk.files.find(x=>x.id===id);if(!u)return;
@@ -5864,7 +5870,7 @@ async function bkUpload(kind,id,files){ // las achica (1600 px, webp) y las guar
   for(const file of [...files].slice(0,10)){
     try{const im=await prepImg(file),data=await b64(im.blob);URL.revokeObjectURL(im.url);
       const r=await Q(sb.from('pay_files').insert({ref_kind:kind,ref_id:id,mime:im.mime,data,w:im.w,h:im.h}).select('id,ref_kind,ref_id,w,h,caption,created_at'));
-      if(r&&r[0]){bk.files.push(r[0]);bkImgs.set(r[0].id,`data:${im.mime};base64,${data}`);n++}}
+      if(r&&r[0]){bk.files.push(r[0]);bkImgs.set(r[0].id,`data:${im.mime};base64,${data}`);imgCachePut(r[0].id,{mime:im.mime,data,at:Date.now()});n++}}
     catch(e){toast(esc(errMsg(e)),'err')}
   }
   return n;

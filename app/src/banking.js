@@ -77,8 +77,11 @@ const bkMini=pid=>{const fs=bkFilesOf('processor',pid).slice(1);return fs.length
 const bkThumbs=(kind,id,edit)=>{const fs=bkFilesOf(kind,id);if(!fs.length)return '';
   return `<div class="bk-ph${kind==='processor'?' ico':''}">${fs.map(f=>`<figure${edit?' class="ed"':''}><button type="button" class="bk-img" data-bkimg="${esc(f.id)}" title="${esc(f.caption||'Ver la foto')}"><img alt="${esc(f.caption||'Foto')}"></button>${edit?`<input class="bk-cap" data-bkcap="${esc(f.id)}" value="${esc(f.caption||'')}" placeholder="Para qué es" maxlength="200"><button type="button" class="ib" data-bkdelimg="${esc(f.id)}" title="Borrar la foto">✕</button>`:f.caption?`<figcaption>${esc(f.caption)}</figcaption>`:''}</figure>`).join('')}</div>`};
 async function bkHydrate(root){
-  const need=[...root.querySelectorAll('[data-bkimg]')].map(b=>b.dataset.bkimg).filter(id=>!bkImgs.has(id));
-  if(need.length){try{for(const r of await Q(sb.from('pay_files').select('id,mime,data').in('id',[...new Set(need)].slice(0,60))))bkImgs.set(r.id,`data:${r.mime};base64,${r.data}`)}catch(e){}}
+  let need=[...new Set([...root.querySelectorAll('[data-bkimg]')].map(b=>b.dataset.bkimg).filter(id=>!bkImgs.has(id)))];
+  if(need.length){const miss=[]; // primero las que ya bajé antes en esta compu
+    for(const id of need){try{const c=await imgCacheGet(id);if(c&&c.data){bkImgs.set(id,`data:${c.mime};base64,${c.data}`);continue}}catch(e){}miss.push(id)}
+    need=miss;}
+  if(need.length){try{for(const r of await Q(sb.from('pay_files').select('id,mime,data').in('id',need.slice(0,60)))){bkImgs.set(r.id,`data:${r.mime};base64,${r.data}`);imgCachePut(r.id,{mime:r.mime,data:r.data,at:Date.now()})}}catch(e){}}
   root.querySelectorAll('[data-bkimg]').forEach(b=>{const u=bkImgs.get(b.dataset.bkimg),im=b.querySelector('img');if(u&&im&&im.src!==u)im.src=u});
 }
 function bkLightbox(id){const u=bkImgs.get(id),f=bk.files.find(x=>x.id===id);if(!u)return;
@@ -88,7 +91,7 @@ async function bkUpload(kind,id,files){ // las achica (1600 px, webp) y las guar
   for(const file of [...files].slice(0,10)){
     try{const im=await prepImg(file),data=await b64(im.blob);URL.revokeObjectURL(im.url);
       const r=await Q(sb.from('pay_files').insert({ref_kind:kind,ref_id:id,mime:im.mime,data,w:im.w,h:im.h}).select('id,ref_kind,ref_id,w,h,caption,created_at'));
-      if(r&&r[0]){bk.files.push(r[0]);bkImgs.set(r[0].id,`data:${im.mime};base64,${data}`);n++}}
+      if(r&&r[0]){bk.files.push(r[0]);bkImgs.set(r[0].id,`data:${im.mime};base64,${data}`);imgCachePut(r[0].id,{mime:im.mime,data,at:Date.now()});n++}}
     catch(e){toast(esc(errMsg(e)),'err')}
   }
   return n;
