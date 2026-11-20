@@ -1203,3 +1203,5 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
 .bk-mc .bk-mnin{width:100%;margin-top:6px;font:inherit;font-size:13px;resize:vertical}
 @keyframes bkmn{from{opacity:0;transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.bk-mnote{animation:none}}
+
+.bk-m .bk-fc{color:var(--err);opacity:1;font-weight:600}

@@ -60,7 +60,7 @@ function fiPayHTML(d){
   const pais=PAISES.includes(d.pais)?d.pais:'';
   if(!bk.ok)return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar</h4><p class="p-sub" style="margin:0">Banking todavía no cargó.</p></div>`;
   if(!pais)return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar</h4><p class="p-sub" style="margin:0">${d.country?`${esc(d.country)} no está entre los países de la mesa.`:'No sé de qué país es.'}</p></div>`;
-  const grp=k=>{const l=bkOptions(pais,k);return `<div class="fi-pk"><span class="fi-pl">${KINDS[k]}</span><div class="bk-chips">${l.length?l.map(o=>`<span class="bk-chip ${o.falla?'avoid':'use'}" title="${esc(o.falla?(o.p.status==='falla'?o.p.status_note:o.x.status_note)||'Está fallando':o.p.notes||'')}">${o.falla?'⚠ ':''}${esc(o.x.m.name)} · ${esc(o.p.name)}${o.falla?' · falla':''}</span>`).join(''):'<span class="dim">Nada cargado</span>'}</div></div>`};
+  const grp=k=>{const l=bkOptions(pais,k);return `<div class="fi-pk"><span class="fi-pl">${KINDS[k]}</span><div class="bk-chips">${l.length?l.map(o=>`<span class="bk-chip ${o.falla?'avoid':'use'}" title="${esc(o.falla?(failsIn(o.p,pais)?o.p.status_note:o.x.status_note)||'Está fallando':o.p.notes||'')}">${o.falla?'⚠ ':''}${esc(o.x.m.name)} · ${esc(o.p.name)}${o.falla?' · falla':''}</span>`).join(''):'<span class="dim">Nada cargado</span>'}</div></div>`};
   const hasAny=['efectivo','transferencia','tarjeta'].some(k=>bkOptions(pais,k).length);
   const banks=bk.banks.filter(b=>!b.country||b.country===pais);
   return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar <span class="fi-v">${esc(pais)}</span></h4>
@@ -116,23 +116,60 @@ const PROF_OUT={
 };
 const PROF_ORDER=['pending','failed_proc','failed_bank','no_money','not_now','not_interested','dnc','dropped'];
 function profStatus(p){const o=p&&p.outcome&&PROF_OUT[p.outcome];return o?o.st+(o.note?` (${o.note})`:''):''}
-function profText(p,lang){
-  if(!p)return '';const en=lang==='en';
-  const cl=s=>String(s||'').trim().replace(/\s*[.;,]+$/,''),S=[];
-  let s1=en?(p.edad!=null?`${p.edad}-year-old client`:'Client'):(p.edad!=null?`Cliente de ${p.edad} años`:'Cliente'),occ='';
-  if(p.desocupado)occ=en?'currently unemployed'+(p.desocupado_desde?` for ${cl(p.desocupado_desde)}`:'')+(p.ocupacion?` (previously worked as ${cl(p.ocupacion)})`:''):'actualmente desocupado'+(p.desocupado_desde?` desde hace ${cl(p.desocupado_desde)}`:'')+(p.ocupacion?` (anteriormente se desempeñaba como ${cl(p.ocupacion)})`:'');
-  else if(p.ocupacion)occ=en?`works as ${cl(p.ocupacion)}`:`se desempeña como ${cl(p.ocupacion)}`;
-  S.push(s1+(occ?`, ${occ}.`:'.'));
-  if(p.objetivo)S.push(en?`States that their goal is ${cl(p.objetivo)}.`:`Manifiesta que su objetivo es ${cl(p.objetivo)}.`);
-  if(p.anuncio)S.push(en?`Reached through the ${cl(p.anuncio)} ad`+(p.vio_min===true?', where they saw the minimum investment amount.':p.vio_min===false?', although they did not see the minimum investment amount.':'.'):`Se contactó a través del anuncio de ${cl(p.anuncio)}`+(p.vio_min===true?', en el cual vio el monto mínimo de inversión.':p.vio_min===false?', aunque no llegó a ver el monto mínimo de inversión.':'.'));
-  else if(p.vio_min===true)S.push(en?'They are aware of the minimum investment amount from the ad.':'Tiene presente el monto mínimo de inversión del anuncio.');
-  else if(p.vio_min===false)S.push(en?'They did not see the minimum investment amount from the ad.':'No llegó a ver el monto mínimo de inversión del anuncio.');
-  const o=p.outcome&&PROF_OUT[p.outcome];if(o)S.push(o[en?'en':'es']);
-  if(p.motivo)S.push(en?`Note: ${cl(p.motivo)}.`:`Detalle: ${cl(p.motivo)}.`);
-  return S.join(' ');
+// el comentario, oración por oración: {es, en, free}. free = tiene texto que escribió el agente (en el CRM va traducido)
+function profParts(p){
+  if(!p)return [];
+  const cl=s=>String(s||'').trim().replace(/\s*[.;,]+$/,''),P=[],add=(es,en,free)=>P.push({es,en,free:!!free});
+  const lc=s=>{s=cl(s);return /^[A-ZÁÉÍÓÚÑ][a-záéíóúñü]/.test(s)?s[0].toLowerCase()+s.slice(1):s}; // "Comerciante" → "comerciante" en medio de la oración
+  const es1=p.edad!=null?`Cliente de ${p.edad} años`:'Cliente',en1=p.edad!=null?`${p.edad}-year-old client`:'Client';
+  let oes='',oen='';
+  if(p.desocupado){oes='actualmente desocupado'+(p.desocupado_desde?` desde hace ${cl(p.desocupado_desde)}`:'')+(p.ocupacion?` (anteriormente se desempeñaba como ${lc(p.ocupacion)})`:'');
+    oen='currently unemployed'+(p.desocupado_desde?` for ${cl(p.desocupado_desde)}`:'')+(p.ocupacion?` (previously worked as ${cl(p.ocupacion)})`:'')}
+  else if(p.ocupacion){oes=`se desempeña como ${lc(p.ocupacion)}`;oen=`works as ${cl(p.ocupacion)}`}
+  add(es1+(oes?`, ${oes}.`:'.'),en1+(oen?`, ${oen}.`:'.'),p.ocupacion||(p.desocupado&&p.desocupado_desde));
+  if(p.objetivo)add(`Manifiesta que su objetivo es ${lc(p.objetivo)}.`,`States that their goal is ${cl(p.objetivo)}.`,1);
+  if(p.anuncio)add(`Se contactó a través del anuncio de ${lc(p.anuncio)}`+(p.vio_min===true?', en el cual vio el monto mínimo de inversión.':p.vio_min===false?', aunque no llegó a ver el monto mínimo de inversión.':'.'),
+    `Reached through the ${cl(p.anuncio)} ad`+(p.vio_min===true?', where they saw the minimum investment amount.':p.vio_min===false?', although they did not see the minimum investment amount.':'.'),1);
+  else if(p.vio_min===true)add('Tiene presente el monto mínimo de inversión del anuncio.','They are aware of the minimum investment amount from the ad.');
+  else if(p.vio_min===false)add('No llegó a ver el monto mínimo de inversión del anuncio.','They did not see the minimum investment amount from the ad.');
+  const o=p.outcome&&PROF_OUT[p.outcome];if(o)add(o.es,o.en);
+  if(p.motivo)add(`Detalle: ${cl(p.motivo)}.`,`Note: ${cl(p.motivo)}.`,1);
+  return P;
 }
-// lo que se pega en el CRM: inglés arriba, traducción al español debajo
+function profText(p,lang){return profParts(p).map(x=>x[lang==='en'?'en':'es']).join(' ')}
+// lo que se pega en el CRM: inglés arriba, español debajo. Sin traductor, lo escrito por el agente queda en español
 function profCrm(p){const en=profText(p,'en'),es=profText(p,'es');return en&&es?`${en}\n\n${es}`:(en||es)}
+// el traductor de Chrome (corre en la computadora: no manda nada afuera). La primera vez baja el idioma: hay que llamarlo con un toque
+let trP=null,trState='';const trCache=new Map(),TR_O={sourceLanguage:'es',targetLanguage:'en'}; // trState: '' · bajando · listo · no
+function trOpen(){
+  if(trP)return trP;
+  if(!('Translator' in self)){trState='no';return trP=Promise.resolve(null)}
+  trP=(async()=>{const a=await Translator.availability(TR_O);if(a==='unavailable'){trState='no';return null}
+    if(a!=='available')trState='bajando';const t=await Translator.create(TR_O);trState='listo';return t})()
+    .catch(()=>{trP=null;if(trState!=='no')trState='';return null}); // sin toque falla: se reintenta en el próximo
+  return trP;
+}
+const tmo=(p,ms)=>Promise.race([p,new Promise(ok=>setTimeout(()=>ok(null),ms))]); // nunca esperar de más: mientras baja, va en español
+async function trEn(s,t){ // t: el traductor ya abierto
+  if(trCache.has(s))return trCache.get(s);
+  if(!t)return null;
+  try{const r=String(await tmo(t.translate(s),5000)||'').trim();if(r){trCache.set(s,r);return r}}catch(e){}
+  return null;
+}
+const trWhy=()=>trState==='bajando'?'Chrome está bajando el traductor: lo que escribiste quedó en español. Probá de nuevo en un minuto.':'Este Chrome no tiene el traductor: lo que escribiste queda en español (hay que actualizar Chrome).';
+// lo que va al CRM con lo escrito por el agente traducido (la oración entera, así queda natural). ok=false: no se pudo traducir
+async function profCrmEn(p){
+  const P=profParts(p);if(!P.length)return {txt:'',ok:true};
+  let ok=true;const en=[],tr=P.some(x=>x.free&&!trCache.has(x.es))?await tmo(trOpen(),2500):null; // se espera una sola vez
+  for(const x of P){if(!x.free){en.push(x.en);continue}const t=await trEn(x.es,tr);if(t)en.push(t);else{ok=false;en.push(x.en)}}
+  return {txt:`${en.join(' ')}\n\n${P.map(x=>x.es).join(' ')}`,ok};
+}
+async function profCopyCrm(p){ // copia lo que va al CRM; true si copió
+  const r=await profCrmEn(p);if(!r.txt)return false;
+  try{await navigator.clipboard.writeText(r.txt)}catch(e){return false}
+  if(!r.ok)toast(esc(trWhy()),'warn',{ms:9000,key:'tr'});
+  return true;
+}
 function fiProfHTML(d){
   const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p,'es'),st=profStatus(p);
   return `<div class="fi-c fi-prof${done?'':' fp-falta'}"><h4>Perfil del cliente ${done?'<span class="badge paid">completo</span>':'<span class="badge warn">faltan datos</span>'}</h4>
@@ -157,7 +194,7 @@ function fichaWire(root,getD,rerender){
     if(a==='campReq')return campReqModal(d,b.dataset.c);
     if(a==='campReqs')return campReqsModal(d,b.dataset.c,rerender);
     if(a==='profEdit')return profModal(d,rerender);
-    if(a==='profCopy'){const t=profCrm(d.prof);if(!t)return;try{await navigator.clipboard.writeText(t);toast('Copiado en inglés, con el español debajo. Pegalo en el comentario del CRM.')}catch(e){toast('No pude copiar. Copialo a mano.','warn')}return}
+    if(a==='profCopy'){trOpen();if(!d.prof)return;if(await profCopyCrm(d.prof))toast('Copiado en inglés, con el español debajo. Pegalo en el comentario del CRM.');else toast('No pude copiar. Copialo a mano.','warn');return}
     if(a==='comAdd'){const t=root.querySelector('[data-fcom]'),body=t.value.trim();if(!body)return t.focus();b.disabled=true;
       try{await Q(sb.from('client_comments').insert({client_id:String(d.id),brand:d.r&&d.r.brand||DEF_BRAND,body:body.slice(0,1000)}));t.value='';await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}finally{b.disabled=false}return}
     if(a==='comDel'){if(!await confirmar('Borrar comentario','¿Borrar este comentario?','borrar',true))return;try{await Q(sb.from('client_comments').delete().eq('id',b.dataset.id));await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}return}
@@ -186,9 +223,9 @@ function profModal(d,rerender){
     const x=read(api);
     if(x.edad!=null&&(!Number.isFinite(x.edad)||x.edad<16||x.edad>110)){api.q('#pfErr').textContent='La edad tiene que estar entre 16 y 110.';return false}
     try{await Q(sb.rpc('prof_save',{p_client:String(d.id),p_brand:d.r&&d.r.brand||DEF_BRAND,p_data:{...x,edad:x.edad==null?'':String(x.edad)}}))}catch(e){api.q('#pfErr').textContent=errMsg(e);return false}
-    if(copy){try{await navigator.clipboard.writeText(profCrm(x));toast('Perfil guardado y copiado. Pegalo en el comentario del CRM.')}catch(e){toast('Perfil guardado. No pude copiar: usá "Copiar al CRM" en la ficha.','warn')}}
+    await rerender(true); // primero se ve guardado; después se copia (traducir puede tardar un poco)
+    if(copy){if(await profCopyCrm(x))toast('Perfil guardado y copiado. Pegalo en el comentario del CRM.');else toast('Perfil guardado. No pude copiar: usá "Copiar al CRM" en la ficha.','warn')}
     else toast('Perfil guardado.');
-    await rerender(true);
   };
   modal({wide:true,title:`Perfil · ${esc(d.name||d.id)}`,body:`<p class="mp">Lo que la gerencia pide de cada cliente. Lo ve toda la mesa.</p>
     <div class="pf-grid"><div>
@@ -206,14 +243,17 @@ function profModal(d,rerender){
       <label class="fld"><span>Detalle <small class="dim">(opcional)</small></span><textarea id="pfMo" rows="2" maxlength="400" placeholder="Ej.: quiere consultarlo con la esposa / se le ofreció efectivo y transferencia">${esc(p.motivo||'')}</textarea></label>
     </div>
     <div class="pf-prev"><span class="p-sub">Así queda en Vitalis</span><div id="pfPrev" class="pf-txt"></div>
-      <details><summary>Ver lo que va al CRM (inglés + español)</summary><div id="pfPrevEn" class="pf-txt en"></div></details></div></div>
+      <details><summary>Ver lo que va al CRM (inglés + español)</summary><div id="pfPrevEn" class="pf-txt en"></div><p class="p-sub" id="pfTr" style="margin:4px 0 0"></p></details></div></div>
     <div class="ebox" id="pfErr"></div>`,
     onOpen:api=>{
       const draw=()=>{const x=read(api),o=x.outcome&&PROF_OUT[x.outcome],st=profStatus(x),es=profText(x,'es');
         api.q('#pfDwrap').style.display=x.desocupado?'':'none';
         api.q('#pfSt').innerHTML=st?`Status sugerido en el CRM: <b>${esc(st)}</b>`:o?'':'<span class="dim">Al elegir cómo terminó, te digo qué status poner en el CRM.</span>';
         api.q('#pfPrev').textContent=es&&(x.edad!=null||x.ocupacion||x.desocupado||x.objetivo||x.anuncio||x.outcome||x.motivo)?es:'Completá los datos y acá vas viendo el comentario.';
-        api.q('#pfPrevEn').textContent=profCrm(x);};
+        api.q('#pfPrevEn').textContent=profCrm(x);clearTimeout(api._tr);api._tr=setTimeout(async()=>{ // y con lo escrito ya traducido
+          const r=await profCrmEn(x);if(!api.box.isConnected||JSON.stringify(read(api))!==JSON.stringify(x))return;
+          api.q('#pfPrevEn').textContent=r.txt;api.q('#pfTr').textContent=r.ok?'':trWhy()},450)};
+      trOpen(); // se abrió con un toque: si hace falta, Chrome baja el traductor ahora
       api.mb.addEventListener('input',draw);api.mb.addEventListener('change',draw);draw();
     },
     actions:[{l:'Cancelar'},{l:'Guardar',fn:api=>save(api,false)},{l:'Guardar y copiar al CRM',cls:'pri',fn:api=>save(api,true)}]});

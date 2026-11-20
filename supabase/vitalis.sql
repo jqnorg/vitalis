@@ -1342,21 +1342,50 @@ update public.pay_methods set kind = case
 create or replace function public.pay_editor() returns boolean language sql stable security definer set search_path = public
   as $$ select coalesce(public.my_role(), '') in ('admin', 'leader') $$;
 -- reportar que un procesador (o uno de sus métodos) falla o volvió a andar
-create or replace function public.pay_report(pid uuid, mid uuid, falla boolean, note text default null) returns json
+-- una falla puede ser en todos los países (fail_countries vacío) o solo en algunos
+alter table public.processors add column if not exists fail_countries text[] not null default '{}';
+alter table public.processor_methods add column if not exists fail_countries text[] not null default '{}';
+alter table public.pay_incidents add column if not exists countries text[] not null default '{}'; -- a qué países tocó el aviso (vacío: todos)
+drop function if exists public.pay_report(uuid, uuid, boolean, text);
+create or replace function public.pay_report(pid uuid, mid uuid, falla boolean, note text default null, cs text[] default null) returns json
   language plpgsql security definer set search_path = public as $$
-declare t uuid := public.my_team(); n text := nullif(left(btrim(coalesce(note, '')), 1000), ''); iid uuid;
+declare
+  t uuid := public.my_team(); n text := nullif(left(btrim(coalesce(note, '')), 1000), ''); iid uuid;
+  c text[] := coalesce((select array_agg(distinct btrim(x) order by btrim(x)) from unnest(coalesce(cs, '{}')) x where btrim(x) <> ''), '{}');
+  st text; fc text[]; scope text[]; nf text[]; nst text;
 begin
   if not public.pay_editor() then raise exception 'Solo el administrador o el team leader'; end if;
   if not exists (select 1 from public.processors where id = pid and team_id = t) then raise exception 'PROC: no existe ese procesador'; end if;
   if mid is null then
-    update public.processors set status = case when falla then 'falla' else 'ok' end, status_note = case when falla then n end, status_at = now(), status_by = auth.uid(), updated_at = now() where id = pid;
+    select status, fail_countries, countries into st, fc, scope from public.processors where id = pid;
   else
-    update public.processor_methods set status = case when falla then 'falla' else 'ok' end, status_note = case when falla then n end, status_at = now(), status_by = auth.uid() where processor_id = pid and method_id = mid;
+    select pm.status, pm.fail_countries, case when cardinality(pm.countries) > 0 then pm.countries else p.countries end into st, fc, scope
+      from public.processor_methods pm join public.processors p on p.id = pm.processor_id where pm.processor_id = pid and pm.method_id = mid;
     if not found then raise exception 'METODO: ese procesador no tiene ese método'; end if;
   end if;
-  insert into public.pay_incidents (team_id, processor_id, method_id, kind, note, created_by)
-  values (t, pid, mid, case when falla then 'falla' else 'vuelve' end, n, auth.uid()) returning id into iid;
-  return json_build_object('ok', true, 'id', iid);
+  if cardinality(scope) = 0 then scope := array['Colombia','México','Chile','Panamá','Guatemala','Costa Rica','Perú']; end if; -- sin países: los de la mesa
+  if falla then
+    nst := 'falla';
+    if cardinality(c) = 0 or (st = 'falla' and cardinality(fc) = 0) then nf := '{}';                 -- en todos
+    elsif st = 'falla' then nf := (select array_agg(distinct x order by x) from unnest(fc || c) x);  -- suma países
+    else nf := c; end if;
+    if cardinality(nf) > 0 and scope <@ nf then nf := '{}'; end if;                                 -- falla en todos donde está
+  elsif cardinality(c) = 0 or st <> 'falla' then
+    nst := 'ok'; nf := '{}';                                                                          -- volvió en todos
+  else
+    nf := (select coalesce(array_agg(x order by x), '{}') from unnest(case when cardinality(fc) = 0 then scope else fc end) x where x <> all (c));
+    nst := case when cardinality(nf) = 0 then 'ok' else 'falla' end;                                 -- volvió en algunos
+  end if;
+  if mid is null then
+    update public.processors set status = nst, fail_countries = nf, status_note = case when falla then case when st = 'falla' then coalesce(n, status_note) else n end when nst = 'falla' then status_note end,
+      status_at = now(), status_by = auth.uid(), updated_at = now() where id = pid;
+  else
+    update public.processor_methods set status = nst, fail_countries = nf, status_note = case when falla then case when st = 'falla' then coalesce(n, status_note) else n end when nst = 'falla' then status_note end,
+      status_at = now(), status_by = auth.uid() where processor_id = pid and method_id = mid;
+  end if;
+  insert into public.pay_incidents (team_id, processor_id, method_id, kind, note, countries, created_by)
+  values (t, pid, mid, case when falla then 'falla' else 'vuelve' end, n, c, auth.uid()) returning id into iid;
+  return json_build_object('ok', true, 'id', iid, 'fail_countries', nf, 'status', nst);
 end $$;
 
 do $$
@@ -1378,8 +1407,8 @@ create policy pay_incidents_read on public.pay_incidents for select to authentic
 grant select on public.pay_incidents to authenticated;
 revoke insert, update, delete, truncate on public.pay_incidents from authenticated;
 revoke all on public.pay_incidents from anon;
-revoke all on function public.pay_report(uuid, uuid, boolean, text), public.pay_editor() from public, anon;
-grant execute on function public.pay_report(uuid, uuid, boolean, text), public.pay_editor() to authenticated;
+revoke all on function public.pay_report(uuid, uuid, boolean, text, text[]), public.pay_editor() from public, anon;
+grant execute on function public.pay_report(uuid, uuid, boolean, text, text[]), public.pay_editor() to authenticated;
 
 -- ---------- la ficha del cliente: campañas (monto mínimo y qué ve la persona en el anuncio) y comentarios ----------
 -- por afiliado + campaña + país; la carga cualquiera de la mesa si falta; la cambian admin y team leader (los agentes piden el cambio)
