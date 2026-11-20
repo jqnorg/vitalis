@@ -180,7 +180,7 @@ function targetTrack(S){ // la pista del hero con el target: el mate avanza con 
     ${S.enCurso&&S.n<S.T&&S.ideal?`<i class="ideal" style="left:${P(S.ideal)}%" title="Para ir al día, hoy hay que cerrar en ${S.ideal}"></i>`:''}
     ${M.map(([t])=>`<i class="st${S.n>=t?' on':''}" style="left:${P(t)}%"></i>`).join('')}
     ${M.map(([t,q])=>`<span class="lb${q===1?' at':''}" style="left:${P(t)}%"><b>${t}</b><span class="us">${q===1?'target':pct(q)}</span></span>`).join('')}
-    <span class="mate" style="left:${P(S.n)}%" title="${plural(S.n,'FTD')}"><svg aria-hidden="true"><use href="#mate"/></svg></span></div>`;
+    <span class="glow" style="left:${P(S.n)}%" title="${plural(S.n,'FTD')}"></span></div>`;
 }
 function mesaHero(){
   const ym=ymNow(),S=mesaMes(ym),mes=MES[+ym.slice(5,7)-1],usd=S.list.reduce((a,f)=>a+(+f.amount||0),0),con=S.per.filter(p=>p.n).length;
@@ -232,7 +232,7 @@ function diasQuedan(){ // mis días de trabajo que quedan en el mes (hoy incluid
 function utLine(n){ // en tu inicio: cómo venís con tu target
   const T=utOf(me);if(!T)return '';
   const q=diasQuedan(),f=T-n;
-  return `<div class="msg ut">Tu target: <b>${T} FTDs</b> · ${f>0?`faltan <b>${f}</b>${q?` · <b>${nf(f/q,1)}</b> por día`:''}`:'<b>¡cumplido!</b> 🎯'}</div>`;
+  return `<div class="msg ut">Tu target: <b>${T} FTDs</b> · ${f>0?`faltan <b>${f}</b>${q?` · <b>${nf(f/q,1)}</b> por día`:''}`:'<b>¡cumplido!</b> <svg class="ic" aria-hidden="true"><use href="#i-diana"/></svg>'}</div>`;
 }
 function utModal(ym,focus){ // el team leader fija el target de cada uno
   if(!isLeader())return;

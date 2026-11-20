@@ -369,18 +369,18 @@ V.chat={
     // lista
     const list=[...chats].sort((a,b)=>(a.kind==='team'?-1:0)-(b.kind==='team'?-1:0)||((lastMsg(b.id)||{t:+new Date(b.created_at)}).t-(lastMsg(a.id)||{t:+new Date(a.created_at)}).t));
     $('#chList').innerHTML=list.map(c=>{const l=lastMsg(c.id),n=unread(c.id),mu=muted(c.id);
-      return `<button type="button" class="ch-it${c.id===chatCur?' on':''}${n&&!mu?' un':''}" data-chat="${esc(c.id)}">${chatIcon(c)}<span class="ch-li"><span class="ch-nm">${esc(chatName(c))}${mu?' <span class="q" title="Silenciado">🔕</span>':''}</span><span class="ch-pv">${l?`${l.uid===me?'Vos':esc(first(l.uid))}: ${esc(clip(msgTxt(l.body),60))}`:c.kind==='team'?'Toda la mesa junta':'Sin mensajes todavía'}</span></span><span class="ch-mt">${l?`<span class="ch-tm">${l.t>+parseYMD(todayS())?hhmm(l.t):esc(dm(ymd(new Date(l.t))))}</span>`:''}${n?`<span class="nb${mu?'':' hot'}">${n>99?'99+':n}</span>`:''}</span></button>`}).join('')||'<div class="p-empty">Cargando…</div>';
+      return `<button type="button" class="ch-it${c.id===chatCur?' on':''}${n&&!mu?' un':''}" data-chat="${esc(c.id)}">${chatIcon(c)}<span class="ch-li"><span class="ch-nm">${esc(chatName(c))}${mu?' <span class="q" title="Silenciado"><svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg></span>':''}</span><span class="ch-pv">${l?`${l.uid===me?'Vos':esc(first(l.uid))}: ${esc(clip(msgTxt(l.body),60))}`:c.kind==='team'?'Toda la mesa junta':'Sin mensajes todavía'}</span></span><span class="ch-mt">${l?`<span class="ch-tm">${l.t>+parseYMD(todayS())?hhmm(l.t):esc(dm(ymd(new Date(l.t))))}</span>`:''}${n?`<span class="nb${mu?'':' hot'}">${n>99?'99+':n}</span>`:''}</span></button>`}).join('')||'<div class="p-empty">Cargando…</div>';
     const c=chatOf(chatCur),i=$('#chIn');
     $('#chMain').hidden=!c;
     if(!chats.length)$('#chList').innerHTML='<div class="p-empty">El chat se está activando. Probá de nuevo en un rato.</div>';
     if(!c){chatSig='';return}
     // encabezado
-    const ppl=chatPeople(c),sub=c.kind==='team'?plural(ppl.length,'persona'):c.kind==='dm'?(quiet(members.find(m=>m.id===dmOther(c)))?'🔕 avisos silenciados':'Privado'):
+    const ppl=chatPeople(c),sub=c.kind==='team'?plural(ppl.length,'persona'):c.kind==='dm'?(quiet(members.find(m=>m.id===dmOther(c)))?'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> avisos silenciados':'Privado'):
       clip(ppl.map(u=>u===me?'vos':first(u)).sort((a,b)=>a==='vos'?1:b==='vos'?-1:a.localeCompare(b)).join(', '),70);
     const hd=`<button type="button" class="ib ch-back" data-ch="back" aria-label="Volver a los chats">←</button>${chatIcon(c)}<div class="ch-ti"><b>${esc(chatName(c))}</b><small>${esc(sub)}</small></div><span class="grow"></span>`+
       (c.kind==='dm'?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+
       (c.kind==='group'?`<button type="button" class="btn sm" data-ch="people">Gente</button>`:'')+
-      `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'🔔 Activar avisos':'🔕 Silenciar'}</button>`;
+      `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`;
     if($('#chHead').dataset.h!==hd){$('#chHead').innerHTML=hd;$('#chHead').dataset.h=hd}
     if(i.dataset.c!==c.id){i.dataset.c=c.id;i.value=chatDrafts[c.id]||'';growIn(i);i.placeholder=c.kind==='dm'?`Escribile a ${first(dmOther(c))}`:`Escribí en ${chatName(c)}`}
     // mensajes

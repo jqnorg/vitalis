@@ -173,7 +173,7 @@ V.banking={
       ${bkPais?seg('2. ¿Efectivo o digital?',[['efectivo','Efectivo'],['digital','Digital']],k=>k==='digital'?dig:bkTipo===k,'data-bkt'):''}
       ${bkPais&&dig?seg('3. ¿Tarjeta o transferencia?',[['tarjeta','Tarjeta'],['transferencia','Transferencia']],k=>bkTipo===k,'data-bkt'):''}
       ${fin?`<div class="bk-opts"><span class="bk-sn">Opciones en ${esc(bkPais)}</span>${opts.length?opts.map(bkOptHTML).join(''):`<div class="p-empty" style="padding:8px 0">No hay ${esc(KINDS[bkTipo].toLowerCase())} cargado para ${esc(bkPais)}.</div>`}</div>`:''}</section>`;
-    const fallas=F.length?`<section class="card bk-fallas"><div class="card-h"><h3>⚠️ Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
+    const fallas=F.length?`<section class="card bk-fallas"><div class="card-h"><h3><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg> Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
     const procs=bk.procs.filter(p=>p.active!==false&&bkPaisOk(p.countries)&&(hit(p.name)||pmOf(p.id).some(x=>hit(x.m.name)))&&(!bkTipo||pmOf(p.id).some(x=>kindOk(x.m.kind))));
     const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
       return `<article class="bk-proc${p.status==='falla'?' falla':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(p.name)}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>x.status==='falla').length;return p.status==='falla'?'<span class="badge bad">Falla</span>':nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
@@ -196,7 +196,7 @@ V.banking={
 function bkCard(){
   if(!bk.ok)return '';
   const F=bkFallas();if(!F.length)return '';
-  return `<div class="card-h"><h3>⚠️ Fallas de pago</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span><span class="grow"></span><button type="button" class="btn sm" data-go="banking">Ver Banking</button></div>
+  return `<div class="card-h"><h3><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg> Fallas de pago</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span><span class="grow"></span><button type="button" class="btn sm" data-go="banking">Ver Banking</button></div>
     <div class="lst">${F.slice(0,4).map(f=>`<div class="li"><span class="t">${f.at?esc(rel(new Date(f.at))):''}</span><span class="n"><b>${esc(bkName(f.pid,f.mid))}</b>${f.note?`<small>${esc(f.note)}</small>`:''}</span><span></span><span></span><span></span></div>`).join('')}</div>`;
 }
 

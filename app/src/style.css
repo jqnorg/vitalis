@@ -1,24 +1,23 @@
-@font-face{font-family:"Bricolage";src:url(fonts/bricolage.woff2) format("woff2");font-weight:200 800;font-stretch:75% 100%;font-display:swap}
-@font-face{font-family:"Figtree";src:url(fonts/figtree.woff2) format("woff2");font-weight:300 900;font-display:swap}
+@font-face{font-family:"Geist";src:url(fonts/geist.woff2) format("woff2");font-weight:100 900;font-display:swap}
 
-/* ---------- tokens ---------- */
+/* ---------- tokens: estilo Claro (blanco, gris suave, verde profundo) ---------- */
 :root{color-scheme:light;
-  --bg:#f1f4ef;--panel:#fff;--raised:#f6f8f4;--fg:#15201a;--dim:#5b685f;--line:#dfe5dc;--soft:#ecf0e9;
-  --pri:#1b874a;--pri-h:#156f3c;--pri-ink:#fff;--pri-soft:#e1f2e6;
-  --cuero:#a0612f;--cuero-soft:#f5e7da;--alpaca:#c9ced3;
-  --ok:#1b874a;--acc:#b0620a;--err:#cf3049;--info:#2f7fd0;
-  --s1:#2f7fd0;--s2:#d2722e;--sx:#cdd5cb;
-  --hero:#12391f;--hero-2:#1a4a2b;--hero-ink:#f0f7f0;--hero-dim:#a8c5b0;
-  --r:18px;--r-sm:11px;
-  --display:"Bricolage",ui-sans-serif,system-ui,sans-serif;
-  --ui:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  --bg:#f6f7f8;--panel:#fff;--raised:#f9fafb;--fg:#0f1720;--dim:#6b7684;--line:#e6e9ed;--soft:#eef0f3;
+  --pri:#0f7a55;--pri-h:#0c6647;--pri-ink:#fff;--pri-soft:#e9f4ef;
+  --cuero:#b45309;--cuero-soft:#fdf1e3;--alpaca:#c9ced3;
+  --ok:#0f7a55;--acc:#b45309;--err:#d12f45;--info:#2563eb;
+  --s1:#0f7a55;--s2:#e0a03a;--sx:#d5dae0;
+  --hero:#fff;--hero-2:#f9fafb;--hero-ink:#0f1720;--hero-dim:#6b7684;
+  --r:16px;--r-sm:10px;--sh:0 1px 2px rgba(16,24,40,.04);
+  --display:"Geist",ui-sans-serif,system-ui,sans-serif;
+  --ui:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body.dark{color-scheme:dark;
-  --bg:#0d1210;--panel:#151c17;--raised:#1a221c;--fg:#ebf2ec;--dim:#93a297;--line:#25302a;--soft:#1d2620;
-  --pri:#33b169;--pri-h:#47c47c;--pri-ink:#05200f;--pri-soft:#163322;
-  --cuero:#c27c45;--cuero-soft:#2b2017;
-  --ok:#4cc77f;--acc:#f0a23a;--err:#ff6a7c;--info:#5ba4f0;
-  --s1:#4a94e0;--s2:#d2722e;--sx:#38443c;
-  --hero:#163723;--hero-2:#1d462d;--hero-ink:#eef7ef;--hero-dim:#9fbca8}
+  --bg:#0d1114;--panel:#151a1f;--raised:#1a2026;--fg:#eef1f4;--dim:#94a0ad;--line:#262d35;--soft:#1c232a;
+  --pri:#2fae81;--pri-h:#45c497;--pri-ink:#04150e;--pri-soft:#12291f;
+  --cuero:#e39a4d;--cuero-soft:#2b2014;
+  --ok:#3fc592;--acc:#f0a23a;--err:#ff6a7c;--info:#6ea4ff;
+  --s1:#2fae81;--s2:#e0a03a;--sx:#38414b;
+  --hero:#151a1f;--hero-2:#1a2026;--hero-ink:#eef1f4;--hero-dim:#94a0ad;--sh:none}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;background:var(--bg)}
@@ -1085,3 +1084,63 @@ body.dark .ah-n{color:var(--pri-h)}
 @media (max-width:820px){.turno-mini{grid-template-columns:1fr}.turno-mini .btns{justify-content:flex-start}.subnav{margin-top:0}}
 #nav .mob-only{display:none}
 @media (max-width:820px){#nav .mob-only{display:flex}}
+
+
+/* =========== CLARO: simple, mucho aire, un solo color de acción =========== */
+body{font-size:14.5px}
+.brand .mark{width:32px;height:32px}.brand .word{font-weight:700;font-size:24px;letter-spacing:-.035em}
+#auth .brand .word{font-weight:700}
+h1,h2,h3,.card h3,.abox h2,.cu-empty h2{letter-spacing:-.025em}
+#main h1{font-weight:650;font-size:30px}
+.card h3{font-weight:650}
+.card,.kpi{box-shadow:var(--sh)}
+.kpi .v{font-weight:650;letter-spacing:-.03em}
+.kpi .lb{font-weight:500}
+#side{border-right:1px solid var(--line)}
+#nav button{font-weight:500;border-radius:12px;padding:10px 12px}
+#nav button.on{font-weight:600}
+#nav .nb.hot{background:var(--pri);color:var(--pri-ink)}
+#bar{background:var(--bg);backdrop-filter:none;border-bottom:0;padding-bottom:4px}
+.pill{font-weight:450}.pill b{font-weight:650}
+.btn{font-weight:600;border-radius:12px}.btn.sm{border-radius:10px}
+.seg,.subnav{border-radius:12px}.seg button,.subnav button{border-radius:9px}
+.badge{font-weight:500}
+.mbox{border-radius:20px}
+.pt th{font-weight:500}
+.toast.win{background:var(--pri)}
+.toast.warn{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-left:6px solid var(--acc)}
+.person.last{border-color:var(--pri);background:var(--pri-soft)}
+svg.ic{width:1.15em;height:1.15em;vertical-align:-.2em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+h3 svg.ic{color:var(--acc)}
+.kpi.racha .v svg.ic{color:var(--dim);margin-right:6px;width:.8em;height:.8em;vertical-align:-.05em}
+.kpi.racha.on .v svg.ic{color:var(--acc)}
+
+/* el mes: tarjeta blanca, número grande y una pista con una marca por bono y otra en el target */
+.hero{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:22px;box-shadow:var(--sh);padding:28px 30px 16px}
+.hero .n{font-weight:650;font-size:104px;letter-spacing:-.055em;line-height:.9}
+.hero .lab{font-weight:600;font-size:19px;color:var(--dim);margin-top:8px}
+.hero .msg b{color:var(--fg)}
+.hero .msg.ut b,.hero .ut b{color:var(--pri)}
+.hero .usd .v{font-weight:650}
+.hero .hb{background:var(--panel);color:var(--fg);border:1px solid var(--line);font-weight:600}
+.hero .hb:hover{background:var(--soft)}
+.track{height:100px;margin-top:26px}
+.track .rail,.track.lite .rail{background:var(--soft);height:10px;top:45px}
+.track .fill,.track.lite .fill{background:var(--pri);height:10px;top:45px}
+.track .st,.track.lite .st{top:38px;width:4px;height:24px;margin-left:-2px;border-radius:2px;border:0;background:var(--sx)}
+.track .st.on,.track.lite .st.on{background:var(--pri-h)}
+.track .lb,.track.lite .lb{top:70px;color:var(--dim)}
+.track .lb b,.track.lite .lb b{color:var(--fg);font-weight:650}
+.track .lb.at b,.track.lite .lb.at b{color:var(--pri)}
+.track .ut-tick,.track.lite .ut-tick{top:32px;height:36px;width:4px;margin-left:-2px;background:var(--fg)}
+.track .ut-lb,.track.lite .ut-lb{top:12px;color:var(--fg);font-weight:650}
+.track .ut-tick.ok{background:var(--pri)}.track .ut-lb.ok{color:var(--pri);background:none}
+.track .glow{position:absolute;top:50px;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:#fff;transition:left .8s cubic-bezier(.3,1.4,.5,1);
+  box-shadow:0 0 0 3px var(--pri),0 0 14px 5px color-mix(in srgb,var(--pri) 55%,transparent),0 0 34px 14px color-mix(in srgb,var(--pri) 22%,transparent);animation:glow 2.4s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 0 3px var(--pri),0 0 20px 8px color-mix(in srgb,var(--pri) 65%,transparent),0 0 48px 20px color-mix(in srgb,var(--pri) 28%,transparent)}}
+@media (prefers-reduced-motion:reduce){.track .glow{animation:none}}
+.tg-fill{background:var(--pri)}.tg-ideal{background:var(--fg)}
+
+/* barra de arriba sin pastillas: solo la hora, el aviso de sin conexión y Venta (lo demás ya está en el menú y en el Inicio) */
+#bar #sMes,#bar #sLiq,#bar #sTurno,#bar #sPend,#bar #sTask{display:none}
+.people{margin-top:22px}

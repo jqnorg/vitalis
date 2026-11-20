@@ -5,8 +5,8 @@ ROOT=pathlib.Path(__file__).resolve().parent.parent
 S=ROOT/'app'/'src'; D=ROOT/'site'; D.mkdir(exist_ok=True)
 import re, urllib.parse
 body=(S/'body.html').read_text()
-mate=re.search(r'<symbol id="mate" viewBox="0 0 32 32">(.*?)</symbol>', body, re.S).group(1)
-fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'>"+re.sub(r'\s+',' ',mate).replace('"',"'")+"</svg>"
+mate=re.search(r'<symbol id="mate" viewBox="0 0 48 48">(.*?)</symbol>', body, re.S).group(1)
+fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>"+re.sub(r'\s+',' ',mate).replace('"',"'")+"</svg>"
 (D/'mate.svg').write_text(fav_svg.replace("'",'"'))
 fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
 js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','ficha.js','hoy.js','campanas.js','auth.js'])
@@ -27,12 +27,12 @@ html=f'''<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="vitalis" content="app">
-<meta name="theme-color" content="#f1f4ef">
+<meta name="theme-color" content="#f6f7f8">
 <title>Vitalis</title>
 <link rel="icon" href="{fav}">
 <link rel="preconnect" href="{cfg['url']}" crossorigin>
 <link rel="preload" href="{SUPA}" as="script">
-<link rel="preload" href="fonts/figtree.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 {(S/'style.css').read_text()}</style>
 </head>

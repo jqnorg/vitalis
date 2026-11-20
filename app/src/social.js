@@ -112,7 +112,7 @@ V.social={
     const sel=$('#soTo');if(sel!==document.activeElement){sel.innerHTML=`<option value="">Toda la mesa</option>`+act.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');sel.value=soTo}
     $('#soActs').innerHTML=['mate'].map(k=>{const left=cooldownLeft(k,soTo); // solo el mate (los pedidos de descanso se sacaron)
       return `<button type="button" class="so-act" data-ping="${k}"${left?' disabled':''}><span class="ic">${k==='mate'?'<svg aria-hidden="true"><use href="#mate"/></svg>':k==='d10'?'10\'':'30\''}</span><span><b>${KIND[k].label}</b><small>${left?`Podés de nuevo en ${left>=6e4?Math.ceil(left/6e4)+' min':Math.ceil(left/1e3)+' s'}`:soTo?'A '+esc(first(soTo)):'A toda la mesa'}</small></span></button>`}).join('');
-    $('#soPeople').innerHTML=`<div class="so-people">${act.map(m=>`<button type="button" class="so-p" data-prof="${esc(m.id)}" title="Ver el perfil de ${esc(m.name)}">${avatar(m.name)}<span class="nm">${esc(m.name)}</span>${quiet(m)?'<span class="q" title="Avisos silenciados">🔕</span>':''}</button>`).join('')}</div>`;
+    $('#soPeople').innerHTML=`<div class="so-people">${act.map(m=>`<button type="button" class="so-p" data-prof="${esc(m.id)}" title="Ver el perfil de ${esc(m.name)}">${avatar(m.name)}<span class="nm">${esc(m.name)}</span>${quiet(m)?'<span class="q" title="Avisos silenciados"><svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg></span>':''}</button>`).join('')}</div>`;
     const list=pings.filter(p=>Date.now()-new Date(p.at)<24*36e5);
     $('#soCount').textContent=list.length?plural(list.length,'pedido'):'';
     $('#soFeed').innerHTML=list.length?`<div class="so-feed">${list.map(p=>{

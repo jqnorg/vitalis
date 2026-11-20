@@ -10,7 +10,7 @@ function bonoTrack(n,lite,tg){ // la pista del mes: el mate avanza con cada FTD 
     ${T.map(([t])=>`<i class="st${n>=t?' on':''}" style="left:${P(t)}%"></i>`).join('')}
     ${T.map(([t,b])=>`<span class="lb${t===cur?' at':''}" style="left:${P(t)}%"><b>${t}</b><span class="us">${b} USD</span></span>`).join('')}
     ${tg?`<i class="ut-tick${n>=tg?' ok':''}" style="left:${P(tg)}%" title="Tu target: ${tg} FTDs"></i><span class="ut-lb${n>=tg?' ok':''}" style="left:${P(tg)}%">target</span>`:''}
-    <span class="mate" style="left:${P(n)}%" title="${plural(n,'FTD')}"><svg aria-hidden="true"><use href="#mate"/></svg></span></div>`;
+    <span class="glow" style="left:${P(n)}%" title="${plural(n,'FTD')}"></span></div>`;
 }
 const cap=s=>s?s[0].toUpperCase()+s.slice(1):s;
 function convCards(uid){ // conversión de hoy, la semana y el mes: FTDs ÷ clientes new
@@ -48,7 +48,7 @@ V.inicio={
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
-      (()=>{const r=racha(me);return kpi('Racha',`${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido 🔥':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
+      (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
     {const bc=bkCard();$('#iBank').hidden=!bc;$('#iBank').innerHTML=bc} // si un procesador falla, primero eso
     crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
