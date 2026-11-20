@@ -41,7 +41,33 @@ const clip=(s,n)=>{s=String(s||'').replace(/\s+/g,' ').trim();return s.length>n?
 /* imágenes: el mensaje empieza con [img:id:AnchoxAlto]; la imagen va aparte (chat_files) y se trae al verla */
 const IMG_RE=/^\[img:([0-9a-f-]{36})(?::(\d+)x(\d+))?\]\s*/i;
 const msgImg=b=>{const m=String(b||'').match(IMG_RE);return m?{id:m[1],w:+m[2]||0,h:+m[3]||0,rest:String(b).slice(m[0].length)}:null};
-const msgTxt=b=>{const i=msgImg(b);return i?('📷 Foto'+(i.rest?' · '+i.rest:'')):String(b||'')};
+/* datos compartidos: el mensaje empieza con [card:id] y el título; la foto de la tarjeta va aparte (chat_cards) y se trae al verla */
+const CARD_RE=/^\[card:([0-9a-f-]{36})\][ \t]*([^\n]*)\n?/i;
+const msgCard=b=>{const m=String(b||'').match(CARD_RE);return m?{id:m[1],title:m[2].trim(),rest:String(b).slice(m[0].length).trim()}:null};
+const msgTxt=b=>{const i=msgImg(b);if(i)return '📷 Foto'+(i.rest?' · '+i.rest:'');const k=msgCard(b);return k?'📊 '+(k.title||'Datos')+(k.rest?' · '+k.rest:''):String(b||'')};
+const cards={}; // id → {html, at} | {err} | {p: promesa}
+let cardQ=new Set(),cardT=null;
+function cardLoad(ids){ // se piden juntas las que faltan
+  for(const id of ids)if(!cards[id]||(cards[id].err==='net'&&Date.now()-cards[id].t>3e4)){cards[id]={wait:1};cardQ.add(id)}
+  if(!cardQ.size)return;
+  clearTimeout(cardT);cardT=setTimeout(async()=>{const L=[...cardQ];cardQ=new Set();
+    try{const rows=await Q(sb.from('chat_cards').select('id,html,created_at').in('id',L));
+      for(const id of L)cards[id]={err:'gone'};
+      for(const r of rows)cards[r.id]={html:shClean(r.html),at:+new Date(r.created_at)};
+    }catch(e){for(const id of L)cards[id]={err:'net',t:Date.now()}}
+    for(const el of document.querySelectorAll('[data-card]'))cardPaint(el);
+  },40);
+}
+const cardWhen=t=>(ymd(new Date(t))===todayS()?'de las ':'del '+dm(ymd(new Date(t)))+' ')+hhmm(t);
+function cardPaint(el){ // pone la tarjeta si ya llegó
+  const id=el.dataset.card,x=cards[id];
+  if(!x||x.wait){cardLoad([id]);return}
+  if(el.dataset.ok===id)return;
+  const b=el.querySelector('.chc-b'),f=el.querySelector('.chc-w');
+  if(x.html){b.innerHTML=x.html;shAvatars(b);if(f)f.textContent=' · datos '+cardWhen(x.at);el.dataset.ok=id;el.classList.remove('wait')}
+  else{b.innerHTML=`<span class="d">${x.err==='gone'?'Ya no está: la borró quien la compartió.':'No se pudo traer. Probá de nuevo en un rato.'}</span>`;el.classList.remove('wait')}
+}
+
 const imgs={}; // id → {url} | {err} | {p: promesa}
 function imgLoad(id){
   const x=imgs[id];
@@ -81,7 +107,7 @@ function chatsLoaded(ch,cm,rd,ms){
   reads=Object.fromEntries(rd.map(r=>[r.chat_id,r]));
   msgs={};for(const r of ms){const m=M2X(r);(msgs[m.chat]||(msgs[m.chat]=[])).push(m)}
   for(const k in msgs)msgs[k].sort((a,b)=>a.t-b.t);
-  chatInitT=0;
+  chatInitT=0;if(ready)setTimeout(avisoCheck,300);
   if(!rd.length&&chats.length){ // la primera vez, lo anterior cuenta como leído
     chatInitT=Date.now();
     const rows=chats.map(c=>{const l=lastMsg(c.id);return {user_id:me,chat_id:c.id,read_at:new Date(l?l.t:0).toISOString(),muted:false}});
@@ -117,6 +143,7 @@ function chatEvent(m){
   }
   if(isBot(m.uid)){cheerEvent(m,c);if(chatViewing(c.id))markRead(c.id);return}
   if(chatViewing(c.id)){markRead(c.id);return}
+  if(m.aviso){avisoEvent(m,c);return} // un aviso del team leader o un administrador: llega aunque el chat esté silenciado
   if(Date.now()-m.t>10*6e4)return; // viejo (al reconectar): queda como no leído, sin aviso
   // silenciar un chat solo calla ese chat; si te nombran, te responden o el team leader escribe @todos / @vos, avisa igual
   const nm_=mentionsMe(m.body),rp=!!m.reply&&(msgById(m.reply)||{}).uid===me,td=todosIn(m.body);
@@ -127,6 +154,16 @@ function chatEvent(m){
   if(Date.now()-chatSound>2500){chatSound=Date.now();if(force)beep(1);else pop()}
   if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:force?'imp':'info',title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+how,kw:clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
 }
+// el aviso queda hasta que lo cierres (en Vitalis y en la tarjeta de la extensión); al entrar, los de hoy que no leíste
+function avisoEvent(m,c){
+  if(m.uid===me||Date.now()-m.t>12*36e5||m.t<=readT(c.id))return;
+  const seen=local.get('avisos',[]);if(seen.includes(m._id))return;local.set('avisos',[...seen.slice(-60),m._id]);
+  const who=first(m.uid),k=msgCard(m.body),txt=k?(k.title||'Datos')+(k.rest?': '+k.rest:''):msgTxt(m.body),where=c.kind==='team'?'':` en ${c.kind==='dm'?'tu privado':esc(chatName(c))}`;
+  toast(`<b><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Aviso de ${esc(who)}</b>${where}: ${esc(clip(txt,180))}${k?' <span class="dim">(con datos)</span>':''}`,'imp',{sticky:true,key:'av'+m._id,actions:[{l:'Ver',fn:()=>go('chat',{chat:c.id})}]});
+  if(Date.now()-chatSound>2500){chatSound=Date.now();beep(1)}
+  if(pageAway())extSocial({k:'so:c:'+c.id+':a'+m._id,v:m._id,lvl:'imp',title:'Aviso de '+who,id:clip(k?(k.title||'Datos'):msgTxt(m.body),90),kw:clip(k?k.rest:'',200),meta:(c.kind==='team'?'Toda la mesa':chatName(c))+' · '+hhmm(m.t),btns:[['open','Ver',1],['close','Ok']]});
+}
+function avisoCheck(){if(!ready)return;for(const c of chats)for(const m of (msgs[c.id]||[]).filter(x=>x.aviso&&!chatViewing(c.id)).slice(-3))avisoEvent(m,c)}
 function markRead(cid){
   const l=lastMsg(cid);if(!l)return;
   const r=reads[cid]||(reads[cid]={user_id:me,chat_id:cid,muted:false});
@@ -408,17 +445,17 @@ V.chat={
       for(const m of l){
         const d=ymd(new Date(m.t));
         if(d!==pd){h+=`<div class="ch-day"><span>${esc(chDay(d))}</span></div>`;pd=d;pu=null}
-        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body);
+        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body),cd=im?null:msgCard(m.body);
         const rq=m.reply?msgById(m.reply):null,quote=m.reply?`<button type="button" class="ch-q" data-goto="${esc(m.reply)}" title="Ir al mensaje"><b>${rq?esc(rq.uid===me?'Vos':first(rq.uid)):'Mensaje'}</b><span>${rq?esc(clip(msgTxt(rq.body),90)):'más viejo'}</span></button>`:'';
         const RX=reacts[m._id]||[],grp=EMOJIS.map(e=>({e,u:RX.filter(x=>x.e===e).map(x=>x.uid)})).filter(g=>g.u.length);
         const rxs=grp.length?`<div class="ch-rx">${grp.map(g=>`<button type="button" class="rx${g.u.includes(me)?' on':''}" data-rx="${g.e}" data-mid="${esc(m._id)}" title="${esc(g.u.map(u=>u===me?'vos':first(u)).join(', '))}">${g.e}<b>${g.u.length}</b></button>`).join('')}</div>`:'';
         const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button>${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
-        h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}" data-mid="${esc(m._id)}">`+
+        h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}${m.aviso?' aviso':''}" data-mid="${esc(m._id)}">`+
           (mine?'':head?(isBot(m.uid)?`<span class="avb">${avatar(nm)}</span>`:`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`):'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}">${quote}${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}${cd?' crd':''}">${m.aviso?'<span class="ch-aviso"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Aviso</span>':''}${quote}${cd?`<div class="ch-card${cards[cd.id]&&cards[cd.id].html?'':' wait'}" data-card="${esc(cd.id)}"><div class="chc-b">${cards[cd.id]&&cards[cd.id].html?cards[cd.id].html:'<span class="d">Trayendo los datos…</span>'}</div><div class="chc-f"><b>${esc(cd.title||'Datos')}</b><span class="chc-w">${cards[cd.id]&&cards[cd.id].at?' · datos '+cardWhen(cards[cd.id].at):''}</span></div></div>${cd.rest?`<span class="ch-cap">${fmtBody(cd.rest)}</span>`:''}`:im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
         pu=m.uid;pt=m.t;
       }
-      el.innerHTML=h;imgPaint(el);
+      el.innerHTML=h;imgPaint(el);for(const k of el.querySelectorAll('[data-card]'))cardPaint(k);shAvatars(el);
       if(atBottom){el.scrollTop=el.scrollHeight;for(const im of el.querySelectorAll('.ch-img img'))im.addEventListener('load',()=>{if(el.scrollHeight-el.scrollTop-el.clientHeight<400)el.scrollTop=el.scrollHeight},{once:true})}
     }
     if(chatViewing(c.id)&&el.scrollHeight-el.scrollTop-el.clientHeight<90)markRead(c.id);

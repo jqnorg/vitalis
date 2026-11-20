@@ -424,6 +424,33 @@ r = await as(M, 'delete from public.chat_files where id = $1 returning id', [F1]
 ok(!r.error && r.rows.length === 0, 'Matias no borra la imagen de A');
 r = await as(A, 'delete from public.messages where id = $1', [r.error ? null : (await db.query("select id from public.messages where body like '[img:%'")).rows[0].id]);
 ok((await db.query('select count(*)::int c from public.chat_files where id = $1', [F1])).rows[0].c === 0, 'al borrar el mensaje se borra la imagen');
+// datos compartidos (una foto de una tarjeta) y avisos del team leader o un administrador
+r = await as(A, 'insert into public.chat_cards (chat_id, title, html) values ($1, $2, $3) returning id::text', [G, 'Campaña caliente', '<section class="card"><h3>Campaña caliente</h3></section>']);
+ok(!r.error, 'A comparte una tarjeta en el grupo');
+const K1 = r.rows && r.rows[0].id;
+r = await as(M, 'select title, html from public.chat_cards where id = $1', [K1]);
+ok(r.rows.length === 1 && r.rows[0].title === 'Campaña caliente', 'Matias (del grupo) la ve');
+r = await as(B, 'select 1 from public.chat_cards where id = $1', [K1]);
+ok(r.rows.length === 0, 'B (que no está en el grupo) no la ve');
+r = await as(B, 'insert into public.chat_cards (chat_id, title, html) values ($1, $2, $3)', [G, 'x', 'x']);
+ok(!!r.error, 'B no comparte en un grupo donde no está');
+r = await say(M, G, `[card:${K1}] Campaña caliente`);
+ok(!!r.error, 'no se manda la tarjeta de otro');
+r = await say(A, TC, `[card:${K1}] Campaña caliente`);
+ok(!!r.error, 'ni en otro chat');
+r = await say(A, G, `[card:${K1}] Campaña caliente\nmiren esto`);
+ok(!r.error, 'A manda la tarjeta con un comentario');
+const roleB = (await db.query('select role from public.profiles where id = $1', [B])).rows[0].role;
+r = await as(B, 'insert into public.messages (chat_id, body, aviso) values ($1, $2, true) returning id', [TC, 'Aviso de prueba']);
+ok(roleB === 'agent' && !!r.error && /AVISO/.test(r.error), `un agente no manda avisos (${roleB}: ${r.error})`);
+r = await as(M, 'insert into public.messages (chat_id, body, aviso) values ($1, $2, true) returning aviso', [TC, 'Hoy cierra temprano']);
+ok(!r.error && r.rows[0].aviso === true, 'el team leader manda un aviso a toda la mesa');
+r = await as(B, "select aviso from public.messages where body = 'Hoy cierra temprano'");
+ok(r.rows.length === 1 && r.rows[0].aviso === true, 'y a los de la mesa les llega como aviso');
+r = await as(M, "update public.messages set aviso = false where body = 'Hoy cierra temprano' returning 1");
+ok(!!r.error || r.rows.length === 0, 'un aviso no se cambia después');
+r = await as(A, 'delete from public.messages where id = $1', [(await db.query("select id from public.messages where body like '[card:%'")).rows[0].id]);
+ok((await db.query('select count(*)::int c from public.chat_cards where id = $1', [K1])).rows[0].c === 0, 'al borrar el mensaje se borra la tarjeta');
 R = await rpc(B, 'select public.chat_leave($1) j', [TC]);
 ok(!!R.error, 'del chat de la mesa no se sale');
 // privados

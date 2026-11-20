@@ -1232,6 +1232,43 @@ body.dark #nav button.nv-cli.on{color:#fff}
 @keyframes cliGlow{0%,100%{box-shadow:0 0 0 1px rgba(25,196,138,.45),0 3px 10px rgba(16,185,129,.28)}50%{box-shadow:0 0 0 1px rgba(25,196,138,.75),0 6px 24px rgba(16,185,129,.62)}}
 @keyframes cliShine{0%,55%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
 @media (prefers-reduced-motion:reduce){#nav button.nv-cli{animation:none}#nav button.nv-cli::after{display:none}}
+
+/* ---------- compartir datos en el chat y avisos ---------- */
+.sh-btn{flex:none;display:inline-grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid transparent;border-radius:9px;background:transparent;color:var(--dim);cursor:pointer;transition:color .15s,background .15s,border-color .15s}
+.sh-btn svg.ic{width:17px;height:17px}
+.sh-btn:hover,.sh-btn:focus-visible{color:var(--pri);background:var(--pri-soft);border-color:color-mix(in srgb,var(--pri) 25%,var(--line))}
+.sh-abs{position:relative}
+.sh-abs>.sh-btn{position:absolute;top:12px;right:12px;z-index:2;background:color-mix(in srgb,var(--panel) 82%,transparent)}
+.sh-abs>.card-h{padding-right:30px}
+.fi-c.sh-abs>h4{padding-right:28px}
+.fi-c.sh-abs>.sh-btn{top:8px;right:8px}
+.hero.sh-abs>.sh-btn{color:inherit;opacity:.7;background:transparent}
+.hero.sh-abs>.sh-btn:hover{opacity:1;background:rgba(255,255,255,.14);border-color:transparent;color:inherit}
+@media (hover:hover){.card:not(:hover):not(:focus-within)>.sh-btn,.fi-c:not(:hover):not(:focus-within)>.sh-btn{opacity:.45}}
+.ch-tx.crd{padding:6px 6px 6px;max-width:100%}
+.ch-card{border-radius:12px;overflow:hidden;background:var(--bg);border:1px solid var(--line);margin:2px 0 4px;min-width:min(260px,100%)}
+.chc-b{position:relative;overflow:hidden;contain:paint;max-height:560px;overflow-y:auto;padding:8px;zoom:.86}
+.chc-b>.card,.chc-b>.hero,.chc-b>.fi-c{margin:0;box-shadow:none}
+.chc-b .sh-btn{display:none}
+.chc-f{display:flex;flex-wrap:wrap;gap:2px;align-items:baseline;padding:6px 11px 7px;border-top:1px solid var(--line);font-size:12px;color:var(--dim);background:var(--panel)}
+.chc-f b{color:var(--fg);font-weight:600}
+.ch-card.wait .chc-b{min-height:60px}
+.ch-tx.crd .ch-cap{padding:2px 6px 0}
+.ch-tx.crd .ch-tm{margin-right:6px}
+.ch-aviso{display:inline-flex;align-items:center;gap:5px;margin:0 0 4px;padding:2px 8px 2px 6px;border-radius:999px;background:color-mix(in srgb,var(--acc) 14%,transparent);color:var(--acc);font-size:11.5px;font-weight:650;letter-spacing:.01em}
+.ch-aviso svg.ic{width:13px;height:13px}
+.ch-m.aviso .ch-tx{border-color:color-mix(in srgb,var(--acc) 45%,var(--line))}
+.ch-tx.crd .ch-aviso{margin:2px 4px 6px}
+.sh-prev{margin:0 0 14px;max-height:46vh;overflow:auto;border-radius:14px}
+.sh-prev .ch-card{margin:0}
+.sh-prev .chc-b{max-height:none}
+.sh-av{grid-column:1/-1;display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--raised)}
+.sh-av:has(input:checked){border-color:color-mix(in srgb,var(--acc) 55%,var(--line));background:color-mix(in srgb,var(--acc) 8%,var(--panel))}
+.sh-av input{margin-top:3px;accent-color:var(--pri)}
+.sh-av b{display:flex;align-items:center;gap:6px;font-weight:650}
+.sh-av b svg.ic{color:var(--acc)}
+.sh-av small{display:block;color:var(--dim);margin-top:2px;line-height:1.4}
+.toast .tm svg.ic{color:var(--acc);margin-right:2px}
 </style>
 </head>
 <body class="auth">
@@ -1260,6 +1297,7 @@ body.dark #nav button.nv-cli.on{color:#fff}
     <symbol id="i-ayuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.5M12 16.8v.1"/></symbol>
     <symbol id="i-salir" viewBox="0 0 24 24"><path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14M10 16.5 5.5 12 10 7.5M5.5 12H15"/></symbol>
     <symbol id="i-ahora" viewBox="0 0 24 24"><path d="M7.2 3.5h2.6l1.4 3.9-1.9 1.4a10.6 10.6 0 0 0 5.9 5.9l1.4-1.9 3.9 1.4v2.6a2.2 2.2 0 0 1-2.2 2.2A15.3 15.3 0 0 1 5 5.7a2.2 2.2 0 0 1 2.2-2.2z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.500V4M8 7.800 12 4l4 3.800M5.500 12.500v5.800A1.700 1.700 0 0 0 7.200 20h9.600a1.700 1.700 0 0 0 1.700-1.700v-5.800"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.100"/></symbol>
     <symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 4 21 19.500H3z"/><path d="M12 10v4.500M12 17v.100"/></symbol>
     <symbol id="i-racha" viewBox="0 0 24 24"><path d="M12 3c.5 3.500 5 5.500 5 10.500a5 5 0 0 1-10 0c0-1.800.8-3 1.800-4 .3 1.700 1.200 2.500 2.200 2.500C11 9 10.500 6 12 3z"/></symbol>
@@ -1678,7 +1716,7 @@ const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified
 const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,global:!!r.global,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
-const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,at:r.created_at,t:+new Date(r.created_at)});
+const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,aviso:!!r.aviso,at:r.created_at,t:+new Date(r.created_at)});
 const quiet=(m=profile)=>!!(m&&m.quiet_until&&new Date(m.quiet_until)>new Date()); // avisos sociales silenciados
 function mine(){ftds=team.filter(f=>f.uid===me)}
 function errMsg(e){
@@ -3087,7 +3125,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
-  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
   if(d&&d.type==='ftd-agenda-tick'&&d.v===1){if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
@@ -3210,6 +3248,8 @@ function ayuda(){
     <dt>Imágenes</dt><dd>Pegalas con Ctrl+V, arrastralas o tocá el ícono al lado del mensaje. Van achicadas para que carguen rápido. Tocá una para verla grande, copiarla o bajarla.</dd>
     <dt>Responder y reaccionar</dt><dd>Pasá por un mensaje: ↩ para responderlo, ☺ para reaccionar. Tocá la cita para ir al mensaje original.</dd>
     <dt>@</dt><dd>Escribí @ y elegí a quién nombrar (flechas y Enter). El team leader tiene @todos.</dd>
+    <dt>Compartir datos</dt><dd>Cada tarjeta con datos tiene el botón <svg class="ic" aria-hidden="true"><use href="#i-share"/></svg> arriba a la derecha: va al chat que elijas una foto de la tarjeta tal como la ves, con la hora, y un comentario si querés.</dd>
+    <dt>Avisos del team leader</dt><dd>El team leader y los administradores pueden mandar lo que comparten como aviso: a todos los de ese chat les queda hasta que lo cierren, aunque lo tengan silenciado.</dd>
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciar un chat (desde su encabezado) solo calla ese chat. Si te nombran o te responden, el aviso llega igual; si es el team leader con @todos o @vos, llega aunque tengas todo silenciado.</dd>
     <dt>Colores</dt><dd>Rojo: urgente (agenda, descansos). Cuero: importante (tareas, clientes new, el team leader). Celeste: chat y social. Verde: logros.</dd></dl>
   <h4>Filtros</h4><dl>
@@ -4143,7 +4183,7 @@ function onReady(){
   $('#navEquipo').hidden=!isLeader();
   let h='';try{h=location.hash.slice(1)}catch(e){}
   go(VIEWS.includes(h)?h:'inicio');
-  status();check();setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
+  status();check();setTimeout(avisoCheck,900);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
 }
@@ -4449,7 +4489,33 @@ const clip=(s,n)=>{s=String(s||'').replace(/\s+/g,' ').trim();return s.length>n?
 /* imágenes: el mensaje empieza con [img:id:AnchoxAlto]; la imagen va aparte (chat_files) y se trae al verla */
 const IMG_RE=/^\[img:([0-9a-f-]{36})(?::(\d+)x(\d+))?\]\s*/i;
 const msgImg=b=>{const m=String(b||'').match(IMG_RE);return m?{id:m[1],w:+m[2]||0,h:+m[3]||0,rest:String(b).slice(m[0].length)}:null};
-const msgTxt=b=>{const i=msgImg(b);return i?('📷 Foto'+(i.rest?' · '+i.rest:'')):String(b||'')};
+/* datos compartidos: el mensaje empieza con [card:id] y el título; la foto de la tarjeta va aparte (chat_cards) y se trae al verla */
+const CARD_RE=/^\[card:([0-9a-f-]{36})\][ \t]*([^\n]*)\n?/i;
+const msgCard=b=>{const m=String(b||'').match(CARD_RE);return m?{id:m[1],title:m[2].trim(),rest:String(b).slice(m[0].length).trim()}:null};
+const msgTxt=b=>{const i=msgImg(b);if(i)return '📷 Foto'+(i.rest?' · '+i.rest:'');const k=msgCard(b);return k?'📊 '+(k.title||'Datos')+(k.rest?' · '+k.rest:''):String(b||'')};
+const cards={}; // id → {html, at} | {err} | {p: promesa}
+let cardQ=new Set(),cardT=null;
+function cardLoad(ids){ // se piden juntas las que faltan
+  for(const id of ids)if(!cards[id]||(cards[id].err==='net'&&Date.now()-cards[id].t>3e4)){cards[id]={wait:1};cardQ.add(id)}
+  if(!cardQ.size)return;
+  clearTimeout(cardT);cardT=setTimeout(async()=>{const L=[...cardQ];cardQ=new Set();
+    try{const rows=await Q(sb.from('chat_cards').select('id,html,created_at').in('id',L));
+      for(const id of L)cards[id]={err:'gone'};
+      for(const r of rows)cards[r.id]={html:shClean(r.html),at:+new Date(r.created_at)};
+    }catch(e){for(const id of L)cards[id]={err:'net',t:Date.now()}}
+    for(const el of document.querySelectorAll('[data-card]'))cardPaint(el);
+  },40);
+}
+const cardWhen=t=>(ymd(new Date(t))===todayS()?'de las ':'del '+dm(ymd(new Date(t)))+' ')+hhmm(t);
+function cardPaint(el){ // pone la tarjeta si ya llegó
+  const id=el.dataset.card,x=cards[id];
+  if(!x||x.wait){cardLoad([id]);return}
+  if(el.dataset.ok===id)return;
+  const b=el.querySelector('.chc-b'),f=el.querySelector('.chc-w');
+  if(x.html){b.innerHTML=x.html;shAvatars(b);if(f)f.textContent=' · datos '+cardWhen(x.at);el.dataset.ok=id;el.classList.remove('wait')}
+  else{b.innerHTML=`<span class="d">${x.err==='gone'?'Ya no está: la borró quien la compartió.':'No se pudo traer. Probá de nuevo en un rato.'}</span>`;el.classList.remove('wait')}
+}
+
 const imgs={}; // id → {url} | {err} | {p: promesa}
 function imgLoad(id){
   const x=imgs[id];
@@ -4489,7 +4555,7 @@ function chatsLoaded(ch,cm,rd,ms){
   reads=Object.fromEntries(rd.map(r=>[r.chat_id,r]));
   msgs={};for(const r of ms){const m=M2X(r);(msgs[m.chat]||(msgs[m.chat]=[])).push(m)}
   for(const k in msgs)msgs[k].sort((a,b)=>a.t-b.t);
-  chatInitT=0;
+  chatInitT=0;if(ready)setTimeout(avisoCheck,300);
   if(!rd.length&&chats.length){ // la primera vez, lo anterior cuenta como leído
     chatInitT=Date.now();
     const rows=chats.map(c=>{const l=lastMsg(c.id);return {user_id:me,chat_id:c.id,read_at:new Date(l?l.t:0).toISOString(),muted:false}});
@@ -4525,6 +4591,7 @@ function chatEvent(m){
   }
   if(isBot(m.uid)){cheerEvent(m,c);if(chatViewing(c.id))markRead(c.id);return}
   if(chatViewing(c.id)){markRead(c.id);return}
+  if(m.aviso){avisoEvent(m,c);return} // un aviso del team leader o un administrador: llega aunque el chat esté silenciado
   if(Date.now()-m.t>10*6e4)return; // viejo (al reconectar): queda como no leído, sin aviso
   // silenciar un chat solo calla ese chat; si te nombran, te responden o el team leader escribe @todos / @vos, avisa igual
   const nm_=mentionsMe(m.body),rp=!!m.reply&&(msgById(m.reply)||{}).uid===me,td=todosIn(m.body);
@@ -4535,6 +4602,16 @@ function chatEvent(m){
   if(Date.now()-chatSound>2500){chatSound=Date.now();if(force)beep(1);else pop()}
   if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:force?'imp':'info',title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+how,kw:clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
 }
+// el aviso queda hasta que lo cierres (en Vitalis y en la tarjeta de la extensión); al entrar, los de hoy que no leíste
+function avisoEvent(m,c){
+  if(m.uid===me||Date.now()-m.t>12*36e5||m.t<=readT(c.id))return;
+  const seen=local.get('avisos',[]);if(seen.includes(m._id))return;local.set('avisos',[...seen.slice(-60),m._id]);
+  const who=first(m.uid),k=msgCard(m.body),txt=k?(k.title||'Datos')+(k.rest?': '+k.rest:''):msgTxt(m.body),where=c.kind==='team'?'':` en ${c.kind==='dm'?'tu privado':esc(chatName(c))}`;
+  toast(`<b><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Aviso de ${esc(who)}</b>${where}: ${esc(clip(txt,180))}${k?' <span class="dim">(con datos)</span>':''}`,'imp',{sticky:true,key:'av'+m._id,actions:[{l:'Ver',fn:()=>go('chat',{chat:c.id})}]});
+  if(Date.now()-chatSound>2500){chatSound=Date.now();beep(1)}
+  if(pageAway())extSocial({k:'so:c:'+c.id+':a'+m._id,v:m._id,lvl:'imp',title:'Aviso de '+who,id:clip(k?(k.title||'Datos'):msgTxt(m.body),90),kw:clip(k?k.rest:'',200),meta:(c.kind==='team'?'Toda la mesa':chatName(c))+' · '+hhmm(m.t),btns:[['open','Ver',1],['close','Ok']]});
+}
+function avisoCheck(){if(!ready)return;for(const c of chats)for(const m of (msgs[c.id]||[]).filter(x=>x.aviso&&!chatViewing(c.id)).slice(-3))avisoEvent(m,c)}
 function markRead(cid){
   const l=lastMsg(cid);if(!l)return;
   const r=reads[cid]||(reads[cid]={user_id:me,chat_id:cid,muted:false});
@@ -4816,17 +4893,17 @@ V.chat={
       for(const m of l){
         const d=ymd(new Date(m.t));
         if(d!==pd){h+=`<div class="ch-day"><span>${esc(chDay(d))}</span></div>`;pd=d;pu=null}
-        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body);
+        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body),cd=im?null:msgCard(m.body);
         const rq=m.reply?msgById(m.reply):null,quote=m.reply?`<button type="button" class="ch-q" data-goto="${esc(m.reply)}" title="Ir al mensaje"><b>${rq?esc(rq.uid===me?'Vos':first(rq.uid)):'Mensaje'}</b><span>${rq?esc(clip(msgTxt(rq.body),90)):'más viejo'}</span></button>`:'';
         const RX=reacts[m._id]||[],grp=EMOJIS.map(e=>({e,u:RX.filter(x=>x.e===e).map(x=>x.uid)})).filter(g=>g.u.length);
         const rxs=grp.length?`<div class="ch-rx">${grp.map(g=>`<button type="button" class="rx${g.u.includes(me)?' on':''}" data-rx="${g.e}" data-mid="${esc(m._id)}" title="${esc(g.u.map(u=>u===me?'vos':first(u)).join(', '))}">${g.e}<b>${g.u.length}</b></button>`).join('')}</div>`:'';
         const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button>${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
-        h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}" data-mid="${esc(m._id)}">`+
+        h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}${m.aviso?' aviso':''}" data-mid="${esc(m._id)}">`+
           (mine?'':head?(isBot(m.uid)?`<span class="avb">${avatar(nm)}</span>`:`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`):'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}">${quote}${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}${cd?' crd':''}">${m.aviso?'<span class="ch-aviso"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Aviso</span>':''}${quote}${cd?`<div class="ch-card${cards[cd.id]&&cards[cd.id].html?'':' wait'}" data-card="${esc(cd.id)}"><div class="chc-b">${cards[cd.id]&&cards[cd.id].html?cards[cd.id].html:'<span class="d">Trayendo los datos…</span>'}</div><div class="chc-f"><b>${esc(cd.title||'Datos')}</b><span class="chc-w">${cards[cd.id]&&cards[cd.id].at?' · datos '+cardWhen(cards[cd.id].at):''}</span></div></div>${cd.rest?`<span class="ch-cap">${fmtBody(cd.rest)}</span>`:''}`:im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
         pu=m.uid;pt=m.t;
       }
-      el.innerHTML=h;imgPaint(el);
+      el.innerHTML=h;imgPaint(el);for(const k of el.querySelectorAll('[data-card]'))cardPaint(k);shAvatars(el);
       if(atBottom){el.scrollTop=el.scrollHeight;for(const im of el.querySelectorAll('.ch-img img'))im.addEventListener('load',()=>{if(el.scrollHeight-el.scrollTop-el.clientHeight<400)el.scrollTop=el.scrollHeight},{once:true})}
     }
     if(chatViewing(c.id)&&el.scrollHeight-el.scrollTop-el.clientHeight<90)markRead(c.id);
@@ -6883,6 +6960,138 @@ V.radar={
     $('#rdBody').innerHTML=`<div class="rd-grid">${mapCard()}${cobroCardRd()}${radarCard()}${lateCard()}</div>`;
   },
 };
+
+/* ---------- compartir datos en el chat, y avisos del team leader o un administrador ---------- */
+// Cada tarjeta de datos tiene su botón Compartir: al chat va una foto de la tarjeta tal como se ve, con la hora, sin botones ni formularios.
+// El team leader y los administradores la pueden mandar como aviso: a todos los del chat les queda hasta que lo cierren, aunque lo tengan silenciado.
+const SH_VIEWS=new Set(['inicio','sueldo','turnos','ahora','clientes','ventas','filtros','radar','equipo','cliente','banking']);
+const SH_SEL='.card,.hero,.fi-c';
+const SH_HTML=new Set('div span p b i small br h2 h3 h4 h5 ul ol li table thead tbody tfoot tr th td section header footer details summary mark sub sup kbd s u'.split(' '));
+const SH_SVG=new Set('svg g path rect circle ellipse line polyline polygon text tspan use title'.split(' '));
+const SH_CONV={button:'span',a:'span',label:'span',time:'span',strong:'b',em:'i',figure:'div',figcaption:'div',nav:'div',aside:'div',article:'div',main:'div',dl:'div',dt:'div',dd:'div',output:'span',abbr:'span',code:'span',q:'span',cite:'span'};
+const SH_DROP=new Set('script style iframe object embed form input select textarea option optgroup img picture source video audio canvas link meta noscript template datalist dialog frame frameset base math'.split(' '));
+const SH_ATTR=new Set('class title colspan rowspan open viewBox d x y x1 y1 x2 y2 dx dy cx cy r rx ry width height fill stroke stroke-width stroke-linecap stroke-linejoin stroke-dasharray stroke-opacity fill-opacity points transform text-anchor dominant-baseline font-size font-weight opacity preserveAspectRatio aria-hidden aria-label role'.split(' '));
+const SH_CSS=new Set('width height min-width max-width min-height max-height flex flex-grow flex-shrink flex-basis grid-column grid-row grid-template-columns background-color background-image color opacity border-color border-left-color border-top-color border-bottom-color text-align font-weight aspect-ratio margin-left padding-left left right top bottom transform'.split(' '));
+function shCss(s){ // solo lo que hace falta para barras y colores: nada de url(), posiciones fijas ni capas
+  const d=document.createElement('div');d.setAttribute('style',s);const o=[];
+  for(let i=0;i<d.style.length;i++){const p=d.style[i],v=d.style.getPropertyValue(p).trim();
+    if(!(SH_CSS.has(p)||/^--[a-z0-9-]+$/i.test(p))||!v||/url\s*\(|expression|javascript:|@import|\\|<|>/i.test(v))continue;o.push(p+':'+v)}
+  return o.join(';');
+}
+// limpia el HTML de una tarjeta (al mandarla y otra vez al mostrarla: no se confía en lo guardado)
+function shClean(html){
+  const t=document.createElement('template');t.innerHTML=String(html||'');
+  const SVGNS='http://www.w3.org/2000/svg';
+  const fix=el=>{
+    for(const c of [...el.children]){
+      const svg=c.namespaceURI===SVGNS,tag=svg?c.localName:c.localName.toLowerCase();
+      if(svg?!SH_SVG.has(tag):SH_DROP.has(tag)){c.remove();continue}
+      let x=c;
+      if(!svg&&!SH_HTML.has(tag)){ // lo demás pasa a un span o un div con lo de adentro
+        x=document.createElement(SH_CONV[tag]||'span');
+        for(const a of c.attributes)x.setAttribute(a.name,a.value);
+        while(c.firstChild)x.appendChild(c.firstChild);c.replaceWith(x);
+      }
+      for(const a of [...x.attributes]){
+        const n=a.name;
+        if(n==='style'){const v=shCss(a.value);if(v)x.setAttribute('style',v);else x.removeAttribute('style');continue}
+        if(n==='href'||n==='xlink:href'){if(!(svg&&tag==='use'&&/^#(i-[a-z0-9-]+|mate)$/i.test(a.value)))x.removeAttribute(n);continue}
+        if(n==='data-av'){if(!/^[0-9a-f-]{36}$/i.test(a.value))x.removeAttribute(n);continue} // la foto de alguien de la mesa: se pone al mostrarla
+        if(!SH_ATTR.has(n))x.removeAttribute(n);
+      }
+      fix(x);
+    }
+  };
+  fix(t.content);return t.innerHTML;
+}
+// la foto de la tarjeta: lo que se ve (lo escondido no va; lo de un desplegable cerrado sí, cerrado)
+function shSnap(el,rows=30){
+  const rev=new Map();for(const id in avatars){const a=avatars[id];if(a&&a.url)rev.set(a.url,id)}
+  const skip=new Set(['script','style','input','select','textarea','form','template','canvas','video','audio','iframe','datalist','dialog']);
+  const cp=(n,out,inDet)=>{
+    for(const c of n.childNodes){
+      if(c.nodeType===3){out.appendChild(document.createTextNode(c.nodeValue));continue}
+      if(c.nodeType!==1||skip.has(c.localName)||(c.matches&&c.matches('.sh-btn,.btn,.hb,button[data-act],a[data-act]'))||c.hasAttribute('data-noshare'))continue; // los botones de acción no van
+      const det=inDet||(n.localName==='details'&&!n.open&&c.localName!=='summary');
+      if(!det&&c.localName!=='br'&&!c.getClientRects().length)continue; // no se ve
+      if(c.classList&&c.classList.contains('av')&&c.classList.contains('pic')){ // foto de perfil: va quién es, no la foto
+        const img=c.querySelector('img'),uid=img&&rev.get(img.getAttribute('src')),s=document.createElement('span');
+        s.className=String(c.className).replace(/\bpic\b/,'').trim();
+        if(uid){const nm=memberName(uid);s.dataset.av=uid;s.style.setProperty('--h',avHue(nm));s.textContent=initials(nm)}
+        out.appendChild(s);continue;
+      }
+      const k=c.cloneNode(false);out.appendChild(k);cp(c,k,det);
+    }
+  };
+  const root=el.cloneNode(false);root.classList.remove('sh-abs');cp(el,root,false);
+  for(const tb of root.querySelectorAll('tbody')){const L=[...tb.children];if(L.length>rows){L.slice(rows).forEach(r=>r.remove());
+    tb.insertAdjacentHTML('beforeend',`<tr><td colspan="99" class="d">… y ${L.length-rows} más</td></tr>`)}}
+  return shClean(root.outerHTML);
+}
+// pone la foto de cada uno donde la tarjeta compartida nombra a alguien de la mesa
+function shAvatars(root){for(const s of root.querySelectorAll('[data-av]')){const nm=memberName(s.dataset.av);if(nm&&nm!=='—')s.outerHTML=avatar(nm,String(s.className).replace(/\bav\b/,'').trim())}}
+const shTitle=el=>{
+  const h=el.querySelector(':scope > .card-h h3,:scope > .card-h h2');
+  let t=(h&&h.textContent)||el.getAttribute('aria-label')||((el.querySelector('h3,h4,h2')||{}).textContent)||(VTITLE[cur]||'Datos');
+  t=String(t).replace(/\s+/g,' ').trim();
+  if(cur==='cliente'&&curCl&&!t.includes(curCl.id))t+=' · '+curCl.id;
+  return clip(t,120);
+};
+const VTITLE={inicio:'Inicio',sueldo:'Sueldo',turnos:'Turnos',ahora:'Cola',clientes:'Campañas',ventas:'Ventas',filtros:'Filtros',radar:'Radar',equipo:'Equipo',cliente:'Cliente',banking:'Banking'};
+
+// el botón Compartir en cada tarjeta de datos (se pone solo cuando una sección se dibuja)
+function shMark(){
+  if(!ready||!SH_VIEWS.has(cur))return;
+  const v=document.getElementById('v-'+cur);if(!v||v.hidden)return;
+  for(const el of v.querySelectorAll(SH_SEL)){
+    if(el.hidden||!el.getClientRects().length||el.closest('.mbox')||el.parentElement.closest(SH_SEL)||el.querySelector(':scope > .sh-btn'))continue;
+    if(el.matches('.wr,.turno-mini')||!el.textContent.trim())continue; // formularios y la franja del turno no
+    const b=document.createElement('button');b.type='button';b.className='sh-btn';b.dataset.share='';b.title='Compartir en el chat';b.setAttribute('aria-label','Compartir en el chat');
+    b.innerHTML='<svg class="ic" aria-hidden="true"><use href="#i-share"/></svg>';
+    el.classList.add('sh-abs');el.appendChild(b); // arriba a la derecha, siempre en el mismo lugar
+  }
+}
+let shRaf=0;
+new MutationObserver(()=>{if(!shRaf)shRaf=requestAnimationFrame(()=>{shRaf=0;shMark()})}).observe(document.getElementById('main'),{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-share]');if(!b)return;e.preventDefault();e.stopPropagation();const el=b.closest(SH_SEL);if(el)shareModal(el)},true);
+
+function shareModal(el){
+  if(!chats.length){toast('El chat todavía no cargó. Probá en un ratito.','warn');return}
+  let html=shSnap(el);if(html.length>90000)html=shSnap(el,10);
+  if(html.length>90000){toast('Es demasiado grande para compartir. Filtrá un poco o compartí una parte.','warn');return}
+  const title=shTitle(el),lead=isLeader();
+  const L=[...chats].sort((a,b)=>(a.kind==='team'?0:a.kind==='group'?1:2)-(b.kind==='team'?0:b.kind==='group'?1:2)||chatName(a).localeCompare(chatName(b)));
+  const body=`<div class="sh-prev"><div class="ch-card"><div class="chc-b">${html}</div><div class="chc-f">${esc(title)} · datos de las ${hhmm(Date.now())}</div></div></div>
+    <div class="fgrid">
+      <label class="fld full"><span>Dónde</span><select name="chat">${L.map(c=>`<option value="${esc(c.id)}">${esc(c.kind==='dm'?'Privado con '+first(dmOther(c)):chatName(c))}</option>`).join('')}</select></label>
+      <label class="fld full"><span>Comentario <small class="dim">(opcional)</small></span><textarea name="txt" rows="2" maxlength="500" placeholder="Ej.: miren esta campaña"></textarea></label>
+      ${lead?`<label class="sh-av"><input type="checkbox" name="aviso"><span><b><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Mandarlo como aviso</b><small>A todos los de ese chat les aparece un aviso que queda hasta que lo cierren, aunque lo tengan silenciado.</small></span></label>`:''}
+    </div><div class="ebox" id="shE"></div>`;
+  modal({title:'Compartir en el chat',wide:true,body,onOpen:api=>{shAvatars(api.box);
+      if(lead){const cb=api.q('[name=aviso]'),go_=api.mf.querySelector('.pri');cb.onchange=()=>{go_.textContent=cb.checked?'Mandar aviso':'Compartir'}}},
+    actions:[{l:'Cancelar'},{l:'Compartir',cls:'pri',fn:async api=>{
+      const cid=api.q('[name=chat]').value,txt=api.q('[name=txt]').value.trim(),av=lead&&api.q('[name=aviso]')&&api.q('[name=aviso]').checked;
+      const ok=await B.shareCard(cid,title,html,txt,av);if(!ok)return false;
+      const c=chatOf(cid);toast(`${av?'Aviso mandado':'Compartido'} en ${esc(c?(c.kind==='dm'?'el privado con '+first(dmOther(c)):chatName(c)):'el chat')}.`,'ok',{actions:[{l:'Ver',fn:()=>go('chat',{chat:cid})}]});
+    }}]});
+}
+
+Object.assign(B,{
+  async shareCard(cid,title,html,txt,aviso){
+    let k=null;
+    try{
+      [k]=await Q(sb.from('chat_cards').insert({chat_id:cid,title,html}).select('id,created_at'));
+      cards[k.id]={html,at:+new Date(k.created_at)};
+      const row={chat_id:cid,body:`[card:${k.id}] ${title}`+(txt?'\n'+txt.slice(0,1500):'')};if(aviso)row.aviso=true;
+      const m=await Q(sb.from('messages').insert(row).select().single());msgIn(M2X(m));markRead(cid);return true;
+    }catch(e){
+      if(k)sb.from('chat_cards').delete().eq('id',k.id).then(()=>{},()=>{}); // el mensaje no salió: la foto no queda suelta
+      if(/chat_cards|aviso|PGRST20[45]|42P01|42703/.test(String(e&&(e.message||e.code))))toast('Compartir se activa en un rato (falta actualizar la base).','warn');
+      else toast(esc(errMsg(e)),/^SLOW/.test(String(e&&e.message||''))?'warn':'err');
+      return false;
+    }
+  },
+});
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.

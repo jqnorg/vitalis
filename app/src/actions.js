@@ -530,7 +530,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
-  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'')});return}
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
   if(d&&d.type==='ftd-agenda-tick'&&d.v===1){if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
@@ -653,6 +653,8 @@ function ayuda(){
     <dt>Imágenes</dt><dd>Pegalas con Ctrl+V, arrastralas o tocá el ícono al lado del mensaje. Van achicadas para que carguen rápido. Tocá una para verla grande, copiarla o bajarla.</dd>
     <dt>Responder y reaccionar</dt><dd>Pasá por un mensaje: ↩ para responderlo, ☺ para reaccionar. Tocá la cita para ir al mensaje original.</dd>
     <dt>@</dt><dd>Escribí @ y elegí a quién nombrar (flechas y Enter). El team leader tiene @todos.</dd>
+    <dt>Compartir datos</dt><dd>Cada tarjeta con datos tiene el botón <svg class="ic" aria-hidden="true"><use href="#i-share"/></svg> arriba a la derecha: va al chat que elijas una foto de la tarjeta tal como la ves, con la hora, y un comentario si querés.</dd>
+    <dt>Avisos del team leader</dt><dd>El team leader y los administradores pueden mandar lo que comparten como aviso: a todos los de ese chat les queda hasta que lo cierren, aunque lo tengan silenciado.</dd>
     <dt>Avisos</dt><dd>Llegan al instante, acá y (con la extensión) en la pestaña que estés. Silenciar un chat (desde su encabezado) solo calla ese chat. Si te nombran o te responden, el aviso llega igual; si es el team leader con @todos o @vos, llega aunque tengas todo silenciado.</dd>
     <dt>Colores</dt><dd>Rojo: urgente (agenda, descansos). Cuero: importante (tareas, clientes new, el team leader). Celeste: chat y social. Verde: logros.</dd></dl>
   <h4>Filtros</h4><dl>

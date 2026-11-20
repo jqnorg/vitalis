@@ -354,6 +354,47 @@ async def main():
             await A.evaluate("go('chat')"); await A.wait_for_timeout(300); await A.fill('#chIn', '@todos prueba de agente'); await A.keyboard.press('Enter'); await A.wait_for_timeout(700)
             await D.evaluate('catchUp(true)'); await D.wait_for_timeout(700)
             ok(await D.locator('#toasts .toast:has-text("prueba de agente")').count() == 0, 'el @todos de otro no salta el silencio')
+            # compartir datos: cada tarjeta tiene su botón; el team leader lo manda como aviso y a todos les queda hasta que lo cierren
+            await D.evaluate("go('inicio')"); await D.wait_for_timeout(700)
+            ok(await D.locator('#iHero > .sh-btn').count() == 1 and await D.locator('#iHoy > .sh-btn').count() == 1, 'cada tarjeta de datos tiene su botón Compartir')
+            ok(await D.locator('#iTurno .sh-btn').count() == 0, 'la franja del turno no')
+            hero_txt = (await D.inner_text('#iHero')).split('\n')[0]
+            await A.evaluate("go('radar')"); await A.wait_for_timeout(900); await A.screenshot(path=OUT / 'x_share_btns.png'); await A.evaluate("go('social')")
+            await D.click('#iHero > .sh-btn'); await D.wait_for_timeout(400)
+            ok(await D.is_visible('.mbox .sh-prev .ch-card') and 'FTDs de la mesa' in await D.inner_text('.mbox .sh-prev'), 'se ve cómo va a quedar, con la hora')
+            ok(await D.locator('.mbox .sh-prev .sh-btn, .mbox .sh-prev button, .mbox .sh-prev input').count() == 0, 'la foto va sin botones ni campos')
+            ok(await D.locator('.mbox [name=aviso]').count() == 1, 'el team leader puede mandarlo como aviso')
+            await D.check('.mbox [name=aviso]'); await D.fill('.mbox [name=txt]', 'Vamos que se puede')
+            ok(await D.inner_text('.mbox .mf .pri') == 'Mandar aviso', 'el botón dice Mandar aviso')
+            await D.screenshot(path=OUT / 'x_share_modal.png')
+            await D.click('.mbox .mf .pri'); await D.wait_for_timeout(900)
+            ok(sql("select count(*)::int c from public.messages where aviso and body like '[card:%Vamos que se puede'")[0]['c'] == 1, 'el aviso queda en el chat de la mesa, con los datos')
+            await A.evaluate("go('social')"); await A.evaluate('catchUp(true)')
+            t = A.locator('#toasts .toast:has-text("Aviso de Matias")')
+            try: await t.first.wait_for(timeout=6000)
+            except Exception: pass
+            ok(await t.count() == 1 and 'imp' in (await t.get_attribute('class')) and await t.get_attribute('data-sticky') == '1', 'a Joaquín le llega el aviso y queda hasta que lo cierre')
+            await A.screenshot(path=OUT / 'x_aviso_toast.png')
+            await A.wait_for_timeout(5000)
+            ok(await t.count() == 1, 'sigue ahí a los 5 segundos')
+            await t.locator('.ta button:has-text("Ver")').click(); await A.wait_for_timeout(900)
+            m = A.locator('#chMsgs .ch-m.aviso').last
+            ok(await m.locator('.ch-aviso').count() == 1 and 'Vamos que se puede' in await m.inner_text(), 'en el chat se ve marcado como aviso, con el comentario')
+            try: await m.locator('.ch-card:not(.wait) .chc-b .hero').wait_for(timeout=4000)
+            except Exception: pass
+            ok(await m.locator('.chc-b .hero').count() == 1 and 'FTDs de la mesa' in await m.locator('.chc-b').inner_text() and 'datos de las' in await m.locator('.chc-f').inner_text(), 'con la tarjeta tal como la vio Matias y la hora de los datos')
+            await A.evaluate("(()=>{const e=[...document.querySelectorAll('#chMsgs .ch-m.aviso')].pop();e&&e.scrollIntoView({block:'end'})})()"); await A.wait_for_timeout(300)
+            await A.screenshot(path=OUT / 'x_aviso_chat.png')
+            ok('📊' in await A.evaluate("msgTxt([...msgs[chats.find(c=>c.kind==='team').id]].reverse().find(m=>m.aviso).body)"), 'en los avisos se lee como datos (📊 y el título)')
+            # lo guardado no se cree: se limpia otra vez al mostrarlo (sin scripts, sin eventos, sin url(), sin posiciones fijas)
+            sql("""insert into public.chat_cards (id, chat_id, user_id, title, html) select '00000000-0000-4000-8000-00000000c0de', c.id, p.id, 'Raro',
+              '<section class="card"><h3>Raro</h3><img src=x onerror="window.__pwn=1"><script>window.__pwn=2</script><div class="bar" style="background:url(https://example.com/x.png);position:fixed;width:40%">a</div><a href="javascript:void(0)" onclick="window.__pwn=3">link</a><svg><use href="https://example.com/#x"/></svg><iframe src="https://example.com"></iframe></section>'
+              from public.chats c, public.profiles p where c.kind='team' and p.name='Matias Me'""")
+            sql("insert into public.messages (chat_id, user_id, body) select c.id, p.id, '[card:00000000-0000-4000-8000-00000000c0de] Raro' from public.chats c, public.profiles p where c.kind='team' and p.name='Matias Me'")
+            await A.evaluate('catchUp(true)'); await A.wait_for_timeout(1500)
+            raro = A.locator('[data-card="00000000-0000-4000-8000-00000000c0de"] .chc-b')
+            h = await raro.inner_html() if await raro.count() else ''
+            ok('Raro' in h and await A.evaluate('window.__pwn') is None and not any(x in h for x in ['<img', '<script', 'onerror', 'onclick', 'url(', 'fixed', '<iframe', 'javascript:', 'example.com']) and 'width:40%' in h, f'una tarjeta rara se muestra limpia ({h[:220]!r})')
             await A.click('#chHead [data-ch=mute]'); await A.wait_for_timeout(500)
             # perfil, toque y privado
             await A.keyboard.press('Escape'); await A.evaluate("go('social')"); await A.wait_for_timeout(400)
@@ -594,6 +635,14 @@ async def main():
             await E.evaluate(f"openProfile('{sof}')"); await E.wait_for_timeout(300)
             ok(not await E.is_visible('.mbox [data-pa=ficha]'), 'el agente no tiene «Ver ficha»')
             await E.keyboard.press('Escape')
+            # un agente comparte datos (sin aviso)
+            await E.evaluate("modals.slice().forEach(m=>m.close());go('radar')"); await E.wait_for_timeout(900)
+            await E.locator('#v-radar .sh-btn:visible').first.click(); await E.wait_for_timeout(400)
+            ok(await E.is_visible('.mbox .sh-prev') and await E.locator('.mbox [name=aviso]').count() == 0, 'un agente comparte, pero no manda avisos')
+            await E.click('.mbox .mf .pri'); await E.wait_for_timeout(900)
+            ok(sql("select count(*)::int c from public.messages m join public.profiles p on p.id=m.user_id where p.name='Elias Me' and m.body like '[card:%' and not m.aviso")[0]['c'] == 1, 'y le llega a la mesa como datos compartidos')
+            ok(not await E.evaluate("(async()=>{const r=await sb.from('messages').insert({chat_id:chats.find(c=>c.kind==='team').id,body:'aviso trucho',aviso:true});return !r.error})()"), 'un agente no puede mandar un aviso ni por fuera de la app')
+            await E.wait_for_timeout(200); errs[:] = [x for x in errs if not (x.startswith('E console') and ('400' in x or '403' in x))]
             res = await E.evaluate('''()=>importFromExt([
               {date:'2026-11-17',time:'10:00',id:'99001',name:'Uno',amount:100,tx:'TX99001',brand:'Trade24Seven',agent:'Elias Me'},
               {date:'2026-11-17',time:'11:00',id:'99002',name:'Dos',amount:120,tx:'TX99002',brand:'Trade24Seven',agent:'Mateo He'}])''')

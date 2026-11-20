@@ -212,6 +212,19 @@ create table if not exists public.chat_files (
   created_at timestamptz not null default now()
 );
 create index if not exists chat_files_chat on public.chat_files (chat_id, created_at desc);
+-- un aviso: lo manda el team leader o un administrador; a todos los del chat les queda hasta que lo cierren, aunque lo tengan silenciado
+alter table public.messages add column if not exists aviso boolean not null default false;
+-- datos compartidos en el chat: una foto de una tarjeta de Vitalis (HTML que la app limpia al mandarlo y otra vez al mostrarlo).
+-- El mensaje la nombra con [card:id] y lleva el título, así el aviso se lee sin abrirla
+create table if not exists public.chat_cards (
+  id         uuid primary key default gen_random_uuid(),
+  chat_id    uuid not null references public.chats(id) on delete cascade,
+  user_id    uuid not null default auth.uid() references public.profiles(id) on delete cascade,
+  title      text not null check (length(title) between 1 and 120),
+  html       text not null check (length(html) between 1 and 90000),
+  created_at timestamptz not null default now()
+);
+create index if not exists chat_cards_chat on public.chat_cards (chat_id, created_at desc);
 
 -- foto de perfil (la app la recorta cuadrada y la achica); la ve toda la mesa, la cambia cada uno
 create table if not exists public.avatars (
@@ -566,6 +579,13 @@ begin
        where f.id::text = substring(new.body from '^\[img:([0-9a-f-]{36})') and f.chat_id = new.chat_id and f.user_id = new.user_id) then
     raise exception 'IMG: la imagen no se subió, probá de nuevo';
   end if;
+  if new.body like '[card:%' and not exists (select 1 from public.chat_cards k
+       where k.id::text = substring(new.body from '^\[card:([0-9a-f-]{36})') and k.chat_id = new.chat_id and k.user_id = new.user_id) then
+    raise exception 'CARD: los datos no se subieron, probá de nuevo';
+  end if;
+  if new.aviso and coalesce((select role from public.profiles where id = new.user_id), '') not in ('leader', 'admin') then
+    raise exception 'AVISO: los avisos los manda el team leader o un administrador';
+  end if;
   new.created_at := now();
   if (select count(*) from public.messages where user_id = new.user_id and created_at > now() - interval '30 seconds') >= 15 then
     raise exception 'SLOW: vas muy rápido, esperá unos segundos';
@@ -579,6 +599,7 @@ create or replace function public.msg_gone() returns trigger
   language plpgsql security definer set search_path = public as $$
 begin
   if old.body like '[img:%' then delete from public.chat_files where id::text = substring(old.body from '^\[img:([0-9a-f-]{36})'); end if;
+  if old.body like '[card:%' then delete from public.chat_cards where id::text = substring(old.body from '^\[card:([0-9a-f-]{36})'); end if;
   return old;
 end $$;
 drop trigger if exists messages_gone on public.messages;
@@ -616,6 +637,18 @@ drop trigger if exists message_reactions_guard on public.message_reactions;
 create trigger message_reactions_guard before insert on public.message_reactions for each row execute function public.react_guard();
 drop trigger if exists chat_files_guard on public.chat_files;
 create trigger chat_files_guard before insert on public.chat_files for each row execute function public.file_guard();
+create or replace function public.card_guard() returns trigger
+  language plpgsql security definer set search_path = public as $$
+begin
+  new.created_at := now();
+  new.title := left(btrim(new.title), 120);
+  if (select count(*) from public.chat_cards where user_id = new.user_id and created_at > now() - interval '10 minutes') >= 30 then
+    raise exception 'SLOW: compartiste mucho seguido, esperá unos minutos';
+  end if;
+  return new;
+end $$;
+drop trigger if exists chat_cards_guard on public.chat_cards;
+create trigger chat_cards_guard before insert on public.chat_cards for each row execute function public.card_guard();
 
 -- crear un grupo con gente de la mesa (quien lo crea queda adentro)
 create or replace function public.chat_create(nm text, people uuid[]) returns uuid
@@ -819,6 +852,7 @@ alter table public.tasks        enable row level security;
 alter table public.task_people  enable row level security;
 alter table public.targets      enable row level security;
 alter table public.chat_files   enable row level security;
+alter table public.chat_cards   enable row level security;
 alter table public.avatars      enable row level security;
 alter table public.message_reactions enable row level security;
 alter table public.user_targets enable row level security;
@@ -946,6 +980,12 @@ drop policy if exists files_insert on public.chat_files;
 create policy files_insert on public.chat_files for insert to authenticated with check (user_id = (select auth.uid()) and public.in_chat(chat_id));
 drop policy if exists files_delete on public.chat_files;
 create policy files_delete on public.chat_files for delete to authenticated using (user_id = (select auth.uid()));
+drop policy if exists cards_read on public.chat_cards;
+create policy cards_read on public.chat_cards for select to authenticated using (public.in_chat(chat_id));
+drop policy if exists cards_insert on public.chat_cards;
+create policy cards_insert on public.chat_cards for insert to authenticated with check (user_id = (select auth.uid()) and public.in_chat(chat_id));
+drop policy if exists cards_delete on public.chat_cards;
+create policy cards_delete on public.chat_cards for delete to authenticated using (user_id = (select auth.uid()));
 drop policy if exists messages_delete on public.messages;
 create policy messages_delete on public.messages for delete to authenticated using (user_id = (select auth.uid()));
 drop policy if exists chat_reads_own on public.chat_reads;
@@ -964,6 +1004,9 @@ revoke update on public.messages from authenticated;
 grant select, insert, delete on public.chat_files to authenticated;
 revoke update on public.chat_files from authenticated;
 revoke all on public.chat_files from anon;
+grant select, insert, delete on public.chat_cards to authenticated;
+revoke update on public.chat_cards from authenticated;
+revoke all on public.chat_cards from anon;
 grant select, insert, update, delete on public.avatars to authenticated;
 grant select, insert, delete on public.message_reactions to authenticated;
 grant select, insert, update, delete on public.user_targets to authenticated;
