@@ -163,7 +163,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&rDirty&&r
 /* ---------- barra de estado ---------- */
 const avHue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h};
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name),a=m&&avatars[m.id]; // con foto, si la subió
+const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name)||(botU&&botU.name===name?botU:null),a=m&&avatars[m.id]; // con foto, si la subió (Vitalis también)
   return a?`<span class="av pic ${cls}" aria-hidden="true"><img src="${a.url}" alt=""></span>`:`<span class="av ${cls}" style="--h:${avHue(name)}" aria-hidden="true">${esc(initials(name))}</span>`};
 const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':'Agente';
 function status(){

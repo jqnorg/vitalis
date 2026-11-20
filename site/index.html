@@ -1522,7 +1522,7 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.22.2';
+const VERSION='1.22.3';
 const EXT_VER='1.9.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1629,7 +1629,7 @@ let avatars={},avOk=false; // fotos de perfil: uid → {url, at}
 let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
-// Joaquín Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
+// Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
 let botU=null;const isBot=uid=>!!botU&&uid===botU.id;
 function setMembers(list){botU=list.find(m=>m.bot)||null;members=list.filter(m=>!m.bot)}
 let mesaCh=null,crmPingAt=0;function mesaPing(ev){try{if(mesaCh)mesaCh.send({type:'broadcast',event:ev,payload:{}})}catch(e){}}
@@ -1897,7 +1897,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{
       if(p.eventType==='DELETE')return;
       if(p.new.team_id!==profile.team_id&&p.new.id!==me)return;
-      if(p.new.bot){botU=p.new;refresh();return} // Joaquín Vitalis no va en la lista de la mesa
+      if(p.new.bot){botU=p.new;refresh();return} // Vitalis no va en la lista de la mesa
       up(members,p.new,'id');
       if(p.new.id===me){profile=p.new;if(!p.new.active)return location.reload()}
       refresh();
@@ -2468,7 +2468,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&rDirty&&r
 /* ---------- barra de estado ---------- */
 const avHue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%360;return h};
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name),a=m&&avatars[m.id]; // con foto, si la subió
+const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name)||(botU&&botU.name===name?botU:null),a=m&&avatars[m.id]; // con foto, si la subió (Vitalis también)
   return a?`<span class="av pic ${cls}" aria-hidden="true"><img src="${a.url}" alt=""></span>`:`<span class="av ${cls}" style="--h:${avHue(name)}" aria-hidden="true">${esc(initials(name))}</span>`};
 const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':'Agente';
 function status(){
@@ -4452,7 +4452,7 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
-// una venta: Joaquín Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
+// una venta: Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
 let botAsk=0;
 function cheerEvent(m,c){
   if(Date.now()-m.t>10*6e4)return;
@@ -4464,7 +4464,7 @@ function cheerEvent(m,c){
 function chatEvent(m){
   if(m.uid===me)return;
   const c=chatOf(m.chat);if(!c)return;
-  if(!isBot(m.uid)&&memberName(m.uid)==='—'&&Date.now()-botAsk>6e4){ // alguien que todavía no conozco (la primera venta crea a Joaquín Vitalis): traigo la lista y sigo
+  if(!isBot(m.uid)&&memberName(m.uid)==='—'&&Date.now()-botAsk>6e4){ // alguien que todavía no conozco (la primera venta crea a Vitalis): traigo la lista y sigo
     botAsk=Date.now();Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')).then(l=>{setMembers(l);chatEvent(m);refresh()}).catch(()=>{});return;
   }
   if(isBot(m.uid)){cheerEvent(m,c);if(chatViewing(c.id))markRead(c.id);return}
@@ -4766,8 +4766,8 @@ V.chat={
         const rxs=grp.length?`<div class="ch-rx">${grp.map(g=>`<button type="button" class="rx${g.u.includes(me)?' on':''}" data-rx="${g.e}" data-mid="${esc(m._id)}" title="${esc(g.u.map(u=>u===me?'vos':first(u)).join(', '))}">${g.e}<b>${g.u.length}</b></button>`).join('')}</div>`:'';
         const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button>${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
         h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}" data-mid="${esc(m._id)}">`+
-          (mine?'':head?`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`:'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`:''}<div class="ch-tx${im?' pic':''}">${quote}${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
+          (mine?'':head?(isBot(m.uid)?`<span class="avb">${avatar(nm)}</span>`:`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`):'<span class="ch-sp"></span>')+
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}">${quote}${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
         pu=m.uid;pt=m.t;
       }
       el.innerHTML=h;imgPaint(el);

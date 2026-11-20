@@ -789,7 +789,7 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!!q.error || q.rows.length === 0, 'nadie edita el perfil directo (solo por prof_save)');
 }
 
-// ---------- Joaquín Vitalis felicita las ventas de hoy ----------
+// ---------- Vitalis felicita las ventas de hoy ----------
 {
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);
   const n0 = (await db.query("select count(*)::int c from public.messages m join public.profiles p on p.id = m.user_id where p.bot")).rows[0].c;
@@ -797,8 +797,8 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!r.error && (await db.query("select count(*)::int c from public.messages m join public.profiles p on p.id = m.user_id where p.bot")).rows[0].c === n0, 'una venta vieja no manda felicitación');
   r = await as(C, "insert into public.sales (date, client_id, amount, tx) values ($1,'88002',100,'88002') returning id", [hoy]);
   const bm = (await db.query("select m.body, m.chat_id, p.name, p.active, p.login from public.messages m join public.profiles p on p.id = m.user_id where p.bot order by m.created_at desc")).rows;
-  ok(!r.error && bm.length === n0 + 1 && bm[0].name === 'Joaquín Vitalis' && bm[0].chat_id === TC && bm[0].body.includes('Arlette'), `una venta de hoy: Joaquín Vitalis felicita en el chat de la mesa (${bm[0] && bm[0].body})`);
-  ok(bm[0] && bm[0].active === false && bm[0].login === null && !(await rpc(null, 'select public.roster() j')).people.some((p) => p.name === 'Joaquín Vitalis'), 'Joaquín Vitalis no entra ni aparece en la lista de nombres');
+  ok(!r.error && bm.length === n0 + 1 && bm[0].name === 'Vitalis' && bm[0].chat_id === TC && bm[0].body.includes('Arlette'), `una venta de hoy: Vitalis felicita en el chat de la mesa (${bm[0] && bm[0].body})`);
+  ok(bm[0] && bm[0].active === false && bm[0].login === null && !(await rpc(null, 'select public.roster() j')).people.some((p) => p.name === 'Vitalis'), 'Vitalis no entra ni aparece en la lista de nombres');
   r = await as(C, "insert into public.sales (date, client_id, amount, tx) values ($1,'88003',100,'88003') returning id", [hoy]);
   ok((await db.query("select count(*)::int c from public.profiles where bot")).rows[0].c === 1, 'es uno solo aunque haya más ventas');
   r = await as(A, 'select body from public.messages where chat_id = $1 order by created_at desc limit 1', [TC]);

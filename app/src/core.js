@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.22.2';
+const VERSION='1.22.3';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -110,7 +110,7 @@ let avatars={},avOk=false; // fotos de perfil: uid → {url, at}
 let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
-// Joaquín Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
+// Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
 let botU=null;const isBot=uid=>!!botU&&uid===botU.id;
 function setMembers(list){botU=list.find(m=>m.bot)||null;members=list.filter(m=>!m.bot)}
 let mesaCh=null,crmPingAt=0;function mesaPing(ev){try{if(mesaCh)mesaCh.send({type:'broadcast',event:ev,payload:{}})}catch(e){}}
@@ -378,7 +378,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{
       if(p.eventType==='DELETE')return;
       if(p.new.team_id!==profile.team_id&&p.new.id!==me)return;
-      if(p.new.bot){botU=p.new;refresh();return} // Joaquín Vitalis no va en la lista de la mesa
+      if(p.new.bot){botU=p.new;refresh();return} // Vitalis no va en la lista de la mesa
       up(members,p.new,'id');
       if(p.new.id===me){profile=p.new;if(!p.new.active)return location.reload()}
       refresh();

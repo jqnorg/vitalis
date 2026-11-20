@@ -1591,7 +1591,8 @@ select t.id, 'team', 'Toda la mesa' from public.teams t
 select name as mesa, (select count(*) from public.profiles where team_id = teams.id and active) as personas from public.teams;
 
 -- ============================================================================
--- Joaquín Vitalis: el compañero ficticio del chat de la mesa.
+-- Vitalis: el compañero ficticio del chat de la mesa (con la foto del excompañero que le dio el nombre, con su visto bueno;
+-- la foto se cargó directo en la base, en avatars, y no está en el repo).
 -- Cuando alguien de la mesa hace una venta de hoy, felicita en "Toda la mesa".
 -- No entra a Vitalis (sin PIN, inactivo, fuera de la lista de nombres) y no cuenta como agente.
 -- ============================================================================
@@ -1602,12 +1603,13 @@ declare uid uuid;
 begin
   select id into uid from public.profiles where team_id = t and bot order by created_at limit 1;
   if uid is null then
-    uid := public._new_seat(t, 'Joaquín Vitalis', 'agent');
+    uid := public._new_seat(t, 'Vitalis', 'agent');
     update public.profiles set active = false, bot = true, login = null where id = uid;
   end if;
   return uid;
 end $$;
 revoke all on function public.vitalis_bot(uuid) from public, anon, authenticated;
+update public.profiles set name = 'Vitalis' where bot and name = 'Joaquín Vitalis'; -- se llamaba así al principio
 
 create or replace function public.sale_cheer() returns trigger
   language plpgsql security definer set search_path = public, extensions as $$

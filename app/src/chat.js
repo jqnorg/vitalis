@@ -100,7 +100,7 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
-// una venta: Joaquín Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
+// una venta: Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
 let botAsk=0;
 function cheerEvent(m,c){
   if(Date.now()-m.t>10*6e4)return;
@@ -112,7 +112,7 @@ function cheerEvent(m,c){
 function chatEvent(m){
   if(m.uid===me)return;
   const c=chatOf(m.chat);if(!c)return;
-  if(!isBot(m.uid)&&memberName(m.uid)==='—'&&Date.now()-botAsk>6e4){ // alguien que todavía no conozco (la primera venta crea a Joaquín Vitalis): traigo la lista y sigo
+  if(!isBot(m.uid)&&memberName(m.uid)==='—'&&Date.now()-botAsk>6e4){ // alguien que todavía no conozco (la primera venta crea a Vitalis): traigo la lista y sigo
     botAsk=Date.now();Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')).then(l=>{setMembers(l);chatEvent(m);refresh()}).catch(()=>{});return;
   }
   if(isBot(m.uid)){cheerEvent(m,c);if(chatViewing(c.id))markRead(c.id);return}
@@ -414,8 +414,8 @@ V.chat={
         const rxs=grp.length?`<div class="ch-rx">${grp.map(g=>`<button type="button" class="rx${g.u.includes(me)?' on':''}" data-rx="${g.e}" data-mid="${esc(m._id)}" title="${esc(g.u.map(u=>u===me?'vos':first(u)).join(', '))}">${g.e}<b>${g.u.length}</b></button>`).join('')}</div>`:'';
         const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button>${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
         h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}" data-mid="${esc(m._id)}">`+
-          (mine?'':head?`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`:'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`:''}<div class="ch-tx${im?' pic':''}">${quote}${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
+          (mine?'':head?(isBot(m.uid)?`<span class="avb">${avatar(nm)}</span>`:`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`):'<span class="ch-sp"></span>')+
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}">${quote}${im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
         pu=m.uid;pt=m.t;
       }
       el.innerHTML=h;imgPaint(el);

@@ -65,7 +65,8 @@ async def main():
             ok(await A.evaluate('ready'), 'entra a Vitalis')
             ok(await A.evaluate('profile.role') == 'admin', 'el primero queda como admin')
             await A.screenshot(path=OUT / 'b0_inicio_vacio.png')
-            # datos de ejemplo (las felicitaciones de Joaquín Vitalis se prueban al final: acá ensuciarían el chat)
+            PNG1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+            # datos de ejemplo (las felicitaciones de Vitalis se prueban al final: acá ensuciarían el chat)
             sql("alter table public.sales disable trigger sales_cheer")
             sql(SEED)
             await A.reload(); await A.wait_for_timeout(2500)
@@ -840,18 +841,22 @@ async def main():
             await M.click('#chHead [data-ch=back]'); await M.wait_for_timeout(400)
             ok(await M.is_visible('#chList'), 'y vuelve a la lista')
 
-            # una venta de hoy: Joaquín Vitalis felicita en el chat de la mesa y le avisa a todos
+            # una venta de hoy: Vitalis felicita en el chat de la mesa y le avisa a todos
             sql("alter table public.sales enable trigger sales_cheer")
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
             sql("insert into public.sales (team_id,user_id,date,time,client_id,amount,tx,brand) select team_id,id,((now() at time zone 'UTC') - interval '3 hours')::date,'11:20','919191',250,'919191','Novara Markets' from public.profiles where name='Sofía Ar'")
             r = sql("select m.body, p.name from public.messages m join public.profiles p on p.id=m.user_id where p.bot")
-            ok(len(r) == 1 and r[0]['name'] == 'Joaquín Vitalis' and 'Sofía' in r[0]['body'], f'la venta de Sofía: Joaquín Vitalis la felicita en el chat ({r})')
+            ok(len(r) == 1 and r[0]['name'] == 'Vitalis' and 'Sofía' in r[0]['body'], f'la venta de Sofía: Vitalis la felicita en el chat ({r})')
             await A.evaluate('catchUp(true)'); await A.wait_for_timeout(1800)
-            t = A.locator('#toasts .toast:has-text("Joaquín Vitalis")')
+            sql(f"insert into public.avatars (user_id, mime, data) select id, 'image/png', '{PNG1}' from public.profiles where bot")
+            await A.evaluate('catchUp(true);loadAvatars()'); await A.wait_for_timeout(1800)
+            t = A.locator('#toasts .toast:has-text("Vitalis")')
             ok(await t.count() == 1 and 'Sofía' in await t.inner_text(), 'a los demás les llega el aviso de la venta')
             await A.screenshot(path=OUT / 'v0_venta_aviso.png')
             await A.evaluate("go('chat')"); await A.wait_for_timeout(700)
-            ok('Joaquín Vitalis' in await A.inner_text('#chMsgs'), 'y en el chat el remitente es Joaquín Vitalis')
+            ok('Vitalis' in await A.inner_text('#chMsgs'), 'y en el chat el remitente es Vitalis')
+            vm = A.locator('#chMsgs .ch-m.head:has(.ch-who:text-is("Vitalis"))')
+            ok(await vm.count() >= 1 and await vm.first.locator('.avb img').count() == 1 and await vm.first.locator('[data-prof]').count() == 0, 'con su foto, y sin perfil para abrir')
             await A.screenshot(path=OUT / 'v1_venta_chat.png')
             ok(await A.evaluate("!members.some(m=>m.bot)&&!!botU"), 'no cuenta como alguien de la mesa')
 
