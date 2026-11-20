@@ -245,11 +245,18 @@
     if (m && m.type === 'import-result') { result(m.res); return false; }
     if (m && m.type === 'crm-refresh') { // pedido de la extensión: refrescar la lista
       if (document.hasFocus() && Date.now() - lastInput < 15000) { reply({ skipped: true }); return false; } // la estás usando: no te la muevo
-      // tocar "Search" del CRM (recarga la lista sin recargar la página); si no está, "Refresh"; si tampoco, recargar
-      const btns = [...document.querySelectorAll('button,a,[role=button],input[type=button],input[type=submit]')].filter((b) => b.offsetParent !== null && !b.disabled);
-      const txt = (b) => cellText(b) || b.value || '';
+      // un agente: el botón ⟳ de su CRM, si no "Search" (recarga la lista sin recargar la página), si no "Refresh".
+      // El team leader: su CRM se actualiza con "Refresh" (con "Search" no anda): nunca toca "Search". Si no hay ninguno, recarga.
+      const btns = [...document.querySelectorAll('button,a,[role=button],input[type=button],input[type=submit]')]
+        .filter((b) => b.offsetParent !== null && !b.disabled && !(ui && ui.h.contains(b))); // los botones de Vitalis no cuentan
+      const txt = (b) => cellText(b) || b.value || b.getAttribute('aria-label') || b.getAttribute('title') || '';
+      const isSearch = (b) => /^\W*(search|buscar)\W*$/i.test(txt(b));
+      const isRe = (b) => /^\W*(refresh|actualizar|refrescar|recargar|reload)\W*$/i.test(txt(b))
+        || !!b.querySelector('.anticon-reload,.anticon-sync,[data-icon=reload],[data-icon=sync],[aria-label=reload],[aria-label=sync]');
       const rb = [...document.querySelectorAll('.refresh-btn')].map((e) => e.closest('button,a,[role=button]') || e).find((b) => b.offsetParent !== null && !b.disabled); // el botón de tu CRM
-      const btn = rb || btns.find((b) => /^\W*(search|buscar)\W*$/i.test(txt(b))) || btns.find((b) => /^\W*(refresh|actualizar|refrescar)\W*$/i.test(txt(b)));
+      const btn = multiWatch()
+        ? (btns.find(isRe) || (rb && !isSearch(rb) ? rb : null))
+        : (rb || btns.find(isSearch) || btns.find(isRe));
       if (btn) { btn.click(); reply({ clicked: txt(btn).trim() || 'refresh-btn' }); setTimeout(() => refresh(true), 2500); }
       else { reply({ reload: true }); setTimeout(() => location.reload(), 50); }
       return false;

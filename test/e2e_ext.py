@@ -28,6 +28,7 @@ CRM = '''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body
 <tr><td>555002</td><td>Jorge Díaz</td><td>Chile</td><td>New</td><td>17/11/2026 10:40</td></tr>
 <tr><td>555003</td><td>Ana Gómez</td><td>Mexico</td><td>No answer</td><td>16/11/2026 18:00</td></tr>
 </tbody></table></body>'''
+TLCRM = re.sub(r'<button class="refresh-btn"[^>]*>.*?</button>', '<button class="ant-btn" onclick="window.__s=(window.__s||0)+1"><span>Search</span></button> <button class="ant-btn" onclick="window.__r=(window.__r||0)+1"><span class="anticon anticon-reload"></span><span>Refresh</span></button>', CRM, count=1)
 T24 = '''<!doctype html><meta charset="utf-8"><title>CRM · Bank transactions</title><body style="font:14px system-ui;padding:20px"><h3>Bank transactions</h3><button class="refresh-btn" onclick="window.__clicks=(window.__clicks||0)+1">⟳</button>
 <table border="1" cellpadding="6"><thead><tr><th>Status</th><th>Time of FTD</th><th>User ID</th><th>Full Name</th><th>Country</th><th>Amount</th><th>Transaction ID</th><th>Sales Rep</th></tr></thead><tbody>
 <tr><td>Approved</td><td>17/11/2026 10:15</td><td>777001</td><td>Carla Núñez</td><td>Peru</td><td>250</td><td>TX777001</td><td>Sofia Arias</td></tr>
@@ -92,6 +93,7 @@ async def main():
             await ctx.route('https://crmtrade24seven.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=T24))
             await ctx.route('https://ant-crm.crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body='<!doctype html><meta charset="utf-8"><title>CRM</title><body><div class="hdr"><div><h2>Fabio Prueba</h2><div>ID 712345</div></div></div><p>Server: Stock</p></body>'))
             await ctx.route('https://crmnovaramarkets.com/novara', lambda r: r.fulfill(status=200, content_type='text/html', body=NOVARA))
+            await ctx.route('https://crmnovaramarkets.com/tl', lambda r: r.fulfill(status=200, content_type='text/html', body=TLCRM))
             await ctx.route('https://crmtrade24seven.com/sinrep', lambda r: r.fulfill(status=200, content_type='text/html', body=T24_SINREP))
             sw = ctx.service_workers[0] if ctx.service_workers else await ctx.wait_for_event('serviceworker')
             ok('chrome-extension://' in sw.url, 'la extensión cargó')
@@ -424,6 +426,15 @@ async def main():
             ws = await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.keys(s.watches||{}).length)")
             ok(ws == 2 and '2 pestañas' in await L1.locator('#ftd-crm-button #wst').inner_text(), f'y quedan las dos actualizándose ({ws})')
             await L1.close(); await L2.close(); await F.wait_for_timeout(800)
+            # el CRM del team leader se actualiza con "Refresh": nunca toca "Search" (el de un agente, sí)
+            TLp = await ctx.new_page(); await TLp.goto('https://crmnovaramarkets.com/tl'); await TLp.wait_for_timeout(2500)
+            send = "chrome.tabs.query({url:'https://crmnovaramarkets.com/tl'}).then(([t])=>chrome.tabs.sendMessage(t.id,{type:'crm-refresh'}))"
+            r1 = await sw.evaluate(send); await TLp.wait_for_timeout(500)
+            ok(r1.get('clicked') == 'Refresh' and await TLp.evaluate('[window.__r||0, window.__s||0]') == [1, 0], f'team leader: toca Refresh, nunca Search ({r1})')
+            await sw.evaluate(asAgent); await TLp.wait_for_timeout(800)
+            r2 = await sw.evaluate(send); await TLp.wait_for_timeout(500)
+            ok(r2.get('clicked') == 'Search' and await TLp.evaluate('[window.__r||0, window.__s||0]') == [1, 1], f'un agente sigue tocando Search ({r2})')
+            await TLp.close()
             await sw.evaluate(f"chrome.storage.local.set({{desk:{json.dumps(desk0)}}})")
 
             # la extensión despierta a Vitalis en segundo plano para ponerse al día
