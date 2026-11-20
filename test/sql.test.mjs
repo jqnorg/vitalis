@@ -857,6 +857,26 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!!q.error || q.rows.length === 0, 'nadie edita el perfil directo (solo por prof_save)');
 }
 
+// ---------- palabra clave de confidencialidad del cliente ----------
+{
+  let q = await as(B, "insert into public.client_keywords (client_id, kw) values ('70390','azul') returning 1");
+  ok(!!q.error, 'nadie escribe directo en client_keywords');
+  let R = await rpc(B, "select public.client_kw_set('70390','Novara Markets','  Montevideo  ') j");
+  ok(!R.error && R.ok && R.kw === 'Montevideo', 'client_kw_set guarda la palabra clave (sin espacios de más)');
+  q = await as(Dh, "select kw from public.client_keywords where client_id='70390'");
+  ok(q.rows.length === 1 && q.rows[0].kw === 'Montevideo', 'la mesa la ve');
+  R = await rpc(B, "select public.client_kw_set('70390','Novara Markets','Colonia') j");
+  q = await as(B, "select count(*)::int n, max(kw) k from public.client_keywords where client_id='70390'");
+  ok(q.rows[0].n === 1 && q.rows[0].k === 'Colonia', 'editar pisa la misma (una por cliente)');
+  R = await rpc(B, "select public.client_kw_set('70390','Novara Markets','') j");
+  q = await as(B, "select count(*)::int n from public.client_keywords where client_id='70390'");
+  ok(!R.error && R.kw === null && q.rows[0].n === 0, 'vacía la borra');
+  await rpc(B, "select public.client_kw_set('70390','Novara Markets','Rocha') j");
+  q = await as(X, 'select * from public.client_keywords');
+  ok(q.rows.length === 0, 'otra mesa no la ve');
+  await db.query("delete from public.client_keywords where client_id='70390'");
+}
+
 // ---------- Vitalis felicita las ventas de hoy ----------
 {
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);

@@ -16,7 +16,7 @@ async function fichaData(id,force){
   const country=r&&r.country||ld&&ld.country||f&&f.country||'',aff=String(r&&r.aff||f&&f.aff||''),camp=r&&r.camp||f&&f.camp||'',pais=paisOf(country);
   if(bk.ok==null)await bkLoad(true);
   const [cs,camps,coms,reqs,prof]=await Promise.all([comboStats(aff,camp,country),aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[],profileOf(id)]);
-  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs,prof};
+  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs,prof,kw:clientKw(id)};
   fichaCache.set(id,{at:Date.now(),d});
   return d;
 }
@@ -45,6 +45,7 @@ function fichaHTML(d){
     <div class="fi-cols"><div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
         ${rw2('Status',r?`${esc(r.status||'—')}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
+        <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
         ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}
         ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
@@ -197,10 +198,26 @@ function fichaWire(root,getD,rerender){
     if(a==='profCopy'){trOpen();if(!d.prof)return;if(await profCopyCrm(d.prof))toast('Copiado en inglés, con el español debajo. Pegalo en el comentario del CRM.');else toast('No pude copiar. Copialo a mano.','warn');return}
     if(a==='comAdd'){const t=root.querySelector('[data-fcom]'),body=t.value.trim();if(!body)return t.focus();b.disabled=true;
       try{await Q(sb.from('client_comments').insert({client_id:String(d.id),brand:d.r&&d.r.brand||DEF_BRAND,body:body.slice(0,1000)}));t.value='';await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}finally{b.disabled=false}return}
+    if(a==='kwEdit')return kwModal(d,rerender);
     if(a==='comDel'){if(!await confirmar('Borrar comentario','¿Borrar este comentario?','borrar',true))return;try{await Q(sb.from('client_comments').delete().eq('id',b.dataset.id));await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}return}
   });
 }
 const closeAllModals=()=>modals.slice().forEach(m=>m.close());
+async function setClientKw(id,brand,kw){
+  const r=await Q(sb.rpc('client_kw_set',{p_client:String(id),p_brand:brand||clientBrand(id),p_kw:kw||''}));
+  const k=norm(id);if(r&&r.kw)ckw[k]={kw:r.kw,brand:brand||clientBrand(id)};else delete ckw[k];
+  return r;
+}
+function kwModal(d,rerender){
+  const cur=d.kw||'';
+  modal({title:`Palabra clave de ${esc(d.name||d.id)}`,
+    body:`<p class="mp">La palabra de confidencialidad que acordaste con el cliente para verificarlo en las próximas llamadas.</p>
+      <label class="fld"><span>Palabra clave</span><input id="kwIn" maxlength="80" value="${esc(cur)}" placeholder="Ej.: montevideo" autocomplete="off"></label><div class="ebox" id="kwErr"></div>`,
+    onOpen:api=>{const i=api.q('#kwIn');i.focus();i.select()},
+    actions:[...(cur?[{l:'Borrar',cls:'danger',fn:async api=>{try{await setClientKw(d.id,d.r&&d.r.brand,'');await rerender(true);toast('Palabra clave borrada.')}catch(e){api.q('#kwErr').textContent=errMsg(e);return false}}}]:[]),
+      {l:'Cancelar'},
+      {l:'Guardar',cls:'pri',fn:async api=>{const v=api.q('#kwIn').value.trim();if(v===cur)return;try{await setClientKw(d.id,d.r&&d.r.brand,v);await rerender(true);toast(v?'Palabra clave guardada.':'Palabra clave borrada.')}catch(e){api.q('#kwErr').textContent=errMsg(e);return false}}}]});
+}
 function campModal(d,camp,edit,rerender){
   const i=(d.camps.find(c=>norm(c.camp)===norm(camp))||{}).info;
   modal({title:`${edit?'Editar':'Agregar'} campaña · ${esc(camp)}`,body:`<p class="mp">Afiliador ${esc(d.aff)}${d.pais?' · '+esc(d.pais):''}.</p>
@@ -338,7 +355,7 @@ V.cliente={
       if(a==='rec'){const h=cuHist.find(x=>x.id===b.dataset.id);return setCurrent(b.dataset.id,h&&h.name||'','lista')}
       if(!curCl)return;
       if(a==='copy'){try{await navigator.clipboard.writeText(curCl.id);toast(`<b>${esc(curCl.id)}</b> copiado.`)}catch(err){toast('No pude copiar.','err')}return}
-      if(a==='ag'){const x=getD();agendarCliente(curCl.id,(x&&x.name)||curCl.name||'')}}); // la palabra clave arranca con el nombre, no con el status
+      if(a==='ag')return agendarCliente(curCl.id);});
   },
   render(o){cuRender(!!o.force)}
 };

@@ -1616,6 +1616,40 @@ end $$;
 revoke all on function public.prof_save(text, text, jsonb) from public, anon;
 grant execute on function public.prof_save(text, text, jsonb) to authenticated;
 
+-- palabra clave de confidencialidad del cliente: la acuerda el agente con el cliente para verificarlo en las próximas llamadas.
+-- Es un dato propio del cliente (uno por cliente), lo ve y edita la mesa. Empieza sin palabra clave; se agrega/edita/borra por client_kw_set.
+create table if not exists public.client_keywords (
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  brand      text not null default 'Novara Markets' check (length(brand) <= 40),
+  client_id  text not null check (length(btrim(client_id)) between 1 and 60),
+  kw         text not null check (length(btrim(kw)) between 1 and 80),
+  set_by     uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (team_id, brand, client_id)
+);
+create index if not exists client_keywords_cl on public.client_keywords (team_id, client_id);
+alter table public.client_keywords enable row level security;
+drop policy if exists client_keywords_read on public.client_keywords;
+create policy client_keywords_read on public.client_keywords for select to authenticated using (team_id = (select public.my_team()));
+grant select on public.client_keywords to authenticated;
+revoke insert, update, delete, truncate on public.client_keywords from authenticated;
+revoke all on public.client_keywords from anon;
+-- agregar / editar / borrar (kw vacía borra) la palabra clave de un cliente
+create or replace function public.client_kw_set(p_client text, p_brand text, p_kw text) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); cid text := btrim(coalesce(p_client, '')); br text := coalesce(nullif(btrim(p_brand), ''), 'Novara Markets'); k text := nullif(btrim(coalesce(p_kw, '')), '');
+begin
+  if t is null then raise exception 'sin mesa'; end if;
+  if cid = '' then raise exception 'sin cliente'; end if;
+  if k is null then delete from public.client_keywords where team_id = t and brand = br and client_id = cid; return json_build_object('ok', true, 'kw', null); end if;
+  k := left(k, 80);
+  insert into public.client_keywords (team_id, brand, client_id, kw, set_by, updated_at) values (t, br, cid, k, auth.uid(), now())
+    on conflict (team_id, brand, client_id) do update set kw = excluded.kw, set_by = auth.uid(), updated_at = now();
+  return json_build_object('ok', true, 'kw', k);
+end $$;
+revoke all on function public.client_kw_set(text, text, text) from public, anon;
+grant execute on function public.client_kw_set(text, text, text) to authenticated;
+
 -- ---------- llamadas: cada toque en Omega, Gizat o Voiso desde la ficha del cliente en el CRM (estimado) ----------
 -- solo agente, cliente, línea y hora (ni teléfonos ni internos). Dos toques a la misma línea y cliente en menos de 30 s cuentan uno.
 alter table public.teams add column if not exists min_calls integer not null default 250; -- llamadas mínimas por día (lo fija team leader/admin)

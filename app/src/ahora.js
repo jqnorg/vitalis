@@ -29,6 +29,16 @@ function leadOwner(l){const r=crmStatusOf(l.id);if(r&&(r.agent||r.firstAgent))re
 const soldIdx=perPass(()=>{const m=new Map();for(const f of [...team].sort(byDate)){const k=ckey(f.brand,f.id);if(!m.has(k))m.set(k,f)}return m}); // la primera venta de cada cliente
 function soldOf(id,brand){const k=norm(id);let best=null;for(const f of team)if(norm(f.id)===k&&(!brand||norm(f.brand)===norm(brand))&&(!best||byDate(f,best)<0))best=f;return best}
 function crmStatusOf(id){let r=crm.rows.get(ckey(DEF_BRAND,id));if(r)return r;return crm.byId.get(norm(id))||null} // por ID, de cualquier marca menos el archivo
+// palabra clave de confidencialidad del cliente (la pone el agente, la ve la mesa): dato propio del cliente
+let ckw={};
+const clientKw=id=>(ckw[norm(id)]||{}).kw||'';
+const clientBrand=id=>{const r=crm.byId.get(norm(id));return r&&r.brand||DEF_BRAND};
+let kwAt=0,kwBusy=null;
+async function kwLoad(force){
+  if(!ready||!sb||kwBusy||(!force&&Date.now()-kwAt<20e3))return;
+  kwBusy=(async()=>{try{const rows=await Q(sb.from('client_keywords').select('client_id,brand,kw'));const m={};for(const r of rows)m[norm(r.client_id)]={kw:r.kw,brand:r.brand};ckw=m;kwAt=Date.now()}catch(e){}finally{kwBusy=null}})();
+  return kwBusy;
+}
 const isDnc=id=>{const r=crmStatusOf(id);return !!(r&&r.grp==='dnc')};
 // horas desde el registro hasta el depósito (dato: a la empresa le importa new o late, pero se muestra)
 function regHrs(f){const r=String(f.reg||'');if(r.length<16||!/^\d{1,2}:\d{2}/.test(f.time||''))return null;
@@ -48,6 +58,7 @@ async function crmLoad(force){
   if(!ready||!sb)return;
   if(crm.busy)return crm.busy;
   if(!force&&Date.now()-crm.at<20e3)return;
+  kwLoad(force);
   crm.busy=(async()=>{
     try{
       const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromTs=parseYMD(from).toISOString();
@@ -148,7 +159,7 @@ V.ahora={
       const b=e.target.closest('[data-ah]');if(!b)return;
       const a=b.dataset.ah,id=b.dataset.id;
       if(a==='ficha')return openFicha(id);
-      if(a==='ag')return agendarCliente(id,b.dataset.nm||'');
+      if(a==='ag')return agendarCliente(id);
       if(a==='low'){ahLow=!ahLow;this.render({});return}
       if(a==='rep'){ahRep=!ahRep;this.render({});return}
       if(a==='fail'){ahFail=!ahFail;this.render({});return}

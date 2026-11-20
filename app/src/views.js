@@ -704,7 +704,7 @@ V.clientes={
     cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
       if(b.dataset.cl==='ficha')return openFicha(l.id);
-      if(b.dataset.cl==='ag')return agendarCliente(l.id,l.name);
+      if(b.dataset.cl==='ag')return agendarCliente(l.id);
       if(b.dataset.cl==='del'){if(!await confirmar('Borrar cliente',`¿Sacar a <b>${esc(l.id)}</b> ${esc(l.name)} del registro?`,'Borrar',true))return;if(await B.delLead(l))toast('Cliente borrado del registro.')}});
   },
   render(){

@@ -1595,7 +1595,7 @@ body.dark #nav button.nv-cli.on{color:#fff}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.4';
+const VERSION='1.23.5';
 const EXT_VER='1.9.4'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -2801,7 +2801,7 @@ function agFields(p){
   const d=p?p.due.slice(0,10):addDays(todayS(),1),t=p?p.due.slice(11,16):cfg.hora;
   return `<div class="frow">
     <label class="fld" style="flex:1 1 120px"><span>ID</span><input name="pid" value="${esc(p?p.id:'')}"></label>
-    <label class="fld" style="flex:3 1 200px"><span>Palabra clave</span><input name="kw" value="${esc(p?p.kw:'')}"></label>
+    <label class="fld" style="flex:3 1 200px"><span>Palabra clave <small class="dim">(del cliente)</small></span><input name="kw" value="${esc(p?p.kw:'')}" placeholder="la que acordaste con el cliente"></label>
     <label class="fld" style="flex:0 1 150px"><span>Fecha</span><input type="date" name="pdate" value="${d}"></label>
     <label class="fld" style="flex:0 1 104px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label>
     ${p?'':'<button type="submit" class="btn pri">Agendar</button>'}</div>
@@ -2818,8 +2818,7 @@ function readAg(root){
   const g=n=>root.querySelector(`[name=${n}]`).value.trim();
   const id=g('pid'),kw=g('kw'),d=g('pdate'),t=g('ptime')||cfg.hora;
   if(!id)return {err:'Falta el ID.',k:'pid'};
-  if(!kw)return {err:'Falta la palabra clave.',k:'kw'};
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return {err:'Fecha inválida.',k:'pdate'};
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return {err:'Fecha inválida.',k:'pdate'}; // la palabra clave es opcional (es un dato del cliente)
   const due=`${d}T${t}`;
   return {id,kw,due};
 }
@@ -2835,8 +2834,9 @@ function bindAgForm(form){
     if(await dncBlock(R.id))return;
     const n=pend.reduce((a,p)=>Math.max(a,p.n||0),0)+1;
     if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false,created:new Date().toISOString()}))return;
+    syncAgKw(R.id,R.kw);
     const dd=parseDue(R.due);
-    toast(`✔ Agendado #${n} · <b>${esc(R.id)}</b> · ${esc(R.kw)} · ${esc(whenTxt(dd))} <span class="dim">(${esc(rel(dd))})</span>`);
+    toast(`✔ Agendado #${n} · <b>${esc(R.id)}</b>${R.kw?' · '+esc(R.kw):''} · ${esc(whenTxt(dd))} <span class="dim">(${esc(rel(dd))})</span>`);
     form.querySelector('[name=pid]').value='';form.querySelector('[name=kw]').value='';
     form.querySelector('[name=pdate]').value=addDays(todayS(),1);form.querySelector('[name=ptime]').value=cfg.hora;F.mark();
     form.querySelector('[name=pid]').focus();primeAudio();check();
@@ -2870,7 +2870,7 @@ function pendEdit(p){
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
-      if(!await B.updPend(p,ch))return false;clearAlert(p);toast(`✔ #${p.n} actualizado`);
+      if(!await B.updPend(p,ch))return false;syncAgKw(R.id,R.kw);clearAlert(p);toast(`✔ #${p.n} actualizado`);
     }}],onOpen:api=>bindAgFields(api.box)});
 }
 async function pendDel(p){
@@ -3178,15 +3178,18 @@ async function addLeadsFromExt(rows){
   if(n)toast(`${n===1?'Nuevo cliente':n+' clientes nuevos'} en el registro: ${list.slice(0,4).map(l=>`<b>${esc(l.id.startsWith('n:')?l.name:l.id)}</b>`).join(', ')}${list.length>4?'…':''}`,'imp',{key:'leads'});
   return {added:n,keys};
 }
+// al agendar, si pusiste una palabra clave distinta a la del cliente, se guarda como palabra clave del cliente (vacía no la borra)
+async function syncAgKw(id,kw){kw=(kw||'').trim();if(kw&&kw!==clientKw(id)){try{await setClientKw(id,clientBrand(id),kw)}catch(e){}}}
 function agendarModal(id,kw){
   if(!noRO())return;
-  const p={id,kw:kw||'',due:`${addDays(todayS(),1)}T${cfg.hora}`};
+  const p={id,kw:kw!=null?kw:clientKw(id),due:`${addDays(todayS(),1)}T${cfg.hora}`}; // arranca con la palabra clave del cliente
   modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
     actions:[{l:'Cancelar'},{l:'Agendar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       if(parseDue(R.due)<new Date(Date.now()-6e4)){api.q('#pErr').textContent='Esa fecha y hora ya pasó.';return false}
       const n=pend.reduce((a,x)=>Math.max(a,x.n||0),0)+1;
       if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false}))return false;
+      syncAgKw(R.id,R.kw);
       toast(`Agendado <b>${esc(R.id)}</b> para ${esc(whenTxt(parseDue(R.due)))}.`);check();
     }}],onOpen:api=>bindAgFields(api.box)});
 }
@@ -4070,7 +4073,7 @@ V.clientes={
     cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
       if(b.dataset.cl==='ficha')return openFicha(l.id);
-      if(b.dataset.cl==='ag')return agendarCliente(l.id,l.name);
+      if(b.dataset.cl==='ag')return agendarCliente(l.id);
       if(b.dataset.cl==='del'){if(!await confirmar('Borrar cliente',`¿Sacar a <b>${esc(l.id)}</b> ${esc(l.name)} del registro?`,'Borrar',true))return;if(await B.delLead(l))toast('Cliente borrado del registro.')}});
   },
   render(){
@@ -5514,6 +5517,16 @@ function leadOwner(l){const r=crmStatusOf(l.id);if(r&&(r.agent||r.firstAgent))re
 const soldIdx=perPass(()=>{const m=new Map();for(const f of [...team].sort(byDate)){const k=ckey(f.brand,f.id);if(!m.has(k))m.set(k,f)}return m}); // la primera venta de cada cliente
 function soldOf(id,brand){const k=norm(id);let best=null;for(const f of team)if(norm(f.id)===k&&(!brand||norm(f.brand)===norm(brand))&&(!best||byDate(f,best)<0))best=f;return best}
 function crmStatusOf(id){let r=crm.rows.get(ckey(DEF_BRAND,id));if(r)return r;return crm.byId.get(norm(id))||null} // por ID, de cualquier marca menos el archivo
+// palabra clave de confidencialidad del cliente (la pone el agente, la ve la mesa): dato propio del cliente
+let ckw={};
+const clientKw=id=>(ckw[norm(id)]||{}).kw||'';
+const clientBrand=id=>{const r=crm.byId.get(norm(id));return r&&r.brand||DEF_BRAND};
+let kwAt=0,kwBusy=null;
+async function kwLoad(force){
+  if(!ready||!sb||kwBusy||(!force&&Date.now()-kwAt<20e3))return;
+  kwBusy=(async()=>{try{const rows=await Q(sb.from('client_keywords').select('client_id,brand,kw'));const m={};for(const r of rows)m[norm(r.client_id)]={kw:r.kw,brand:r.brand};ckw=m;kwAt=Date.now()}catch(e){}finally{kwBusy=null}})();
+  return kwBusy;
+}
 const isDnc=id=>{const r=crmStatusOf(id);return !!(r&&r.grp==='dnc')};
 // horas desde el registro hasta el depósito (dato: a la empresa le importa new o late, pero se muestra)
 function regHrs(f){const r=String(f.reg||'');if(r.length<16||!/^\d{1,2}:\d{2}/.test(f.time||''))return null;
@@ -5533,6 +5546,7 @@ async function crmLoad(force){
   if(!ready||!sb)return;
   if(crm.busy)return crm.busy;
   if(!force&&Date.now()-crm.at<20e3)return;
+  kwLoad(force);
   crm.busy=(async()=>{
     try{
       const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromTs=parseYMD(from).toISOString();
@@ -5633,7 +5647,7 @@ V.ahora={
       const b=e.target.closest('[data-ah]');if(!b)return;
       const a=b.dataset.ah,id=b.dataset.id;
       if(a==='ficha')return openFicha(id);
-      if(a==='ag')return agendarCliente(id,b.dataset.nm||'');
+      if(a==='ag')return agendarCliente(id);
       if(a==='low'){ahLow=!ahLow;this.render({});return}
       if(a==='rep'){ahRep=!ahRep;this.render({});return}
       if(a==='fail'){ahFail=!ahFail;this.render({});return}
@@ -6128,7 +6142,7 @@ async function fichaData(id,force){
   const country=r&&r.country||ld&&ld.country||f&&f.country||'',aff=String(r&&r.aff||f&&f.aff||''),camp=r&&r.camp||f&&f.camp||'',pais=paisOf(country);
   if(bk.ok==null)await bkLoad(true);
   const [cs,camps,coms,reqs,prof]=await Promise.all([comboStats(aff,camp,country),aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[],profileOf(id)]);
-  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs,prof};
+  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs,prof,kw:clientKw(id)};
   fichaCache.set(id,{at:Date.now(),d});
   return d;
 }
@@ -6157,6 +6171,7 @@ function fichaHTML(d){
     <div class="fi-cols"><div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
         ${rw2('Status',r?`${esc(r.status||'—')}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
+        <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
         ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}
         ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
@@ -6309,10 +6324,26 @@ function fichaWire(root,getD,rerender){
     if(a==='profCopy'){trOpen();if(!d.prof)return;if(await profCopyCrm(d.prof))toast('Copiado en inglés, con el español debajo. Pegalo en el comentario del CRM.');else toast('No pude copiar. Copialo a mano.','warn');return}
     if(a==='comAdd'){const t=root.querySelector('[data-fcom]'),body=t.value.trim();if(!body)return t.focus();b.disabled=true;
       try{await Q(sb.from('client_comments').insert({client_id:String(d.id),brand:d.r&&d.r.brand||DEF_BRAND,body:body.slice(0,1000)}));t.value='';await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}finally{b.disabled=false}return}
+    if(a==='kwEdit')return kwModal(d,rerender);
     if(a==='comDel'){if(!await confirmar('Borrar comentario','¿Borrar este comentario?','borrar',true))return;try{await Q(sb.from('client_comments').delete().eq('id',b.dataset.id));await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}return}
   });
 }
 const closeAllModals=()=>modals.slice().forEach(m=>m.close());
+async function setClientKw(id,brand,kw){
+  const r=await Q(sb.rpc('client_kw_set',{p_client:String(id),p_brand:brand||clientBrand(id),p_kw:kw||''}));
+  const k=norm(id);if(r&&r.kw)ckw[k]={kw:r.kw,brand:brand||clientBrand(id)};else delete ckw[k];
+  return r;
+}
+function kwModal(d,rerender){
+  const cur=d.kw||'';
+  modal({title:`Palabra clave de ${esc(d.name||d.id)}`,
+    body:`<p class="mp">La palabra de confidencialidad que acordaste con el cliente para verificarlo en las próximas llamadas.</p>
+      <label class="fld"><span>Palabra clave</span><input id="kwIn" maxlength="80" value="${esc(cur)}" placeholder="Ej.: montevideo" autocomplete="off"></label><div class="ebox" id="kwErr"></div>`,
+    onOpen:api=>{const i=api.q('#kwIn');i.focus();i.select()},
+    actions:[...(cur?[{l:'Borrar',cls:'danger',fn:async api=>{try{await setClientKw(d.id,d.r&&d.r.brand,'');await rerender(true);toast('Palabra clave borrada.')}catch(e){api.q('#kwErr').textContent=errMsg(e);return false}}}]:[]),
+      {l:'Cancelar'},
+      {l:'Guardar',cls:'pri',fn:async api=>{const v=api.q('#kwIn').value.trim();if(v===cur)return;try{await setClientKw(d.id,d.r&&d.r.brand,v);await rerender(true);toast(v?'Palabra clave guardada.':'Palabra clave borrada.')}catch(e){api.q('#kwErr').textContent=errMsg(e);return false}}}]});
+}
 function campModal(d,camp,edit,rerender){
   const i=(d.camps.find(c=>norm(c.camp)===norm(camp))||{}).info;
   modal({title:`${edit?'Editar':'Agregar'} campaña · ${esc(camp)}`,body:`<p class="mp">Afiliador ${esc(d.aff)}${d.pais?' · '+esc(d.pais):''}.</p>
@@ -6450,7 +6481,7 @@ V.cliente={
       if(a==='rec'){const h=cuHist.find(x=>x.id===b.dataset.id);return setCurrent(b.dataset.id,h&&h.name||'','lista')}
       if(!curCl)return;
       if(a==='copy'){try{await navigator.clipboard.writeText(curCl.id);toast(`<b>${esc(curCl.id)}</b> copiado.`)}catch(err){toast('No pude copiar.','err')}return}
-      if(a==='ag'){const x=getD();agendarCliente(curCl.id,(x&&x.name)||curCl.name||'')}}); // la palabra clave arranca con el nombre, no con el status
+      if(a==='ag')return agendarCliente(curCl.id);});
   },
   render(o){cuRender(!!o.force)}
 };

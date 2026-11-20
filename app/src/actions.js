@@ -181,7 +181,7 @@ function agFields(p){
   const d=p?p.due.slice(0,10):addDays(todayS(),1),t=p?p.due.slice(11,16):cfg.hora;
   return `<div class="frow">
     <label class="fld" style="flex:1 1 120px"><span>ID</span><input name="pid" value="${esc(p?p.id:'')}"></label>
-    <label class="fld" style="flex:3 1 200px"><span>Palabra clave</span><input name="kw" value="${esc(p?p.kw:'')}"></label>
+    <label class="fld" style="flex:3 1 200px"><span>Palabra clave <small class="dim">(del cliente)</small></span><input name="kw" value="${esc(p?p.kw:'')}" placeholder="la que acordaste con el cliente"></label>
     <label class="fld" style="flex:0 1 150px"><span>Fecha</span><input type="date" name="pdate" value="${d}"></label>
     <label class="fld" style="flex:0 1 104px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label>
     ${p?'':'<button type="submit" class="btn pri">Agendar</button>'}</div>
@@ -198,8 +198,7 @@ function readAg(root){
   const g=n=>root.querySelector(`[name=${n}]`).value.trim();
   const id=g('pid'),kw=g('kw'),d=g('pdate'),t=g('ptime')||cfg.hora;
   if(!id)return {err:'Falta el ID.',k:'pid'};
-  if(!kw)return {err:'Falta la palabra clave.',k:'kw'};
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return {err:'Fecha inválida.',k:'pdate'};
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return {err:'Fecha inválida.',k:'pdate'}; // la palabra clave es opcional (es un dato del cliente)
   const due=`${d}T${t}`;
   return {id,kw,due};
 }
@@ -215,8 +214,9 @@ function bindAgForm(form){
     if(await dncBlock(R.id))return;
     const n=pend.reduce((a,p)=>Math.max(a,p.n||0),0)+1;
     if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false,created:new Date().toISOString()}))return;
+    syncAgKw(R.id,R.kw);
     const dd=parseDue(R.due);
-    toast(`✔ Agendado #${n} · <b>${esc(R.id)}</b> · ${esc(R.kw)} · ${esc(whenTxt(dd))} <span class="dim">(${esc(rel(dd))})</span>`);
+    toast(`✔ Agendado #${n} · <b>${esc(R.id)}</b>${R.kw?' · '+esc(R.kw):''} · ${esc(whenTxt(dd))} <span class="dim">(${esc(rel(dd))})</span>`);
     form.querySelector('[name=pid]').value='';form.querySelector('[name=kw]').value='';
     form.querySelector('[name=pdate]').value=addDays(todayS(),1);form.querySelector('[name=ptime]').value=cfg.hora;F.mark();
     form.querySelector('[name=pid]').focus();primeAudio();check();
@@ -250,7 +250,7 @@ function pendEdit(p){
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
-      if(!await B.updPend(p,ch))return false;clearAlert(p);toast(`✔ #${p.n} actualizado`);
+      if(!await B.updPend(p,ch))return false;syncAgKw(R.id,R.kw);clearAlert(p);toast(`✔ #${p.n} actualizado`);
     }}],onOpen:api=>bindAgFields(api.box)});
 }
 async function pendDel(p){
@@ -558,15 +558,18 @@ async function addLeadsFromExt(rows){
   if(n)toast(`${n===1?'Nuevo cliente':n+' clientes nuevos'} en el registro: ${list.slice(0,4).map(l=>`<b>${esc(l.id.startsWith('n:')?l.name:l.id)}</b>`).join(', ')}${list.length>4?'…':''}`,'imp',{key:'leads'});
   return {added:n,keys};
 }
+// al agendar, si pusiste una palabra clave distinta a la del cliente, se guarda como palabra clave del cliente (vacía no la borra)
+async function syncAgKw(id,kw){kw=(kw||'').trim();if(kw&&kw!==clientKw(id)){try{await setClientKw(id,clientBrand(id),kw)}catch(e){}}}
 function agendarModal(id,kw){
   if(!noRO())return;
-  const p={id,kw:kw||'',due:`${addDays(todayS(),1)}T${cfg.hora}`};
+  const p={id,kw:kw!=null?kw:clientKw(id),due:`${addDays(todayS(),1)}T${cfg.hora}`}; // arranca con la palabra clave del cliente
   modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
     actions:[{l:'Cancelar'},{l:'Agendar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       if(parseDue(R.due)<new Date(Date.now()-6e4)){api.q('#pErr').textContent='Esa fecha y hora ya pasó.';return false}
       const n=pend.reduce((a,x)=>Math.max(a,x.n||0),0)+1;
       if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false}))return false;
+      syncAgKw(R.id,R.kw);
       toast(`Agendado <b>${esc(R.id)}</b> para ${esc(whenTxt(parseDue(R.due)))}.`);check();
     }}],onOpen:api=>bindAgFields(api.box)});
 }
