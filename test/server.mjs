@@ -17,6 +17,7 @@ await db.exec(fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url
 await db.exec(`update public.teams set invite_code = 'MATIAS-TEST'`);
 const PK = { settings: ['user_id'], adjustments: ['user_id', 'ym'], shifts: ['user_id', 'date'], sales: ['id'], agenda: ['id'], profiles: ['id'], teams: ['id'], snippets: ['id'], leads: ['id'], pings: ['id'], chats: ['id'], chat_members: ['chat_id', 'user_id'], messages: ['id'], chat_reads: ['user_id', 'chat_id'], tasks: ['id'], task_people: ['task_id', 'user_id'], targets: ['team_id', 'ym'], chat_files: ['id'], avatars: ['user_id'], message_reactions: ['message_id', 'user_id', 'emoji'], user_targets: ['user_id', 'ym'], crm_clients: ['team_id', 'brand', 'client_id'], crm_status_log: ['id'], crm_agent_log: ['id'], crm_status_map: ['team_id', 'status_key'], audit_log: ['id'], pay_methods: ['id'], processors: ['id'], processor_methods: ['processor_id', 'method_id'], banks: ['id'], pay_incidents: ['id'], pay_files: ['id'], campaign_info: ['team_id', 'aff', 'camp', 'country'], campaign_requests: ['id'], client_comments: ['id'], calls: ['id'], client_profiles: ['team_id', 'brand', 'client_id'] };
 const TABLES = new Set(Object.keys(PK));
+let DOLAR = { compra: 39.4, venta: 41.8, ebrou: { compra: 39.9, venta: 41.3 } };
 
 // ---------- auth ----------
 const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -134,6 +135,9 @@ const srv = http.createServer(async (req, res) => {
   const body = raw ? JSON.parse(raw) : null;
   try {
     if (u.pathname === '/__sql' && req.method === 'POST') { if (!body.params || !body.params.length) { const r = await db.exec(body.sql); return send(res, 200, r[r.length - 1].rows); } const r = await db.query(body.sql, body.params); return send(res, 200, r.rows); } // solo para pruebas
+    // la función dolar-brou de Supabase (el dólar BROU de pizarra): acá, un valor fijo. POST /__dolar con {compra} lo cambia; con {} responde 502
+    if (u.pathname === '/__dolar') { DOLAR = body && body.compra ? body : null; return send(res, 200, { ok: true }); }
+    if (u.pathname === '/functions/v1/dolar-brou') return DOLAR ? send(res, 200, { ...DOLAR, fuente: 'BROU · pizarra', at: new Date().toISOString() }) : send(res, 502, { error: 'sin cotización' });
     if (u.pathname.startsWith('/rest/v1/rpc/')) return rpc(req, res, u.pathname.slice(13), body);
     if (u.pathname.startsWith('/rest/v1/')) return rest(req, res, u.pathname.slice(9), body);
     if (u.pathname === '/auth/v1/signup') {

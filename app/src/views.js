@@ -386,7 +386,7 @@ V.sueldo={
     const n=parseAmount($('#suTc').value);
     if(isNaN(n)||n<10||n>200){$('#suTc').classList.add('bad');return toast('Cotización inválida.','err')}
     $('#suTc').classList.remove('bad');
-    cfg={...cfg,tc:n,tcFecha:todayS()};
+    cfg={...cfg,tc:n,tcFecha:todayS(),tcAuto:false};
     if(await B.saveCfg()){const P=sueldoPesos(calc(ymNow()));toast(`✔ Dólar BROU compra ${nf(n,2)}${P&&P.total!=null?' · líquido de '+esc(MES[new Date().getMonth()])+' ≈ '+sp('ok b',pesos(P.total)):''}`)}
   },
   render(){
@@ -842,7 +842,7 @@ function onReady(){
   $('#navEquipo').hidden=!isLeader();
   let h='';try{h=location.hash.slice(1)}catch(e){}
   go(VIEWS.includes(h)?h:'inicio');
-  status();check();setInterval(check,15000);setInterval(tick,1000);turnoBar(true);
+  status();check();setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Cargá tu primera venta con <b>Venta</b> o importá tu historial en Ajustes.`,'ok',{ms:12000});
 }

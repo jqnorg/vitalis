@@ -319,7 +319,7 @@ async function catchUp(force){
   if(!ready||!sb)return;
   if(catching)return catching;
   if(!force&&Date.now()-lastCatch<4e3)return;
-  lastCatch=Date.now();
+  lastCatch=Date.now();tcAuto();
   catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll(),callsFetch().then(x=>{if(x){const n=calls.length;callsApply(x);if(calls.length!==n)refresh()}})]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
@@ -525,8 +525,24 @@ function faltaErr(d){ // por qué no se puede cargar una falta ese día (o null)
   return null;
 }
 const parseNum=v=>{v=String(v||'').trim().replace(/\s|\$|usd|uyu/gi,'');if(v.includes(','))v=v.replace(/\./g,'').replace(',','.');else if(/^\d{1,3}(\.\d{3})+$/.test(v))v=v.replace(/\./g,'');const n=Number(v);return isFinite(n)?n:NaN};
-const tcTxt=()=>cfg.tc>0?`BROU compra ${nf(cfg.tc,2)}${cfg.tcFecha?' del '+dm(cfg.tcFecha):''}`:'sin cargar';
+const tcTxt=()=>cfg.tc>0?`BROU compra ${nf(cfg.tc,2)}${cfg.tcFecha?(cfg.tcFecha===todayS()?' de hoy':' del '+dm(cfg.tcFecha)):''}${cfg.tcAuto?' (automático)':''}`:'sin cargar';
 const tcViejo=()=>cfg.tc>0&&cfg.tcFecha&&(parseYMD(todayS())-parseYMD(cfg.tcFecha))/864e5>=3;
+// el dólar BROU (pizarra, compra) se trae solo una vez por día: la función dolar-brou de Supabase lo lee de brou.com.uy.
+// Si lo cargás a mano, se respeta hasta el día siguiente. Si no se puede traer, queda el último (nunca otro número).
+let tcBusy=false,tcTried='';
+async function tcAuto(){
+  const te=todayS();
+  if(tcBusy||!ready||!sb||!me||readOnly||tcTried===te||(cfg.tc>0&&cfg.tcFecha===te))return;
+  tcBusy=true;tcTried=te;
+  try{
+    const c=window.VITALIS_CONFIG||{},s=(await sb.auth.getSession()).data.session;if(!s||!c.url)return;
+    const r=await fetch(c.url.replace(/\/$/,'')+'/functions/v1/dolar-brou',{headers:{Authorization:'Bearer '+s.access_token,apikey:c.key},signal:AbortSignal.timeout(9000)});
+    if(!r.ok)return;
+    const n=Math.round(+(await r.json()).compra*100)/100;
+    if(!(n>=15&&n<=150)||(cfg.tc>0&&cfg.tcFecha===te))return; // lo cargó a mano mientras tanto
+    cfg={...cfg,tc:n,tcFecha:te,tcAuto:true};await B.saveCfg();
+  }catch(e){}finally{tcBusy=false}
+}
 const progressTxt=s=>s.next?`faltan ${s.next[0]-s.n} para ${s.next[1]} USD`:(s.n?'bono máximo 🔥':'');
 
 /* ---------- ventas ---------- */
