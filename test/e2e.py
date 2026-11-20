@@ -183,11 +183,9 @@ async def main():
             await D.screenshot(path=OUT / 'e1_oscuro_inicio.png')
             # el team leader carga una venta a nombre de Sofía
             await D.keyboard.press('n'); await D.wait_for_timeout(400)
-            ok(await D.is_visible('.mbox [name=uid]'), 'el team leader elige el vendedor en Nueva venta')
+            ok(not await D.is_visible('.mbox') and await D.locator('[data-act=nueva]').count() == 0, 'ya no se cargan ventas a mano: ni botón Venta ni tecla N (entran desde el CRM con la extensión)')
             sofia = sql("select id from public.profiles where name='Sofía Ar'")[0]['id']
-            await D.select_option('.mbox [name=uid]', sofia)
-            await D.fill('.mbox [name=id]', '88001'); await D.fill('.mbox [name=name]', 'Cliente de Sofía'); await D.fill('.mbox [name=amount]', '150'); await D.fill('.mbox [name=brand]', 'Trade24Seven'); await D.fill('.mbox [name=tx]', 'T88001')
-            await D.click('.mbox .mf .pri'); await D.wait_for_timeout(1200)
+            await D.evaluate(f"importFromExt([{{date:todayS(),time:'10:00',id:'88001',name:'Cliente de Sofía',amount:150,tx:'T88001',brand:'Trade24Seven',reg:todayS(),uid:'{sofia}'}}])"); await D.wait_for_timeout(1200)
             r = sql("select (select name from public.profiles where id=user_id) who, brand, n from public.sales where client_id='88001'")
             ok(len(r) == 1 and r[0]['who'] == 'Sofía Ar' and r[0]['brand'] == 'Trade24Seven' and r[0]['n'] == sql("select count(*)::int c from public.sales where user_id=(select id from public.profiles where name='Sofía Ar')")[0]['c'], f'la venta queda a nombre de Sofía, con su número ({r})')
             # CSV del team leader con columna de agente

@@ -845,7 +845,7 @@ function onReady(){
   go(VIEWS.includes(h)?h:'inicio');
   status();check();setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   addEventListener('online',status);addEventListener('offline',status);
-  if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Cargá tu primera venta con <b>Venta</b> o importá tu historial en Ajustes.`,'ok',{ms:12000});
+  if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
 }
 function boot(){
   applyTheme(local.get('tema','auto'));
