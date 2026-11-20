@@ -1595,7 +1595,7 @@ body.dark #nav button.nv-cli.on{color:#fff}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.1';
+const VERSION='1.23.2';
 const EXT_VER='1.9.4'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1731,7 +1731,19 @@ function errMsg(e){
   return m||'error desconocido';
 }
 function dbErr(e){toast('No se pudo guardar: '+esc(errMsg(e)),'err');refresh()}
-async function Q(p){const r=await p;if(r.error)throw r.error;return r.data}
+// Freno a la API: si la base empieza a dar errores de sobrecarga (5xx, timeout, sin red), el sondeo se espacia solo
+// (cada vez más, con un toque al azar para que los 13 no caigan juntos) y vuelve a la normalidad apenas responde bien.
+// Un rechazo normal (RLS, duplicado, lógica) NO cuenta como caída: eso no frena nada.
+let apiFail=0,apiCoolUntil=0;
+function apiDown(e){
+  const code=String(e&&e.code||'');if(/^(PGRST|22|23|42|P0|40001)/.test(code))return false; // rechazos normales
+  const st=+(e&&(e.status||e.statusCode))||0;if(st>=400&&st<500)return false;
+  const s=String(e&&(e.message||e)||'').toLowerCase();
+  return st>=500||/failed to fetch|network|load failed|timeout|timed out|fetch failed|gateway|unavailable|aborted|too many|rate ?limit|50[0234]/.test(s);
+}
+function apiBad(){apiFail=Math.min(apiFail+1,8);const base=Math.min(90e3,1500*2**apiFail);apiCoolUntil=Date.now()+Math.round(base*(0.7+Math.random()*0.6))}
+const apiCooling=()=>Date.now()<apiCoolUntil;
+async function Q(p){try{const r=await p;if(r.error)throw r.error;apiFail=0;apiCoolUntil=0;return r.data}catch(e){if(apiDown(e))apiBad();throw e}}
 async function QO(p){try{return await Q(p)}catch(e){return []}} // opcional: si la tabla todavía no está en la base, sigo sin eso
 async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, pero distingo "no está" (null) de "vacío"
 
@@ -1915,7 +1927,7 @@ let rtOk=false,rtGen=0,rtWd=null,rtEver=false,lastCatch=0,catching=null;
 async function catchUp(force){
   if(!ready||!sb)return;
   if(catching)return catching;
-  if(!force&&Date.now()-lastCatch<4e3)return;
+  if(!force&&(Date.now()-lastCatch<4e3||apiCooling()))return; // la API está mal: espero a que afloje el freno
   lastCatch=Date.now();tcAuto();
   catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll(),callsFetch().then(x=>{if(x){const n=calls.length;callsApply(x);if(calls.length!==n)refresh()}})]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
@@ -1924,7 +1936,7 @@ async function catchUp(force){
 // Sin tiempo real: cada 5 s con la pestaña a la vista, cada minuto escondida. Los clientes del CRM no van en tiempo real: cada 45 s a la vista.
 let hidAt=0;
 const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:5e3):Date.now()-lastCatch>5*6e4;
-setInterval(()=>{if(!ready)return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad()},5e3);
+setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad()},5e3);
 addEventListener('online',()=>catchUp(true));
 addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
@@ -2021,7 +2033,7 @@ async function connect(cached){
     catch(e){
       const m=String(e&&e.message||e);
       if(m==='INACTIVE'||m==='NO_PROFILE'){snapClear();if(cached){ready=false;document.body.classList.add('auth')}return authScreen(m==='INACTIVE'?'inactive':'noprofile')}
-      if(!cached)return authScreen('error',errMsg(e));
+      if(!cached){if(apiDown(e)&&i<5){await new Promise(r=>setTimeout(r,Math.round(Math.min(15e3,1500*2**i)*(0.7+Math.random()*0.6))));continue}return authScreen('error',errMsg(e))} // la API está sobrecargada: reintento con freno antes de rendirme
       if(i===0)toast('Sin conexión: ves lo último que cargó esta computadora. Sigo intentando.','warn',{key:'boot',sticky:true});
       await new Promise(r=>setTimeout(r,Math.min(30e3,3e3*(i+1)))); // con lo guardado a la vista, reintento solo
     }
