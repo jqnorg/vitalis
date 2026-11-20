@@ -822,133 +822,133 @@ alter table public.message_reactions enable row level security;
 alter table public.user_targets enable row level security;
 
 drop policy if exists team_read on public.teams;
-create policy team_read on public.teams for select to authenticated using (id = public.my_team());
+create policy team_read on public.teams for select to authenticated using (id = (select public.my_team()));
 drop policy if exists team_admin on public.teams;
-create policy team_admin on public.teams for update to authenticated using (id = public.my_team() and public.my_role() = 'admin');
+create policy team_admin on public.teams for update to authenticated using (id = (select public.my_team()) and (select public.my_role()) = 'admin');
 
 drop policy if exists prof_read on public.profiles;
-create policy prof_read on public.profiles for select to authenticated using (id = auth.uid() or team_id = public.my_team());
+create policy prof_read on public.profiles for select to authenticated using (id = (select auth.uid()) or team_id = (select public.my_team()));
 drop policy if exists prof_update on public.profiles;
 create policy prof_update on public.profiles for update to authenticated
-  using (id = auth.uid() or (team_id = public.my_team() and public.my_role() = 'admin'));
+  using (id = (select auth.uid()) or (team_id = (select public.my_team()) and (select public.my_role()) = 'admin'));
 
 drop policy if exists sales_read on public.sales;
-create policy sales_read on public.sales for select to authenticated using (team_id = public.my_team());
+create policy sales_read on public.sales for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists sales_insert on public.sales;
-create policy sales_insert on public.sales for insert to authenticated with check (team_id = public.my_team()
-  and (user_id = auth.uid() or (public.my_role() in ('admin','leader') and public.in_my_team(user_id)))); -- el team leader carga para la mesa
+create policy sales_insert on public.sales for insert to authenticated with check (team_id = (select public.my_team())
+  and (user_id = (select auth.uid()) or ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id)))); -- el team leader carga para la mesa
 drop policy if exists sales_update on public.sales;
 create policy sales_update on public.sales for update to authenticated
-  using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')))
-  with check (team_id = public.my_team() and (user_id = auth.uid() or (public.my_role() in ('admin','leader') and public.in_my_team(user_id))));
+  using (team_id = (select public.my_team()) and (user_id = (select auth.uid()) or (select public.my_role()) in ('admin','leader')))
+  with check (team_id = (select public.my_team()) and (user_id = (select auth.uid()) or ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id))));
 drop policy if exists sales_delete on public.sales;
 create policy sales_delete on public.sales for delete to authenticated
-  using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')));
+  using (team_id = (select public.my_team()) and (user_id = (select auth.uid()) or (select public.my_role()) in ('admin','leader')));
 
 drop policy if exists own_settings on public.settings;
-create policy own_settings on public.settings for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy own_settings on public.settings for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 drop policy if exists own_adjustments on public.adjustments;
-create policy own_adjustments on public.adjustments for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy own_adjustments on public.adjustments for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 drop policy if exists own_agenda on public.agenda;
-create policy own_agenda on public.agenda for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy own_agenda on public.agenda for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 drop policy if exists own_shifts on public.shifts;
-create policy own_shifts on public.shifts for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy own_shifts on public.shifts for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 -- el team leader (y el admin) ven la agenda, los turnos y los "sin detalle" de toda la mesa (solo leer; el sueldo no)
 drop policy if exists lead_agenda on public.agenda;
-create policy lead_agenda on public.agenda for select to authenticated using (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+create policy lead_agenda on public.agenda for select to authenticated using ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id));
 drop policy if exists lead_shifts on public.shifts;
-create policy lead_shifts on public.shifts for select to authenticated using (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+create policy lead_shifts on public.shifts for select to authenticated using ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id));
 drop policy if exists lead_adjustments on public.adjustments;
-create policy lead_adjustments on public.adjustments for select to authenticated using (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+create policy lead_adjustments on public.adjustments for select to authenticated using ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id));
 drop policy if exists targets_read on public.targets;
-create policy targets_read on public.targets for select to authenticated using (team_id = public.my_team());
+create policy targets_read on public.targets for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists targets_write on public.targets;
 create policy targets_write on public.targets for all to authenticated
-  using (team_id = public.my_team() and public.my_role() in ('admin','leader'))
-  with check (team_id = public.my_team() and public.my_role() in ('admin','leader'));
+  using (team_id = (select public.my_team()) and (select public.my_role()) in ('admin','leader'))
+  with check (team_id = (select public.my_team()) and (select public.my_role()) in ('admin','leader'));
 
 drop policy if exists snip_read on public.snippets;
-create policy snip_read on public.snippets for select to authenticated using (user_id = auth.uid() or ((shared or global) and team_id = public.my_team()));
+create policy snip_read on public.snippets for select to authenticated using (user_id = (select auth.uid()) or ((shared or global) and team_id = (select public.my_team())));
 drop policy if exists snip_insert on public.snippets;
 create policy snip_insert on public.snippets for insert to authenticated
-  with check (user_id = auth.uid() and team_id = public.my_team() and (not global or public.my_role() = 'admin'));
+  with check (user_id = (select auth.uid()) and team_id = (select public.my_team()) and (not global or (select public.my_role()) = 'admin'));
 drop policy if exists snip_update on public.snippets;
 create policy snip_update on public.snippets for update to authenticated   -- los globales, solo el admin
-  using ((user_id = auth.uid() and not global) or (team_id = public.my_team() and public.my_role() = 'admin' and (global or shared))
-         or (shared and not global and team_id = public.my_team() and public.my_role() = 'leader'))
-  with check (team_id = public.my_team() and (not global or public.my_role() = 'admin'));
+  using ((user_id = (select auth.uid()) and not global) or (team_id = (select public.my_team()) and (select public.my_role()) = 'admin' and (global or shared))
+         or (shared and not global and team_id = (select public.my_team()) and (select public.my_role()) = 'leader'))
+  with check (team_id = (select public.my_team()) and (not global or (select public.my_role()) = 'admin'));
 drop policy if exists snip_delete on public.snippets;
 create policy snip_delete on public.snippets for delete to authenticated
-  using ((user_id = auth.uid() and not global) or (team_id = public.my_team() and public.my_role() = 'admin' and (global or shared))
-         or (shared and not global and team_id = public.my_team() and public.my_role() = 'leader'));
+  using ((user_id = (select auth.uid()) and not global) or (team_id = (select public.my_team()) and (select public.my_role()) = 'admin' and (global or shared))
+         or (shared and not global and team_id = (select public.my_team()) and (select public.my_role()) = 'leader'));
 
 -- tareas: se ven si te las mandaron (team leader y admin ven todas); se crean y marcan con las funciones
 drop policy if exists tasks_read on public.tasks;
-create policy tasks_read on public.tasks for select to authenticated using (team_id = public.my_team() and public.can_see_task(id));
+create policy tasks_read on public.tasks for select to authenticated using (team_id = (select public.my_team()) and public.can_see_task(id));
 drop policy if exists tasks_delete on public.tasks;
 create policy tasks_delete on public.tasks for delete to authenticated
-  using (team_id = public.my_team() and (created_by = auth.uid() or public.my_role() = 'admin'));
+  using (team_id = (select public.my_team()) and (created_by = (select auth.uid()) or (select public.my_role()) = 'admin'));
 drop policy if exists task_people_read on public.task_people;
 create policy task_people_read on public.task_people for select to authenticated using (public.can_see_task(task_id));
 
 drop policy if exists leads_read on public.leads;
-create policy leads_read on public.leads for select to authenticated using (team_id = public.my_team());
+create policy leads_read on public.leads for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists leads_insert on public.leads;
-create policy leads_insert on public.leads for insert to authenticated with check (team_id = public.my_team() and user_id = auth.uid());
+create policy leads_insert on public.leads for insert to authenticated with check (team_id = (select public.my_team()) and user_id = (select auth.uid()));
 drop policy if exists leads_update on public.leads;
 create policy leads_update on public.leads for update to authenticated
-  using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')))
-  with check (team_id = public.my_team());
+  using (team_id = (select public.my_team()) and (user_id = (select auth.uid()) or (select public.my_role()) in ('admin','leader')))
+  with check (team_id = (select public.my_team()));
 drop policy if exists leads_delete on public.leads;
 create policy leads_delete on public.leads for delete to authenticated
-  using (team_id = public.my_team() and (user_id = auth.uid() or public.my_role() in ('admin','leader')));
+  using (team_id = (select public.my_team()) and (user_id = (select auth.uid()) or (select public.my_role()) in ('admin','leader')));
 
 drop policy if exists pings_read on public.pings;
 create policy pings_read on public.pings for select to authenticated
-  using (team_id = public.my_team() and (to_id is null or to_id = auth.uid() or from_id = auth.uid()));
+  using (team_id = (select public.my_team()) and (to_id is null or to_id = (select auth.uid()) or from_id = (select auth.uid())));
 drop policy if exists pings_insert on public.pings;
 create policy pings_insert on public.pings for insert to authenticated
-  with check (team_id = public.my_team() and from_id = auth.uid() and (to_id is null or (to_id <> auth.uid() and public.in_my_team(to_id))));
+  with check (team_id = (select public.my_team()) and from_id = (select auth.uid()) and (to_id is null or (to_id <> (select auth.uid()) and public.in_my_team(to_id))));
 drop policy if exists pings_delete on public.pings;
-create policy pings_delete on public.pings for delete to authenticated using (from_id = auth.uid());
+create policy pings_delete on public.pings for delete to authenticated using (from_id = (select auth.uid()));
 
 -- chat: se lee y se escribe donde estás; grupos y privados se arman con las funciones de arriba
 drop policy if exists chats_read on public.chats;
-create policy chats_read on public.chats for select to authenticated using (team_id = public.my_team() and public.in_chat(id));
+create policy chats_read on public.chats for select to authenticated using (team_id = (select public.my_team()) and public.in_chat(id));
 drop policy if exists chat_members_read on public.chat_members;
 create policy chat_members_read on public.chat_members for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists messages_read on public.messages;
 create policy messages_read on public.messages for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists messages_insert on public.messages;
-create policy messages_insert on public.messages for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+create policy messages_insert on public.messages for insert to authenticated with check (user_id = (select auth.uid()) and public.in_chat(chat_id));
 drop policy if exists ut_read on public.user_targets;
 create policy ut_read on public.user_targets for select to authenticated
-  using (user_id = auth.uid() or (public.my_role() in ('admin','leader') and public.in_my_team(user_id)));
+  using (user_id = (select auth.uid()) or ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id)));
 drop policy if exists ut_write on public.user_targets;
 create policy ut_write on public.user_targets for all to authenticated
-  using (public.my_role() in ('admin','leader') and public.in_my_team(user_id))
-  with check (public.my_role() in ('admin','leader') and public.in_my_team(user_id));
+  using ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id))
+  with check ((select public.my_role()) in ('admin','leader') and public.in_my_team(user_id));
 drop policy if exists reactions_read on public.message_reactions;
 create policy reactions_read on public.message_reactions for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists reactions_insert on public.message_reactions;
-create policy reactions_insert on public.message_reactions for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+create policy reactions_insert on public.message_reactions for insert to authenticated with check (user_id = (select auth.uid()) and public.in_chat(chat_id));
 drop policy if exists reactions_delete on public.message_reactions;
-create policy reactions_delete on public.message_reactions for delete to authenticated using (user_id = auth.uid());
+create policy reactions_delete on public.message_reactions for delete to authenticated using (user_id = (select auth.uid()));
 drop policy if exists avatars_read on public.avatars;
 create policy avatars_read on public.avatars for select to authenticated using (public.in_my_team(user_id));
 drop policy if exists avatars_own on public.avatars;
-create policy avatars_own on public.avatars for all to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy avatars_own on public.avatars for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 drop policy if exists files_read on public.chat_files;
 create policy files_read on public.chat_files for select to authenticated using (public.in_chat(chat_id));
 drop policy if exists files_insert on public.chat_files;
-create policy files_insert on public.chat_files for insert to authenticated with check (user_id = auth.uid() and public.in_chat(chat_id));
+create policy files_insert on public.chat_files for insert to authenticated with check (user_id = (select auth.uid()) and public.in_chat(chat_id));
 drop policy if exists files_delete on public.chat_files;
-create policy files_delete on public.chat_files for delete to authenticated using (user_id = auth.uid());
+create policy files_delete on public.chat_files for delete to authenticated using (user_id = (select auth.uid()));
 drop policy if exists messages_delete on public.messages;
-create policy messages_delete on public.messages for delete to authenticated using (user_id = auth.uid());
+create policy messages_delete on public.messages for delete to authenticated using (user_id = (select auth.uid()));
 drop policy if exists chat_reads_own on public.chat_reads;
 create policy chat_reads_own on public.chat_reads for all to authenticated
-  using (user_id = auth.uid()) with check (user_id = auth.uid() and public.in_chat(chat_id));
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()) and public.in_chat(chat_id));
 
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on public.sales, public.settings, public.adjustments, public.agenda, public.shifts, public.snippets, public.leads to authenticated;
@@ -1235,16 +1235,16 @@ alter table public.crm_status_log enable row level security;
 alter table public.crm_status_map enable row level security;
 alter table public.audit_log      enable row level security;
 drop policy if exists crm_clients_read on public.crm_clients;
-create policy crm_clients_read on public.crm_clients for select to authenticated using (team_id = public.my_team());
+create policy crm_clients_read on public.crm_clients for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists crm_log_read on public.crm_status_log;
-create policy crm_log_read on public.crm_status_log for select to authenticated using (team_id = public.my_team());
+create policy crm_log_read on public.crm_status_log for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists crm_agent_log_read on public.crm_agent_log;
-create policy crm_agent_log_read on public.crm_agent_log for select to authenticated using (team_id = public.my_team());
+create policy crm_agent_log_read on public.crm_agent_log for select to authenticated using (team_id = (select public.my_team()));
 alter table public.crm_agent_log enable row level security;
 drop policy if exists crm_map_read on public.crm_status_map;
-create policy crm_map_read on public.crm_status_map for select to authenticated using (team_id = public.my_team());
+create policy crm_map_read on public.crm_status_map for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists audit_read on public.audit_log;
-create policy audit_read on public.audit_log for select to authenticated using (team_id = public.my_team() and public.my_role() in ('admin', 'leader'));
+create policy audit_read on public.audit_log for select to authenticated using (team_id = (select public.my_team()) and (select public.my_role()) in ('admin', 'leader'));
 grant select on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log to authenticated;
 revoke insert, update, delete, truncate on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log from authenticated;
 revoke all on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log from anon;
@@ -1361,16 +1361,16 @@ begin
   foreach t in array array['pay_methods','processors','processor_methods','banks','pay_files'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists %I on public.%I', t || '_read', t);
-    execute format('create policy %I on public.%I for select to authenticated using (team_id = public.my_team())', t || '_read', t);
+    execute format('create policy %I on public.%I for select to authenticated using (team_id = (select public.my_team()))', t || '_read', t);
     execute format('drop policy if exists %I on public.%I', t || '_write', t);
-    execute format('create policy %I on public.%I for all to authenticated using (team_id = public.my_team() and public.pay_editor()) with check (team_id = public.my_team() and public.pay_editor())', t || '_write', t);
+    execute format('create policy %I on public.%I for all to authenticated using (team_id = (select public.my_team()) and (select public.pay_editor())) with check (team_id = (select public.my_team()) and (select public.pay_editor()))', t || '_write', t);
     execute format('grant select, insert, update, delete on public.%I to authenticated', t);
     execute format('revoke all on public.%I from anon', t);
   end loop;
 end $$;
 alter table public.pay_incidents enable row level security;
 drop policy if exists pay_incidents_read on public.pay_incidents;
-create policy pay_incidents_read on public.pay_incidents for select to authenticated using (team_id = public.my_team());
+create policy pay_incidents_read on public.pay_incidents for select to authenticated using (team_id = (select public.my_team()));
 grant select on public.pay_incidents to authenticated;
 revoke insert, update, delete, truncate on public.pay_incidents from authenticated;
 revoke all on public.pay_incidents from anon;
@@ -1418,25 +1418,25 @@ alter table public.campaign_info enable row level security;
 alter table public.campaign_requests enable row level security;
 alter table public.client_comments enable row level security;
 drop policy if exists campaign_info_read on public.campaign_info;
-create policy campaign_info_read on public.campaign_info for select to authenticated using (team_id = public.my_team());
+create policy campaign_info_read on public.campaign_info for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists campaign_info_add on public.campaign_info;
-create policy campaign_info_add on public.campaign_info for insert to authenticated with check (team_id = public.my_team() and created_by = auth.uid());
+create policy campaign_info_add on public.campaign_info for insert to authenticated with check (team_id = (select public.my_team()) and created_by = (select auth.uid()));
 drop policy if exists campaign_info_edit on public.campaign_info;
-create policy campaign_info_edit on public.campaign_info for update to authenticated using (team_id = public.my_team() and public.pay_editor()) with check (team_id = public.my_team());
+create policy campaign_info_edit on public.campaign_info for update to authenticated using (team_id = (select public.my_team()) and (select public.pay_editor())) with check (team_id = (select public.my_team()));
 drop policy if exists campaign_info_del on public.campaign_info;
-create policy campaign_info_del on public.campaign_info for delete to authenticated using (team_id = public.my_team() and public.pay_editor());
+create policy campaign_info_del on public.campaign_info for delete to authenticated using (team_id = (select public.my_team()) and (select public.pay_editor()));
 drop policy if exists campaign_req_read on public.campaign_requests;
-create policy campaign_req_read on public.campaign_requests for select to authenticated using (team_id = public.my_team() and (created_by = auth.uid() or public.pay_editor()));
+create policy campaign_req_read on public.campaign_requests for select to authenticated using (team_id = (select public.my_team()) and (created_by = (select auth.uid()) or (select public.pay_editor())));
 drop policy if exists campaign_req_add on public.campaign_requests;
-create policy campaign_req_add on public.campaign_requests for insert to authenticated with check (team_id = public.my_team() and created_by = auth.uid() and not done);
+create policy campaign_req_add on public.campaign_requests for insert to authenticated with check (team_id = (select public.my_team()) and created_by = (select auth.uid()) and not done);
 drop policy if exists campaign_req_done on public.campaign_requests;
-create policy campaign_req_done on public.campaign_requests for update to authenticated using (team_id = public.my_team() and public.pay_editor()) with check (team_id = public.my_team());
+create policy campaign_req_done on public.campaign_requests for update to authenticated using (team_id = (select public.my_team()) and (select public.pay_editor())) with check (team_id = (select public.my_team()));
 drop policy if exists client_comments_read on public.client_comments;
-create policy client_comments_read on public.client_comments for select to authenticated using (team_id = public.my_team());
+create policy client_comments_read on public.client_comments for select to authenticated using (team_id = (select public.my_team()));
 drop policy if exists client_comments_add on public.client_comments;
-create policy client_comments_add on public.client_comments for insert to authenticated with check (team_id = public.my_team() and created_by = auth.uid());
+create policy client_comments_add on public.client_comments for insert to authenticated with check (team_id = (select public.my_team()) and created_by = (select auth.uid()));
 drop policy if exists client_comments_del on public.client_comments;
-create policy client_comments_del on public.client_comments for delete to authenticated using (team_id = public.my_team() and (created_by = auth.uid() or public.pay_editor()));
+create policy client_comments_del on public.client_comments for delete to authenticated using (team_id = (select public.my_team()) and (created_by = (select auth.uid()) or (select public.pay_editor())));
 grant select, insert, update, delete on public.campaign_info, public.campaign_requests, public.client_comments to authenticated;
 revoke update on public.client_comments from authenticated;
 revoke all on public.campaign_info, public.campaign_requests, public.client_comments from anon;
@@ -1463,7 +1463,7 @@ create table if not exists public.client_profiles (
 create index if not exists client_profiles_cl on public.client_profiles (team_id, client_id);
 alter table public.client_profiles enable row level security;
 drop policy if exists client_profiles_read on public.client_profiles;
-create policy client_profiles_read on public.client_profiles for select to authenticated using (team_id = public.my_team());
+create policy client_profiles_read on public.client_profiles for select to authenticated using (team_id = (select public.my_team()));
 grant select on public.client_profiles to authenticated;
 revoke insert, update, delete, truncate on public.client_profiles from authenticated;
 revoke all on public.client_profiles from anon;
@@ -1513,7 +1513,7 @@ create index if not exists calls_day on public.calls (team_id, at);
 create index if not exists calls_cl on public.calls (team_id, client_id, at);
 alter table public.calls enable row level security;
 drop policy if exists calls_read on public.calls;
-create policy calls_read on public.calls for select to authenticated using (team_id = public.my_team());
+create policy calls_read on public.calls for select to authenticated using (team_id = (select public.my_team()));
 grant select on public.calls to authenticated;
 revoke insert, update, delete, truncate on public.calls from authenticated;
 revoke all on public.calls from anon;
@@ -1648,3 +1648,5 @@ begin
 end $$;
 drop trigger if exists sales_cheer on public.sales;
 create trigger sales_cheer after insert on public.sales for each row execute function public.sale_cheer();
+revoke all on function public.sale_cheer() from public, anon, authenticated; -- es de un trigger: nadie la llama
+create index if not exists messages_user on public.messages (user_id, created_at);
