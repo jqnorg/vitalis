@@ -119,7 +119,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
+const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -129,7 +129,7 @@ const GROUPS=[
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
-  {g:'analisis',views:['ventas','clientes','filtros'],tabs:['Ventas','Campañas','Filtros']},
+  {g:'analisis',views:['ventas','clientes','filtros','radar'],tabs:['Ventas','Campañas','Filtros','Radar']},
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];

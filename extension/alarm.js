@@ -1,6 +1,6 @@
 // Ventanita de aviso: se usa cuando la pestaña activa no admite la tarjeta (página nueva, chrome://, etc.)
 async function render() {
-  const { live = [] } = await chrome.storage.session.get('live');
+  const live = ((await chrome.storage.session.get('live')).live || []).filter((x) => !x.exp); // los mensajes del chat se van solos: acá no van
   if (!live.length) return window.close();
   const main = document.getElementById('list');
   main.textContent = '';

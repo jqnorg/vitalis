@@ -30,6 +30,9 @@
   const VER = (() => { try { return chrome.runtime.getManifest().version; } catch (e) { return ''; } })();
   const send = (msg) => new Promise((res) => { try { chrome.runtime.sendMessage(msg, (r) => res(chrome.runtime.lastError ? null : r)); } catch (e) { res(null); } });
 
+  // lo que no se puede perder (una llamada, un cliente nuevo): si la extensión no contesta, pruebo de nuevo
+  const sendSure = async (msg, tries = 3) => { for (let i = 0; i < tries; i++) { const r = await send(msg); if (r || !live()) return r; await new Promise((ok) => setTimeout(ok, 700 * (i + 1))); } return null; };
+
   /* ================= tablas de la página ================= */
   const match = (l, al) => al.some((a) => l === a || l.startsWith(a + ' '));
   const idxOf = (labels, al) => { // el alias más específico primero: "client id" no es el nombre aunque empiece con "client"
@@ -224,9 +227,9 @@
   const nWatch = () => Object.keys(watches).length;
   function autoWatch(hasTable) { // si la elegida se queda sin tabla un rato (te fuiste a otra parte del CRM), se libera
     if (myTab == null || !watched) return;
-    if (hasTable) { noTableSince = 0; return; }
+    if (hasTable || loginPage()) { noTableSince = 0; return; } // si el CRM cerró la sesión, la pestaña sigue elegida: al volver a entrar sigue sola
     if (!noTableSince) noTableSince = Date.now();
-    else if (Date.now() - noTableSince > 20000) { noTableSince = 0; send({ type: 'crm-watch-stop' }); }
+    else if (Date.now() - noTableSince > 20000) { noTableSince = 0; send({ type: 'crm-watch-stop', auto: 1 }); }
   }
   async function watchBtn() {
     if (watched) { await send({ type: 'crm-watch-stop' }); return; }
@@ -260,7 +263,7 @@
     const sig = JSON.stringify([clients ? clients.map((c) => c.key) : null, login]);
     if (!force && sig === lastReport) return;
     lastReport = sig;
-    send({ type: 'crm-clients', clients: clients || [], ok: !!clients, login, title: document.title });
+    sendSure({ type: 'crm-clients', clients: clients || [], ok: !!clients, login, title: document.title }).then((r) => { if (!r && lastReport === sig) { lastReport = ''; again(); } });
   }
 
   // clientes en "new": van al registro de Vitalis (para la conversión del día), estés vigilando o no
@@ -271,24 +274,29 @@
     const sig = rows.map((c) => c.id || c.name).join('|');
     if (sig === lastLeads) return;
     lastLeads = sig;
-    send({ type: 'crm-leads', clients: rows.slice(0, 300) });
+    sendSure({ type: 'crm-leads', clients: rows.slice(0, 300) }).then((r) => { if (!r && lastLeads === sig) { lastLeads = ''; again(); } }); // no llegó: se manda de nuevo
   }
 
   // todos los clientes que se ven en esta pestaña → registro de clientes de Vitalis (status, registro, agente, campaña)
   const sentSig = new Map((() => { try { return JSON.parse(sessionStorage.getItem('vitalis-seen') || '[]'); } catch (e) { return []; } })());
+  const flying = new Map(); // mandados, esperando que la extensión confirme
   function reportSeen(all) {
     if (!all || !all.length) return;
     const rows = [];
     for (const c of all) {
       if (!c.id) continue;
       const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country, c.call, c.note, c.ftd, c.desk].join('|');
-      if (sentSig.get(k) === sig) continue;
-      sentSig.set(k, sig);
-      rows.push({ id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note, ftd: c.ftd, desk: c.desk });
+      if (sentSig.get(k) === sig || flying.get(k) === sig) continue;
+      flying.set(k, sig);
+      rows.push({ k, sig, row: { id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note, ftd: c.ftd, desk: c.desk } });
     }
-    if (!rows.length) return;
-    try { sessionStorage.setItem('vitalis-seen', JSON.stringify([...sentSig].slice(-5000))); } catch (e) {}
-    for (let i = 0; i < rows.length; i += 300) send({ type: 'crm-seen', rows: rows.slice(i, i + 300) });
+    for (let i = 0; i < rows.length; i += 300) {
+      const part = rows.slice(i, i + 300);
+      sendSure({ type: 'crm-seen', rows: part.map((x) => x.row) }).then((r) => {
+        for (const x of part) { if (flying.get(x.k) === x.sig) flying.delete(x.k); if (r) sentSig.set(x.k, x.sig); } // recién ahí cuenta como mandado
+        if (r) { try { sessionStorage.setItem('vitalis-seen', JSON.stringify([...sentSig].slice(-5000))); } catch (e) {} } else again();
+      });
+    }
   }
 
   // cada toque en Omega, Gizat o Voiso (lo que va después del guión es el interno de cada agente: no se lee) = una llamada al cliente de esa ficha.
@@ -304,10 +312,14 @@
   }
   document.addEventListener('click', (ev) => {
     if (!live()) return;
-    const b = ev.target && ev.target.closest && ev.target.closest('button,a,[role=button]'); if (!b || (ui && ui.h.contains(b))) return;
-    const m = (b.textContent || '').replace(/\s+/g, ' ').match(LINE_RE); if (!m) return;
+    const t0 = ev.target; if (!t0 || !t0.closest || (ui && ui.h.contains(t0))) return;
+    let b = t0.closest('button,a,[role=button]'), m = b && (b.textContent || '').replace(/\s+/g, ' ').match(LINE_RE);
+    if (!m) { // el botón puede no ser un <button>: el elemento tocado o alguno de los que lo contienen, si el texto es corto y empieza con la línea
+      for (let e = t0, k = 0; e && k < 4 && !m; e = e.parentElement, k++) { const tx = (e.textContent || '').replace(/\s+/g, ' ').trim(); if (tx.length <= 40 && (m = tx.match(LINE_RE))) b = e; }
+    }
+    if (!m) return;
     const id = idNear(b) || idInUrl() || ((idInPage() || {}).id || ''); if (!id) return;
-    send({ type: 'crm-seen', rows: [{ id, brand, ln: m[1].toLowerCase(), at: new Date().toISOString() }] });
+    sendSure({ type: 'crm-seen', rows: [{ id, brand, ln: m[1].toLowerCase(), at: new Date().toISOString() }] });
   }, true);
 
   // en la pestaña que se actualiza: un Talking que desaparece de la lista ya cambió de status en el CRM.
@@ -523,9 +535,15 @@
     h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:600 12.5px system-ui,sans-serif;background:${ok ? '#1f7a4d' : '#8a5a1c'};color:#fff;padding:7px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25)}b{font-weight:800}</style><div><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</div>`;
     clearTimeout(pillT); pillT = setTimeout(() => h.remove(), 4500);
   }
-  document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible') reportCurrent(true); });
+  document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible') { reportCurrent(true); } });
+  let lastMs = 0, againT = null;
+  const again = () => { clearTimeout(againT); againT = setTimeout(() => { if (live()) refresh(); }, 3000); }; // algo no llegó a la extensión: vuelvo a leer y lo mando
   function refresh(force) {
     if (!live()) return retire();
+    const t0 = performance.now();
+    try { refresh0(force); } finally { lastMs = performance.now() - t0; }
+  }
+  function refresh0(force) {
     reportCurrent();
     for (const e of document.querySelectorAll('#ftd-crm-button')) if (!ui || e !== ui.h) e.remove(); // paneles de copias viejas
     const T = tables();
@@ -595,10 +613,16 @@
     navigator.clipboard.writeText(html).then(() => setMsg('Copiado. Mandáselo a quien mantiene Vitalis para ajustar el botón.', 'ok', 10000), () => setMsg('No pude copiar.', 'err'));
   }
 
-  let t = null;
+  // la página cambió: leo de nuevo cuando se queda quieta 0,6 s, y como mucho a los 2 s aunque no pare de moverse (un reloj, una animación).
+  // Si leer la lista tarda (tablas muy grandes), espero más entre lecturas para no trabar el CRM.
+  let t = null, firstMut = 0;
+  const mine = (n) => { const h = n && n.nodeType === 1 ? n : n && n.parentElement; return !!(h && ((ui && (h === ui.h || ui.h.contains(h))) || h.id === 'vitalis-cur-pill' || h.id === 'ftd-agenda-overlay')); };
   const obs = new MutationObserver((muts) => {
-    if (ui && muts.every((m) => ui.h.contains(m.target) || m.target === ui.h)) return;
-    clearTimeout(t); t = setTimeout(refresh, 600);
+    if (muts.every((m) => mine(m.target) || (m.type === 'childList' && [...m.addedNodes, ...m.removedNodes].length > 0 && [...m.addedNodes, ...m.removedNodes].every(mine)))) return; // lo que cambió es de Vitalis
+    const now = Date.now(), quiet = Math.min(3000, Math.max(600, lastMs * 4)), cap = Math.max(2000, quiet * 2);
+    if (!firstMut) firstMut = now;
+    clearTimeout(t);
+    t = setTimeout(() => { firstMut = 0; refresh(); }, Math.max(0, Math.min(quiet, firstMut + cap - now)));
   });
   const start = () => { obs.observe(document.documentElement, { childList: true, subtree: true, characterData: true }); refresh(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();

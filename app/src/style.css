@@ -1144,3 +1144,45 @@ h3 svg.ic{color:var(--acc)}
 /* barra de arriba sin pastillas: solo la hora, el aviso de sin conexión y Venta (lo demás ya está en el menú y en el Inicio) */
 #bar #sMes,#bar #sLiq,#bar #sTurno,#bar #sPend,#bar #sTask{display:none}
 .people{margin-top:22px}
+
+/* ---------- Radar y lo que predice ventas (radar.js) ---------- */
+.rl{display:inline-block;margin-left:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.rl.on{color:#fff;background:var(--pri);border-color:var(--pri)}
+.rl.mid{color:var(--acc);border-color:currentColor}
+.rd-hot{border-color:var(--pri)}
+.rd-hot .card-h .ic{width:18px;height:18px;color:var(--pri)}
+.rd-hot-r{padding:9px 0;border-top:1px solid var(--soft)}
+.rd-ids{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;align-items:center}
+.rd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px;align-items:start}
+.rd-grid>.card{margin:0}
+.rd-now{margin:2px 0 12px;font-size:14px}
+.rd-foot{margin:10px 2px 0}
+table.rd-map{border-collapse:separate;border-spacing:2px;font-size:12px;width:100%}
+.rd-map th{font-weight:600;color:var(--dim);text-align:center;padding:2px 3px}
+.rd-map tbody th{text-align:left;color:var(--fg);white-space:nowrap;padding-right:8px}
+.rd-map td{position:relative;height:26px;min-width:22px;border-radius:5px;background:var(--soft);text-align:center;overflow:hidden}
+.rd-map td i{position:absolute;inset:0;background:var(--pri)}
+.rd-map td b{position:relative;color:#fff;font-size:9px}
+.rd-map .now{outline:2px solid var(--fg);outline-offset:-1px;border-radius:5px}
+.rd-map thead .now{outline:0;color:var(--fg);font-weight:800}
+.rd-pay td.up,.pt td.up{color:var(--pri);font-weight:700}
+.rd-pay td.dn{color:var(--dim)}
+.rd-pay th.now{color:var(--fg);font-weight:800}
+.rd-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.rd-2 h4{margin:0 0 6px;font-size:13px;color:var(--dim);font-weight:600}
+.rd-l{list-style:none;margin:0;padding:0}
+.rd-l li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--soft);font-size:13.5px}
+.rd-l li b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rd-l li span{white-space:nowrap}
+.rd-curve{display:flex;gap:10px;align-items:flex-end;height:130px;padding:6px 2px 0}
+.rd-cb{flex:1;max-width:70px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;font-size:12px;color:var(--dim)}
+.rd-cb i{order:2;width:100%;background:var(--pri);border-radius:6px 6px 0 0;min-height:3px}
+.rd-cb b{order:1;color:var(--fg)}
+.rd-cb span{order:3}
+.dia-mini{margin:0 0 14px;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pri);border-radius:12px;font-size:14px}
+.fi-late,.ag-hint{margin:8px 0 0;font-size:13px;color:var(--acc)}
+.ag-hint{color:var(--dim)}
+details[data-k=seg]>summary{cursor:pointer;list-style:none}
+details[data-k=seg]>summary::-webkit-details-marker{display:none}
+details[data-k=seg][open]>summary{margin-bottom:10px}
+@media(max-width:640px){.rd-2{grid-template-columns:1fr}}

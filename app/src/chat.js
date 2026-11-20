@@ -100,9 +100,22 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
+// una venta: Joaquín Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
+let botAsk=0;
+function cheerEvent(m,c){
+  if(Date.now()-m.t>10*6e4)return;
+  const txt=clip(msgTxt(m.body),160);
+  toast(`<b>${esc(memberName(m.uid))}</b>: ${esc(txt)}`,'win',{ms:9000,key:'venta'+m._id,actions:chatViewing(c.id)?[]:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
+  if(Date.now()-chatSound>2500){chatSound=Date.now();pop()}
+  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:'info',title:'Venta nueva',id:memberName(m.uid),kw:txt,meta:'',btns:[['open','Abrir chat',1],['close','Ok']]});
+}
 function chatEvent(m){
   if(m.uid===me)return;
   const c=chatOf(m.chat);if(!c)return;
+  if(!isBot(m.uid)&&memberName(m.uid)==='—'&&Date.now()-botAsk>6e4){ // alguien que todavía no conozco (la primera venta crea a Joaquín Vitalis): traigo la lista y sigo
+    botAsk=Date.now();Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')).then(l=>{setMembers(l);chatEvent(m);refresh()}).catch(()=>{});return;
+  }
+  if(isBot(m.uid)){cheerEvent(m,c);if(chatViewing(c.id))markRead(c.id);return}
   if(chatViewing(c.id)){markRead(c.id);return}
   if(Date.now()-m.t>10*6e4)return; // viejo (al reconectar): queda como no leído, sin aviso
   // silenciar un chat solo calla ese chat; si te nombran, te responden o el team leader escribe @todos / @vos, avisa igual

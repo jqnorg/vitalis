@@ -1589,3 +1589,62 @@ select t.id, 'team', 'Toda la mesa' from public.teams t
  where not exists (select 1 from public.chats c where c.team_id = t.id and c.kind = 'team');
 
 select name as mesa, (select count(*) from public.profiles where team_id = teams.id and active) as personas from public.teams;
+
+-- ============================================================================
+-- Joaquín Vitalis: el compañero ficticio del chat de la mesa.
+-- Cuando alguien de la mesa hace una venta de hoy, felicita en "Toda la mesa".
+-- No entra a Vitalis (sin PIN, inactivo, fuera de la lista de nombres) y no cuenta como agente.
+-- ============================================================================
+alter table public.profiles add column if not exists bot boolean not null default false;
+create or replace function public.vitalis_bot(t uuid) returns uuid
+  language plpgsql security definer set search_path = public, extensions as $$
+declare uid uuid;
+begin
+  select id into uid from public.profiles where team_id = t and bot order by created_at limit 1;
+  if uid is null then
+    uid := public._new_seat(t, 'Joaquín Vitalis', 'agent');
+    update public.profiles set active = false, bot = true, login = null where id = uid;
+  end if;
+  return uid;
+end $$;
+revoke all on function public.vitalis_bot(uuid) from public, anon, authenticated;
+
+create or replace function public.sale_cheer() returns trigger
+  language plpgsql security definer set search_path = public, extensions as $$
+declare
+  b uuid; c uuid; nm text; k int; body text;
+  hoy date := ((now() at time zone 'UTC') - interval '3 hours')::date; -- el día en Uruguay
+  msgs text[] := array[
+    '¡Vamo arriba, {n}! 🧉 Otra venta pa la mesa.',
+    '¡Qué crack, {n}! Venta adentro. Así da gusto, bo.',
+    '¡Tremendo, {n}! 🔥 Venta nueva. Felicitaciones.',
+    '¡Grande, {n}! Venta cerrada. A cebar un mate para festejar 🧉',
+    '¡Golazo de {n}! ⚽ Venta confirmada. Felicitaciones.',
+    '¡De más, {n}! Venta nueva. Estás en llamas 🔥',
+    '¡Aplausos para {n}! 👏 Otra venta. Ta, impecable.',
+    '¡Bien ahí, {n}! Venta adentro. La mesa te banca.',
+    '¡Impecable, {n}! Venta cerrada. Vamo que vamo 🚀',
+    '¡Bo, {n} no para! Otra venta. Felicitaciones 👏',
+    '¡Salú, {n}! 🧉 Venta nueva. Seguí así.',
+    '¡Notable, {n}! Venta confirmada. Un lujo.',
+    '¡Espectacular, {n}! 🎉 Otra venta pa la mesa. Felicitaciones.',
+    '¡Epa, {n}! Venta adentro. Se festeja con bizcochos 🥐'];
+begin
+  begin
+    if new.date < hoy or new.date > hoy + 1 then return new; end if; -- solo las de hoy: cargar historia no llena el chat
+    select split_part(btrim(name), ' ', 1) into nm from public.profiles where id = new.user_id and active and not bot;
+    if coalesce(nm, '') = '' then return new; end if;
+    select id into c from public.chats where team_id = new.team_id and kind = 'team' limit 1;
+    if c is null then return new; end if;
+    b := public.vitalis_bot(new.team_id);
+    if (select count(*) from public.messages where user_id = b and created_at > now() - interval '30 seconds') >= 10 then return new; end if;
+    select count(*) into k from public.sales where user_id = new.user_id and to_char(date, 'YYYY-MM') = to_char(new.date, 'YYYY-MM');
+    body := replace(msgs[1 + floor(random() * array_length(msgs, 1))::int], '{n}', nm)
+      || case when k = 1 then ' Primera del mes.' when k > 1 then ' Va ' || k || ' este mes.' else '' end;
+    insert into public.messages (chat_id, user_id, body) values (c, b, body);
+  exception when others then null; -- felicitar nunca traba una venta
+  end;
+  return new;
+end $$;
+drop trigger if exists sales_cheer on public.sales;
+create trigger sales_cheer after insert on public.sales for each row execute function public.sale_cheer();

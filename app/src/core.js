@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.21.0';
+const VERSION='1.22.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -110,7 +110,11 @@ let avatars={},avOk=false; // fotos de perfil: uid → {url, at}
 let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
-const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
+// Joaquín Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
+let botU=null;const isBot=uid=>!!botU&&uid===botU.id;
+function setMembers(list){botU=list.find(m=>m.bot)||null;members=list.filter(m=>!m.bot)}
+let mesaCh=null,crmPingAt=0;function mesaPing(ev){try{if(mesaCh)mesaCh.send({type:'broadcast',event:ev,payload:{}})}catch(e){}}
+const memberName=uid=>{if(isBot(uid))return botU.name;const m=members.find(x=>x.id===uid);return m?m.name:'—'};
 const S2F=r=>({_id:r.id,uid:r.user_id,n:r.n,date:r.date,time:r.time||'',id:r.client_id,country:r.country||'',name:r.name||'',aff:r.aff||'',camp:r.camp??'',
   amount:+r.amount,tx:r.tx||undefined,reg:r.reg||r.date,brand:r.brand||''});
 const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),country:f.country||null,name:f.name||null,aff:f.aff||null,camp:f.camp??null,
@@ -296,7 +300,7 @@ function bootApply(R,quiet){
   if(!R.prof)throw new Error('NO_PROFILE');
   profile=R.prof;
   if(!profile.active)throw new Error('INACTIVE');
-  teamInfo=R.tm;members=R.mem.filter(m=>m.team_id===profile.team_id);
+  teamInfo=R.tm;setMembers(R.mem.filter(m=>m.team_id===profile.team_id));
   chatsLoaded(R.ch,R.cm,R.rd,R.ms);tasksLoaded(R.tk,R.tp);
   snippets=R.sn.map(N2S);leads=R.ld.map(L2C);pings=R.pg.map(G2P);
   team=R.sales.map(S2F);mine();
@@ -333,6 +337,8 @@ addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
+  // canal de la mesa, solo para avisarse "cambió algo del CRM" (sin datos): así un new cuenta para todos apenas alguien lo ve, sin esperar los 45 s
+  try{if(mesaCh)sb.removeChannel(mesaCh);mesaCh=sb.channel('vitalis-mesa-'+profile.team_id,{config:{broadcast:{self:false}}}).on('broadcast',{event:'crm'},()=>{if(Date.now()-crmPingAt>4000){crmPingAt=Date.now();clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),600)}}).subscribe()}catch(e){mesaCh=null}
   const gen=++rtGen;rtOk=false;
   const up=(arr,item,key='_id')=>{const i=arr.findIndex(x=>x[key]===item[key]);if(i>=0)arr[i]=item;else arr.push(item)};
   chan=sb.channel('vitalis-'+me)
@@ -372,6 +378,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{
       if(p.eventType==='DELETE')return;
       if(p.new.team_id!==profile.team_id&&p.new.id!==me)return;
+      if(p.new.bot){botU=p.new;refresh();return} // Joaquín Vitalis no va en la lista de la mesa
       up(members,p.new,'id');
       if(p.new.id===me){profile=p.new;if(!p.new.active)return location.reload()}
       refresh();

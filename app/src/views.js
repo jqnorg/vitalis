@@ -42,7 +42,7 @@ V.inicio={
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
     if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}</div><span class="grow"></span>
-      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n,false,utOf(me))}`;
+      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
@@ -53,6 +53,7 @@ V.inicio={
     crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
+    {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
     this.turno(true);
   },
   turno(force){
@@ -373,8 +374,7 @@ V.sueldo={
     $('#suPrev').onclick=()=>step(-1);$('#suNext').onclick=()=>step(1);
     $('#suTcSave').onclick=()=>this.saveTc();
     $('#suTc').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();this.saveTc()}});
-    $('#suNom').addEventListener('click',e=>{const b=e.target.closest('[data-aj]');if(!b)return;setAjusteN(suYm,(ajustes[suYm]||0)+ +b.dataset.aj)});
-    $('#suNom').addEventListener('change',e=>{if(e.target.id==='suAj')setAjusteN(suYm,e.target.value)});
+    $('#suNom').addEventListener('click',e=>{if(e.target.closest('[data-aj0]'))quitarAjuste(suYm)}); // los FTDs entran solo desde el CRM con la extensión; los "sin detalle" viejos se pueden quitar
     const setN=n=>{siN=Math.max(0,Math.min(999,Math.round(+n||0)));this.sim()};
     $('#siR').addEventListener('input',e=>setN(e.target.value));
     $('#siN').addEventListener('input',e=>{if(e.target.value!=='')setN(e.target.value)});
@@ -402,7 +402,7 @@ V.sueldo={
     $('#suNom').innerHTML=`<div class="rows">`+
       rw('FTDs',`<b>${s.n}</b>`,'big')+
       rw('Cargados',String(s.loaded))+
-      rw('Sin detalle',readOnly?String(s.extra):`<span class="step"><button type="button" data-aj="-1" aria-label="menos">−</button><input type="number" id="suAj" min="0" max="999" value="${s.extra}" aria-label="FTDs sin detalle"><button type="button" data-aj="1" aria-label="más">+</button></span>`)+
+      (s.extra?rw('Sin detalle (ya no se cargan)',readOnly?String(s.extra):`${s.extra} <button type="button" class="lnk" data-aj0>quitar</button>`):'')+
       rw('Fijo',`${pesos(cfg.base)} UYU`)+
       rw(`Por FTD (${s.n} × ${cfg.porftd} USD)`,`${money(s.porftd)} USD`)+
       rw(s.tier?`Bono (${s.tier}+ FTDs)`:'Bono',`${money(s.bono)} USD`)+
@@ -589,6 +589,7 @@ V.equipo={
     const k=(lb,v,s2,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`;
     const T=targets[eqYm]||0;
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);
+    {const pr=eqYm===now?pronCard():'';$('#eqPron').hidden=!pr;$('#eqPron').innerHTML=pr;const cv=eqYm===now?curvaCard():'';$('#eqCurva').hidden=!cv;$('#eqCurva').innerHTML=cv} // pronóstico y curva del agente nuevo: solo team leader y admin
     {const pm=eqYm===now?callsMesaCard():'';$('#eqPool').hidden=!pm;$('#eqPool').innerHTML=pm} // las llamadas de hoy de cada uno
     crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
@@ -612,7 +613,7 @@ V.equipo={
 };
 
 /* ---------- mi cuenta y la mesa (en ajustes) ---------- */
-async function reloadMembers(){try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'));refresh()}catch(e){}}
+async function reloadMembers(){try{setMembers(await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')));refresh()}catch(e){}}
 V.cuenta={
   build(){
     $('#cfNameSave').onclick=async()=>{const v=$('#cfName').value.trim();if(!v)return toast('Escribí tu nombre.','err');if(v===profile.name)return;if(await B.saveName(v))toast('Nombre guardado.')};

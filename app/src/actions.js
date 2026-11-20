@@ -109,7 +109,7 @@ async function ensureFormers(rows){ // crea (o encuentra) a cada uno y le pasa s
   const {data,error}=await sb.rpc('add_formers',{nms:names}); // todos de una
   if(error){if(/add_former|PGRST202|42883/.test(String(error.message||error.code)))toast('Los desvinculados se activan en un rato (falta actualizar la base).','warn');else toast(esc(errMsg(error)),'err');return nuevos}
   for(const r of data||[])if(r&&r.id){for(const x of rows)if(!x.uid&&repName(x.agent)===r.name)x.uid=r.id;if(r.new)nuevos.push(r.id)}
-  if(names.length)try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'))}catch(e){}
+  if(names.length)try{setMembers(await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')))}catch(e){}
   return nuevos;
 }
 function formersToast(ids,rows){
@@ -162,31 +162,12 @@ function assignModal(rows,src){ // "¿quién es «J. Ortega»?" → se guarda co
   }}]});
 }
 
-/* ---------- FTDs sin detalle ---------- */
-async function setAjusteN(ym,n){
-  if(!noRO())return false;
-  n=Math.max(0,Math.min(999,Math.round(+n||0)));const cur=ajustes[ym]||0;if(n===cur){refresh();return true}
-  const before=calc(ym);if(!await B.setAjuste(ym,n))return false;
-  const s=calc(ym);
-  toast(`✔ ${esc(mLong(ym))}: ${plural(n,'FTD')} sin detalle → <b>${plural(s.n,'FTD')}</b> · ${money(s.usd)} USD`,'ok',{key:'aj'});
-  if(s.tier>before.tier){toast(`🎉 Bono de ${s.bono} USD desbloqueado (${s.tier}+ FTDs).`,'win',{ms:9000});beep(2)}
-  return true;
+/* ---------- FTDs sin detalle: ya no se cargan (las ventas entran solo desde el CRM con la extensión); los viejos se pueden quitar ---------- */
+function quitarAjuste(ym){
+  if(!noRO())return;const n=ajustes[ym]||0;if(!n)return;
+  modal({title:'Quitar los FTDs sin detalle',body:`<p class="mp">${esc(mLong(ym))} tiene ${plural(n,'FTD')} sin detalle. Si ${n===1?'lo':'los'} quitás, no se ${n===1?'puede':'pueden'} volver a cargar: las ventas entran solo desde el CRM con la extensión.</p>`,
+    actions:[{l:'Cancelar'},{l:'Quitar',cls:'pri',fn:async()=>{if(!await B.setAjuste(ym,0))return false;toast(`${esc(mLong(ym))}: sin FTDs sin detalle.`,'ok',{key:'aj'});refresh()}}]});
 }
-function ajusteModal(ym){
-  if(!noRO())return;
-  const cur=ajustes[ym]||0;
-  const body=`<div class="rows">
-    <div class="rw"><span class="k">Cargados</span><span class="d"></span><span class="v">${calc(ym).loaded}</span></div>
-    <div class="rw"><span class="k">Sin detalle</span><span class="d"></span><span class="v"><span class="step"><button type="button" data-d="-1" aria-label="menos">−</button><input type="number" id="ajN" min="0" max="999" value="${cur}" aria-label="FTDs sin detalle"><button type="button" data-d="1" aria-label="más">+</button></span></span></div>
-    <div class="rw tot hl"><span class="k">Total</span><span class="d"></span><span class="v" id="ajTot"></span></div></div>`;
-  modal({title:`FTDs sin detalle · ${esc(mLong(ym))}`,body,actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:api=>setAjusteN(ym,api.q('#ajN').value).then(ok=>ok?undefined:false)}],
-    onOpen(api){
-      const inp=api.q('#ajN'),upd=()=>{const n=calc(ym).loaded+Math.max(0,+inp.value||0),s=porCantidad(n);api.q('#ajTot').textContent=`${plural(n,'FTD')} · ${money(s.usd)} USD`};
-      api.box.addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;inp.value=Math.max(0,(+inp.value||0)+ +b.dataset.d);upd()});
-      inp.addEventListener('input',upd);upd();setTimeout(()=>inp.select(),0);
-    }});
-}
-
 /* ---------- agenda ---------- */
 const dueStr=d=>`${ymd(d)}T${z(d.getHours())}:${z(d.getMinutes())}`;
 const byDue=(a,b)=>a.due<b.due?-1:a.due>b.due?1:0;
@@ -264,7 +245,7 @@ async function posponer(p,minutes,toDate){
 }
 function pendEdit(p){
   if(!p||!noRO())return;
-  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
+  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div>${(h=>h?`<p class="p-sub ag-hint">${esc(h)}</p>`:'')(cobroHint((crmStatusOf(id)||{}).country))}<div class="ebox" id="pErr"></div>`,wide:1,
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
@@ -694,7 +675,7 @@ function ayuda(){
   <h4>Sueldo</h4><dl>
     <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
-    <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
+    <dt>Ventas</dt><dd>Entran solas desde el CRM con la extensión. Ya no se cargan FTDs sin detalle.</dd>
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
   <h4>Turno y agenda</h4><dl>
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
@@ -723,7 +704,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   fichaCl:el=>openFicha(el.dataset.id),
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),

@@ -1157,6 +1157,48 @@ h3 svg.ic{color:var(--acc)}
 /* barra de arriba sin pastillas: solo la hora, el aviso de sin conexión y Venta (lo demás ya está en el menú y en el Inicio) */
 #bar #sMes,#bar #sLiq,#bar #sTurno,#bar #sPend,#bar #sTask{display:none}
 .people{margin-top:22px}
+
+/* ---------- Radar y lo que predice ventas (radar.js) ---------- */
+.rl{display:inline-block;margin-left:6px;font-size:11.5px;font-weight:600;border-radius:999px;padding:1px 8px;border:1px solid var(--line);color:var(--dim);white-space:nowrap}
+.rl.on{color:#fff;background:var(--pri);border-color:var(--pri)}
+.rl.mid{color:var(--acc);border-color:currentColor}
+.rd-hot{border-color:var(--pri)}
+.rd-hot .card-h .ic{width:18px;height:18px;color:var(--pri)}
+.rd-hot-r{padding:9px 0;border-top:1px solid var(--soft)}
+.rd-ids{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;align-items:center}
+.rd-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px;align-items:start}
+.rd-grid>.card{margin:0}
+.rd-now{margin:2px 0 12px;font-size:14px}
+.rd-foot{margin:10px 2px 0}
+table.rd-map{border-collapse:separate;border-spacing:2px;font-size:12px;width:100%}
+.rd-map th{font-weight:600;color:var(--dim);text-align:center;padding:2px 3px}
+.rd-map tbody th{text-align:left;color:var(--fg);white-space:nowrap;padding-right:8px}
+.rd-map td{position:relative;height:26px;min-width:22px;border-radius:5px;background:var(--soft);text-align:center;overflow:hidden}
+.rd-map td i{position:absolute;inset:0;background:var(--pri)}
+.rd-map td b{position:relative;color:#fff;font-size:9px}
+.rd-map .now{outline:2px solid var(--fg);outline-offset:-1px;border-radius:5px}
+.rd-map thead .now{outline:0;color:var(--fg);font-weight:800}
+.rd-pay td.up,.pt td.up{color:var(--pri);font-weight:700}
+.rd-pay td.dn{color:var(--dim)}
+.rd-pay th.now{color:var(--fg);font-weight:800}
+.rd-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.rd-2 h4{margin:0 0 6px;font-size:13px;color:var(--dim);font-weight:600}
+.rd-l{list-style:none;margin:0;padding:0}
+.rd-l li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--soft);font-size:13.5px}
+.rd-l li b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rd-l li span{white-space:nowrap}
+.rd-curve{display:flex;gap:10px;align-items:flex-end;height:130px;padding:6px 2px 0}
+.rd-cb{flex:1;max-width:70px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;font-size:12px;color:var(--dim)}
+.rd-cb i{order:2;width:100%;background:var(--pri);border-radius:6px 6px 0 0;min-height:3px}
+.rd-cb b{order:1;color:var(--fg)}
+.rd-cb span{order:3}
+.dia-mini{margin:0 0 14px;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pri);border-radius:12px;font-size:14px}
+.fi-late,.ag-hint{margin:8px 0 0;font-size:13px;color:var(--acc)}
+.ag-hint{color:var(--dim)}
+details[data-k=seg]>summary{cursor:pointer;list-style:none}
+details[data-k=seg]>summary::-webkit-details-marker{display:none}
+details[data-k=seg][open]>summary{margin-bottom:10px}
+@media(max-width:640px){.rd-2{grid-template-columns:1fr}}
 </style>
 </head>
 <body class="auth">
@@ -1241,6 +1283,7 @@ h3 svg.ic{color:var(--acc)}
     <section class="hero" id="iHero" aria-label="Tu mes"></section>
     <div class="side-kpis" id="iKpis"></div>
   </div>
+  <p class="dia-mini" id="iDia" hidden></p>
   <section class="card turno-mini" id="iTurno" aria-label="Turno">
     <div class="tm-l"><h3>Turno</h3><div class="tstate" id="itState"></div></div>
     <div class="btns wr" id="itBtns"></div>
@@ -1447,6 +1490,11 @@ h3 svg.ic{color:var(--acc)}
   </div>
 </section>
 
+<section class="view" id="v-radar" hidden>
+  <div class="vh"><div><h1>Radar</h1><p class="sub" id="rdSub"></p></div></div>
+  <div id="rdBody"></div>
+</section>
+
 <section class="view" id="v-equipo" hidden>
   <div class="vh"><div><h1>Equipo</h1><p class="sub" id="eqSub"></p></div><span class="grow"></span>
     <div class="tools"><button type="button" class="btn sm icon" id="eqPrev" aria-label="Mes anterior">‹</button><select id="eqMes" aria-label="Mes"></select><button type="button" class="btn sm icon" id="eqNext" aria-label="Mes siguiente">›</button></div></div>
@@ -1456,7 +1504,9 @@ h3 svg.ic{color:var(--acc)}
     <section class="card"><div class="card-h"><h3>FTDs por agente</h3><span class="p-sub">Tocá uno para ver sus ventas</span></div><div id="eqRank"></div></section>
     <section class="card"><div class="card-h"><h3>FTDs por día de la mesa</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div></div><div class="chart" id="eqChart"></div></section>
   </div>
+  <section class="card" id="eqPron" aria-label="Pronóstico del mes" hidden></section>
   <section class="card" id="eqPool" aria-label="Llamadas de hoy de cada uno" hidden></section>
+  <section class="card" id="eqCurva" aria-label="Curva del agente nuevo" hidden></section>
   <section class="card" id="eqCola" aria-label="La cola de cada uno" hidden></section>
   <section class="card"><div class="card-h"><h3>Agentes</h3><span class="p-sub" id="eqCount"></span><span class="grow"></span><span class="p-sub">Tocá <b>Ficha</b> para ver su agenda, turnos, clientes y tareas</span></div><div class="p-tablewrap" id="eqTable"></div></section>
 </section>
@@ -1473,8 +1523,8 @@ h3 svg.ic{color:var(--acc)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.21.0';
-const EXT_VER='1.8.5'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.22.0';
+const EXT_VER='1.9.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -1580,7 +1630,11 @@ let avatars={},avOk=false; // fotos de perfil: uid → {url, at}
 let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
 const canEdit=f=>f&&(f.uid===me||isLeader());
-const memberName=uid=>{const m=members.find(x=>x.id===uid);return m?m.name:'—'};
+// Joaquín Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
+let botU=null;const isBot=uid=>!!botU&&uid===botU.id;
+function setMembers(list){botU=list.find(m=>m.bot)||null;members=list.filter(m=>!m.bot)}
+let mesaCh=null,crmPingAt=0;function mesaPing(ev){try{if(mesaCh)mesaCh.send({type:'broadcast',event:ev,payload:{}})}catch(e){}}
+const memberName=uid=>{if(isBot(uid))return botU.name;const m=members.find(x=>x.id===uid);return m?m.name:'—'};
 const S2F=r=>({_id:r.id,uid:r.user_id,n:r.n,date:r.date,time:r.time||'',id:r.client_id,country:r.country||'',name:r.name||'',aff:r.aff||'',camp:r.camp??'',
   amount:+r.amount,tx:r.tx||undefined,reg:r.reg||r.date,brand:r.brand||''});
 const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),country:f.country||null,name:f.name||null,aff:f.aff||null,camp:f.camp??null,
@@ -1766,7 +1820,7 @@ function bootApply(R,quiet){
   if(!R.prof)throw new Error('NO_PROFILE');
   profile=R.prof;
   if(!profile.active)throw new Error('INACTIVE');
-  teamInfo=R.tm;members=R.mem.filter(m=>m.team_id===profile.team_id);
+  teamInfo=R.tm;setMembers(R.mem.filter(m=>m.team_id===profile.team_id));
   chatsLoaded(R.ch,R.cm,R.rd,R.ms);tasksLoaded(R.tk,R.tp);
   snippets=R.sn.map(N2S);leads=R.ld.map(L2C);pings=R.pg.map(G2P);
   team=R.sales.map(S2F);mine();
@@ -1803,6 +1857,8 @@ addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
+  // canal de la mesa, solo para avisarse "cambió algo del CRM" (sin datos): así un new cuenta para todos apenas alguien lo ve, sin esperar los 45 s
+  try{if(mesaCh)sb.removeChannel(mesaCh);mesaCh=sb.channel('vitalis-mesa-'+profile.team_id,{config:{broadcast:{self:false}}}).on('broadcast',{event:'crm'},()=>{if(Date.now()-crmPingAt>4000){crmPingAt=Date.now();clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),600)}}).subscribe()}catch(e){mesaCh=null}
   const gen=++rtGen;rtOk=false;
   const up=(arr,item,key='_id')=>{const i=arr.findIndex(x=>x[key]===item[key]);if(i>=0)arr[i]=item;else arr.push(item)};
   chan=sb.channel('vitalis-'+me)
@@ -1842,6 +1898,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'profiles'},p=>{
       if(p.eventType==='DELETE')return;
       if(p.new.team_id!==profile.team_id&&p.new.id!==me)return;
+      if(p.new.bot){botU=p.new;refresh();return} // Joaquín Vitalis no va en la lista de la mesa
       up(members,p.new,'id');
       if(p.new.id===me){profile=p.new;if(!p.new.active)return location.reload()}
       refresh();
@@ -2368,7 +2425,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
+const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -2378,7 +2435,7 @@ const GROUPS=[
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
-  {g:'analisis',views:['ventas','clientes','filtros'],tabs:['Ventas','Campañas','Filtros']},
+  {g:'analisis',views:['ventas','clientes','filtros','radar'],tabs:['Ventas','Campañas','Filtros','Radar']},
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
@@ -2571,7 +2628,7 @@ async function ensureFormers(rows){ // crea (o encuentra) a cada uno y le pasa s
   const {data,error}=await sb.rpc('add_formers',{nms:names}); // todos de una
   if(error){if(/add_former|PGRST202|42883/.test(String(error.message||error.code)))toast('Los desvinculados se activan en un rato (falta actualizar la base).','warn');else toast(esc(errMsg(error)),'err');return nuevos}
   for(const r of data||[])if(r&&r.id){for(const x of rows)if(!x.uid&&repName(x.agent)===r.name)x.uid=r.id;if(r.new)nuevos.push(r.id)}
-  if(names.length)try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'))}catch(e){}
+  if(names.length)try{setMembers(await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')))}catch(e){}
   return nuevos;
 }
 function formersToast(ids,rows){
@@ -2624,31 +2681,12 @@ function assignModal(rows,src){ // "¿quién es «J. Ortega»?" → se guarda co
   }}]});
 }
 
-/* ---------- FTDs sin detalle ---------- */
-async function setAjusteN(ym,n){
-  if(!noRO())return false;
-  n=Math.max(0,Math.min(999,Math.round(+n||0)));const cur=ajustes[ym]||0;if(n===cur){refresh();return true}
-  const before=calc(ym);if(!await B.setAjuste(ym,n))return false;
-  const s=calc(ym);
-  toast(`✔ ${esc(mLong(ym))}: ${plural(n,'FTD')} sin detalle → <b>${plural(s.n,'FTD')}</b> · ${money(s.usd)} USD`,'ok',{key:'aj'});
-  if(s.tier>before.tier){toast(`🎉 Bono de ${s.bono} USD desbloqueado (${s.tier}+ FTDs).`,'win',{ms:9000});beep(2)}
-  return true;
+/* ---------- FTDs sin detalle: ya no se cargan (las ventas entran solo desde el CRM con la extensión); los viejos se pueden quitar ---------- */
+function quitarAjuste(ym){
+  if(!noRO())return;const n=ajustes[ym]||0;if(!n)return;
+  modal({title:'Quitar los FTDs sin detalle',body:`<p class="mp">${esc(mLong(ym))} tiene ${plural(n,'FTD')} sin detalle. Si ${n===1?'lo':'los'} quitás, no se ${n===1?'puede':'pueden'} volver a cargar: las ventas entran solo desde el CRM con la extensión.</p>`,
+    actions:[{l:'Cancelar'},{l:'Quitar',cls:'pri',fn:async()=>{if(!await B.setAjuste(ym,0))return false;toast(`${esc(mLong(ym))}: sin FTDs sin detalle.`,'ok',{key:'aj'});refresh()}}]});
 }
-function ajusteModal(ym){
-  if(!noRO())return;
-  const cur=ajustes[ym]||0;
-  const body=`<div class="rows">
-    <div class="rw"><span class="k">Cargados</span><span class="d"></span><span class="v">${calc(ym).loaded}</span></div>
-    <div class="rw"><span class="k">Sin detalle</span><span class="d"></span><span class="v"><span class="step"><button type="button" data-d="-1" aria-label="menos">−</button><input type="number" id="ajN" min="0" max="999" value="${cur}" aria-label="FTDs sin detalle"><button type="button" data-d="1" aria-label="más">+</button></span></span></div>
-    <div class="rw tot hl"><span class="k">Total</span><span class="d"></span><span class="v" id="ajTot"></span></div></div>`;
-  modal({title:`FTDs sin detalle · ${esc(mLong(ym))}`,body,actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:api=>setAjusteN(ym,api.q('#ajN').value).then(ok=>ok?undefined:false)}],
-    onOpen(api){
-      const inp=api.q('#ajN'),upd=()=>{const n=calc(ym).loaded+Math.max(0,+inp.value||0),s=porCantidad(n);api.q('#ajTot').textContent=`${plural(n,'FTD')} · ${money(s.usd)} USD`};
-      api.box.addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;inp.value=Math.max(0,(+inp.value||0)+ +b.dataset.d);upd()});
-      inp.addEventListener('input',upd);upd();setTimeout(()=>inp.select(),0);
-    }});
-}
-
 /* ---------- agenda ---------- */
 const dueStr=d=>`${ymd(d)}T${z(d.getHours())}:${z(d.getMinutes())}`;
 const byDue=(a,b)=>a.due<b.due?-1:a.due>b.due?1:0;
@@ -2726,7 +2764,7 @@ async function posponer(p,minutes,toDate){
 }
 function pendEdit(p){
   if(!p||!noRO())return;
-  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
+  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div>${(h=>h?`<p class="p-sub ag-hint">${esc(h)}</p>`:'')(cobroHint((crmStatusOf(id)||{}).country))}<div class="ebox" id="pErr"></div>`,wide:1,
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
@@ -3156,7 +3194,7 @@ function ayuda(){
   <h4>Sueldo</h4><dl>
     <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
-    <dt>Sin detalle</dt><dd>FTDs del mes que suman al sueldo pero no están en ventas.</dd>
+    <dt>Ventas</dt><dd>Entran solas desde el CRM con la extensión. Ya no se cargan FTDs sin detalle.</dd>
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
   <h4>Turno y agenda</h4><dl>
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
@@ -3185,7 +3223,7 @@ const ACT={
   salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
-  ajuste:el=>ajusteModal(el.dataset.ym||ymNow()),target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
+  target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},
   fichaCl:el=>openFicha(el.dataset.id),
   pHecho:el=>pendHecho(pendOf(el)),pDeshacer:el=>{const p=pendOf(el);if(p&&noRO())B.updPend(p,{done:false,doneAt:null})},
   pMas:el=>posponer(pendOf(el),+el.dataset.m||60),pManana:el=>posponer(pendOf(el),0,addDays(todayS(),1)),
@@ -3266,7 +3304,7 @@ V.inicio={
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
     if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}</div><span class="grow"></span>
-      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div><button type="button" class="hb wr" data-act="ajuste" data-ym="${ym}" title="FTDs del mes que no están en ventas">FTDs sin detalle</button></div></div>${bonoTrack(s.n,false,utOf(me))}`;
+      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
@@ -3277,6 +3315,7 @@ V.inicio={
     crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
+    {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
     this.turno(true);
   },
   turno(force){
@@ -3597,8 +3636,7 @@ V.sueldo={
     $('#suPrev').onclick=()=>step(-1);$('#suNext').onclick=()=>step(1);
     $('#suTcSave').onclick=()=>this.saveTc();
     $('#suTc').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();this.saveTc()}});
-    $('#suNom').addEventListener('click',e=>{const b=e.target.closest('[data-aj]');if(!b)return;setAjusteN(suYm,(ajustes[suYm]||0)+ +b.dataset.aj)});
-    $('#suNom').addEventListener('change',e=>{if(e.target.id==='suAj')setAjusteN(suYm,e.target.value)});
+    $('#suNom').addEventListener('click',e=>{if(e.target.closest('[data-aj0]'))quitarAjuste(suYm)}); // los FTDs entran solo desde el CRM con la extensión; los "sin detalle" viejos se pueden quitar
     const setN=n=>{siN=Math.max(0,Math.min(999,Math.round(+n||0)));this.sim()};
     $('#siR').addEventListener('input',e=>setN(e.target.value));
     $('#siN').addEventListener('input',e=>{if(e.target.value!=='')setN(e.target.value)});
@@ -3626,7 +3664,7 @@ V.sueldo={
     $('#suNom').innerHTML=`<div class="rows">`+
       rw('FTDs',`<b>${s.n}</b>`,'big')+
       rw('Cargados',String(s.loaded))+
-      rw('Sin detalle',readOnly?String(s.extra):`<span class="step"><button type="button" data-aj="-1" aria-label="menos">−</button><input type="number" id="suAj" min="0" max="999" value="${s.extra}" aria-label="FTDs sin detalle"><button type="button" data-aj="1" aria-label="más">+</button></span>`)+
+      (s.extra?rw('Sin detalle (ya no se cargan)',readOnly?String(s.extra):`${s.extra} <button type="button" class="lnk" data-aj0>quitar</button>`):'')+
       rw('Fijo',`${pesos(cfg.base)} UYU`)+
       rw(`Por FTD (${s.n} × ${cfg.porftd} USD)`,`${money(s.porftd)} USD`)+
       rw(s.tier?`Bono (${s.tier}+ FTDs)`:'Bono',`${money(s.bono)} USD`)+
@@ -3813,6 +3851,7 @@ V.equipo={
     const k=(lb,v,s2,hero)=>`<div class="kpi${hero?' hero':''}"><div class="lb">${esc(lb)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s2)}</div></div>`;
     const T=targets[eqYm]||0;
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);
+    {const pr=eqYm===now?pronCard():'';$('#eqPron').hidden=!pr;$('#eqPron').innerHTML=pr;const cv=eqYm===now?curvaCard():'';$('#eqCurva').hidden=!cv;$('#eqCurva').innerHTML=cv} // pronóstico y curva del agente nuevo: solo team leader y admin
     {const pm=eqYm===now?callsMesaCard():'';$('#eqPool').hidden=!pm;$('#eqPool').innerHTML=pm} // las llamadas de hoy de cada uno
     crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
@@ -3836,7 +3875,7 @@ V.equipo={
 };
 
 /* ---------- mi cuenta y la mesa (en ajustes) ---------- */
-async function reloadMembers(){try{members=await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name'));refresh()}catch(e){}}
+async function reloadMembers(){try{setMembers(await Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')));refresh()}catch(e){}}
 V.cuenta={
   build(){
     $('#cfNameSave').onclick=async()=>{const v=$('#cfName').value.trim();if(!v)return toast('Escribí tu nombre.','err');if(v===profile.name)return;if(await B.saveName(v))toast('Nombre guardado.')};
@@ -4414,9 +4453,22 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
+// una venta: Joaquín Vitalis felicita en "Toda la mesa". Es un logro: avisa a todos aunque el chat esté silenciado.
+let botAsk=0;
+function cheerEvent(m,c){
+  if(Date.now()-m.t>10*6e4)return;
+  const txt=clip(msgTxt(m.body),160);
+  toast(`<b>${esc(memberName(m.uid))}</b>: ${esc(txt)}`,'win',{ms:9000,key:'venta'+m._id,actions:chatViewing(c.id)?[]:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
+  if(Date.now()-chatSound>2500){chatSound=Date.now();pop()}
+  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:'info',title:'Venta nueva',id:memberName(m.uid),kw:txt,meta:'',btns:[['open','Abrir chat',1],['close','Ok']]});
+}
 function chatEvent(m){
   if(m.uid===me)return;
   const c=chatOf(m.chat);if(!c)return;
+  if(!isBot(m.uid)&&memberName(m.uid)==='—'&&Date.now()-botAsk>6e4){ // alguien que todavía no conozco (la primera venta crea a Joaquín Vitalis): traigo la lista y sigo
+    botAsk=Date.now();Q(sb.from('profiles').select('*').eq('team_id',profile.team_id).order('name')).then(l=>{setMembers(l);chatEvent(m);refresh()}).catch(()=>{});return;
+  }
+  if(isBot(m.uid)){cheerEvent(m,c);if(chatViewing(c.id))markRead(c.id);return}
   if(chatViewing(c.id)){markRead(c.id);return}
   if(Date.now()-m.t>10*6e4)return; // viejo (al reconectar): queda como no leído, sin aviso
   // silenciar un chat solo calla ese chat; si te nombran, te responden o el team leader escribe @todos / @vos, avisa igual
@@ -5355,7 +5407,7 @@ async function crmSeenFromExt(rows){
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
   const keys=batch.map(r=>String(r&&r.k||''));
   if(!list.length)return {keys};
-  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();return {keys,added:res&&res.new||0}}
+  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();if(res&&(res.new||res.changed))mesaPing('crm');return {keys,added:res&&res.new||0}}
   catch(e){const m=String(e&&(e.message||e.code));if(/crm_seen|PGRST202|42883|crm_clients|does not exist/.test(m)){crm.ok=false;crm.at=Date.now();return {err:'falta actualizar la base'}}return {err:errMsg(e)}}
 }
 
@@ -5391,7 +5443,7 @@ function ahRow(r,i,who){
   const ra=regAt(r),ca=callAt(r),tz=cliTime(r.country);
   return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}${dayTag(r)}</td>
     <td class="d" title="${ca?esc(whenTxt(ca)):''}">${ca?esc(rel(ca)):'—'}${r.note?`<div class="ah-nt trunc" title="${esc(r.note)}">${esc(r.note)}</div>`:''}</td>
-    <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
+    <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}${newClock(r)}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
     ${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}<td class="act wr"><button type="button" class="ib" data-ah="ficha" data-id="${esc(r.id)}">Ficha</button><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
 }
 function ahTable(list,who,lim){
@@ -5432,11 +5484,12 @@ V.ahora={
     const lim=g=>ahMore[g]?0:40,more=(g,l)=>l.length>40&&!ahMore[g]?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${g}">Ver los ${l.length}</button>`:'';
     const agBody=q.ag.length?`<div class="alist">${q.ag.map(p=>uid===me||pend.includes(p)?pendItem(p,now,true):`<div class="ai"><span class="wh">${esc(whenTxt(parseDue(p.due)))}</span><span class="id">${esc(p.id)}</span><span class="kw">${esc(p.kw)}<small>${esc(memberName(p.uid))}</small></span><span></span></div>`).join('')}</div>`:'';
     const g3sub=q.many?`Son ${q.n3}: más que el tope de ${q.cap}, así que van solo los registrados en ${MES[now.getMonth()]} (${q.g3.length})`:`${plural(q.n3,'cliente')} · hasta ${q.cap} se llaman todos`;
-    $('#ahBody').innerHTML=
+    hotNotify();
+    $('#ahBody').innerHTML=hotCard(q)+
       sec(1,'New',`${q.g1.length} sin depositar`,ahTable(q.g1,who,lim('g1'))+more('g1',q.g1),crm.rows.size?'No hay new sin depositar.':esc(noCrm()))+
       sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas')+(q.cb.length?` · ${plural(q.cb.length,'CallBack o Pending Payment','CallBack o Pending Payment')} sin agenda en Vitalis`:''),
         agBody+(q.cb.length?`<p class="p-sub" style="margin:10px 0 6px">Tienen cita en el CRM: agendalos en Vitalis para que te avise.</p>`+ahTable(q.cb,who,lim('cb'))+more('cb',q.cb):''),'Nada agendado para ahora.')+
-      sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+
+      sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+segCard(q,who)+
       `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}
@@ -6352,7 +6405,7 @@ function comboHTML(d){
   const g=d.cs,rw2=(k,v)=>`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`;
   if(!d.aff&&!d.camp)return `<div class="fi-c"><h4>Campaña</h4><p class="p-sub" style="margin:0">El CRM no la muestra en la lista.</p></div>`;
   return `<div class="fi-c fi-combo"><h4>Campaña <span class="fi-v" title="${esc(campTxt(d.aff,d.camp,d.pais))}">${esc(campTxt(d.aff,d.camp,d.pais))}</span></h4>
-    ${g&&g.reg?`<p class="fi-cline">${campLine(g)}</p>${stBar(g)}`:''}
+    ${g&&g.reg?`<p class="fi-cline">${campLine(g)}</p>${stBar(g)}`:''}${(h=>h?`<p class="fi-late">${esc(h)}</p>`:'')(affLateHint(d.aff))}
     ${g&&g.reg?rw2('Registrados vistos',g.reg)+rw2('Atienden',`${g.at} · ${pctTxt(g.at,g.at+g.no)}`)+rw2('Depositaron',`${g.dep} · ${pctTxt(g.dep,g.reg)}${g.dep?` <span class="d">(${g.nw} new · ${g.lt} late)</span>`:''}`):''}
     ${g&&g.ftd?rw2('FTDs en 30 días',g.f30)+rw2('FTDs en total',`${g.ftd} · ${pctTxt(g.flt,g.ftd)} late`)+(g.last?rw2('Último FTD',`${esc(g.last.date===todayS()?'hoy':dm(g.last.date))} ${esc(g.last.time||'')}`):''):(g&&g.reg?'':'<p class="p-sub" style="margin:0">Sin datos de esta campaña todavía.</p>')}</div>`;
 }
@@ -6403,6 +6456,243 @@ function campDetail(k,from,to,perTxt){
       campModal(d,g.camp,a.dataset.cma==='edit',after);
     }),actions:[{l:'Cerrar'}]});
 }
+
+/* ============================================================
+   Radar: lo que predice ventas (PROPUESTAS.md, 10 ideas).
+   Todo sale de las ventas de la mesa (`team`) y de los clientes del CRM: sin tablas nuevas.
+   Mientras Novara junta historia (menos de RD_MIN FTDs), los patrones usan también la de Trade24Seven y lo dicen.
+   El pronóstico del mes y la curva del agente nuevo: solo team leader y admin (en Equipo).
+   ============================================================ */
+const RD_MIN=400;
+const rdBase=perPass(()=>{const nv=team.filter(f=>!isArch(f.brand)),all=nv.length<RD_MIN;return {list:all?team:nv,nv:nv.length,all}});
+const rdNote=()=>{const b=rdBase();return b.all?`Con la historia de Trade24Seven: Novara lleva ${plural(b.nv,'FTD')} y desde ${RD_MIN} se usa sola.`:`Con los ${nf(b.nv)} FTDs de Novara.`};
+const rdHour=f=>{const m=/^(\d{1,2}):/.exec(f.time||'');return m?+m[1]:null};
+const rdPais=f=>paisOf(f.country)||'';
+const rdFew=n=>`<div class="p-empty">Pocos datos todavía${n!=null?` (${n})`:''}.</div>`;
+// días hábiles entre dos fechas (los del viernes vuelven el lunes)
+function bizDays(a,b){let n=0;const d=parseYMD(a),e=parseYMD(b);while(d<e){d.setDate(d.getDate()+1);const w=d.getDay();if(w!==0&&w!==6)n++}return n}
+
+/* ---------- 1) el reloj del new ---------- */
+// mismo día: la mitad deposita antes de estos minutos desde el registro (por país); 85% antes de las 2 h
+const NEW_WIN={chile:46,colombia:54,mexico:64,peru:66},NEW_DEF=52;
+function newClock(r){
+  if(r.grp!=='new'||!r.reg||r.reg.length<=10)return '';
+  const at=regAt(r);if(!at||ymd(at)!==todayS())return '';
+  const m=Math.round((Date.now()-at)/6e4);if(m<0)return '';
+  const w=NEW_WIN[norm(paisOf(r.country))]||NEW_DEF,t=`La mitad de los que depositan el mismo día lo hace antes de los ${w} min del registro; 85% antes de las 2 h.`;
+  if(m<=w)return `<span class="rl on" title="${t}">ventana fuerte · ${w-m} min</span>`;
+  if(m<=120)return `<span class="rl mid" title="${t}">se enfría · ${120-m} min</span>`;
+  return `<span class="rl off" title="${t}">frío</span>`;
+}
+
+/* ---------- 2) campaña caliente ---------- */
+const hotCamps=perPass(()=>{
+  const te=todayS(),m=new Map();
+  for(const f of team){if(f.date!==te||isArch(f.brand))continue;const k=comboKey(f.aff,f.camp,f.country);let o=m.get(k);if(!o)m.set(k,o={k,n:0,txt:campTxt(f.aff,f.camp,f.country)});o.n++}
+  return [...m.values()].filter(o=>o.n>=2).sort((a,b)=>b.n-a.n);
+});
+const hotChance=n=>n>=3?'casi la mitad de las veces llega otro':'1 de cada 3 veces llega otro';
+function hotMine(q){ // q: la cola de quien mira; devuelve las campañas calientes con sus clientes sin depositar
+  const H=hotCamps();if(!H.length||!q)return [];
+  const L=[...q.g1,...q.cb,...q.g3,...q.low];
+  return H.map(h=>({...h,cl:L.filter(r=>comboKey(r.aff,r.camp,r.country)===h.k)})).filter(h=>h.cl.length);
+}
+function hotCard(q){
+  const H=hotMine(q);if(!H.length)return '';
+  return `<section class="card rd-hot"><div class="card-h"><svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg><h3>Campaña caliente</h3><span class="p-sub">está depositando hoy: llamá primero a los de esa campaña</span></div>
+    ${H.map(h=>`<div class="rd-hot-r"><div><b>${esc(h.txt)}</b> <span class="d">lleva ${h.n} FTDs hoy · ${hotChance(h.n)}</span></div>
+      <div class="rd-ids">${h.cl.slice(0,14).map(r=>`<button type="button" class="chip" data-ah="ficha" data-id="${esc(r.id)}" title="${esc(r.name)} · ${esc(r.status)}">${esc(r.id)}</button>`).join('')}${h.cl.length>14?`<span class="d">+${h.cl.length-14}</span>`:''}</div></div>`).join('')}</section>`;
+}
+function hotNotify(){ // un aviso por campaña y por día, cuando llega a 2 y tenés clientes de esa campaña
+  if(!ready||!crm.ok||isLeadUid(me))return;
+  const H=hotCamps();if(!H.length)return;
+  const te=todayS(),seen=local.get('hot',{d:te,k:[]});if(seen.d!==te){seen.d=te;seen.k=[]}
+  const fresh=H.filter(h=>!seen.k.includes(h.k));if(!fresh.length)return;
+  const mine=hotMine(queueOf(me));
+  for(const h of fresh){seen.k.push(h.k);const x=mine.find(y=>y.k===h.k);
+    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'cliente')} de esa campaña sin depositar.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Ver la cola',fn:()=>go('ahora')}]})}
+  local.set('hot',seen);
+}
+
+/* ---------- 3) segundas oportunidades ---------- */
+// de los que depositan otro día (late): 47% al día siguiente, 64% en 3 días, 87% en 7
+const SEG_GRP=['pending','failed','callback','call_again','low_potential'];
+function segList(q){
+  if(!q)return [];
+  const te=todayS(),seen=new Set(),out=[];
+  for(const r of [...q.cb,...q.g3,...q.low,...q.failed]){
+    if(!SEG_GRP.includes(r.grp)||seen.has(r.id))continue;seen.add(r.id);
+    const rd=regDay(r);if(!rd||rd>=te)continue;
+    const d=bizDays(rd,te);if(d<1||d>10)continue;
+    out.push({r,d,w:(d<=1?0:d<=3?10:d<=7?20:30)+SEG_GRP.indexOf(r.grp)});
+  }
+  return out.sort((a,b)=>a.w-b.w||(regAt(b.r)||0)-(regAt(a.r)||0));
+}
+const segTag=d=>d<=1?sp('rl on','hoy es su mejor día'):d<=3?sp('rl mid','todavía a tiempo'):d<=7?sp('rl off','última semana'):sp('rl off','poca chance');
+function segCard(q,who){
+  const L=segList(q);if(!L.length)return '';
+  const row=({r,d})=>`<tr><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td><td class="d">hace ${plural(d,'día hábil','días hábiles')}</td><td>${segTag(d)}</td><td>${esc(r.country)}</td>${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}
+    <td class="act wr"><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
+  return `<section class="card ah-g"><details data-k="seg"${L.some(x=>x.d<=1)?' open':''}><summary class="card-h"><h3>Segundas oportunidades</h3><span class="p-sub">${L.length} que hablaron y no depositaron · de los que vuelven, la mitad lo hace al día siguiente y 9 de cada 10 en la semana</span></summary>
+    <div class="p-tablewrap"><table class="pt ah-t"><thead><tr><th>Cliente</th><th>Status</th><th>Registro</th><th>Chance</th><th>País</th>${who?'<th>Agente</th>':''}<th class="act"></th></tr></thead><tbody>${L.slice(0,25).map(row).join('')}</tbody></table></div>
+    ${L.length>25?`<p class="p-sub" style="margin-top:8px">y ${L.length-25} más.</p>`:''}</details></section>`;
+}
+
+/* ---------- 5) el mapa del día ---------- */
+const H0=8,H1=20;
+const dayMap=perPass(()=>{
+  const m=new Map();
+  for(const f of rdBase().list){const h=rdHour(f),p=rdPais(f);if(h==null||!p)continue;let o=m.get(p);if(!o)m.set(p,o={p,n:0,h:Array(24).fill(0)});o.n++;o.h[h]++}
+  return [...m.values()].filter(o=>o.n>=20).sort((a,b)=>b.n-a.n).slice(0,8);
+});
+function mapCard(){
+  const M=dayMap(),hr=new Date().getHours(),hs=[];for(let h=H0;h<=H1;h++)hs.push(h);
+  if(!M.length)return `<section class="card"><div class="card-h"><h3>El mapa del día</h3><span class="p-sub">a qué hora deposita cada país</span></div>${rdFew()}</section>`;
+  const strong=M.filter(o=>{const mx=Math.max(...o.h);return mx&&o.h[hr]>=mx*.8}).map(o=>o.p);
+  return `<section class="card"><div class="card-h"><h3>El mapa del día</h3><span class="p-sub">a qué hora deposita cada país (hora del CRM)</span></div>
+    <p class="rd-now">${hr>=H0&&hr<=H1?(strong.length?`Ahora (${hr} h) es hora fuerte de <b>${esc(strong.join(', '))}</b>.`:`Ahora (${hr} h) no es la hora fuerte de ningún país.`):'Fuera del horario de depósitos.'}</p>
+    <div class="p-tablewrap"><table class="rd-map"><thead><tr><th></th>${hs.map(h=>`<th class="${h===hr?'now':''}">${h}</th>`).join('')}</tr></thead><tbody>
+    ${M.map(o=>{const mx=Math.max(...o.h.slice(H0,H1+1))||1,top=o.h.indexOf(Math.max(...o.h));
+      return `<tr><th>${esc(o.p)} <span class="d">${o.n}</span></th>${hs.map(h=>{const v=o.h[h]/mx;return `<td class="${h===hr?'now':''}" title="${esc(o.p)} · ${h} h: ${o.h[h]} FTDs (${pct(o.h[h]/o.n)})"><i style="opacity:${v?Math.max(.08,v).toFixed(2):0}"></i>${h===top?'<b>●</b>':''}</td>`}).join('')}</tr>`}).join('')}
+    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país.</p></section>`;
+}
+
+/* ---------- 6) días de cobro ---------- */
+const BUCK=[[1,6],[7,13],[14,17],[18,24],[25,31]];
+const payDaysBy=perPass(()=>{
+  const m=new Map();
+  for(const f of rdBase().list){const p=rdPais(f),d=+String(f.date).slice(8,10);if(!p||!d)continue;let o=m.get(p);if(!o)m.set(p,o={p,n:0,b:BUCK.map(()=>0)});o.n++;o.b[BUCK.findIndex(([a,z])=>d>=a&&d<=z)]++}
+  for(const o of m.values())o.ix=o.b.map((v,i)=>{const even=(BUCK[i][1]-BUCK[i][0]+1)/30.4;return {sh:v/o.n,even,ix:v/o.n/even}});
+  return [...m.values()].filter(o=>o.n>=40).sort((a,b)=>b.n-a.n).slice(0,8);
+});
+const bTxt=i=>`del ${BUCK[i][0]} al ${BUCK[i][1]}`;
+function cobroHint(country){ // para agendar a un "no tengo la plata": cuándo deposita más su país
+  const o=payDaysBy().find(x=>norm(x.p)===norm(paisOf(country)));if(!o)return '';
+  const i=o.ix.reduce((bi,x,j)=>x.ix>o.ix[bi].ix?j:bi,0);if(o.ix[i].ix<1.25)return '';
+  return `En ${o.p} depositan más ${bTxt(i)} (${pct(o.ix[i].sh)} de sus FTDs; parejo sería ${pct(o.ix[i].even)}).`;
+}
+function cobroCardRd(){
+  const M=payDaysBy(),day=new Date().getDate(),bi=BUCK.findIndex(([a,z])=>day>=a&&day<=z);
+  if(!M.length)return `<section class="card"><div class="card-h"><h3>Días de cobro</h3><span class="p-sub">en qué días del mes deposita cada país</span></div>${rdFew()}</section>`;
+  const hoy=M.filter(o=>o.ix[bi].ix>=1.25).map(o=>o.p);
+  return `<section class="card"><div class="card-h"><h3>Días de cobro</h3><span class="p-sub">en qué días del mes deposita cada país</span></div>
+    <p class="rd-now">${hoy.length?`Hoy es ${day}: días fuertes de <b>${esc(hoy.join(', '))}</b>.`:`Hoy es ${day}: ningún país está en sus días fuertes.`} A los "no tengo la plata", agendalos para los días fuertes de su país.</p>
+    <div class="p-tablewrap"><table class="pt rd-pay"><thead><tr><th>País</th>${BUCK.map(([a,z],i)=>`<th class="r${i===bi?' now':''}">${a}–${z}</th>`).join('')}</tr></thead><tbody>
+    ${M.map(o=>`<tr><td><b>${esc(o.p)}</b> <span class="d">${o.n}</span></td>${o.ix.map((x,i)=>`<td class="r${x.ix>=1.25?' up':x.ix<=.8?' dn':''}" title="${pct(x.sh)} de sus FTDs; parejo sería ${pct(x.even)}">${pct(x.sh)}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div><p class="p-sub rd-foot">En verde, los días en que ese país deposita bastante más que lo parejo.</p></section>`;
+}
+
+/* ---------- 7) radar de campañas ---------- */
+const campRadar=perPass(()=>{
+  const te=todayS(),a0=addDays(te,-13),b0=addDays(te,-27),m=new Map();
+  for(const f of team){if(isArch(f.brand)||f.date<b0||f.date>te)continue;const k=comboKey(f.aff,f.camp,f.country);let o=m.get(k);if(!o)m.set(k,o={k,txt:campTxt(f.aff,f.camp,f.country),a:0,b:0});if(f.date>=a0)o.a++;else o.b++}
+  const L=[...m.values()];
+  return {up:L.filter(o=>(o.b===0&&o.a>=2)||(o.b>0&&o.a>=3&&o.a>=o.b*2)).sort((x,y)=>y.a-x.a).slice(0,8),
+    dn:L.filter(o=>o.b>=3&&o.a<=o.b/2).sort((x,y)=>y.b-x.b).slice(0,8),n:L.length};
+});
+function radarCard(){
+  const R=campRadar(),li=(o,cls)=>`<li><b>${esc(o.txt)}</b><span class="${cls}">${o.b} → ${o.a}</span></li>`;
+  return `<section class="card"><div class="card-h"><h3>Radar de campañas</h3><span class="p-sub">FTDs de las últimas 2 semanas contra las 2 anteriores · Novara</span></div>
+    ${!R.n?rdFew():`<div class="rd-2"><div><h4>Nacen o crecen</h4>${R.up.length?`<ul class="rd-l">${R.up.map(o=>li(o,'ok b')).join('')}</ul>`:'<p class="p-sub">Ninguna por ahora.</p>'}</div>
+    <div><h4>Se apagan</h4>${R.dn.length?`<ul class="rd-l">${R.dn.map(o=>li(o,'hot b')).join('')}</ul>`:'<p class="p-sub">Ninguna por ahora.</p>'}</div></div>
+    <p class="p-sub rd-foot">Una campaña da lo mejor en sus primeras semanas: a las que nacen, llamarlas primero.</p>`}</section>`;
+}
+
+/* ---------- 8) tu día ---------- */
+// por agente y día: a qué hora llegó el primer FTD y cómo terminó el día
+const dayStart=perPass(()=>{
+  const m=new Map();
+  for(const f of rdBase().list){const h=rdHour(f);if(h==null)continue;const k=f.uid+'|'+f.date;let o=m.get(k);if(!o)m.set(k,o={h:99,n:0});o.n++;if(h<o.h)o.h=h}
+  const B=[{l:'antes de las 11',t:h=>h<11},{l:'entre las 11 y las 13',t:h=>h>=11&&h<13},{l:'entre las 13 y las 15',t:h=>h>=13&&h<15},{l:'después de las 15',t:h=>h>=15}].map(b=>({...b,d:0,n2:0,n3:0}));
+  for(const o of m.values()){const b=B.find(x=>x.t(o.h));if(!b)continue;b.d++;if(o.n>=2)b.n2++;if(o.n>=3)b.n3++}
+  return B;
+});
+function diaLine(){
+  if(isLeadUid(me))return '';
+  const te=todayS(),hoy=ftds.filter(f=>f.date===te&&f.time).sort((a,b)=>a.time.localeCompare(b.time)),B=dayStart(),hr=new Date().getHours();
+  if(hoy.length){
+    const h=rdHour(hoy[0]),b=B.find(x=>x.t(h));if(!b||b.d<20)return '';
+    if(hoy.length>=3)return '';
+    return `Primer FTD a las ${esc(hoy[0].time)}. De los días que arrancan ${b.l}, <b>${pct(b.n2/b.d)}</b> termina con 2 o más${b.n3?` y ${pct(b.n3/b.d)} con 3 o más`:''}.`;
+  }
+  if(hr<11&&B[0].d>=20&&!ftds.some(f=>f.date===te))return `Un FTD antes de las 11 cambia el día: <b>${pct(B[0].n2/B[0].d)}</b> de esos días termina con 2 o más.`;
+  return '';
+}
+
+/* ---------- 9) afiliadores que maduran tarde ---------- */
+const affLate=perPass(()=>{
+  const m=new Map();let n=0,lt=0;
+  for(const f of rdBase().list){const a=String(f.aff||'').trim();n++;const l=isLate(f)?1:0;lt+=l;if(!a)continue;let o=m.get(norm(a));if(!o)m.set(norm(a),o={a,n:0,lt:0});o.n++;o.lt+=l}
+  const mesa=n?lt/n:0,L=[...m.values()].filter(o=>o.n>=15).map(o=>({...o,sh:o.lt/o.n,slow:o.lt/o.n>=mesa*1.8&&o.lt/o.n>=mesa+.08})).sort((x,y)=>y.sh-x.sh);
+  return {mesa,L,n};
+});
+function affLateHint(aff){
+  const A=affLate(),o=A.L.find(x=>norm(x.a)===norm(String(aff||'').trim()));
+  return o&&o.slow?`Este afiliador madura tarde: ${pct(o.sh)} de sus ventas llegan otro día (la mesa: ${pct(A.mesa)}). Conviene insistir varios días.`:'';
+}
+function lateCard(){
+  const A=affLate();
+  return `<section class="card"><div class="card-h"><h3>Afiliadores que maduran tarde</h3><span class="p-sub">cuánto de lo que venden llega otro día (late) · la mesa: ${pct(A.mesa)}</span></div>
+    ${!A.L.length?rdFew():`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Afiliador</th><th class="r">FTDs</th><th class="r">Late</th><th></th></tr></thead><tbody>
+    ${A.L.slice(0,12).map(o=>`<tr><td><b>${esc(o.a)}</b></td><td class="r">${o.n}</td><td class="r${o.slow?' up':''}">${pct(o.sh)}</td><td>${o.slow?sp('rl mid','insistir varios días'):''}</td></tr>`).join('')}
+    </tbody></table></div><p class="p-sub rd-foot">Con los que maduran tarde, un "lo pienso" vale más: agendalos y volvé a llamar.</p>`}</section>`;
+}
+
+/* ---------- 4) pronóstico del mes (solo team leader y admin) ---------- */
+// cuánto del mes lleva la mesa a cada día: centro (mínimo–máximo) de los meses de historia
+const PACE=[[10,.34,.21,.41],[15,.52,.34,.61],[20,.70,.52,.82],[25,.85,.70,.98],[31,1,1,1]];
+function paceAt(day){
+  if(day<8)return null;
+  if(day<=10){const k=day/10;return {mid:PACE[0][1]*k,lo:PACE[0][2]*k,hi:PACE[0][3]*k}}
+  for(let i=1;i<PACE.length;i++){const a=PACE[i-1],b=PACE[i];if(day<=b[0]){const k=(day-a[0])/(b[0]-a[0]),f=j=>a[j]+(b[j]-a[j])*k;return {mid:f(1),lo:f(2),hi:f(3)}}}
+  return {mid:1,lo:1,hi:1};
+}
+function proj(n,day){const p=paceAt(day);if(!p)return null;return {mid:Math.round(n/p.mid),lo:Math.max(n,Math.round(n/p.hi)),hi:Math.max(n,Math.round(n/p.lo))}}
+function pronCard(){
+  if(!isLeader())return '';
+  const ym=ymNow(),day=new Date().getDate(),L=team.filter(f=>f.date.slice(0,7)===ym),tg=+targets[ym]||0,P=proj(L.length,day);
+  const head=`<div class="card-h"><h3>Pronóstico del mes</h3><span class="p-sub">solo team leader y admin · según cómo cerraron los meses de historia</span></div>`;
+  if(!P)return head+`<div class="p-empty">Antes del día 8 es muy temprano para proyectar.</div>`;
+  const verdict=(p,t)=>!t?'':p.lo>=t?sp('ok b','llega'):p.hi<t?sp('hot b','no llega a este ritmo'):p.mid>=t?sp('ok','en camino'):sp('warn','justo');
+  const rows=sellers(team).filter(m=>!isLeadUid(m.id)||L.some(f=>f.uid===m.id)).map(m=>{const n=L.filter(f=>f.uid===m.id).length;return {m,n,p:proj(n,day),t:utOf(m.id,ym)}}).sort((a,b)=>b.n-a.n);
+  return head+`<p class="rd-now">La mesa lleva <b>${L.length}</b> al día ${day}. Los meses así cierran entre <b>${P.lo} y ${P.hi}</b> (lo más probable, ${P.mid}).${tg?` Target ${tg}: ${verdict(P,tg)}.`:''}</p>
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">Lleva</th><th class="r">Cierre probable</th><th class="r">Rango</th><th class="r">Target</th><th></th></tr></thead><tbody>
+    ${rows.map(({m,n,p,t})=>`<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td class="r">${n}</td><td class="r"><b>${p.mid}</b></td><td class="r d">${p.lo}–${p.hi}</td><td class="r">${t||'<span class="d">—</span>'}</td><td>${verdict(p,t)}</td></tr>`).join('')}
+    </tbody></table></div><p class="p-sub rd-foot">El rango de un agente solo es más ancho que el de la mesa: tomalo como orientación.</p>`;
+}
+
+/* ---------- 10) curva del agente nuevo (solo team leader y admin) ---------- */
+const newCurve=perPass(()=>{
+  const by=new Map();for(const f of team){let o=by.get(f.uid);if(!o)by.set(f.uid,o={first:f.date.slice(0,7),m:new Map()});const ym=f.date.slice(0,7);if(ym<o.first)o.first=ym;o.m.set(ym,(o.m.get(ym)||0)+1)}
+  const now=ymNow(),idx=(a,b)=>(+b.slice(0,4)-+a.slice(0,4))*12+(+b.slice(5,7)-+a.slice(5,7)),nxt=(ym,k)=>{const d=new Date(+ym.slice(0,4),+ym.slice(5,7)-1+k,1);return d.getFullYear()+'-'+z(d.getMonth()+1)};
+  const start=[...by.values()].reduce((a,o)=>o.first<a?o.first:a,now); // quien ya vendía en el primer mes de la historia no es "nuevo": no se sabe cuándo entró
+  const curve=[];
+  for(let k=0;k<6;k++){let s=0,c=0;for(const o of by.values()){if(o.first===start)continue;const ym=nxt(o.first,k);if(ym>=now)continue;s+=o.m.get(ym)||0;c++}curve.push({k:k+1,avg:c?s/c:null,c})}
+  const fresh=[];for(const [uid,o] of by){const k=idx(o.first,now);if(o.first!==start&&k<=2){const m=members.find(x=>x.id===uid);if(m&&m.active)fresh.push({m,k:k+1,n:o.m.get(now)||0})}}
+  return {curve,fresh};
+});
+function curvaCard(){
+  if(!isLeader())return '';
+  const C=newCurve(),day=new Date().getDate(),ok=C.curve.filter(x=>x.c>=3),mx=Math.max(1,...ok.map(x=>x.avg));
+  const head=`<div class="card-h"><h3>Curva del agente nuevo</h3><span class="p-sub">solo team leader y admin · FTDs por mes desde su primera venta</span></div>`;
+  if(!ok.length)return head+rdFew();
+  const ref=k=>{const x=C.curve[k-1];return x&&x.c>=3?x.avg:null};
+  return head+`<div class="rd-curve">${ok.map(x=>`<div class="rd-cb" title="${x.c} agentes"><i style="height:${Math.round(x.avg/mx*100)}%"></i><b>${nf(x.avg,1)}</b><span>mes ${x.k}</span></div>`).join('')}</div>
+    ${C.fresh.length?`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">Va por su</th><th class="r">Lleva este mes</th><th class="r">Lo normal al cierre</th><th></th></tr></thead><tbody>
+    ${C.fresh.map(({m,k,n})=>{const r=ref(k),p=proj(n,day),v=r==null||!p?'':p.mid>=r?sp('ok b','arriba de la curva'):p.hi>=r?sp('warn','en la curva'):sp('hot b','debajo de la curva');
+      return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td class="r">mes ${k}</td><td class="r"><b>${n}</b></td><td class="r">${r==null?'—':nf(r,1)}</td><td>${v}</td></tr>`}).join('')}</tbody></table></div>`
+      :'<p class="p-sub" style="margin-top:10px">Ahora no hay agentes en sus primeros 3 meses.</p>'}
+    ${ref(1)!=null&&ref(2)!=null&&ref(1)<ref(2)*.75?'<p class="p-sub rd-foot">El primer mes rinde bastante menos que el segundo: es lo normal.</p>':''}`;
+}
+
+/* ---------- la sección Radar (en Análisis) ---------- */
+V.radar={
+  build(){},
+  render(){
+    $('#rdSub').textContent=rdNote();
+    $('#rdBody').innerHTML=`<div class="rd-grid">${mapCard()}${cobroCardRd()}${radarCard()}${lateCard()}</div>`;
+  },
+};
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.

@@ -362,6 +362,33 @@ async def main():
             ok(await F.locator('#ftd-agenda-overlay .card.social:has-text("campañas")').count() == 1, 'y aparece al pasar a otra pestaña')
             await Vo.close()
 
+            # los avisos quedan hasta que los cierres: sincronizar con Vitalis no los saca; los mensajes del chat sí se van solos
+            sql("insert into public.tasks (team_id, created_by, what, campaigns, status) select team_id, id, 'Llamar news', array['Meta CL'], 'New' from public.profiles where name='Sofía Ar'")
+            sql("insert into public.task_people (task_id, user_id) select t.id, p.id from public.tasks t, public.profiles p where p.name='Matias Me' and t.what='Llamar news'")
+            await A2.evaluate('catchUp(true)'); await F.wait_for_timeout(2500)
+            tcard = F.locator('#ftd-agenda-overlay .card.social:has-text("Meta CL")')
+            ok(await tcard.count() == 1, 'otra tarea: su tarjeta aparece')
+            await sw.evaluate("alertCard({k:'crm:t1',kind:'crm',title:'Cliente nuevo en el CRM',id:'990001',kw:'Prueba Nueva',meta:'Chile',btns:[['crm','Ver en el CRM',1],['close','Ok']]},null)")
+            await A2.evaluate("extSig='';syncExt()"); await F.wait_for_timeout(1500)
+            await A2.evaluate("extSig='';syncExt()"); await F.wait_for_timeout(1500)
+            ok(await tcard.count() == 1 and await F.locator('#ftd-agenda-overlay .card.crm:has-text("990001")').count() == 1, 'sincronizar con Vitalis no saca las tarjetas de tareas ni de clientes nuevos')
+            await F.mouse.move(20, 700) # con el mouse encima la tarjeta espera
+            await F.wait_for_timeout(7500)
+            ok(await F.locator('#ftd-agenda-overlay .card.social:has-text("campañas")').count() == 0, 'el mensaje del chat se va solo a los segundos')
+            ok(await tcard.count() == 1 and await F.locator('#ftd-agenda-overlay .card.crm:has-text("990001")').count() == 1, 'la tarea y el cliente nuevo siguen ahí hasta que los cierres')
+            F2 = await ctx.new_page(); await F2.goto('https://example.test/otra'); await F2.bring_to_front(); await F2.wait_for_timeout(1500)
+            nl = await sw.evaluate("liveNow().then(l=>l.length)")
+            ok(nl >= 2 and await F2.locator('#ftd-agenda-overlay .card').count() == nl and await F2.locator('#ftd-agenda-overlay .card:has-text("campañas")').count() == 0, f'y te siguen a la pestaña que abras, sin el mensaje del chat ({nl})')
+            for _ in range(nl):
+                await F2.locator('#ftd-agenda-overlay .card .x').first.click(); await F2.wait_for_timeout(700)
+            ok(await sw.evaluate("liveNow().then(l=>l.length)") == 0, 'al cerrarlas, no queda ninguna pendiente')
+            await F2.close(); await F.bring_to_front(); await F.wait_for_timeout(600)
+            ok(await F.locator('#ftd-agenda-overlay .card').count() == 0, 'y se van también de las otras pestañas')
+            # tres tandas de clientes a la vez (una lista grande, o dos pestañas): no se pisan en la cola
+            await sw.evaluate("Promise.all([0,1,2].map(b=>crmSeen(Array.from({length:120},(_,i)=>({id:String(661000+b*1000+i),brand:'Novara Markets',name:'Tanda '+b,status:'No Answer',reg:'2026-11-18 10:00'})))))")
+            await F.wait_for_timeout(4000)
+            ok(sql("select count(*)::int c from public.crm_clients where name like 'Tanda %'")[0]['c'] == 360, 'tres tandas de clientes al mismo tiempo llegan enteras (360)')
+
             # una sola pestaña del CRM se actualiza: la que elegís; mientras exista, ninguna otra la reemplaza (para un agente)
             asAgent = "chrome.storage.local.get('desk').then(s=>chrome.storage.local.set({desk:{...(s.desk||{}),role:'agent'}}))"
             await sw.evaluate(asAgent)

@@ -96,7 +96,7 @@ async function crmSeenFromExt(rows){
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
   const keys=batch.map(r=>String(r&&r.k||''));
   if(!list.length)return {keys};
-  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();return {keys,added:res&&res.new||0}}
+  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();if(res&&(res.new||res.changed))mesaPing('crm');return {keys,added:res&&res.new||0}}
   catch(e){const m=String(e&&(e.message||e.code));if(/crm_seen|PGRST202|42883|crm_clients|does not exist/.test(m)){crm.ok=false;crm.at=Date.now();return {err:'falta actualizar la base'}}return {err:errMsg(e)}}
 }
 
@@ -132,7 +132,7 @@ function ahRow(r,i,who){
   const ra=regAt(r),ca=callAt(r),tz=cliTime(r.country);
   return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}${dayTag(r)}</td>
     <td class="d" title="${ca?esc(whenTxt(ca)):''}">${ca?esc(rel(ca)):'—'}${r.note?`<div class="ah-nt trunc" title="${esc(r.note)}">${esc(r.note)}</div>`:''}</td>
-    <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
+    <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}${newClock(r)}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
     ${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}<td class="act wr"><button type="button" class="ib" data-ah="ficha" data-id="${esc(r.id)}">Ficha</button><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
 }
 function ahTable(list,who,lim){
@@ -173,11 +173,12 @@ V.ahora={
     const lim=g=>ahMore[g]?0:40,more=(g,l)=>l.length>40&&!ahMore[g]?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${g}">Ver los ${l.length}</button>`:'';
     const agBody=q.ag.length?`<div class="alist">${q.ag.map(p=>uid===me||pend.includes(p)?pendItem(p,now,true):`<div class="ai"><span class="wh">${esc(whenTxt(parseDue(p.due)))}</span><span class="id">${esc(p.id)}</span><span class="kw">${esc(p.kw)}<small>${esc(memberName(p.uid))}</small></span><span></span></div>`).join('')}</div>`:'';
     const g3sub=q.many?`Son ${q.n3}: más que el tope de ${q.cap}, así que van solo los registrados en ${MES[now.getMonth()]} (${q.g3.length})`:`${plural(q.n3,'cliente')} · hasta ${q.cap} se llaman todos`;
-    $('#ahBody').innerHTML=
+    hotNotify();
+    $('#ahBody').innerHTML=hotCard(q)+
       sec(1,'New',`${q.g1.length} sin depositar`,ahTable(q.g1,who,lim('g1'))+more('g1',q.g1),crm.rows.size?'No hay new sin depositar.':esc(noCrm()))+
       sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas')+(q.cb.length?` · ${plural(q.cb.length,'CallBack o Pending Payment','CallBack o Pending Payment')} sin agenda en Vitalis`:''),
         agBody+(q.cb.length?`<p class="p-sub" style="margin:10px 0 6px">Tienen cita en el CRM: agendalos en Vitalis para que te avise.</p>`+ahTable(q.cb,who,lim('cb'))+more('cb',q.cb):''),'Nada agendado para ahora.')+
-      sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+
+      sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+segCard(q,who)+
       `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}

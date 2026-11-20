@@ -24,6 +24,14 @@ const sess = {
   set(k, v) { return chrome.storage.session.set({ [k]: v }); },
 };
 
+// Lo guardado se lee, se cambia y se vuelve a escribir: si dos cosas lo hacen a la vez, una pisa a la otra.
+// Con esto van de a una (por lista): no se pierde un aviso, un cliente en cola ni una llamada.
+const locks = {};
+function lock(name, fn) { const p = (locks[name] || Promise.resolve()).then(fn); locks[name] = p.catch(() => {}); return p; }
+const mut = (fn) => lock('st', async () => { const st = await state(); const upd = await fn(st); if (upd) await chrome.storage.local.set(upd); return st; }); // colas y agenda
+const liveNow = async () => (await sess.get('live', [])).filter((x) => !x.exp || x.exp > Date.now()); // los mensajes del chat se van solos
+const liveSet = (fn) => lock('live', async () => { const n = fn(await liveNow()); await sess.set('live', n); return n; });
+
 function dayTxt(ms) {
   const d = new Date(ms), t = new Date();
   t.setHours(0, 0, 0, 0);
@@ -101,6 +109,10 @@ function ftdOverlay(items) {
       card.remove(); if (!stack.children.length) host.remove();
     });
     stack.appendChild(card);
+    if (d.exp) { // un mensaje del chat: se va solo a los segundos (si tenés el mouse encima, espera)
+      const bye = () => { if (!card.isConnected) return; if (card.matches(':hover')) return card.addEventListener('mouseleave', () => setTimeout(bye, 1200), { once: true }); card.remove(); if (!stack.children.length) host.remove(); };
+      setTimeout(bye, Math.max(1500, d.exp - Date.now()));
+    }
   }
 }
 function ftdOverlayRemove(k) {
@@ -122,7 +134,7 @@ async function cardTab() { // la pestaña activa de la última ventana normal qu
   return { tab: otra || null, blocked: !otra };
 }
 async function injectInto(tabId) {
-  const live = await sess.get('live', []);
+  const live = await liveNow();
   if (!live.length) return true;
   try {
     if (!cardOk(await chrome.tabs.get(tabId))) return false;
@@ -132,13 +144,13 @@ async function injectInto(tabId) {
     return true;
   } catch (e) { return false; }
 }
-async function showNow() {
+async function showNow(noWin) {
   const { tab, blocked } = await cardTab();
   if (tab && await injectInto(tab.id)) {
     try { await chrome.windows.update(tab.windowId, { drawAttention: true }); } catch (e) {}
     return 'pestaña';
   }
-  if (blocked) return 'espera'; // estás en Voiso: no te tapo nada, la tarjeta te espera en la próxima pestaña
+  if (blocked || noWin) return 'espera'; // estás en Voiso: no te tapo nada, la tarjeta te espera en la próxima pestaña
   await openAlertWindow();
   return 'ventana';
 }
@@ -151,17 +163,21 @@ async function openAlertWindow() {
 chrome.windows.onRemoved.addListener(async (id) => { if (id === await sess.get('win', null)) await sess.set('win', null); });
 
 async function dismiss(k) {
-  const live = (await sess.get('live', [])).filter((x) => x.k !== k);
-  await sess.set('live', live);
+  const live = await liveSet((l) => l.filter((x) => x.k !== k));
+  try { chrome.notifications.getAll((all) => { for (const nid in all || {}) if (kOf(nid) === k) chrome.notifications.clear(nid); }); } catch (e) {} // y la notificación del sistema de ese aviso
   for (const tabId of await sess.get('tabs', [])) {
     chrome.scripting.executeScript({ target: { tabId }, func: ftdOverlayRemove, args: [k] }).catch(() => {});
   }
   if (!live.length) await sess.set('tabs', []);
 }
 // al cambiar de pestaña (o cargar otra página) el aviso te sigue hasta que lo atiendas
-chrome.tabs.onActivated.addListener(async ({ tabId }) => { if ((await sess.get('live', [])).length) injectInto(tabId); });
+chrome.tabs.onActivated.addListener(async ({ tabId }) => { if ((await liveNow()).length) injectInto(tabId); });
+chrome.windows.onFocusChanged.addListener(async (wid) => { // volvés a Chrome (o cambiás de ventana): el aviso pendiente está ahí
+  if (wid === chrome.windows.WINDOW_ID_NONE || !(await liveNow()).length) return;
+  try { const [t] = await chrome.tabs.query({ active: true, windowId: wid }); if (t) injectInto(t.id); } catch (e) {}
+});
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
-  if (info.status === 'complete' && tab.active && (await sess.get('live', [])).length) injectInto(tabId);
+  if (info.status === 'complete' && tab.active && (await liveNow()).length) injectInto(tabId);
 });
 
 /* ---------- aviso completo ---------- */
@@ -169,15 +185,12 @@ const createN = (id, opt) => new Promise((r) => chrome.notifications.create(id, 
 const level = () => new Promise((r) => chrome.notifications.getPermissionLevel(r));
 
 async function alertItem(it, { snooze = false } = {}) {
-  const st = await state();
-  st.fired[keyOf(it)] = Date.now();
-  await chrome.storage.local.set({ fired: st.fired });
+  await mut((st) => { st.fired[keyOf(it)] = Date.now(); return { fired: st.fired }; });
   const late = Date.now() - it.due > 5 * 6e4;
   const tag = snooze ? 'recordatorio' : late ? 'atrasado' : '';
   const info = { k: it.k, kind: 'agenda', title: 'Hora de contactar', id: it.id, kw: it.kw || '(sin palabra clave)', meta: `${dayTxt(it.due)}${tag ? ', ' + tag : ''}`,
     btns: [['done', 'Hecho', 1], ['snooze', '+15 min'], ['open', 'Abrir Vitalis']] };
-  const live = (await sess.get('live', [])).filter((x) => x.k !== it.k);
-  await sess.set('live', [...live, info]);
+  await liveSet((l) => [...l.filter((x) => x.k !== it.k), info]);
   const sound = await playSound('agenda');
   const where = await showNow();
   const sys = await createN('n|' + Date.now() + '|' + it.k, {
@@ -191,24 +204,27 @@ async function alertItem(it, { snooze = false } = {}) {
 /* ---------- sincronización con el panel ---------- */
 async function sync(msg) {
   const { items, url, known } = msg;
-  const st = await state();
   const now = Date.now();
   const keys = new Set(items.map(keyOf));
   const fired = {};
-  for (const k in st.fired) if (keys.has(k)) fired[k] = st.fired[k];
-  const upd = { items, url: url || st.url, lastSync: now, fired, cmds: [] };
-  if (known) upd.known = { ids: known.ids, txs: known.txs, at: now }; // para que el botón del CRM sepa cuáles ya están
-  if (Array.isArray(msg.snips)) upd.snips = msg.snips; // los snippets que pega snip.js en cualquier página
-  if (msg.user) upd.me = msg.user;
-  if (msg.desk) upd.desk = msg.desk; // para el botón del CRM del team leader
-  if (Array.isArray(msg.leadIds)) { upd.leadIds = msg.leadIds; const have = new Set(msg.leadIds); upd.leadQ = st.leadQ.filter((c) => !have.has(leadKey(c))); }
-  await chrome.storage.local.set(upd);
+  let upd = null;
+  const st = await mut((st) => {
+    for (const k in st.fired) if (keys.has(k)) fired[k] = st.fired[k];
+    upd = { items, url: url || st.url, lastSync: now, fired, cmds: [] };
+    if (known) upd.known = { ids: known.ids, txs: known.txs, at: now }; // para que el botón del CRM sepa cuáles ya están
+    if (Array.isArray(msg.snips)) upd.snips = msg.snips; // los snippets que pega snip.js en cualquier página
+    if (msg.user) upd.me = msg.user;
+    if (msg.desk) upd.desk = msg.desk; // para el botón del CRM del team leader
+    if (Array.isArray(msg.leadIds)) { upd.leadIds = msg.leadIds; const have = new Set(msg.leadIds); upd.leadQ = st.leadQ.filter((c) => !have.has(leadKey(c))); }
+    return upd;
+  });
 
   const alive = new Set(items.map((x) => x.k));
   for (const a of await chrome.alarms.getAll()) {
     if (a.name.startsWith('p:') || (a.name.startsWith('s:') && !alive.has(a.name.slice(2)))) await chrome.alarms.clear(a.name);
   }
-  for (const l of await sess.get('live', [])) if (l.k !== 'test' && !alive.has(l.k)) await dismiss(l.k); // ya resuelto en el panel
+  // solo las tarjetas de agenda ya resueltas en el panel: las demás (clientes new, tareas, chat, fallas de pago) quedan hasta que las cierres
+  for (const l of await liveNow()) if (l.kind === 'agenda' && l.k !== 'test' && !alive.has(l.k)) await dismiss(l.k);
   let scheduled = 0;
   for (const it of items) {
     if (fired[keyOf(it)]) continue;
@@ -220,17 +236,20 @@ async function sync(msg) {
 
 /* ---------- clientes new del CRM → registro de Vitalis ---------- */
 async function crmLeads(clients) {
-  const st = await state(), have = new Set(st.leadIds), inQ = new Set(st.leadQ.map(leadKey)), today = ymdLocal(), fresh = [];
+  const today = ymdLocal(), fresh = [];
   const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
-  for (const c of clients.slice(0, 300)) {
-    const k = leadKey(c);
-    if (!k || k === 'n:' || have.has(k) || inQ.has(k)) continue;
-    inQ.add(k); fresh.push({ id: cl(c.id, 60), name: cl(c.name, 120), country: cl(c.country, 60), date: today });
-  }
-  if (!fresh.length) return { fresh: 0 };
-  await chrome.storage.local.set({ leadQ: [...st.leadQ, ...fresh].slice(-500) });
+  await mut((st) => {
+    const have = new Set(st.leadIds), inQ = new Set(st.leadQ.map(leadKey));
+    for (const c of clients.slice(0, 300)) {
+      const k = leadKey(c);
+      if (!k || k === 'n:' || have.has(k) || inQ.has(k)) continue;
+      inQ.add(k); fresh.push({ id: cl(c.id, 60), name: cl(c.name, 120), country: cl(c.country, 60), date: today });
+    }
+    return fresh.length ? { leadQ: [...st.leadQ, ...fresh].slice(-500) } : null;
+  });
+  if (!fresh.length) return { ok: true, fresh: 0 };
   await deliverLeads();
-  return { fresh: fresh.length };
+  return { ok: true, fresh: fresh.length };
 }
 async function deliverLeads() {
   const st = await state();
@@ -244,8 +263,8 @@ async function deliverLeads() {
   return false; // Vitalis cerrado: quedan en cola hasta que se abra
 }
 async function leadsDone(keys) {
-  const st = await state(), ks = new Set(keys.map(String));
-  await chrome.storage.local.set({ leadQ: st.leadQ.filter((c) => !ks.has(leadKey(c))), leadIds: [...new Set([...st.leadIds, ...ks])].slice(-50000) });
+  const ks = new Set(keys.map(String));
+  await mut((st) => ({ leadQ: st.leadQ.filter((c) => !ks.has(leadKey(c))), leadIds: [...new Set([...st.leadIds, ...ks])].slice(-50000) }));
 }
 
 /* ---------- todos los clientes que se ven en el CRM → registro de clientes de Vitalis ---------- */
@@ -253,8 +272,10 @@ async function leadsDone(keys) {
 const seenKey = (r) => nrm(r.brand) + '|' + nrm(r.id);
 const REG_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/;
 async function crmSeen(rows) {
-  const st = await state(), q = new Map(st.crmQ.map((r) => [r.ln ? r.k : seenKey(r), r])), now = Date.now(); // las llamadas tienen su propia clave
+  const now = Date.now();
   const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  await mut((st) => {
+  const q = new Map(st.crmQ.map((r) => [r.ln ? r.k : seenKey(r), r])); // las llamadas tienen su propia clave
   for (const r of rows.slice(0, 1000)) {
     const id = cl(r.id, 60); if (!id) continue;
     if (/^(omega|gizat|voiso)$/.test(r.ln || '')) { // una llamada: va aparte, cada una con su clave
@@ -267,7 +288,8 @@ async function crmSeen(rows) {
     row.k = seenKey(row) + '@' + now;
     q.set(seenKey(row), row);
   }
-  await chrome.storage.local.set({ crmQ: [...q.values()].slice(-5000) });
+  return { crmQ: [...q.values()].slice(-5000) };
+  });
   await deliverSeen();
   return { ok: true };
 }
@@ -289,7 +311,7 @@ async function deliverSeen() {
     return true;
   } finally { delivering = false; }
 }
-async function seenDone(keys) { const st = await state(), ks = new Set(keys.map(String)); await chrome.storage.local.set({ crmQ: st.crmQ.filter((r) => !ks.has(r.k)) }); }
+async function seenDone(keys) { const ks = new Set(keys.map(String)); await mut((st) => ({ crmQ: st.crmQ.filter((r) => !ks.has(r.k)) })); }
 
 /* ---------- ventas desde el CRM ---------- */
 const CRM_URLS = ['https://crmnovaramarkets.com/*', 'https://*.crmnovaramarkets.com/*', 'https://crmtrade24seven.com/*', 'https://*.crmtrade24seven.com/*'];
@@ -320,21 +342,30 @@ async function crmImport(rows) {
     } catch (e) {}
   }
   // Vitalis no está abierto: quedan en espera hasta la próxima vez que se abra
-  const st = await state(), seen = new Set(), q = [];
-  for (const x of [...st.importQ, ...rows]) { const k = x.brand + '|' + x.id; if (!seen.has(k)) { seen.add(k); q.push(x); } }
-  await chrome.storage.local.set({ importQ: q.slice(-500) });
+  await mut((st) => {
+    const seen = new Set(), q = [];
+    for (const x of [...st.importQ, ...rows]) { const k = x.brand + '|' + x.id; if (!seen.has(k)) { seen.add(k); q.push(x); } }
+    return { importQ: q.slice(-500) };
+  });
   return { queued: rows.length };
 }
 /* ---------- una sola pestaña del CRM se actualiza sola cada 10 s: la que se eligió con el botón ---------- */
 const EVERY = 10; // segundos, fijo
 async function allW() { return (await chrome.storage.local.get('watches')).watches || {}; }
 async function getW(tabId) { return (await allW())[tabId] || null; }
-async function setW(tabId, w) { const all = await allW(); if (w) all[tabId] = w; else delete all[tabId]; await chrome.storage.local.set({ watches: all }); }
+const updW = (tabId, fn) => lock('w', async () => { // fn recibe la vigilancia de esa pestaña como está ahora y devuelve la nueva (null = soltarla)
+  const all = await allW(), cur = all[tabId] || null, w = fn(cur);
+  if (w === cur) return cur;
+  if (w) all[tabId] = w; else delete all[tabId];
+  await chrome.storage.local.set({ watches: all }); return w;
+});
+const setW = (tabId, w) => updW(tabId, () => w);
 const isCrmUrl = async (url) => { try { const h = new URL(url).hostname, s = (await chrome.storage.local.get('crmSites')).crmSites || {}; return /(^|\.)crm(novaramarkets|trade24seven)\.com$/.test(h) || !!s[h]; } catch (e) { return false; } };
 // el team leader no gestiona clientes: puede tener varias pestañas actualizándose (para el registro, sin avisos de new)
 const deskRole = async () => (((await chrome.storage.local.get('desk')).desk) || {}).role || '';
 const MAX_WATCH = 8;
-async function watchStart(tab) {
+const watchStart = (tab) => lock('w', () => watchStart0(tab)).then(async (r) => { if (r && r.ok) { await ensureLoop(); if ((await liveNow()).some((x) => x.k === 'crm:nowatch')) await dismiss('crm:nowatch'); } return r; });
+async function watchStart0(tab) {
   const all = await allW(), multi = (await deskRole()) === 'leader';
   for (const w of Object.values(all)) { // ya hay otra elegida (y sigue abierta en el CRM): no se puede elegir esta (salvo el team leader)
     if (!w || w.tabId === tab.id) continue;
@@ -347,7 +378,6 @@ async function watchStart(tab) {
   all[tab.id] = { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null };
   await chrome.storage.local.set({ watches: all });
   try { await chrome.tabs.update(tab.id, { autoDiscardable: false }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria
-  await ensureLoop();
   return { ok: true };
 }
 async function watchGo() { const w = Object.values(await allW())[0]; if (!w) return; try { const t = await chrome.tabs.get(w.tabId); await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); } catch (e) {} }
@@ -365,7 +395,7 @@ async function tickOne(w) {
   let r = null;
   try { r = await withTimeout(chrome.tabs.sendMessage(w.tabId, { type: 'crm-refresh' }), 5000); } catch (e) {}
   if (!r && tab.status === 'complete') { try { await chrome.tabs.reload(w.tabId); } catch (e) {} } // la página no responde: la recargo
-  if (!r || !r.skipped) { const cur = await getW(w.tabId); if (cur) await setW(w.tabId, { ...cur, lastRefresh: Date.now() }); }
+  if (!r || !r.skipped) await updW(w.tabId, (cur) => (cur ? { ...cur, lastRefresh: Date.now() } : cur));
 }
 let ticking = false;
 async function watchTick() {
@@ -388,6 +418,7 @@ async function ensureLoop() {
   loopT = setTimeout(step, EVERY * 1000);
 }
 chrome.runtime.onStartup.addListener(() => ensureLoop());
+ensureLoop(); // Chrome apaga y prende este proceso: al volver, el temporizador de 10 s arranca enseguida (no espera a la alarma)
 chrome.storage.local.remove('watch'); // la vigilancia vieja (una sola pestaña, con opciones)
 chrome.tabs.onRemoved.addListener(async (tabId) => { if (await getW(tabId)) await watchStop(tabId); });
 async function crmClients(tabId, m) {
@@ -396,17 +427,22 @@ async function crmClients(tabId, m) {
   const now = Date.now();
   if (m.login) { // se cerró la sesión del CRM: aviso una vez por hora
     if (now - (w.loginAt || 0) > 3600e3) {
-      await setW(tabId, { ...w, loginAt: now });
+      await updW(tabId, (c) => (c ? { ...c, loginAt: now } : c));
       await alertCard({ k: 'crm:login', kind: 'crm', title: 'El CRM cerró la sesión', id: 'Volvé a entrar al CRM', kw: 'Mientras tanto no puedo ver los clientes nuevos.', meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', '⚠ El CRM cerró la sesión', 'Volvé a entrar para seguir vigilando los clientes nuevos.');
     }
     return { watched: true };
   }
   if (!m.ok) return { watched: true };
-  if ((await sess.get('live', [])).some((x) => x.k === 'crm:login')) await dismiss('crm:login'); // volvió la sesión
-  const seen = { ...w.seen }, fresh = [];
-  for (const c of m.clients) { if (!seen[c.key]) { if (w.base) fresh.push(c); seen[c.key] = now; } }
-  const keys = Object.keys(seen); if (keys.length > 3000) for (const k of keys.sort((a, b) => seen[a] - seen[b]).slice(0, keys.length - 3000)) delete seen[k];
-  await setW(tabId, { ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 });
+  if ((await liveNow()).some((x) => x.k === 'crm:login')) await dismiss('crm:login'); // volvió la sesión
+  const fresh = [];
+  const got = await updW(tabId, (w) => { // con la vigilancia como está ahora: dos listas seguidas no avisan dos veces del mismo cliente
+    if (!w) return w;
+    const seen = { ...w.seen };
+    for (const c of m.clients) { if (!seen[c.key]) { if (w.base) fresh.push(c); seen[c.key] = now; } }
+    const keys = Object.keys(seen); if (keys.length > 3000) for (const k of keys.sort((a, b) => seen[a] - seen[b]).slice(0, keys.length - 3000)) delete seen[k];
+    return { ...w, seen, base: true, inNew: m.clients.length, loginAt: 0 };
+  });
+  if (!got) return { watched: false };
   if ((await deskRole()) === 'leader') return { watched: true, fresh: 0 }; // el team leader no recibe avisos de new: los gestionan los agentes
   for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
   for (const c of fresh.slice(0, 5)) {
@@ -416,11 +452,12 @@ async function crmClients(tabId, m) {
   if (fresh.length > 5) await alertCard({ k: 'crm:mas' + now, kind: 'crm', title: 'Clientes nuevos en el CRM', id: `+${fresh.length - 5} más`, kw: 'Hay más clientes en new.', meta: hm(now), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, null);
   return { watched: true, fresh: fresh.length };
 }
+const CHAT_MS = 8000; // un mensaje del chat se va solo; todo lo demás queda hasta que lo cierres
 async function alertCard(info, tone, sysTitle, sysMsg) {
-  const live = (await sess.get('live', [])).filter((x) => x.k !== info.k);
-  await sess.set('live', [...live, info]);
+  await liveSet((l) => [...l.filter((x) => x.k !== info.k), info]);
   if (tone) await playSound(tone);
-  await showNow();
+  await showNow(!!info.exp); // por un mensaje del chat no abro una ventanita
+  if (info.exp) setTimeout(() => liveSet((l) => l.filter((x) => !(x.k === info.k && x.exp === info.exp))), info.exp - Date.now() + 300);
   if (sysTitle) await createN('n|' + Date.now() + '|' + info.k, { type: 'basic', iconUrl: 'icons/128.png', title: sysTitle, message: sysMsg || '', priority: 2, requireInteraction: true, buttons: [{ title: 'Ver en el CRM' }] });
 }
 async function focusCrm() { // la pestaña de clientes (la que tiene clientes en new), si no cualquiera del CRM
@@ -441,8 +478,7 @@ async function sendCmd(cmd) { // "hecho" desde el aviso: se lo paso a Vitalis si
   for (const t of tabs) {
     try { const r = await chrome.tabs.sendMessage(t.id, { type: 'cmds', cmds: [cmd] }); if (r && r.ok) return true; } catch (e) {}
   }
-  const st = await state();
-  await chrome.storage.local.set({ cmds: [...st.cmds, cmd] });
+  await mut((st) => ({ cmds: [...st.cmds, cmd] }));
   return false;
 }
 
@@ -459,11 +495,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'crm-leads' && Array.isArray(msg.clients)) { crmLeads(msg.clients).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'leads-done' && msg.res && Array.isArray(msg.res.keys)) { leadsDone(msg.res.keys); return false; }
   if (msg.type === 'import-done') { // se cargaron las que estaban en espera
-    chrome.storage.local.set({ importQ: [] }).then(() => tellCrm(msg.res));
+    mut(() => ({ importQ: [] })).then(() => tellCrm(msg.res));
     return false;
   }
   if (msg.type === 'open-panel') { openPanel(); return false; }
-  if (msg.type === 'social' && msg.card) { alertCard(msg.card, 'social'); return false; }
+  if (msg.type === 'social' && msg.card) {
+    const card = msg.card;
+    if (/^so:c:/.test(card.k) && card.lvl !== 'imp') card.exp = Date.now() + CHAT_MS; // mensaje común del chat: se va solo (si te nombran o es el team leader, queda)
+    alertCard(card, 'social'); return false;
+  }
   if (msg.type === 'social-close' && msg.k) { dismiss(msg.k); return false; }
   if (msg.type === 'crm-site-add' && msg.tabId) {
     chrome.tabs.get(msg.tabId).then((tab) => crmSiteAdd(tab, String(msg.brand || 'Novara Markets'))).then(() => reply({ ok: true })).catch((e) => reply({ ok: false, err: String(e && e.message || e) }));
@@ -477,14 +517,23 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       const c = { cmd: 'actual', k: String(msg.id).slice(0, 60), r: String(msg.name || '').slice(0, 120), at: Date.now() };
       const done = (sent) => chrome.storage.local.set({ curLast: { id: c.k, sent, at: c.at } }).then(() => sent, () => sent); // para el ícono de la extensión
       for (const t of await vitalisTabs()) { try { const r = await chrome.tabs.sendMessage(t.id, { type: 'cmds', cmds: [c] }); if (r && r.ok) return done(true); } catch (e) {} }
-      const st = await state(); await chrome.storage.local.set({ cmds: [...st.cmds.filter((x) => x.cmd !== 'actual'), c] });
+      await mut((st) => ({ cmds: [...st.cmds.filter((x) => x.cmd !== 'actual'), c] }));
       return done(false);
     })().then((sent) => reply({ ok: true, sent }), () => reply({ ok: true, sent: false }));
     return true;
   }
   if (msg.type === 'crm-seen' && Array.isArray(msg.rows)) { crmSeen(msg.rows).then(reply).catch(() => reply(null)); return true; }
-  if (msg.type === 'seen-done' && Array.isArray(msg.keys)) { seenDone(msg.keys); return false; }
-  if (msg.type === 'crm-watch-stop' && sender.tab) { watchStop(sender.tab.id).then(() => reply({ ok: true })); return true; }
+  if (msg.type === 'seen-done' && Array.isArray(msg.keys)) { seenDone(msg.keys).then(() => deliverSeen()); return false; } // si quedaron más en cola, siguen
+  if (msg.type === 'crm-watch-stop' && sender.tab) {
+    watchStop(sender.tab.id).then(async () => {
+      reply({ ok: true });
+      // se soltó sola (esa pestaña se fue de la lista de clientes) y no queda ninguna: sin esto no llegan los avisos de new
+      if (msg.auto && !Object.keys(await allW()).length && (await deskRole()) !== 'leader') {
+        await alertCard({ k: 'crm:nowatch', kind: 'crm', title: 'Ninguna pestaña se actualiza sola', id: 'Elegí una en el CRM', kw: 'La que se actualizaba salió de la lista de clientes. Sin una elegida no te aviso de los clientes nuevos.', meta: hm(Date.now()), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'social');
+      }
+    });
+    return true;
+  }
   if (msg.type === 'crm-clients' && sender.tab && Array.isArray(msg.clients)) { crmClients(sender.tab.id, msg).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'test') {
     alertItem({ k: 'test', n: 0, id: 'PRUEBA', kw: 'Así te van a llegar los avisos', due: Date.now() })
@@ -512,8 +561,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       }
       if (msg.k === 'test') { if (msg.a === 'open') await openPanel(); return; }
       if (msg.a === 'done') {
-        const st = await state();
-        await chrome.storage.local.set({ items: st.items.filter((x) => x.k !== msg.k) });
+        await mut((st) => ({ items: st.items.filter((x) => x.k !== msg.k) }));
         await chrome.alarms.clear('p:' + msg.k); await chrome.alarms.clear('s:' + msg.k);
         await sendCmd({ cmd: 'done', k: msg.k, at: Date.now() });
       } else if (msg.a === 'snooze') {
@@ -526,7 +574,14 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 });
 
 // cada 30 s despierto a Vitalis si está en segundo plano (Chrome frena sus relojes): se pone al día con lo social y el chat
-async function tickVitalis() { for (const t of await vitalisTabs()) { try { await chrome.tabs.sendMessage(t.id, { type: 'tick' }); } catch (e) {} } }
+async function tickVitalis() {
+  for (const t of await vitalisTabs()) { try { await chrome.tabs.sendMessage(t.id, { type: 'tick' }); } catch (e) {} }
+  // lo que quedó en cola (Vitalis estaba cargando o cerrado) se vuelve a intentar; y el aviso pendiente sigue a la vista
+  const st = await state();
+  if (st.crmQ.length) deliverSeen();
+  if (st.leadQ.length) deliverLeads();
+  if ((await liveNow()).length) { const { tab } = await cardTab(); if (tab) injectInto(tab.id); }
+}
 chrome.alarms.get('vt').then((a) => { if (!a) chrome.alarms.create('vt', { periodInMinutes: 0.5 }); });
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === 'vt') return tickVitalis();
