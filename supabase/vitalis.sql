@@ -537,6 +537,8 @@ begin
   if p.id is null then raise exception 'PING_GONE: ese pedido ya no está'; end if;
   if p.from_id = auth.uid() then raise exception 'PING_OWN: el pedido es tuyo'; end if;
   if p.to_id is not null and p.to_id <> auth.uid() then raise exception 'PING_NOT_YOURS: no es para vos'; end if;
+  -- un mate se queda con el primer "sí": un "ahora no" no lo cierra ni le llega al que pidió
+  if p.kind = 'mate' and r <> 'si' then return json_build_object('ok', true, 'skip', true); end if;
   if p.reply is not null then return json_build_object('ok', false, 'taken', true, 'by', p.reply_by, 'reply', p.reply); end if;
   update public.pings set reply = r, reply_by = auth.uid(), replied_at = now() where id = pid;
   return json_build_object('ok', true);

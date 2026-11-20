@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.22.3';
+const VERSION='1.22.4';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -238,11 +238,12 @@ const B={ // todas las escrituras pasan por acá
     catch(e){dbErr(e);return false}
   },
   async ping(kind,to,body){ // social: pedir un mate, salir a los 10 / a la media, mensaje
-    try{const row=await Q(sb.from('pings').insert({kind,to_id:to||null,body:body||null}).select().single());const g=G2P(row);pings=pings.filter(x=>x._id!==g._id);pings.unshift(g);refresh();return g}
+    try{const row=await Q(sb.from('pings').insert({kind,to_id:to||null,body:body||null}).select().single());const g=G2P(row);pings=pings.filter(x=>x._id!==g._id);pings.unshift(g);refresh();if(kind==='mate')mateWait(g);return g}
     catch(e){toast(esc(errMsg(e)),String(e.message||'').startsWith('COOLDOWN')?'warn':'err');return null}
   },
   async replyPing(id,r){
     try{const res=await Q(sb.rpc('reply_ping',{pid:id,r}));const p=pings.find(x=>x._id===id);
+      if(res&&res.skip){soNoAdd(id);closeToast('so'+id);extSocialClose(id);refresh();return true} // "ahora no" a un mate: solo se te va el aviso
       if(res&&res.ok){if(p){p.reply=r;p.by=me;p.rat=new Date().toISOString()}refresh();return true}
       if(res&&res.taken){if(p){p.reply=res.reply;p.by=res.by}toast(`Ya contestó ${esc(memberName(res.by).split(/\s+/)[0])}.`,'warn');refresh()}return false}
     catch(e){toast(esc(errMsg(e)),'err');return false}

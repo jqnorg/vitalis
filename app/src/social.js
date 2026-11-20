@@ -13,6 +13,22 @@ const first=uid=>memberName(uid).split(/\s+/)[0];
 const replyTxt=(p,r=p.reply)=>{if(p.kind==='toque')return 'te devolvió el toque 👈';const k=KIND[p.kind]||KIND.msg;const x=k.replies.find(y=>y[0]===r);return x?x[1]:r};
 const askTxt=p=>p.kind==='msg'?p.body:(p.to?KIND[p.kind].askTo:KIND[p.kind].ask);
 const forMe=p=>p.from!==me&&(p.to===me||p.to===null);
+// los mates a los que dijiste "ahora no" (no cierran el pedido: queda abierto para otro)
+const soNo=()=>new Set(local.get('soNo',[]));
+function soNoAdd(id){const a=local.get('soNo',[]).filter(x=>x!==id);a.push(id);local.set('soNo',a.slice(-100))}
+// pediste un mate: el primer "sí" te llega; si en MATE_WAIT nadie dijo que sí, "No hay cebador"
+let MATE_WAIT=10e3;
+function mateWait(g){
+  setTimeout(async()=>{
+    const p=pings.find(x=>x._id===g._id);
+    if(p&&p.reply==='si')return;
+    const r=await QN(sb.from('pings').select('reply').eq('id',g._id).maybeSingle()); // por si el aviso en vivo no llegó
+    if(r&&r.reply==='si')return;
+    toast('<b>No hay cebador</b> 🧉','info',{ms:15000,key:'nocebo'+g._id});
+    if(!quiet())pop();
+    if(pageAway())extSocial({k:'so:'+g._id,title:'No hay cebador',id:'Nadie contestó tu mate',kw:'',meta:'',btns:[['close','Ok',1]]});
+  },MATE_WAIT);
+}
 const agoTxt=iso=>{const m=Math.round((Date.now()-new Date(iso))/6e4);return m<1?'recién':m<60?`hace ${m} min`:`hace ${Math.floor(m/60)} h`};
 
 function pop(){ // sonido corto y amable para lo social (distinto a la agenda)
@@ -43,8 +59,8 @@ function socialEvent(p,type,prev){
     return;
   }
   if(type==='UPDATE'&&p.reply&&!(prev&&prev.reply)){
-    closeToast('so'+p._id);extSocialClose(p._id);
-    if(p.from===me&&p.by!==me){ // me contestaron
+    closeToast('so'+p._id);closeToast('nocebo'+p._id);extSocialClose(p._id);
+    if(p.from===me&&p.by!==me){ // me contestaron (en un mate, solo el primer sí)
       const txt=p.kind==='toque'?`<b>${esc(first(p.by))}</b> te devolvió el toque 👈`:`<b>${esc(first(p.by))}</b>: ${esc(replyTxt(p))}${p.kind==='msg'?'':' · '+esc(KIND[p.kind].label.toLowerCase())}`;
       toast(txt,'info',{ms:9000,key:'sor'+p._id});
       if(!quiet()){pop();if(pageAway())extSocial({k:'so:'+p._id,title:'Te contestaron',id:first(p.by)+': '+replyTxt(p),kw:p.kind==='msg'?p.body:KIND[p.kind].label,meta:'',btns:[['close','Ok',1]]})}
@@ -80,7 +96,7 @@ function socialCmd(d){
   if(d.cmd==='reply'&&['si','no','luego'].includes(d.r))B.replyPing(id,d.r);
   else if(d.cmd==='quiet')setQuiet(36e5);
 }
-const pendingForMe=()=>pings.filter(p=>p.kind!=='toque'&&forMe(p)&&!p.reply&&Date.now()-new Date(p.at)<60*6e4).length;
+const pendingForMe=()=>{const no=soNo();return pings.filter(p=>p.kind!=='toque'&&forMe(p)&&!p.reply&&!no.has(p._id)&&Date.now()-new Date(p.at)<60*6e4).length};
 function cooldownLeft(kind,to){
   const k=KIND[kind];const last=pings.filter(p=>p.from===me&&p.kind===kind&&(kind==='mate'||p.to===(to||null))).reduce((a,p)=>Math.max(a,+new Date(p.at)),0);
   return Math.max(0,last+k.wait-Date.now());
@@ -119,8 +135,9 @@ V.social={
       const mine=p.from===me,k=KIND[p.kind]||KIND.msg;
       const st=p.reply?`<span class="badge${p.reply==='si'?' paid':''}">${p.by===me?'Vos':esc(first(p.by))}: ${esc(replyTxt(p))}</span>`
         :mine?`<span class="d">Esperando</span><button type="button" class="ib del" data-pr="del" data-id="${esc(p._id)}">Cancelar</button>`
+        :forMe(p)&&soNo().has(p._id)?`<span class="d">Dijiste ahora no</span><button type="button" class="ib" data-pr="si" data-id="${esc(p._id)}">${esc(k.replies[0][1])}</button>` // te arrepentiste: todavía podés cebarlo
         :forMe(p)?k.replies.map(([r,l],i)=>`<button type="button" class="${i===0?'btn sm pri':'ib'}" data-pr="${r}" data-id="${esc(p._id)}">${esc(l)}</button>`).join(''):'';
-      return `<div class="so-it${forMe(p)&&!p.reply&&p.kind!=='toque'?' new':''}"><button type="button" class="avb" data-prof="${esc(p.from)}" title="Ver el perfil de ${esc(memberName(p.from))}">${avatar(memberName(p.from))}</button><span class="tx">${feedTxt(p)}<small>${agoTxt(p.at)}</small></span><span class="st">${st}</span></div>`}).join('')}</div>`
+      return `<div class="so-it${forMe(p)&&!p.reply&&p.kind!=='toque'&&!soNo().has(p._id)?' new':''}"><button type="button" class="avb" data-prof="${esc(p.from)}" title="Ver el perfil de ${esc(memberName(p.from))}">${avatar(memberName(p.from))}</button><span class="tx">${feedTxt(p)}<small>${agoTxt(p.at)}</small></span><span class="st">${st}</span></div>`}).join('')}</div>`
       :'<div class="p-empty">Nada por hoy. ¿Arrancás la ronda?</div>';
   },
 };
