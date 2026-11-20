@@ -22,9 +22,16 @@ const kpi=(lb,v,s,cls='',extra='')=>`<div class="kpi ${cls}"${extra}><div class=
 const rw=(k,v,cls='')=>`<div class="rw ${cls}"><span class="k">${k}</span><span class="d"></span><span class="v">${v}</span></div>`;
 
 /* ---------- inicio ---------- */
+// la racha: días laborables seguidos con al menos un FTD (si hoy todavía no vendiste, cuenta hasta ayer; los días que no se trabajan no la cortan)
+function racha(uid){
+  const days=new Set(team.filter(f=>f.uid===uid).map(f=>f.date)),te=todayS();
+  let d=te,n=0;const hoy=days.has(te);if(!hoy)d=addDays(te,-1);
+  for(let i=0;i<500;i++){if(days.has(d))n++;else if(!noTrabajo(d)||(cfg.faltas||[]).some(x=>x.d===d))break;d=addDays(d,-1)}
+  return {n,hoy};
+}
 V.inicio={
   k:'',
-  build(){bindAgForm($('#iaForm'))},
+  build(){},
   render(){
     const now=new Date(),te=todayS(),ym=ymNow(),s=calc(ym),P=sueldoPesos(s),h=now.getHours();
     $('#iHola').textContent=`${h<13?'Buen día':h<20?'Buenas tardes':'Buenas noches'}, ${profile.name.split(/\s+/)[0]}`;
@@ -40,31 +47,13 @@ V.inicio={
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
-      kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`);
+      kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
+      (()=>{const r=racha(me);return kpi('Racha',`${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido 🔥':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
     {const bc=bkCard();$('#iBank').hidden=!bc;$('#iBank').innerHTML=bc} // si un procesador falla, primero eso
     crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
-    $('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
+    $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
     this.turno(true);
-    // agenda
-    const open=pend.filter(p=>!p.done&&p.due.slice(0,10)<=te).sort(byDue),next=pend.filter(p=>!p.done&&p.due.slice(0,10)>te).sort(byDue)[0];
-    const venc=open.filter(p=>parseDue(p.due)<=now).length;
-    $('#iaSub').innerHTML=`${plural(open.length,'pendiente')}${venc?' · '+sp('hot b',plural(venc,'vencido')):''}`;
-    $('#iaList').innerHTML=(open.length?`<div class="alist">${open.map(p=>pendItem(p,now,true)).join('')}</div>`:'<div class="p-empty" style="padding:10px 0">Nada pendiente para hoy.</div>')+
-      (next?`<div class="note">Próximo: ${esc(whenTxt(parseDue(next.due)))}, <b style="color:var(--fg)">${esc(next.id)}</b> ${esc(next.kw)}</div>`:'');
-    // conversión
-    $('#iConvBody').innerHTML=convCardsX(TL?null:me);$('#iConvSub').textContent=convSubX(TL);
-    // FTDs por día
-    const [Y,M]=ym.split('-').map(Number),days=new Date(Y,M,0).getDate(),bd={};
-    for(const f of (TL?team.filter(x=>x.date.slice(0,7)===ym):s.list)){const d=+f.date.slice(8,10),o=bd[d]||(bd[d]={a:0,b:0,m:0});if(isLate(f))o.b++;else o.a++;o.m+=+f.amount||0}
-    const data=[];for(let d=1;d<=days;d++){const o=bd[d]||{a:0,b:0,m:0},dw=new Date(Y,M-1,d).getDay();data.push({lab:String(d),a:o.a,b:o.b,m:o.m,d,dw,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
-    $('#idTitle').textContent=TL?`FTDs de la mesa por día en ${mes}`:`FTDs por día en ${mes}`;
-    colChart($('#iChart'),data,{h:200,capMin:18,int:true,label:'FTDs por día',empty:'Sin FTDs este mes.',
-      tip:d=>({title:`${cap(DIAL[d.dw])} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
-    // últimas ventas
-    const lastF=[...(TL?team:ftds)].sort((a,b)=>-byDate(a,b)).slice(0,7);$('#iLastH').textContent=TL?'Últimas ventas de la mesa':'Últimas ventas';
-    $('#iLast').innerHTML=lastF.length?`<div class="lst">${lastF.map(f=>`<div class="li"><span class="t">${esc(f.date===te?'hoy':dm(f.date))} ${esc(f.time||'')}</span><span class="n" title="${esc(f.name)} · ${esc(f.camp)}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${TL?esc(first(f.uid))+' · ':''}${esc(f.country)}</small></span><span class="m">${money(f.amount)}</span><span>${tipoBadge(f)}</span><span class="wr"><button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button></span></div>`).join('')}</div>`
-      :TL?'<div class="p-empty">La mesa todavía no tiene ventas.</div>':'<div class="p-empty">Todavía no cargaste ventas. Tocá <b>Venta</b> arriba a la derecha.</div>';
   },
   turno(force){
     if(cur!=='inicio')return;
@@ -85,9 +74,7 @@ V.inicio={
       else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
     $('#itState').innerHTML=st;
-    $('#itSub').textContent=`Jornada de ${durS(jorMs())}`;
     $('#itTl').innerHTML=day?timeline(day,now):'';
-    $('#itMarks').innerHTML=day?marksHTML(day):'';
   },
 };
 function timeline(t,now){

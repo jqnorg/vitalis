@@ -106,11 +106,11 @@ V.social={
     const q=quiet(),qu=profile.quiet_until?new Date(profile.quiet_until):null;
     const qk=!q?'on':qu.getFullYear()>2090?'siempre':qu-Date.now()>2*36e5?'manana':'1h';
     $$('[data-q]',$('#soQuiet')).forEach(b=>b.classList.toggle('on',b.dataset.q===qk));
-    $('#soSub').innerHTML=q?sp('hot',`Avisos sociales silenciados${qu.getFullYear()>2090?'':' hasta las '+z(qu.getHours())+':'+z(qu.getMinutes())}.`)+' Igual ves todo acá.':'Pedí un mate o arreglá para salir. Les llega como aviso.';
+    $('#soSub').innerHTML=q?sp('hot',`Avisos sociales silenciados${qu.getFullYear()>2090?'':' hasta las '+z(qu.getHours())+':'+z(qu.getMinutes())}.`)+' Igual ves todo acá.':'Pedí un mate o tocá a alguien para darle un toque. Les llega como aviso.';
     const act=members.filter(m=>m.active&&m.id!==me);
     if(soTo&&!act.some(m=>m.id===soTo))soTo='';
     const sel=$('#soTo');if(sel!==document.activeElement){sel.innerHTML=`<option value="">Toda la mesa</option>`+act.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');sel.value=soTo}
-    $('#soActs').innerHTML=['mate','d10','d30'].map(k=>{const left=cooldownLeft(k,soTo);
+    $('#soActs').innerHTML=['mate'].map(k=>{const left=cooldownLeft(k,soTo); // solo el mate (los pedidos de descanso se sacaron)
       return `<button type="button" class="so-act" data-ping="${k}"${left?' disabled':''}><span class="ic">${k==='mate'?'<svg aria-hidden="true"><use href="#mate"/></svg>':k==='d10'?'10\'':'30\''}</span><span><b>${KIND[k].label}</b><small>${left?`Podés de nuevo en ${left>=6e4?Math.ceil(left/6e4)+' min':Math.ceil(left/1e3)+' s'}`:soTo?'A '+esc(first(soTo)):'A toda la mesa'}</small></span></button>`}).join('');
     $('#soPeople').innerHTML=`<div class="so-people">${act.map(m=>`<button type="button" class="so-p" data-prof="${esc(m.id)}" title="Ver el perfil de ${esc(m.name)}">${avatar(m.name)}<span class="nm">${esc(m.name)}</span>${quiet(m)?'<span class="q" title="Avisos silenciados">🔕</span>':''}</button>`).join('')}</div>`;
     const list=pings.filter(p=>Date.now()-new Date(p.at)<24*36e5);
@@ -168,8 +168,6 @@ function openProfile(uid){
     const lt=cooldownLeft('toque',uid),lm=cooldownLeft('mate',uid),t=ms=>ms>=6e4?Math.ceil(ms/6e4)+' min':Math.ceil(ms/1e3)+' s';
     el.innerHTML=`<button type="button" class="btn pri" data-pa="toque"${lt?' disabled':''}>👉 ${lt?'Toque en '+t(lt):'Dar un toque'}</button>
       <button type="button" class="btn" data-pa="mate"${lm?' disabled':''}>${lm?'Mate en '+t(lm):'Pedirle un mate'}</button>
-      <button type="button" class="btn" data-pa="d10"${cooldownLeft('d10',uid)?' disabled':''}>¿Salimos a los 10?</button>
-      <button type="button" class="btn" data-pa="d30"${cooldownLeft('d30',uid)?' disabled':''}>¿A la media?</button>
       <button type="button" class="btn" data-pa="chat">Mensaje</button>${isLeader()?'<button type="button" class="btn" data-pa="ficha">Ver ficha</button>':''}`};
   modal({title:'Perfil',wide:true,body,onOpen:api=>{
       const ch=api.q('#pfChart');

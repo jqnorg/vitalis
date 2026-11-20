@@ -707,12 +707,12 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Ahora, Filtros, Ventas, Clientes, Agenda, Chat, Sueldo, Turnos; 0 Ajustes)</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>6</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Panel, Tareas, Chat, Banking, Análisis; 0 Ajustes)</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>N</kbd></dt><dd>Nueva venta</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
 /* ---------- clicks y teclas ---------- */
-const hv=el=>el.closest('#iTurno')?($('#itHora').value||''):'';
+const hv=el=>el.closest('#iTurno')&&$('#itHora')?($('#itHora').value||''):'';
 const ACT={
   nueva:()=>ftdForm(),importar:()=>importar(),exportar:()=>exportar(),ayuda:()=>ayuda(),
   entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
@@ -733,7 +733,8 @@ const ACT={
     else toast('Así suenan los avisos. '+sp('hot','La extensión de Chrome no está conectada.'))},
 };
 document.addEventListener('click',e=>{
-  const v=e.target.closest('#nav [data-v]');if(v){go(v.dataset.v);return}
+  const v=e.target.closest('#nav [data-g]');if(v){goGroup(v.dataset.g);return}
+  const tb=e.target.closest('#subnav [data-tab]');if(tb){go(tb.dataset.tab);return}
   const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);return}
   const a=e.target.closest('[data-act]');if(a&&ACT[a.dataset.act]){e.preventDefault();primeAudio();ACT[a.dataset.act](a)}
 });
@@ -745,7 +746,7 @@ document.addEventListener('keydown',e=>{
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
-  if(NAVKEYS[e.key]){e.preventDefault();go(NAVKEYS[e.key]);return} // los números siguen el orden del menú
+  if(NAVKEYS[e.key]){e.preventDefault();goGroup(NAVKEYS[e.key]);return} // los números siguen el orden del menú
   const k=e.key.toLowerCase();
   if(k==='n'){e.preventDefault();ftdForm();return}
   if(k==='t'){e.preventDefault();go('tareas');return}

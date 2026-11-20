@@ -39,26 +39,20 @@
 <aside id="side">
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
-    <button type="button" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
-    <button type="button" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Ahora</span><span class="nb hot" id="nbAh"></span><kbd>2</kbd></button>
-    <button type="button" data-v="cliente"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><kbd>L</kbd></button>
-    <button type="button" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
-    <button type="button" data-v="filtros"><svg><use href="#i-filtros"/></svg><span class="nm">Filtros</span><kbd>3</kbd></button>
-    <button type="button" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Ventas</span><kbd>4</kbd></button>
-    <button type="button" data-v="clientes"><svg><use href="#i-clientes"/></svg><span class="nm">Clientes</span><span class="nb" id="nbCl"></span><kbd>5</kbd></button>
-    <button type="button" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>B</kbd></button>
-    <button type="button" data-v="agenda"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbAg"></span><kbd>6</kbd></button>
-    <button type="button" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>T</kbd></button>
-    <button type="button" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbCh"></span><kbd>7</kbd></button>
-    <button type="button" data-v="sueldo"><svg><use href="#i-sueldo"/></svg><span class="nm">Sueldo</span><kbd>8</kbd></button>
-    <button type="button" data-v="turnos"><svg><use href="#i-turnos"/></svg><span class="nm">Turnos</span><kbd>9</kbd></button>
-    <button type="button" data-v="social"><svg><use href="#i-social"/></svg><span class="nm">Social</span><span class="nb hot" id="nbSo"></span></button>
-    <button type="button" data-v="snippets"><svg><use href="#i-snippets"/></svg><span class="nm">Snippets</span></button>
-    <button type="button" data-v="config"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span><kbd>0</kbd></button>
+    <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
+    <button type="button" data-g="panel" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Panel</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
+    <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
+    <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
+    <button type="button" data-g="banking" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>5</kbd></button>
+    <button type="button" data-g="analisis" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Análisis</span><kbd>6</kbd></button>
+    <button type="button" data-g="ajustes" data-v="config" class="mob-only"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span></button>
+    <button type="button" data-g="equipo" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
   </nav>
+  <span hidden aria-hidden="true"><span id="nbAh"></span><span id="nbCl"></span><span id="nbAg"></span><span id="nbCh"></span><span id="nbSo"></span></span>
   <div class="side-foot">
     <button type="button" class="me" id="sMe" data-go="config" title="Mi cuenta"></button>
     <div class="side-acts">
+      <button type="button" class="ghost" data-go="config" id="navAjustes" title="Ajustes y snippets (0)"><svg><use href="#i-config"/></svg>Ajustes</button>
       <button type="button" class="ghost" data-act="ayuda" title="Ayuda (?)"><svg><use href="#i-ayuda"/></svg>Ayuda</button>
       <button type="button" class="ghost" data-act="salir" title="Salir"><svg><use href="#i-salir"/></svg>Salir</button>
     </div>
@@ -80,6 +74,7 @@
 </header>
 
 <main id="main">
+<div id="subnav" class="subnav" role="tablist" aria-label="Partes de la sección" hidden></div>
 <div id="hoyBand" class="hoy-band" role="status" hidden></div>
 
 <section class="view" id="v-inicio">
@@ -88,43 +83,19 @@
     <section class="hero" id="iHero" aria-label="Tu mes"></section>
     <div class="side-kpis" id="iKpis"></div>
   </div>
-  <section class="card bk-alert" id="iBank" aria-label="Fallas de pago" hidden></section>
-  <section class="card ah-card" id="iAhora" aria-label="Ahora" hidden></section>
-  <section class="card ms" id="iMesa" aria-label="La mesa"></section>
-  <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
-  <div class="g2">
-    <section class="card" id="iTurno">
-      <div class="card-h"><h3>Turno</h3><span class="p-sub" id="itSub"></span><span class="grow"></span>
-        <label class="inl wr" title="Para marcar con otra hora; vacío = ahora">Otra hora <input type="time" id="itHora"></label></div>
-      <div class="tstate" id="itState"></div>
-      <div class="btns wr" id="itBtns"></div>
-      <div id="itTl"></div>
-      <div class="marks" id="itMarks"></div>
-    </section>
-    <section class="card" id="iAgenda">
-      <div class="card-h"><h3>Agenda de hoy</h3><span class="p-sub" id="iaSub"></span><span class="grow"></span><button type="button" class="btn sm" data-go="agenda">Ver todo</button></div>
-      <form class="agform wr" id="iaForm" autocomplete="off"></form>
-      <div id="iaList" style="margin-top:12px"></div>
-    </section>
-  </div>
-  <div class="g2">
-    <section class="card" id="iConv">
-      <div class="card-h"><h3>Conversión</h3><span class="p-sub" id="iConvSub">FTDs sobre clientes new</span><span class="grow"></span><button type="button" class="btn sm" data-go="clientes">Clientes</button></div>
-      <div id="iConvBody"></div>
-    </section>
-    <section class="card">
-      <div class="card-h"><h3 id="iLastH">Últimas ventas</h3><span class="grow"></span><button type="button" class="btn sm" data-go="ventas">Ver todas</button></div>
-      <div id="iLast"></div>
-    </section>
-  </div>
-  <section class="card">
-    <div class="card-h"><h3 id="idTitle">FTDs por día</h3><div class="legend"><span><i class="sw s1"></i>New</span><span><i class="sw s2"></i>Late</span></div></div>
-    <div class="chart" id="iChart"></div>
+  <section class="card turno-mini" id="iTurno" aria-label="Turno">
+    <div class="tm-l"><h3>Turno</h3><div class="tstate" id="itState"></div></div>
+    <div class="btns wr" id="itBtns"></div>
+    <div id="itTl"></div>
   </section>
+  <section class="card bk-alert" id="iBank" aria-label="Fallas de pago" hidden></section>
+  <section class="card ah-card" id="iAhora" aria-label="Lo que toca ahora" hidden></section>
+  <section class="card ms" id="iMesa" aria-label="La mesa" hidden></section>
+  <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
 </section>
 
 <section class="view" id="v-ahora" hidden>
-  <div class="vh"><div><h1>Ahora</h1><p class="sub" id="ahSub"></p></div><span class="grow"></span>
+  <div class="vh"><div><h1>Cola</h1><p class="sub" id="ahSub"></p></div><span class="grow"></span>
     <div class="tools"><select id="ahWho" aria-label="De quién"></select></div></div>
   <div id="ahBody"></div>
 </section>
@@ -153,14 +124,14 @@
 </section>
 
 <section class="view" id="v-clientes" hidden>
-  <div class="vh"><div><h1>Clientes</h1><p class="sub" id="clSub"></p></div><span class="grow"></span>
+  <div class="vh"><div><h1>Campañas</h1><p class="sub" id="clSub"></p></div><span class="grow"></span>
     <div class="tools"><span class="seg" id="clPer"></span><select id="clWho" aria-label="De quién"></select><button type="button" class="btn pri wr" data-act="nuevoCliente"><svg><use href="#i-plus"/></svg>Cliente</button></div></div>
+  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
   <div class="conv3" id="clKpis"></div>
   <section class="card">
     <div class="card-h"><h3>Clientes new por día</h3><div class="legend"><span><i class="sw s1"></i>Ya depositó</span><span><i class="sw sx"></i>Todavía no</span></div><span class="grow"></span><span class="p-sub" id="clChartSub"></span></div>
     <div class="chart" id="clChart"></div>
   </section>
-  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
   <section class="card">
     <p class="note" id="clSeen" style="margin:0 0 10px" hidden></p>
     <div class="card-h"><h3 id="clListT">Registro</h3><span class="p-sub" id="clCount"></span><span class="grow"></span><input id="clQ" type="search" placeholder="Buscar nombre o ID" autocomplete="off" aria-label="Buscar cliente"></div>
@@ -251,7 +222,7 @@
 </section>
 
 <section class="view" id="v-social" hidden>
-  <div class="vh"><div><h1>Social</h1><p class="sub" id="soSub"></p></div><span class="grow"></span>
+  <div class="vh"><div><h1>Mate y toques</h1><p class="sub" id="soSub"></p></div><span class="grow"></span>
     <div class="tools"><span class="seg" id="soQuiet" aria-label="Avisos sociales"></span></div></div>
   <div class="g-wide">
     <section class="card">

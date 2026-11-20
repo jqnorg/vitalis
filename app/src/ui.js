@@ -122,14 +122,31 @@ function colChart(el,data,o={}){
 const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
-// el menú: todas las secciones, en orden de importancia (los números siguen ese orden)
-const NAVKEYS={1:'inicio',2:'ahora',3:'filtros',4:'ventas',5:'clientes',6:'agenda',7:'chat',8:'sueldo',9:'turnos',0:'config'}; // Tareas: T
+// el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
+const GROUPS=[
+  {g:'inicio',views:['inicio','sueldo','turnos'],tabs:['Hoy','Sueldo','Turnos']},
+  {g:'panel',views:['ahora','cliente','agenda'],tabs:['Cola','Cliente','Agenda']},
+  {g:'tareas',views:['tareas']},
+  {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
+  {g:'banking',views:['banking']},
+  {g:'analisis',views:['ventas','clientes','filtros'],tabs:['Ventas','Campañas','Filtros']},
+  {g:'equipo',views:['equipo']},
+  {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
+];
+const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
+let lastTab=local.get('tabs',{});
+function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.views[0])} // Inicio siempre vuelve a Hoy
+const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
-  $$('#nav [data-v]').forEach(b=>{b.classList.toggle('on',b.dataset.v===v);if(b.dataset.v===v)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
+  const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
+  $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
+  {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
+  const sn=$('#subnav');sn.hidden=G.views.length<2;
+  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>x!=='equipo'||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready)V[v].render(opts||{});
@@ -167,6 +184,9 @@ function status(){
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const q=queueOf(tlView()||isLeadUid(me)?null:me);$('#nbAh').textContent=q.g1.length||''}
+  // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
+  {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
+   const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
   {const f=typeof bkFallas==='function'&&bk.ok?bkFallas().length:0;$('#nbBk').textContent=f?'⚠ '+f:''}
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
