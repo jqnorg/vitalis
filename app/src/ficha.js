@@ -1,7 +1,7 @@
 /* ---------- la ficha del cliente y el "cliente actual" ----------
    El cliente actual es el que tenés abierto en el CRM (la extensión lo manda), el último new que entró o el que abriste
    desde una lista. Va en su propia sección (Cliente, tecla L), del tamaño de cualquier otra: solo quedan el menú y la barra.
-   La ficha: el cliente, cómo hacerlo depositar (Banking chico), las campañas de su afiliado en su país y los comentarios. */
+   La ficha: el cliente, cómo hacerlo depositar (Banking chico), las campañas de su afiliador en su país y los comentarios. */
 let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen=0,cuAt=0;
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
@@ -22,7 +22,7 @@ async function fichaData(id,force){
 }
 async function commentsOf(id){if(ficOk===false)return [];try{return await Q(sb.from('client_comments').select('*').eq('client_id',String(id)).order('created_at',{ascending:false}).limit(60))}catch(e){return []}}
 async function reqsFor(aff,pais){try{return await Q(sb.from('campaign_requests').select('*').eq('aff',aff).eq('country',pais).eq('done',false).order('created_at'))}catch(e){return []}}
-// las campañas del mismo afiliado en el mismo país: las vistas en el CRM, las de las ventas y las ya cargadas
+// las campañas del mismo afiliador en el mismo país: las vistas en el CRM, las de las ventas y las ya cargadas
 async function campsFor(aff,pais,mine){
   const names=new Map();const add=c=>{c=String(c??'').trim();if(c&&!/^(null|undefined|-|—)$/i.test(c)&&!names.has(norm(c)))names.set(norm(c),c)};
   if(mine)add(mine);
@@ -70,7 +70,7 @@ function fiBankFlow(b){
   if(!b)return '';
   return `${(b.use_pm||[]).length||(b.avoid_pm||[]).length?`<div class="bk-chips" style="margin:6px 0">${bankChips(b)}</div>`:''}${(b.steps||[]).length?`<ol class="bk-steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}${b.notes?`<p class="bk-notes">${esc(b.notes)}</p>`:''}${(bkFilesOf('bank',b.id)||[]).length?`<button type="button" class="lnk" data-fa="bankview" data-id="${esc(b.id)}">Ver fotos</button>`:''}`;
 }
-// las campañas del afiliado en el país: monto mínimo y qué ve la persona en el anuncio
+// las campañas del afiliador en el país: monto mínimo y qué ve la persona en el anuncio
 function fiCampsHTML(d){
   if(!d.aff)return '';
   const ed=bkEd(),nReq=c=>d.reqs.filter(q=>norm(q.camp)===norm(c)).length;
@@ -81,7 +81,7 @@ function fiCampsHTML(d){
       ${ed&&n?`<button type="button" class="lnk hot" data-fa="campReqs" data-c="${esc(c.camp)}">${plural(n,'pedido de cambio','pedidos de cambio')}</button>`:''}</div>`};
   // para cargar datos solo aparece la campaña del cliente; las otras sin datos van en una línea
   const show=d.camps.filter(c=>c.info||c.mine),rest=d.camps.filter(c=>!c.info&&!c.mine);
-  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">${show.length?'Sin datos':'Campañas'}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}${d.camps.length?'':'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliado.</p>'}</div>`;
+  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">${show.length?'Sin datos':'Campañas'}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}${d.camps.length?'':'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliador.</p>'}</div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>
@@ -106,7 +106,7 @@ function fichaWire(root,getD,rerender){
 const closeAllModals=()=>modals.slice().forEach(m=>m.close());
 function campModal(d,camp,edit,rerender){
   const i=(d.camps.find(c=>norm(c.camp)===norm(camp))||{}).info;
-  modal({title:`${edit?'Editar':'Agregar'} campaña · ${esc(camp)}`,body:`<p class="mp">Afiliado ${esc(d.aff)}${d.pais?' · '+esc(d.pais):''}.</p>
+  modal({title:`${edit?'Editar':'Agregar'} campaña · ${esc(camp)}`,body:`<p class="mp">Afiliador ${esc(d.aff)}${d.pais?' · '+esc(d.pais):''}.</p>
     <label class="fld"><span>Monto mínimo del anuncio</span><input id="caM" maxlength="60" value="${esc(i&&i.min_amount||'')}" placeholder="Ej.: 250 USD" autofocus></label>
     <label class="fld"><span>Qué ve la persona en el anuncio</span><textarea id="caA" rows="4" maxlength="2000" placeholder="Ej.: Invertí con IA desde 250 USD y…">${esc(i&&i.ad_text||'')}</textarea></label><div class="ebox" id="caE"></div>`,
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
@@ -173,7 +173,7 @@ function cuTopHTML(){
 async function cuRender(force){
   const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
   if(!top.contains(document.activeElement)||force)top.innerHTML=cuTopHTML(); // sin pisar el ID que estás escribiendo
-  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con cómo hacerlo depositar, las campañas de su afiliado y los comentarios. Cuando entra un new, también.</p></div>`;return}
+  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con cómo hacerlo depositar, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
   const id=curCl.id;
   // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
   if(!force&&body.dataset.fid===id&&Date.now()-cuAt<30e3)return;

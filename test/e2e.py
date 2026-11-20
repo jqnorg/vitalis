@@ -764,15 +764,15 @@ async def main():
             await A.click('#v-cliente [data-fa=campAdd][data-c="FB-01"]'); await A.wait_for_timeout(300)
             await A.fill('#caM', '250 USD'); await A.fill('#caA', 'Invertí con IA desde 250'); await A.click('.mbox .mf .pri'); await A.wait_for_timeout(1500)
             dk = await A.inner_text('#v-cliente')
-            ok('250 USD' in dk and 'Invertí con IA' in dk, 'la campaña del afiliado en el país: monto mínimo y qué ve en el anuncio')
+            ok('250 USD' in dk and 'Invertí con IA' in dk, 'la campaña del afiliador en el país: monto mínimo y qué ve en el anuncio')
             await A.fill('#v-cliente [data-fcom]', 'Paga el viernes con tarjeta'); await A.click('#v-cliente [data-fa=comAdd]'); await A.wait_for_timeout(1200)
             ok('Paga el viernes con tarjeta' in await A.inner_text('#v-cliente'), 'y los comentarios del cliente')
             await A.screenshot(path=OUT / 'c1_cliente_actual.png')
-            ok('12 · FB-01 · Chile' in dk and '1 registrado visto: 1 atendió y 1 depositó' in dk and 'pocos datos' in dk, f'en la ficha, la campaña es afiliado · campaña · país, con su resumen ({dk[dk.find("Campaña"):][:160]!r})')
-            # campañas dentro de Clientes: afiliado · campaña · país
+            ok('12 · FB-01 · Chile' in dk and '1 registrado visto: 1 atendió y 1 depositó' in dk and 'pocos datos' in dk, f'en la ficha, la campaña es afiliador · campaña · país, con su resumen ({dk[dk.find("Campaña"):][:160]!r})')
+            # campañas dentro de Clientes: afiliador · campaña · país
             await A.evaluate("clPer='todo';go('clientes')"); await A.wait_for_timeout(1800)
             cc = await A.inner_text('#clCamp') if await A.is_visible('#clCamp') else ''
-            ok('Campañas' in cc and 'FB-01' in cc and '12 · Chile' in cc and 'GG-UY' in cc and '250 USD' in cc, f'en Clientes, las campañas por afiliado · campaña · país, con el mínimo del anuncio ({cc[:200]!r})')
+            ok('Campañas' in cc and 'FB-01' in cc and '12 · Chile' in cc and 'GG-UY' in cc and '250 USD' in cc, f'en Clientes, las campañas por afiliador · campaña · país, con el mínimo del anuncio ({cc[:200]!r})')
             await A.select_option('#clCamp [data-cmpf=pais]', 'Chile'); await A.wait_for_timeout(500)
             cc = await A.inner_text('#clCamp tbody')
             ok('FB-01' in cc and 'Perú' not in cc and '· Chile' in cc, f'se filtran por país ({cc[:160]!r})')

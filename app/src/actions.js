@@ -62,7 +62,7 @@ function ftdForm(f){
     if(dup&&dupOk!==key){dupOk=key;const w=api.q('#fDup');w.hidden=false;w.innerHTML=`⚠ Ya existe un FTD de ${esc(rec.brand)} con ID <b>${esc(rec.id)}</b> (${dm(dup.date)} · ${esc(dup.name)}${dup.uid!==me?' · lo cargó '+esc(memberName(dup.uid)):''}). Guardá de nuevo para cargarlo igual.`;return false}
     if(isNew){if(!await commitNew(rec))return false}
     else{if(rec.uid&&rec.uid!==f.uid)rec.n=nextNFor(rec.uid);if(!await B.updFtd(f,rec))return false;toast(`Venta #${rec.n||f.n} actualizada: <b>${esc(rec.id)}</b> ${esc(rec.name)}${rec.uid&&rec.uid!==me?' de '+esc(memberName(rec.uid)):''}`)}
-    if(again){ // seguir cargando: limpia lo propio de la venta, mantiene marca/país/afiliado/campaña
+    if(again){ // seguir cargando: limpia lo propio de la venta, mantiene marca/país/afiliador/campaña
       for(const n of ['id','name','amount','tx'])api.q(`[name=${n}]`).value='';
       api.q('[name=time]').value=nowHM();api.q('[name=regD]').value=api.q('[name=date]').value;api.q('[name=regT]').value='';
       api.q('#fDup').hidden=true;dupOk='';tipo(api);api.q('[name=id]').focus();return false;
@@ -648,12 +648,12 @@ function ayuda(){
   <h4>Ventas</h4><dl>
     <dt>New y late</dt><dd>New: se registró y depositó el mismo día. Late: el registro es de un día anterior al FTD.</dd>
     <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
-    <dt>Filtros</dt><dd>Campaña y afiliado exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
+    <dt>Filtros</dt><dd>Campaña y afiliador exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
   <h4>Ahora</h4><dl>
     <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer, NA-2 a NA-5). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
     <dt>Fuera</dt><dd>Not interested y Low potential (estos se pueden agendar). Do Not Call no aparece nunca y no se puede agendar. Los que ya depositaron salen solos.</dd>
-    <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliado y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
+    <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliador y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
     <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
     <dt>Conversión</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>

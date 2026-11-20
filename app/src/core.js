@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.19.0';
+const VERSION='1.19.1';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -564,7 +564,7 @@ function applyF(list,f){
     if(R.a&&x.date<R.a)return false;
     if(R.b&&x.date>R.b)return false;
     if(f.camp!=null&&f.camp!==''&&x.camp!==f.camp)return false;      // campaña exacta
-    if(f.aff!=null&&f.aff!==''&&String(x.aff)!==f.aff)return false;  // afiliado exacto
+    if(f.aff!=null&&f.aff!==''&&String(x.aff)!==f.aff)return false;  // afiliador exacto
     if(f.pais&&norm(x.country)!==norm(f.pais))return false;
     if(f.marca&&!norm(x.brand||'').includes(norm(f.marca)))return false;
     if(f.vend&&memberName(x.uid)!==f.vend)return false;
@@ -594,7 +594,7 @@ function resumen(list){
 }
 const DIMS={
   campanas:{f:'camp',t:'Campañas',k:x=>x.camp||'(sin campaña)'},
-  afiliados:{f:'aff',t:'Afiliados',k:x=>String(x.aff||'—')},
+  afiliados:{f:'aff',t:'Afiliadores',k:x=>String(x.aff||'—')},
   paises:{f:'pais',t:'Países',k:x=>x.country||'—',norm:1},
   marcas:{f:'marca',t:'Marcas',k:x=>x.brand||'—'},
   vendedores:{f:'vend',t:'Vendedores',k:x=>memberName(x.uid)},
@@ -694,7 +694,7 @@ function csvToRows(rows){ // filas del CSV (export de la plataforma o de este pa
   const H=rows[0].map(h=>norm(h.trim()));
   const ix=(...n)=>H.findIndex(h=>n.includes(h));
   const map={date:ix('date','fecha','time of ftd','ftd time','fecha ftd'),time:ix('time','hora'),id:ix('id','user id','userid'),
-    country:ix('country','pais'),name:ix('full name','fullname','name','nombre','nombre completo'),aff:ix('affiliate','afiliado'),
+    country:ix('country','pais'),name:ix('full name','fullname','name','nombre','nombre completo'),aff:ix('affiliate','afiliado','afiliador'),
     camp:ix('campaign','campana','user source','source'),amount:ix('amount','monto'),tx:ix('transaction id','transaction','tx','transaccion'),
     reg:ix('registration','registration time','registro','fecha de registro'),brand:ix('brand','marca'),
     agent:ix('agent','agente','sales agent','retention agent','conversion agent','owner','assigned to','assigned agent','asignado','vendedor','employee','rep','sales rep')};

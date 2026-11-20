@@ -189,7 +189,7 @@ async def main():
             G = {x['client_id']: x for x in rows}
             ok(len(rows) == 5 and [G[k]['g'] for k in sorted(G)] == ['na', 'na', 'hang_up', 'call_again', 'na'], f'la lista de Novara llega entera y cada status en su grupo ({[(x["client_id"], x["g"]) for x in rows]})')
             ok(G.get('880101', {}).get('last_call') == '2026-11-18 09:45' and G['880101']['note'] == 'NA 3.1' and G['880101']['camp'] == 'App Uno' and G['880101']['aff'] == '109028' and G['880101']['reg'] == '2026-11-17 18:48' and G['880105']['last_call'] is None,
-               f'con último contacto, última nota, campaña, afiliado y registro ({G.get("880101")})')
+               f'con último contacto, última nota, campaña, afiliador y registro ({G.get("880101")})')
             ok(sql("select count(*)::int c from public.crm_clients where status ilike '%no answer, %' or client_id ilike 'search%'")[0]['c'] == 0, 'la fila de filtros no es un cliente')
             nvp = Nv.locator('#ftd-crm-button')
             ok(await nvp.locator('.vv').inner_text() == json.loads((pathlib.Path(EXT) / 'manifest.json').read_text())['version'], 'el panel del CRM muestra la versión de la extensión')

@@ -1029,7 +1029,7 @@ body.dark .ah-n{color:var(--pri-h)}
 .eq-who{display:inline-flex;align-items:center;gap:8px}.eq-who .av{width:24px;height:24px;font-size:10px}
 .eq-calls td b.ok{color:var(--ok)}
 
-/* ---------- campañas: afiliado · campaña · país ---------- */
+/* ---------- campañas: afiliador · campaña · país ---------- */
 .cmp-f{display:flex;gap:6px;flex-wrap:wrap}.cmp-f select,.cmp-f input{max-width:180px}
 .cmp-t tbody tr{cursor:pointer}.cmp-t tbody tr:hover{background:var(--soft)}.cmp-t tbody tr:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
 .cmp-t td.num,.cmp-t th.num{text-align:right;white-space:nowrap}.cmp-t td .d{font-size:12px}

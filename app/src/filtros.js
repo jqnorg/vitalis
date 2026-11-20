@@ -20,7 +20,7 @@ function flData(){
   const ok=f=>flBrand==='all'||norm(f.brand)===norm(flBrand);
   const w=flWin(flDays),pw=flWin(flDays,1);
   const list=team.filter(f=>ok(f)&&f.date>=w.from&&f.date<=w.to),prev=team.filter(f=>ok(f)&&f.date>=pw.from&&f.date<=pw.to);
-  const dims={camp:f=>flVal(f.camp),aff:f=>flVal(f.aff),pais:f=>flVal(f.country),combo:f=>flVal(f.camp)||flVal(f.aff)?campTxt(flVal(f.aff),flVal(f.camp),f.country):''}; // la campaña es afiliado · campaña · país
+  const dims={camp:f=>flVal(f.camp),aff:f=>flVal(f.aff),pais:f=>flVal(f.country),combo:f=>flVal(f.camp)||flVal(f.aff)?campTxt(flVal(f.aff),flVal(f.camp),f.country):''}; // la campaña es afiliador · campaña · país
   const G={},P={};for(const d in dims){G[d]=flGroup(list,dims[d]);P[d]=new Map(flGroup(prev,dims[d]).map(g=>[g.key,g.n]))}
   // lates (se registraron un día anterior al del depósito): qué campañas y afiliadores los convierten
   const L=list.filter(isLate),PL=prev.filter(isLate);
@@ -78,7 +78,7 @@ V.filtros={
     if(!D.list.length){$('#flBody').innerHTML=`<section class="card"><div class="p-empty">${team.length?`Sin FTDs en la mesa ${flDays===1?'hoy':'en este período'}. Probá con más días${flBrand!=='all'?' u otra marca':''}.`:'Cuando la mesa cargue ventas, acá vas a ver qué conviene filtrar.'}</div></section>`;return}
     const few=D.list.length<5?`<p class="note fl-few">Son pocos FTDs: tomalo como pista, o ampliá el período.</p>`:'';
     $('#flBody').innerHTML=few+flRec(D)+
-      `<div class="g2">${flRank('combo','Afiliado · campaña · país',D.G.combo,D.P.combo,false)}${flRank('aff','Afiliadores',D.G.aff,D.P.aff)}</div>`+
+      `<div class="g2">${flRank('combo','Afiliador · campaña · país',D.G.combo,D.P.combo,false)}${flRank('aff','Afiliadores',D.G.aff,D.P.aff)}</div>`+
       `<div class="g2">${flRank('camp','Campañas (todas las de ese nombre)',D.G.camp,D.P.camp)}${flRank('pais','Países',D.G.pais,D.P.pais)}</div>`+
       `<div class="g2">${flRank('lcamp','Campañas que convierten lates',D.G.lcamp,D.P.lcamp,true,'Lates')}${flRank('laff','Afiliadores que convierten lates',D.G.laff,D.P.laff,true,'Lates')}</div>`+
       `<section class="card"><div class="card-h"><h3>Hora de los FTDs</h3><span class="p-sub">Hora del depósito en el CRM</span></div><div id="flHrC"></div></section>`;

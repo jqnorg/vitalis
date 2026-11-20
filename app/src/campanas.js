@@ -1,11 +1,11 @@
 /* ============================================================
-   Campañas: la unidad es afiliado · campaña · país (en todo Vitalis). Información para todos, dentro de Clientes.
+   Campañas: la unidad es afiliador · campaña · país (en todo Vitalis). Información para todos, dentro de Clientes.
    De los registrados en el período (lo que vio la extensión en el CRM): cuántos atienden, cuántos depositaron
    (en el mismo día o después) y dónde se quedan. Los FTD del período salen de las ventas. Lo que promete el anuncio, de campaign_info.
    ============================================================ */
 const camN=c=>{c=String(c??'').trim();return /^(null|undefined|-|—)$/i.test(c)?'':c};
 const comboKey=(aff,cp,pais)=>norm(String(aff||''))+'|'+norm(camN(cp))+'|'+norm(paisOf(pais));
-const campTxt=(aff,cp,pais)=>[String(aff||'')||'sin afiliado',camN(cp)||'sin campaña',paisOf(pais)||'sin país'].join(' · ');
+const campTxt=(aff,cp,pais)=>[String(aff||'')||'sin afiliador',camN(cp)||'sin campaña',paisOf(pais)||'sin país'].join(' · ');
 const ATIENDEN=['callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd'],NO_ATIENDEN=['na','invalid','dnc'];
 const POCOS=10; // con menos registrados, los porcentajes van con "pocos datos"
 // dónde se quedan: los grupos de status, en orden y con su color
@@ -88,15 +88,15 @@ function campCard(from,to,perTxt){
     .sort((a,b)=>b.reg-a.reg||b.ftd-a.ftd||a.k.localeCompare(b.k));
   const tot=L.reduce((a,g)=>{a.reg+=g.reg;a.at+=g.at;a.no+=g.no;a.dep+=g.dep;a.ftd+=g.ftd;return a},{reg:0,at:0,no:0,dep:0,ftd:0});
   const few=g=>g.reg&&g.reg<POCOS?' few" title="Pocos datos todavía':'';
-  const row=g=>{const i=infoOf(g.aff,g.camp,g.pais);return `<tr data-cmp="${esc(g.k)}" tabindex="0"><td><div class="cmp-n"><b>${esc(g.camp||'sin campaña')}</b><span class="d">${esc(g.aff||'sin afiliado')} · ${esc(g.pais||'sin país')}</span></div></td>
+  const row=g=>{const i=infoOf(g.aff,g.camp,g.pais);return `<tr data-cmp="${esc(g.k)}" tabindex="0"><td><div class="cmp-n"><b>${esc(g.camp||'sin campaña')}</b><span class="d">${esc(g.aff||'sin afiliador')} · ${esc(g.pais||'sin país')}</span></div></td>
     <td class="num">${g.reg||'<span class="d">—</span>'}</td><td class="num${few(g)}">${g.at+g.no?`${pctTxt(g.at,g.at+g.no)} <span class="d">${g.at}/${g.at+g.no}</span>`:'<span class="d">—</span>'}</td>
     <td class="num${few(g)}">${g.reg?`${pctTxt(g.dep,g.reg)} <span class="d">${g.nw} new · ${g.lt} late</span>`:'<span class="d">—</span>'}</td>
     <td class="num">${g.ftd?`<b>${g.ftd}</b> <span class="d">${g.fnw} · ${g.flt}</span>`:'<span class="d">—</span>'}</td>
     <td>${g.reg?stBar(g):''}</td><td class="trunc">${i&&i.min_amount?esc(i.min_amount):'<span class="d">—</span>'}</td></tr>`};
   const sel=`<select data-cmpf="pais" aria-label="País"><option value="">Todos los países</option>${PAISES.map(p=>`<option${cmp.pais===p?' selected':''}>${esc(p)}</option>`).join('')}</select>
-    <select data-cmpf="aff" aria-label="Afiliado"><option value="">Todos los afiliados</option>${affs.map(a=>`<option${cmp.aff===a?' selected':''}>${esc(a)}</option>`).join('')}</select>
+    <select data-cmpf="aff" aria-label="Afiliador"><option value="">Todos los afiliadores</option>${affs.map(a=>`<option${cmp.aff===a?' selected':''}>${esc(a)}</option>`).join('')}</select>
     <input data-cmpf="q" type="search" placeholder="Buscar campaña" value="${esc(cmp.q)}" aria-label="Buscar campaña" autocomplete="off">`;
-  return `<div class="card-h"><h3>Campañas</h3><span class="p-sub">afiliado · campaña · país · registrados ${esc(perTxt)}</span><span class="grow"></span><div class="cmp-f">${sel}</div></div>
+  return `<div class="card-h"><h3>Campañas</h3><span class="p-sub">afiliador · campaña · país · registrados ${esc(perTxt)}</span><span class="grow"></span><div class="cmp-f">${sel}</div></div>
     ${loading?'<div class="p-empty">Cargando…</div>':L.length?`<p class="note" style="margin:0 0 10px">${tot.reg} registrados: ${pctTxt(tot.at,tot.at+tot.no)} atienden, ${pctTxt(tot.dep,tot.reg)} depositaron · ${tot.ftd} FTDs en el período. Los registrados y su status salen de lo que vio la extensión en el CRM; los FTDs, de las ventas.</p>
       <div class="p-tablewrap"><table class="pt cmp-t"><thead><tr><th>Campaña</th><th class="num">Registrados</th><th class="num" title="De los que ya tienen resultado: atendieron contra NA, número inválido o Do Not Call">Atienden</th><th class="num" title="De los registrados en el período">Depositaron</th><th class="num" title="Ventas del período (new · late)">FTDs</th><th>Dónde se quedan</th><th>Mínimo del anuncio</th></tr></thead><tbody>${L.slice(0,cmp.open?500:40).map(row).join('')}</tbody></table></div>
       ${L.length>40&&!cmp.open?`<button type="button" class="btn sm rk-more" data-cmpm>Ver las ${L.length}</button>`:''}`:'<div class="p-empty">Sin campañas con ese filtro.</div>'}`;
@@ -107,7 +107,7 @@ function campDetail(k,from,to,perTxt){
   const g=campStats(cmp.rows.filter(r=>regIn(r,from,to)),sales).find(x=>x.k===k);if(!g)return;
   const d={aff:g.aff,pais:g.pais,camp:g.camp,camps:[{camp:g.camp,info:infoOf(g.aff,g.camp,g.pais),mine:true}],reqs:[]};
   const i=d.camps[0].info,ed=bkEd();
-  const body=()=>`<p class="mp">${esc(g.aff||'sin afiliado')} · ${esc(g.pais||'sin país')} · registrados ${esc(perTxt)}</p>
+  const body=()=>`<p class="mp">${esc(g.aff||'sin afiliador')} · ${esc(g.pais||'sin país')} · registrados ${esc(perTxt)}</p>
     ${g.reg?`<p class="fi-cline">${campLine(g)}</p>${stBar(g)}<div class="cmp-leg">${CG.filter(([x])=>g.grp[x]).map(([x,l])=>`<span><i class="cg-${x}"></i>${esc(l)} <b>${g.grp[x]}</b></span>`).join('')}</div>`:'<p class="p-sub">Sin registrados en el período.</p>'}
     <div class="cmp-k"><div><span>Registrados</span><b>${g.reg}</b></div><div><span>Atienden</span><b>${pctTxt(g.at,g.at+g.no)}</b></div><div><span>Depositaron</span><b>${pctTxt(g.dep,g.reg)}</b><small>${g.nw} new · ${g.lt} late</small></div><div><span>FTDs del período</span><b>${g.ftd}</b><small>${g.fnw} new · ${g.flt} late</small></div></div>
     <div class="fi-c"><h4>El anuncio</h4>${g.camp?(i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}<button type="button" class="lnk" data-cma="${ed?'edit':'req'}">${ed?'Editar':'Pedir un cambio'}</button>`:`<p class="p-sub" style="margin:0 0 6px">Sin datos todavía.</p><button type="button" class="btn sm" data-cma="add">Agregar</button>`):'<p class="p-sub" style="margin:0">Sin campaña.</p>'}</div>

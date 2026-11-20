@@ -146,7 +146,7 @@ V.ventas={
         `<label>Desde<input type="date" data-f="desde" max="${todayS()}"></label>`+
         `<label>Hasta<input type="date" data-f="hasta"></label>`+
         `<label>Marca<select data-f="marca">${o('','todas')}${brands.map(b=>o(b,b)).join('')}</select></label>`+
-        `<label>Afiliado<input data-f="aff" list="dlAff" placeholder="todos" autocomplete="off"></label>`+
+        `<label>Afiliador<input data-f="aff" list="dlAff" placeholder="todos" autocomplete="off"></label>`+
         `<label>Campaña<input data-f="camp" list="dlCamp" placeholder="todas" autocomplete="off"></label>`+
         `<label>País<select data-f="pais">${o('','todos')}${countries.map(p=>o(p,p)).join('')}</select></label>`+
         `<label>Tipo<select data-f="late">${o('','todos')}${o('no','new')}${o('si','late')}</select></label>`+
@@ -190,7 +190,7 @@ V.ventas={
       (porDia?(()=>{const bd={};for(const x of list)bd[x.date]=(bd[x.date]||0)+1;const b=Object.entries(bd).sort((x,y)=>y[1]-x[1]||(x[0]<y[0]?1:-1))[0];
         return k('Mejor día',b?`${DIA[parseYMD(b[0]).getDay()]} ${dm(b[0])}`:'—',b?`${b[1]} FTDs`:'')})():k('Mejor mes',R.best?mLabel(R.best[0]):'—',R.best?`${R.best[1]} FTDs`:''))+
       (tc?k('Top campaña',tc.k,`${tc.n} FTDs · ${money(tc.monto)} USD`):'')+
-      (ta?k('Top afiliado',ta.k,`${ta.n} FTDs · ${money(ta.monto)} USD`):'')+
+      (ta?k('Top afiliador',ta.k,`${ta.n} FTDs · ${money(ta.monto)} USD`):'')+
       (many&&list.length?(()=>{const g=groupBy(list,'vendedores')[0];return k('Top vendedor',g.k,`${g.n} FTDs · ${money(g.monto)} USD`)})():'');
     // por mes (o por día, si el rango es corto)
     const data=porMes(list,pF),plain=sinFiltros(pF);
@@ -237,7 +237,7 @@ V.ventas={
     // tabla
     const rows=[...list].sort((a,b)=>-byDate(a,b));
     $('#pCount').textContent=`${plural(rows.length,'venta')} · ${money(R.monto)} USD`;
-    $('#pTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>País</th><th>Afiliado</th><th>Campaña</th><th class="r">Monto</th><th>Registro</th><th>Tipo</th><th>Marca</th>${pWho!=='me'?'<th>Vendedor</th>':''}<th class="act"></th></tr></thead><tbody>`+
+    $('#pTable').innerHTML=rows.length?`<table class="pt"><thead><tr><th>Fecha</th><th>ID</th><th>Nombre</th><th>País</th><th>Afiliador</th><th>Campaña</th><th class="r">Monto</th><th>Registro</th><th>Tipo</th><th>Marca</th>${pWho!=='me'?'<th>Vendedor</th>':''}<th class="act"></th></tr></thead><tbody>`+
       rows.slice(0,pShow).map(f=>`<tr><td>${esc(dm(f.date))}/${f.date.slice(2,4)} <span class="d">${esc(f.time||'')}</span></td><td>${esc(f.id)}</td><td class="trunc" title="${esc(f.name)}">${esc(f.name)}</td><td>${esc(f.country)}</td><td>${esc(f.aff)}</td><td class="trunc" title="${esc(f.camp)}">${esc(f.camp)}</td><td class="r">${money(f.amount)}</td><td class="d">${esc(f.reg?dm(String(f.reg).slice(0,10)):'')}</td><td title="${esc(demora(f)?'Depositó a '+demora(f)+' del registro':'')}">${isLate(f)?`<i class="dot"></i>late ${lateDays(f)} d`:`<i class="dot n"></i><span class="d">new${demora(f)?' · '+esc(demora(f)):''}</span>`}</td><td class="d">${esc(f.brand||'')}</td>${pWho!=='me'?`<td class="trunc">${esc(memberName(f.uid))}</td>`:''}<td class="act wr">${canEdit(f)?`<button type="button" class="ib" data-act="editFtd" data-id="${esc(f._id)}" title="Editar">Editar</button><button type="button" class="ib del" data-act="delFtd" data-id="${esc(f._id)}" title="Borrar">Borrar</button>`:''}</td></tr>`).join('')+'</tbody></table>'
       :'<div class="p-empty">Sin ventas para estos filtros.</div>';
     $('#pMore').hidden=rows.length<=pShow;
@@ -707,7 +707,7 @@ V.clientes={
     $('#clWho').addEventListener('change',e=>{clWho=e.target.value;clShow=60;this.render({})});
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
-    // campañas: afiliado · campaña · país
+    // campañas: afiliador · campaña · país
     const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
     let cqt=null;
     cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
