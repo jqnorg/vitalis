@@ -21,3 +21,17 @@ Notas:
 - La 5 incluía "quién cierra más rápido" (38 a 80 min de mediana por agente): mezcla habilidad con qué clientes le tocan a cada uno; si se hace, solo para team leader.
 - La 8 es en parte obvia (cerrar temprano deja más día), pero el salto es grande.
 - La 1 mejora con la ventana por país de la tabla.
+
+## Más señales como Campaña caliente (20/11/2026)
+
+Avisos en vivo que dicen a quién llamar primero. Las tres primeras se miden con la historia de Trade24Seven; las otras dos se aprenden de lo que junta la extensión.
+
+| # | Propuesta | Dato que la sostiene |
+|---|---|---|
+| 11 | **País caliente**: el país donde se está depositando ahora; tus clientes de ese país primero | Misma hora del día: después de una hora con FTD de Colombia, 43% de chance de otro en la hora siguiente (12% si no hubo); México 23% contra 6%; Chile 35% contra 22% |
+| 12 | **Afiliador caliente**: como Campaña caliente, pero con todo el afiliador (todas sus campañas en ese país) | Afiliador con 2 FTDs en el día: 56% da un tercero (campaña: 36%); con 1, 45% da otro (campaña: 26%) |
+| 13 | **Volvió el procesador**: cuando Banking marca que un procesador o método volvió en un país, tus clientes con depósito trabado de ese país | Sale de lo que ya está en Vitalis (vueltas de `pay_report` y clientes en `failed`) |
+| 14 | **A qué hora atiende cada cliente**: la hora en que atendió antes; a esa hora va primero | Se aprende de los cambios de status (limpios desde el 20/11); hacen falta unas dos semanas |
+| 15 | **Qué línea atiende hoy** (Omega, Gizat o Voiso, por país) | Se aprende de las llamadas registradas y el status que queda después; todavía no hay llamadas registradas |
+
+Descartadas: la "tanda" (mismos campaña y día de registro: 34% contra 26%, casi lo mismo que Campaña caliente) y las notas del CRM (la columna que se lee trae textos de unas 10 letras, sin horas ni días).
