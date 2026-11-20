@@ -898,6 +898,11 @@ async def main():
             ok('250 USD' in dk and 'Invertí con IA' in dk, 'la campaña del afiliador en el país: monto mínimo y qué ve en el anuncio')
             await A.fill('#v-cliente [data-fcom]', 'Paga el viernes con tarjeta'); await A.click('#v-cliente [data-fa=comAdd]'); await A.wait_for_timeout(1200)
             ok('Paga el viernes con tarjeta' in await A.inner_text('#v-cliente'), 'y los comentarios del cliente')
+            # agendar desde la ficha: la palabra clave arranca con el nombre del cliente, no con el status
+            await A.click('#v-cliente [data-cu=ag]'); await A.wait_for_timeout(400)
+            kwv = await A.input_value('.mbox [name=kw]')
+            ok(kwv == 'Nueva Uno', f'agendar desde la ficha pone el nombre en Palabra clave, no el status ({kwv!r})')
+            await A.keyboard.press('Escape')
             await A.screenshot(path=OUT / 'c1_cliente_actual.png')
             ok('12 · FB-01 · Chile' in dk and '1 registrado visto: 1 atendió y 1 depositó' in dk and 'pocos datos' in dk, f'en la ficha, la campaña es afiliador · campaña · país, con su resumen ({dk[dk.find("Campaña"):][:160]!r})')
             # campañas dentro de Clientes: afiliador · campaña · país

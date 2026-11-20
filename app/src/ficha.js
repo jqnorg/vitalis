@@ -338,7 +338,7 @@ V.cliente={
       if(a==='rec'){const h=cuHist.find(x=>x.id===b.dataset.id);return setCurrent(b.dataset.id,h&&h.name||'','lista')}
       if(!curCl)return;
       if(a==='copy'){try{await navigator.clipboard.writeText(curCl.id);toast(`<b>${esc(curCl.id)}</b> copiado.`)}catch(err){toast('No pude copiar.','err')}return}
-      if(a==='ag'){const x=getD();agendarCliente(curCl.id,x&&x.r&&x.r.status||'')}});
+      if(a==='ag'){const x=getD();agendarCliente(curCl.id,(x&&x.name)||curCl.name||'')}}); // la palabra clave arranca con el nombre, no con el status
   },
   render(o){cuRender(!!o.force)}
 };
