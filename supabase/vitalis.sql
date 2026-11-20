@@ -1454,8 +1454,8 @@ create table if not exists public.client_profiles (
   objetivo         text check (objetivo is null or length(objetivo) <= 200),
   anuncio          text check (anuncio is null or length(anuncio) <= 300),  -- qué vio en el anuncio
   vio_min          boolean,                                                 -- vio el monto mínimo (null = no se sabe)
-  tiene            boolean,                                                 -- tiene el dinero (null = no se sabe)
-  motivo           text check (motivo is null or length(motivo) <= 400),    -- por qué no depositó / qué se intentó
+  outcome          text check (outcome is null or length(outcome) <= 30),   -- cómo terminó la llamada (sugiere el status del CRM)
+  motivo           text check (motivo is null or length(motivo) <= 400),    -- detalle de la llamada
   updated_by       uuid references public.profiles(id) on delete set null,
   updated_at       timestamptz not null default now(),
   primary key (team_id, brand, client_id)
@@ -1475,7 +1475,7 @@ begin
   if t is null then raise exception 'sin mesa'; end if;
   if length(btrim(coalesce(p_client,''))) = 0 then raise exception 'sin cliente'; end if;
   insert into public.client_profiles as cp
-    (team_id, brand, client_id, edad, ocupacion, desocupado, desocupado_desde, objetivo, anuncio, vio_min, tiene, motivo, updated_by, updated_at)
+    (team_id, brand, client_id, edad, ocupacion, desocupado, desocupado_desde, objetivo, anuncio, vio_min, outcome, motivo, updated_by, updated_at)
   values (t, coalesce(nullif(btrim(p_brand), ''), 'Novara Markets'), btrim(p_client),
     nullif(p_data->>'edad', '')::integer,
     nullif(btrim(p_data->>'ocupacion'), ''),
@@ -1484,13 +1484,13 @@ begin
     nullif(btrim(p_data->>'objetivo'), ''),
     nullif(btrim(p_data->>'anuncio'), ''),
     (p_data->>'vio_min')::boolean,
-    (p_data->>'tiene')::boolean,
+    nullif(btrim(p_data->>'outcome'), ''),
     nullif(btrim(p_data->>'motivo'), ''),
     auth.uid(), now())
   on conflict (team_id, brand, client_id) do update set
     edad = excluded.edad, ocupacion = excluded.ocupacion, desocupado = excluded.desocupado,
     desocupado_desde = excluded.desocupado_desde, objetivo = excluded.objetivo, anuncio = excluded.anuncio,
-    vio_min = excluded.vio_min, tiene = excluded.tiene, motivo = excluded.motivo,
+    vio_min = excluded.vio_min, outcome = excluded.outcome, motivo = excluded.motivo,
     updated_by = auth.uid(), updated_at = now();
   return 'ok';
 end $$;

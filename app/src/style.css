@@ -1019,6 +1019,14 @@ body.dark .ah-n{color:var(--pri-h)}
 .fi-ptext{white-space:pre-line;font-size:13.5px;line-height:1.5;margin:0 0 8px;color:var(--fg)}
 .fi-pfalta{color:var(--acc);font-size:13px;font-weight:600;margin:0 0 8px}
 .fi-prow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fi-pst{font-size:13px;margin:0 0 8px;color:var(--dim)}.fi-pst b{color:var(--fg)}
+.pf-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:18px;align-items:start}
+.pf-prev{position:sticky;top:0;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--raised);display:flex;flex-direction:column;gap:8px}
+.pf-txt{font-size:13.5px;line-height:1.55;color:var(--fg);white-space:pre-line}
+.pf-txt.en{margin-top:8px;color:var(--dim)}
+.pf-prev summary{cursor:pointer;font-size:12.5px;color:var(--dim)}
+.pf-st{font-size:13px;margin:-2px 0 6px;color:var(--dim)}.pf-st b{color:var(--fg)}
+@media (max-width:720px){.pf-grid{grid-template-columns:1fr}.pf-prev{position:static}}
 .fi-cl{display:grid;gap:8px;margin-top:10px}
 .fi-cm{border-top:1px solid var(--line);padding-top:6px}.fi-cm p{margin:2px 0 0;white-space:pre-wrap}
 .fi-cmh{display:flex;align-items:center;gap:8px;font-size:12.5px}

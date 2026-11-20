@@ -87,26 +87,59 @@ function fiCampsHTML(d){
 }
 // el perfil que exige la gerencia: edad, ocupación y objetivo siempre; más si tiene el dinero y por qué no depositó
 function profFalta(p){const f=[];if(!p||p.edad==null)f.push('edad');if(!p||(!p.ocupacion&&!p.desocupado))f.push('ocupación');if(!p||!p.objetivo)f.push('objetivo');return f}
-function profText(p){
-  if(!p)return '';const L=[],l1=[];
-  if(p.edad!=null)l1.push('Edad '+p.edad);
-  if(p.desocupado)l1.push('Desocupado'+(p.desocupado_desde?' hace '+p.desocupado_desde:'')+(p.ocupacion?' (antes: '+p.ocupacion+')':''));
-  else if(p.ocupacion)l1.push(p.ocupacion);
-  if(p.objetivo)l1.push('Objetivo: '+p.objetivo);
-  if(l1.length)L.push(l1.join(' · '));
-  const an=[];if(p.anuncio)an.push('Anuncio: '+p.anuncio);if(p.vio_min===true)an.push('vio el mínimo');else if(p.vio_min===false)an.push('no vio el mínimo');
-  if(an.length)L.push(an.join(' · '));
-  if(p.tiene===true)L.push('Tiene el dinero'+(p.motivo?'. No depositó: '+p.motivo:'.'));
-  else if(p.tiene===false)L.push('No tiene el dinero. Se buscó la forma de que deposite; agotadas las opciones, se finalizó la llamada.'+(p.motivo?' '+p.motivo:''));
-  else if(p.motivo)L.push(p.motivo);
-  return L.join('\n');
+// cómo terminó la llamada: cada final sugiere un status del CRM y arma su cierre justificado (ES/EN)
+const PROF_OUT={
+  pending:{l:'Depósito en proceso (boleto creado)',st:'Pending Payment',
+    es:'Se avanzó hasta generar el boleto y el depósito quedó en proceso. Se dará seguimiento para confirmar que se complete.',
+    en:'We moved forward and the payment slip was generated; the deposit is now in process. We will follow up to confirm it is completed.'},
+  failed_proc:{l:'Depósito trabado — procesador',st:'Failed Deposit',
+    es:'Se intentó concretar el depósito pero falló por el procesador de pago. Se le ofrecerá otra vía en el próximo contacto.',
+    en:'The deposit was attempted but failed due to the payment processor. An alternative method will be offered on the next contact.'},
+  failed_bank:{l:'Depósito trabado — banco',st:'Bank Block',
+    es:'Se intentó concretar el depósito pero lo bloqueó el banco del cliente. Se le ofrecerá otra vía en el próximo contacto.',
+    en:"The deposit was attempted but was blocked by the client's bank. An alternative method will be offered on the next contact."},
+  no_money:{l:'No tiene el dinero',st:'Low Potential',note:'con agenda si dio fecha',
+    es:'Se le insistió y se le ofrecieron distintas formas de pago, pero no dispone del dinero en este momento. Queda a la espera de una mejor oportunidad.',
+    en:'The client was encouraged and offered several payment methods, but does not have the funds at this time. Pending a better opportunity.'},
+  not_now:{l:'No quiere invertir ahora / lo está pensando',st:'Call Again',note:'CallBack si dejó una cita concreta',
+    es:'Se intentó insistir para que invirtiera, pero por ahora no quiere avanzar. Se continuará insistiendo en los próximos contactos.',
+    en:'The client was urged to invest, but does not want to move forward for now. We will keep following up on the next contacts.'},
+  not_interested:{l:'No le interesa invertir',st:'Not Interested',
+    es:'Se le presentó la propuesta y se insistió, pero el cliente manifiesta que no le interesa invertir.',
+    en:'The offer was presented and the client was encouraged, but states no interest in investing.'},
+  dnc:{l:'No puede operar (nacionalidad prohibida o menor de 18)',st:'Do Not Call',
+    es:'El cliente no puede operar (nacionalidad no admitida o menor de edad). No se vuelve a contactar.',
+    en:'The client is not eligible to operate (restricted nationality or under 18). Not to be contacted again.'},
+  dropped:{l:'Se cortó la llamada (sin boleto)',st:'Call Again',
+    es:'La llamada se cortó antes de poder avanzar. Se intentó retomar el contacto de inmediato y se continuará en el próximo intento.',
+    en:'The call dropped before we could make progress. We tried to reconnect right away and will continue on the next attempt.'},
+};
+const PROF_ORDER=['pending','failed_proc','failed_bank','no_money','not_now','not_interested','dnc','dropped'];
+function profStatus(p){const o=p&&p.outcome&&PROF_OUT[p.outcome];return o?o.st+(o.note?` (${o.note})`:''):''}
+function profText(p,lang){
+  if(!p)return '';const en=lang==='en';
+  const cl=s=>String(s||'').trim().replace(/\s*[.;,]+$/,''),S=[];
+  let s1=en?(p.edad!=null?`${p.edad}-year-old client`:'Client'):(p.edad!=null?`Cliente de ${p.edad} años`:'Cliente'),occ='';
+  if(p.desocupado)occ=en?'currently unemployed'+(p.desocupado_desde?` for ${cl(p.desocupado_desde)}`:'')+(p.ocupacion?` (previously worked as ${cl(p.ocupacion)})`:''):'actualmente desocupado'+(p.desocupado_desde?` desde hace ${cl(p.desocupado_desde)}`:'')+(p.ocupacion?` (anteriormente se desempeñaba como ${cl(p.ocupacion)})`:'');
+  else if(p.ocupacion)occ=en?`works as ${cl(p.ocupacion)}`:`se desempeña como ${cl(p.ocupacion)}`;
+  S.push(s1+(occ?`, ${occ}.`:'.'));
+  if(p.objetivo)S.push(en?`States that their goal is ${cl(p.objetivo)}.`:`Manifiesta que su objetivo es ${cl(p.objetivo)}.`);
+  if(p.anuncio)S.push(en?`Reached through the ${cl(p.anuncio)} ad`+(p.vio_min===true?', where they saw the minimum investment amount.':p.vio_min===false?', although they did not see the minimum investment amount.':'.'):`Se contactó a través del anuncio de ${cl(p.anuncio)}`+(p.vio_min===true?', en el cual vio el monto mínimo de inversión.':p.vio_min===false?', aunque no llegó a ver el monto mínimo de inversión.':'.'));
+  else if(p.vio_min===true)S.push(en?'They are aware of the minimum investment amount from the ad.':'Tiene presente el monto mínimo de inversión del anuncio.');
+  else if(p.vio_min===false)S.push(en?'They did not see the minimum investment amount from the ad.':'No llegó a ver el monto mínimo de inversión del anuncio.');
+  const o=p.outcome&&PROF_OUT[p.outcome];if(o)S.push(o[en?'en':'es']);
+  if(p.motivo)S.push(en?`Note: ${cl(p.motivo)}.`:`Detalle: ${cl(p.motivo)}.`);
+  return S.join(' ');
 }
+// lo que se pega en el CRM: inglés arriba, traducción al español debajo
+function profCrm(p){const en=profText(p,'en'),es=profText(p,'es');return en&&es?`${en}\n\n${es}`:(en||es)}
 function fiProfHTML(d){
-  const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p);
+  const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p,'es'),st=profStatus(p);
   return `<div class="fi-c fi-prof${done?'':' fp-falta'}"><h4>Perfil del cliente ${done?'<span class="badge paid">completo</span>':'<span class="badge warn">faltan datos</span>'}</h4>
-    ${p&&txt?`<div class="fi-ptext">${esc(txt).replace(/\n/g,'<br>')}</div>`:'<p class="p-sub" style="margin:0 0 6px">La gerencia pide siempre edad, ocupación y objetivo. Cargalos para que la mesa y el CRM los tengan.</p>'}
+    ${p&&txt?`<div class="fi-ptext">${esc(txt)}</div>`:'<p class="p-sub" style="margin:0 0 6px">La gerencia pide siempre edad, ocupación y objetivo. Cargalos para que la mesa y el CRM los tengan.</p>'}
+    ${st?`<p class="fi-pst">Status sugerido en el CRM: <b>${esc(st)}</b></p>`:''}
     ${!done?`<p class="fi-pfalta">Faltan: ${esc(falta.join(', '))}</p>`:''}
-    <div class="fi-prow"><button type="button" class="btn sm pri" data-fa="profEdit">${p?'Editar perfil':'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar para el CRM</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
+    <div class="fi-prow"><button type="button" class="btn sm pri" data-fa="profEdit">${p?'Editar perfil':'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>
@@ -124,7 +157,7 @@ function fichaWire(root,getD,rerender){
     if(a==='campReq')return campReqModal(d,b.dataset.c);
     if(a==='campReqs')return campReqsModal(d,b.dataset.c,rerender);
     if(a==='profEdit')return profModal(d,rerender);
-    if(a==='profCopy'){const t=profText(d.prof);if(!t)return;try{await navigator.clipboard.writeText(t);toast('Copiado. Pegalo en el comentario del CRM.')}catch(e){toast('No pude copiar. Copialo a mano.','warn')}return}
+    if(a==='profCopy'){const t=profCrm(d.prof);if(!t)return;try{await navigator.clipboard.writeText(t);toast('Copiado en inglés, con el español debajo. Pegalo en el comentario del CRM.')}catch(e){toast('No pude copiar. Copialo a mano.','warn')}return}
     if(a==='comAdd'){const t=root.querySelector('[data-fcom]'),body=t.value.trim();if(!body)return t.focus();b.disabled=true;
       try{await Q(sb.from('client_comments').insert({client_id:String(d.id),brand:d.r&&d.r.brand||DEF_BRAND,body:body.slice(0,1000)}));t.value='';await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}finally{b.disabled=false}return}
     if(a==='comDel'){if(!await confirmar('Borrar comentario','¿Borrar este comentario?','borrar',true))return;try{await Q(sb.from('client_comments').delete().eq('id',b.dataset.id));await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}return}
@@ -147,26 +180,43 @@ function campModal(d,camp,edit,rerender){
 // el armador del perfil: los campos que pide la gerencia. Al guardar arma el comentario estándar para pegar en el CRM.
 function profModal(d,rerender){
   const p=d.prof||{},chk=v=>v?'checked':'';
-  modal({title:`Perfil · ${esc(d.name||d.id)}`,body:`<p class="mp">Lo que la gerencia pide de cada cliente. Lo ve toda la mesa.</p>
-    <div class="fgrid">
-      <label class="fld"><span>Edad <i>*</i></span><input id="pfE" type="number" min="16" max="110" value="${esc(p.edad!=null?p.edad:'')}" placeholder="Ej.: 34" autofocus></label>
-      <label class="fld"><span>Ocupación <i>*</i></span><input id="pfO" maxlength="120" value="${esc(p.ocupacion||'')}" placeholder="Ej.: taxista, comerciante…"></label>
+  // lo que hay en el formulario, con la forma de un perfil guardado (para la vista previa y para guardar)
+  const read=api=>{const e=api.q('#pfE').value.trim();return {edad:e===''?null:+e,ocupacion:api.q('#pfO').value.trim(),desocupado:api.q('#pfD').checked,desocupado_desde:api.q('#pfDd').value.trim(),objetivo:api.q('#pfG').value.trim(),anuncio:api.q('#pfA').value.trim(),vio_min:api.q('#pfM').checked?true:null,outcome:api.q('#pfR').value||null,motivo:api.q('#pfMo').value.trim()}};
+  const save=async(api,copy)=>{
+    const x=read(api);
+    if(x.edad!=null&&(!Number.isFinite(x.edad)||x.edad<16||x.edad>110)){api.q('#pfErr').textContent='La edad tiene que estar entre 16 y 110.';return false}
+    try{await Q(sb.rpc('prof_save',{p_client:String(d.id),p_brand:d.r&&d.r.brand||DEF_BRAND,p_data:{...x,edad:x.edad==null?'':String(x.edad)}}))}catch(e){api.q('#pfErr').textContent=errMsg(e);return false}
+    if(copy){try{await navigator.clipboard.writeText(profCrm(x));toast('Perfil guardado y copiado. Pegalo en el comentario del CRM.')}catch(e){toast('Perfil guardado. No pude copiar: usá "Copiar al CRM" en la ficha.','warn')}}
+    else toast('Perfil guardado.');
+    await rerender(true);
+  };
+  modal({wide:true,title:`Perfil · ${esc(d.name||d.id)}`,body:`<p class="mp">Lo que la gerencia pide de cada cliente. Lo ve toda la mesa.</p>
+    <div class="pf-grid"><div>
+      <div class="fgrid">
+        <label class="fld"><span>Edad <i>*</i></span><input id="pfE" type="number" min="16" max="110" value="${esc(p.edad!=null?p.edad:'')}" placeholder="Ej.: 34" autofocus></label>
+        <label class="fld"><span>Ocupación <i>*</i></span><input id="pfO" maxlength="120" value="${esc(p.ocupacion||'')}" placeholder="Ej.: taxista, comerciante…"></label>
+      </div>
+      <label class="fck"><input type="checkbox" id="pfD" ${chk(p.desocupado)}> Está desocupado</label>
+      <label class="fld" id="pfDwrap" style="${p.desocupado?'':'display:none'}"><span>¿Hace cuánto?</span><input id="pfDd" maxlength="60" value="${esc(p.desocupado_desde||'')}" placeholder="Ej.: 6 meses"></label>
+      <label class="fld"><span>Objetivo del cliente <i>*</i></span><input id="pfG" maxlength="200" value="${esc(p.objetivo||'')}" placeholder="Ej.: conseguir un ingreso extra"></label>
+      <label class="fld"><span>¿Qué vio en el anuncio?</span><input id="pfA" maxlength="300" value="${esc(p.anuncio||'')}" placeholder="Ej.: inversión con IA"></label>
+      <label class="fck"><input type="checkbox" id="pfM" ${chk(p.vio_min===true)}> Vio el monto mínimo</label>
+      <label class="fld"><span>¿Cómo terminó la llamada?</span><select id="pfR"><option value="">Elegí cómo terminó…</option>${PROF_ORDER.map(k=>`<option value="${k}" ${p.outcome===k?'selected':''}>${esc(PROF_OUT[k].l)}</option>`).join('')}</select></label>
+      <p class="pf-st" id="pfSt"></p>
+      <label class="fld"><span>Detalle <small class="dim">(opcional)</small></span><textarea id="pfMo" rows="2" maxlength="400" placeholder="Ej.: quiere consultarlo con la esposa / se le ofreció efectivo y transferencia">${esc(p.motivo||'')}</textarea></label>
     </div>
-    <label class="fck"><input type="checkbox" id="pfD" ${chk(p.desocupado)}> Está desocupado</label>
-    <label class="fld" id="pfDwrap" style="${p.desocupado?'':'display:none'}"><span>¿Hace cuánto está desocupado?</span><input id="pfDd" maxlength="60" value="${esc(p.desocupado_desde||'')}" placeholder="Ej.: 6 meses"></label>
-    <label class="fld"><span>Objetivo del cliente <i>*</i></span><input id="pfG" maxlength="200" value="${esc(p.objetivo||'')}" placeholder="Ej.: ingreso extra, ahorrar, independizarse…"></label>
-    <label class="fld"><span>¿Qué vio en el anuncio?</span><input id="pfA" maxlength="300" value="${esc(p.anuncio||'')}" placeholder="Ej.: inversión con IA, trading…"></label>
-    <label class="fck"><input type="checkbox" id="pfM" ${chk(p.vio_min===true)}> Vio el monto mínimo</label>
-    <label class="fld"><span>¿Tiene el dinero?</span><select id="pfT"><option value="">No sé todavía</option><option value="1" ${p.tiene===true?'selected':''}>Sí, tiene</option><option value="0" ${p.tiene===false?'selected':''}>No tiene</option></select></label>
-    <label class="fld"><span>Si lo tiene y no depositó, ¿por qué? · Si no lo tiene, ¿qué se intentó?</span><textarea id="pfMo" rows="2" maxlength="400" placeholder="Ej.: quiere pensarlo el finde / se le ofreció efectivo y transferencia">${esc(p.motivo||'')}</textarea></label>
+    <div class="pf-prev"><span class="p-sub">Así queda en Vitalis</span><div id="pfPrev" class="pf-txt"></div>
+      <details><summary>Ver lo que va al CRM (inglés + español)</summary><div id="pfPrevEn" class="pf-txt en"></div></details></div></div>
     <div class="ebox" id="pfErr"></div>`,
-    onOpen:api=>{const c=api.q('#pfD');c.addEventListener('change',()=>{api.q('#pfDwrap').style.display=c.checked?'':'none'})},
-    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
-      const edad=api.q('#pfE').value.trim();
-      if(edad&&(+edad<16||+edad>110)){api.q('#pfErr').textContent='La edad tiene que estar entre 16 y 110.';return false}
-      const data={edad,ocupacion:api.q('#pfO').value.trim(),desocupado:api.q('#pfD').checked,desocupado_desde:api.q('#pfDd').value.trim(),objetivo:api.q('#pfG').value.trim(),anuncio:api.q('#pfA').value.trim(),vio_min:api.q('#pfM').checked?true:null,tiene:api.q('#pfT').value===''?null:api.q('#pfT').value==='1',motivo:api.q('#pfMo').value.trim()};
-      try{await Q(sb.rpc('prof_save',{p_client:String(d.id),p_brand:d.r&&d.r.brand||DEF_BRAND,p_data:data}))}catch(e){api.q('#pfErr').textContent=errMsg(e);return false}
-      toast('Perfil guardado.');await rerender(true)}}]});
+    onOpen:api=>{
+      const draw=()=>{const x=read(api),o=x.outcome&&PROF_OUT[x.outcome],st=profStatus(x),es=profText(x,'es');
+        api.q('#pfDwrap').style.display=x.desocupado?'':'none';
+        api.q('#pfSt').innerHTML=st?`Status sugerido en el CRM: <b>${esc(st)}</b>`:o?'':'<span class="dim">Al elegir cómo terminó, te digo qué status poner en el CRM.</span>';
+        api.q('#pfPrev').textContent=es&&(x.edad!=null||x.ocupacion||x.desocupado||x.objetivo||x.anuncio||x.outcome||x.motivo)?es:'Completá los datos y acá vas viendo el comentario.';
+        api.q('#pfPrevEn').textContent=profCrm(x);};
+      api.mb.addEventListener('input',draw);api.mb.addEventListener('change',draw);draw();
+    },
+    actions:[{l:'Cancelar'},{l:'Guardar',fn:api=>save(api,false)},{l:'Guardar y copiar al CRM',cls:'pri',fn:api=>save(api,true)}]});
 }
 function campReqModal(d,camp){
   modal({title:`Pedir un cambio · ${esc(camp)}`,body:`<p class="mp">Le llega al administrador y al team leader.</p><label class="fld"><span>¿Qué hay que cambiar?</span><textarea id="crB" rows="4" maxlength="1000" placeholder="Ej.: ahora el mínimo es 300 USD" autofocus></textarea></label><div class="ebox" id="crE"></div>`,
