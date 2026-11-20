@@ -1595,7 +1595,7 @@ body.dark #nav button.nv-cli.on{color:#fff}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.2';
+const VERSION='1.23.3';
 const EXT_VER='1.9.4'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1751,11 +1751,24 @@ async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, p
    Al abrir Vitalis con la sesión abierta se dibuja al instante con eso y en paralelo se pide lo nuevo.
    Uno por persona; se borra al salir. */
 const SNAP_V=2;
-const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',1);r.onupgradeneeded=()=>r.result.createObjectStore('snap');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
+const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',2);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('snap'))db.createObjectStore('snap');if(!db.objectStoreNames.contains('img'))db.createObjectStore('img')};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
 async function snapOp(mode,fn){try{const db=await snapDb();return await new Promise((ok,no)=>{const t=db.transaction('snap',mode),q=fn(t.objectStore('snap'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
 const snapGet=k=>snapOp('readonly',s=>s.get(k));
 const snapPut=(k,v)=>snapOp('readwrite',s=>s.put(v,k));
 const snapClear=()=>snapOp('readwrite',s=>s.clear());
+// caché de imágenes del chat: son inmutables (una foto nueva es un id nuevo), así que una vez bajadas no se vuelven a pedir
+async function imgOp(mode,fn){try{const db=await snapDb();if(!db.objectStoreNames.contains('img'))return null;return await new Promise((ok,no)=>{const t=db.transaction('img',mode),q=fn(t.objectStore('img'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
+const imgCacheGet=id=>imgOp('readonly',s=>s.get(id));
+const imgCachePut=(id,rec)=>imgOp('readwrite',s=>s.put(rec,id));
+let imgTrimDone=false; // cada tanto deja las más nuevas y borra el resto para no crecer sin fin
+async function imgCacheTrim(max=400){
+  if(imgTrimDone)return;imgTrimDone=true;
+  try{const db=await snapDb();if(!db.objectStoreNames.contains('img'))return;
+    const all=await new Promise((ok,no)=>{const s=db.transaction('img','readonly').objectStore('img'),out=[],c=s.openCursor();c.onsuccess=()=>{const cur=c.result;if(cur){out.push({k:cur.key,at:(cur.value&&cur.value.at)||0});cur.continue()}else ok(out)};c.onerror=()=>no(c.error)});
+    if(all.length<=max)return;all.sort((a,b)=>b.at-a.at);const drop=all.slice(max).map(x=>x.k);
+    await imgOp('readwrite',s=>{for(const k of drop)s.delete(k)});
+  }catch(e){}
+}
 function snapCrm(rows,rot){if(me)snapPut('crm:'+me,{v:SNAP_V,at:Date.now(),rows,rot})}
 async function W(fn){try{await fn();return true}catch(e){dbErr(e);return false}}
 // todas las filas, de a 1000: las páginas que espero las pido juntas (no una detrás de otra); orden estable con el id
@@ -4196,7 +4209,7 @@ function onReady(){
   $('#navEquipo').hidden=!isLeader();
   let h='';try{h=location.hash.slice(1)}catch(e){}
   go(VIEWS.includes(h)?h:'inicio');
-  status();check();setTimeout(avisoCheck,900);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
+  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
 }
@@ -4530,13 +4543,16 @@ function cardPaint(el){ // pone la tarjeta si ya llegó
 }
 
 const imgs={}; // id → {url} | {err} | {p: promesa}
+const imgBlob=(mime,data)=>{const bin=atob(data),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([u8],{type:mime}))};
 function imgLoad(id){
   const x=imgs[id];
   if(x&&!(x.err==='net'&&Date.now()-x.t>3e4))return x.p||Promise.resolve(x); // si falló la red, reintento después de 30 s
-  const p=(async()=>{try{const [r]=await Q(sb.from('chat_files').select('mime,data').eq('id',id));
+  const p=(async()=>{
+    try{const c=await imgCacheGet(id);if(c&&c.data)return imgs[id]={url:imgBlob(c.mime,c.data)}}catch(e){} // ya la bajé antes en esta compu
+    try{const [r]=await Q(sb.from('chat_files').select('mime,data').eq('id',id));
       if(!r)return imgs[id]={err:'gone'};
-      const bin=atob(r.data),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
-      return imgs[id]={url:URL.createObjectURL(new Blob([u8],{type:r.mime}))}}
+      imgCachePut(id,{mime:r.mime,data:r.data,at:Date.now()}); // la guardo para no volver a pedirla
+      return imgs[id]={url:imgBlob(r.mime,r.data)}}
     catch(e){return imgs[id]={err:'net',t:Date.now()}}})();
   imgs[id]={p};return p;
 }
@@ -4666,8 +4682,8 @@ Object.assign(B,{
     catch(err){undo();if(/message_reactions|PGRST205|42P01/.test(String(err&&(err.message||err.code))))toast('Las reacciones se activan en un rato (falta actualizar la base).','warn');else if(err&&err.code!=='23505')toast(esc(errMsg(err)),'err');return false}
   },
   async sendImg(cid,att,text,reply){
-    try{const [f]=await Q(sb.from('chat_files').insert({chat_id:cid,mime:att.mime,w:att.w,h:att.h,data:await b64(att.blob)}).select('id'));
-      imgs[f.id]={url:att.url};
+    try{const data=await b64(att.blob);const [f]=await Q(sb.from('chat_files').insert({chat_id:cid,mime:att.mime,w:att.w,h:att.h,data}).select('id'));
+      imgs[f.id]={url:att.url};imgCachePut(f.id,{mime:att.mime,data,at:Date.now()}); // la que mandé tampoco se vuelve a pedir
       return await B.sendMsg(cid,`[img:${f.id}:${att.w}x${att.h}]`+(text?' '+text.slice(0,1900):''),reply);
     }catch(e){if(/chat_files|PGRST205|42P01/.test(String(e&&(e.message||e.code))))toast('Las imágenes se activan en un rato (falta actualizar la base).','warn');else dbErr(e);return false}
   },

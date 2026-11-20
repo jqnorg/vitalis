@@ -69,13 +69,16 @@ function cardPaint(el){ // pone la tarjeta si ya llegó
 }
 
 const imgs={}; // id → {url} | {err} | {p: promesa}
+const imgBlob=(mime,data)=>{const bin=atob(data),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([u8],{type:mime}))};
 function imgLoad(id){
   const x=imgs[id];
   if(x&&!(x.err==='net'&&Date.now()-x.t>3e4))return x.p||Promise.resolve(x); // si falló la red, reintento después de 30 s
-  const p=(async()=>{try{const [r]=await Q(sb.from('chat_files').select('mime,data').eq('id',id));
+  const p=(async()=>{
+    try{const c=await imgCacheGet(id);if(c&&c.data)return imgs[id]={url:imgBlob(c.mime,c.data)}}catch(e){} // ya la bajé antes en esta compu
+    try{const [r]=await Q(sb.from('chat_files').select('mime,data').eq('id',id));
       if(!r)return imgs[id]={err:'gone'};
-      const bin=atob(r.data),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
-      return imgs[id]={url:URL.createObjectURL(new Blob([u8],{type:r.mime}))}}
+      imgCachePut(id,{mime:r.mime,data:r.data,at:Date.now()}); // la guardo para no volver a pedirla
+      return imgs[id]={url:imgBlob(r.mime,r.data)}}
     catch(e){return imgs[id]={err:'net',t:Date.now()}}})();
   imgs[id]={p};return p;
 }
@@ -205,8 +208,8 @@ Object.assign(B,{
     catch(err){undo();if(/message_reactions|PGRST205|42P01/.test(String(err&&(err.message||err.code))))toast('Las reacciones se activan en un rato (falta actualizar la base).','warn');else if(err&&err.code!=='23505')toast(esc(errMsg(err)),'err');return false}
   },
   async sendImg(cid,att,text,reply){
-    try{const [f]=await Q(sb.from('chat_files').insert({chat_id:cid,mime:att.mime,w:att.w,h:att.h,data:await b64(att.blob)}).select('id'));
-      imgs[f.id]={url:att.url};
+    try{const data=await b64(att.blob);const [f]=await Q(sb.from('chat_files').insert({chat_id:cid,mime:att.mime,w:att.w,h:att.h,data}).select('id'));
+      imgs[f.id]={url:att.url};imgCachePut(f.id,{mime:att.mime,data,at:Date.now()}); // la que mandé tampoco se vuelve a pedir
       return await B.sendMsg(cid,`[img:${f.id}:${att.w}x${att.h}]`+(text?' '+text.slice(0,1900):''),reply);
     }catch(e){if(/chat_files|PGRST205|42P01/.test(String(e&&(e.message||e.code))))toast('Las imágenes se activan en un rato (falta actualizar la base).','warn');else dbErr(e);return false}
   },

@@ -279,6 +279,13 @@ async def main():
             ok(await A.is_visible('.mbox .imgv img'), 'tocándola se ve grande')
             await A.screenshot(path=OUT / 'h1b_chat_imagen.png')
             await A.keyboard.press('Escape')
+            # la imagen del chat queda cacheada en el navegador: no se vuelve a pedir
+            fid = sql("select id from public.chat_files limit 1")[0]['id']
+            ok(await A.evaluate(f"(async()=>{{const c=await imgCacheGet('{fid}');return !!(c&&c.data)}})()"), 'la imagen del chat queda guardada en la caché del navegador')
+            await A.route('**/chat_files*', lambda r: r.abort())
+            served = await A.evaluate(f"(async()=>{{delete imgs['{fid}'];const r=await imgLoad('{fid}');return !!(r&&r.url&&String(r.url).startsWith('blob:'))}})()")
+            await A.unroute('**/chat_files*')
+            ok(served, 'y se muestra desde la caché aunque la base no la sirva (no se vuelve a pedir)')
             # grupo
             await D.click('#chNew'); await D.wait_for_timeout(400)
             await D.fill('.mbox [name=nm]', 'Los del fondo')

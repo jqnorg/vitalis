@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.2';
+const VERSION='1.23.3';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -159,11 +159,24 @@ async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, p
    Al abrir Vitalis con la sesión abierta se dibuja al instante con eso y en paralelo se pide lo nuevo.
    Uno por persona; se borra al salir. */
 const SNAP_V=2;
-const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',1);r.onupgradeneeded=()=>r.result.createObjectStore('snap');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
+const snapDb=(()=>{let p=null;return()=>p||(p=new Promise((ok,no)=>{try{const r=indexedDB.open('vitalis',2);r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains('snap'))db.createObjectStore('snap');if(!db.objectStoreNames.contains('img'))db.createObjectStore('img')};r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))})();
 async function snapOp(mode,fn){try{const db=await snapDb();return await new Promise((ok,no)=>{const t=db.transaction('snap',mode),q=fn(t.objectStore('snap'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
 const snapGet=k=>snapOp('readonly',s=>s.get(k));
 const snapPut=(k,v)=>snapOp('readwrite',s=>s.put(v,k));
 const snapClear=()=>snapOp('readwrite',s=>s.clear());
+// caché de imágenes del chat: son inmutables (una foto nueva es un id nuevo), así que una vez bajadas no se vuelven a pedir
+async function imgOp(mode,fn){try{const db=await snapDb();if(!db.objectStoreNames.contains('img'))return null;return await new Promise((ok,no)=>{const t=db.transaction('img',mode),q=fn(t.objectStore('img'));t.oncomplete=()=>ok(q&&q.result);t.onerror=t.onabort=()=>no(t.error)})}catch(e){return null}}
+const imgCacheGet=id=>imgOp('readonly',s=>s.get(id));
+const imgCachePut=(id,rec)=>imgOp('readwrite',s=>s.put(rec,id));
+let imgTrimDone=false; // cada tanto deja las más nuevas y borra el resto para no crecer sin fin
+async function imgCacheTrim(max=400){
+  if(imgTrimDone)return;imgTrimDone=true;
+  try{const db=await snapDb();if(!db.objectStoreNames.contains('img'))return;
+    const all=await new Promise((ok,no)=>{const s=db.transaction('img','readonly').objectStore('img'),out=[],c=s.openCursor();c.onsuccess=()=>{const cur=c.result;if(cur){out.push({k:cur.key,at:(cur.value&&cur.value.at)||0});cur.continue()}else ok(out)};c.onerror=()=>no(c.error)});
+    if(all.length<=max)return;all.sort((a,b)=>b.at-a.at);const drop=all.slice(max).map(x=>x.k);
+    await imgOp('readwrite',s=>{for(const k of drop)s.delete(k)});
+  }catch(e){}
+}
 function snapCrm(rows,rot){if(me)snapPut('crm:'+me,{v:SNAP_V,at:Date.now(),rows,rot})}
 async function W(fn){try{await fn();return true}catch(e){dbErr(e);return false}}
 // todas las filas, de a 1000: las páginas que espero las pido juntas (no una detrás de otra); orden estable con el id
