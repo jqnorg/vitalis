@@ -1,6 +1,6 @@
 # Prueba de punta a punta con Chrome headless contra la base de prueba (server.mjs).
 # Uso: cd test && python3 e2e.py   → capturas en test/shots/
-import asyncio, base64, subprocess, time, json, urllib.request, pathlib, sys
+import re, asyncio, base64, subprocess, time, json, urllib.request, pathlib, sys
 from playwright.async_api import async_playwright
 PORT = 54410
 URL = f'http://localhost:{PORT}/'
@@ -854,6 +854,37 @@ async def main():
             ok('Joaquín Vitalis' in await A.inner_text('#chMsgs'), 'y en el chat el remitente es Joaquín Vitalis')
             await A.screenshot(path=OUT / 'v1_venta_chat.png')
             ok(await A.evaluate("!members.some(m=>m.bot)&&!!botU"), 'no cuenta como alguien de la mesa')
+
+            # el Radar aprende de las ventas; sin datos usa los números de respaldo
+            R = await A.evaluate('''(()=>{
+              const keep=team,out={};
+              const z2=n=>String(n).padStart(2,'0');
+              team=[];pass++;
+              out.fix={w:newWin('Chile').w,n:newWin('Chile').n,hot:hotChance(2),seg:segLearn(),pace:paceAt(20)};
+              const L=[];let i=0;
+              const mk=o=>L.push({uid:me,brand:'Novara Markets',id:'R'+(i++),time:'12:00',amount:100,camp:'Meta-CL',...o});
+              for(const m of ['05','06','07','08','09'])for(const d of ['05','25'])for(let k=0;k<12;k++){
+                const date='2026-'+m+'-'+d;
+                mk({date,reg:date+' 11:00',time:'11:30',country:'Chile',aff:'12'});   // a los 30 min
+                mk({date,reg:date+' 11:00',time:'12:30',country:'Mexico',aff:'14'}); // a los 90 min
+              }
+              for(let k=0;k<20;k++){const date='2026-06-'+(k<10?'05':'25');mk({date,reg:date,country:'Colombia',aff:'P'+k,camp:'Par'});mk({date,reg:date,country:'Colombia',aff:'P'+k,camp:'Par'})} // 20 días de campaña que quedan en 2
+              for(let k=0;k<50;k++)mk({date:'2026-04-10',reg:k<30?'2026-04-09':'2026-04-03',country:'Peru',aff:'',camp:''}); // late: 30 al día hábil siguiente, 20 a los 5
+              team=L;pass++;
+              const now=new Date(),ago=m=>{const d=new Date(now-m*6e4);return {grp:'new',country:'Chile',reg:ymd(d)+' '+z2(d.getHours())+':'+z2(d.getMinutes())}};
+              out.got={chile:newWin('Chile'),colombia:newWin('Colombia'),hot2:hotChance(2),hot3:hotChance(3),seg:segLearn(),pace:paceAt(20),proj:proj(10,20),
+                c20:newClock(ago(20)),c70:newClock(ago(70)),c100:newClock(ago(100)),pron:pronCard(),sub:segCard({cb:[],g3:[],low:[],failed:[]},false)};
+              team=keep;pass++;refresh();
+              return out;
+            })()''')
+            RF, RG = R['fix'], R['got']
+            ok(RF['w'] == 46 and RF['n'] == 0 and RF['hot'] == '1 de cada 3 veces llega otro' and RF['seg']['n'] == 0 and abs(RF['seg']['d1'] - .47) < 1e-9 and RF['pace']['n'] == 0 and abs(RF['pace']['mid'] - .70) < 1e-9, f'sin ventas, el Radar usa los números de respaldo ({RF})')
+            ok(RG['chile'] == {'w': 30, 'cold': 90, 'n': 120, 'pais': 1} and RG['colombia'] == {'w': 60, 'cold': 90, 'n': 240, 'pais': 0}, f'reloj del new: aprende la ventana de cada país, y la de la mesa si el país tiene pocas ventas ({RG["chile"]}, {RG["colombia"]})')
+            ok(re.search(r'ventana fuerte · (9|10) min', RG['c20']) and re.search(r'se enfría · (19|20) min', RG['c70']) and '>frío<' in RG['c100'] and 'Sale de 120 ventas de Chile' in RG['c20'], 'y el reloj de la Cola usa lo aprendido')
+            ok(RG['hot2'] == '5 de cada 10 veces llega otro' and RG['hot3'] == 'casi siempre llega otro', f'campaña caliente: la chance de otro FTD sale de la historia ({RG["hot2"]} / {RG["hot3"]})')
+            ok(RG['seg']['n'] == 50 and abs(RG['seg']['d1'] - .6) < 1e-9 and abs(RG['seg']['d7'] - 1) < 1e-9, f'segundas oportunidades: cuándo vuelven los late, en días hábiles ({RG["seg"]})')
+            ok(RG['pace']['n'] == 5 and abs(RG['pace']['mid'] - .5) < 1e-9 and RG['proj'] == {'mid': 20, 'lo': 20, 'hi': 20, 'months': 5}, f'pronóstico: aprende de los meses cerrados, sin el actual ni el primero ({RG["pace"]}, {RG["proj"]})')
+            ok('5 meses de historia' in RG['pron'], 'y dice de cuántos meses sale')
             await b.close()
     finally:
         srv.terminate()

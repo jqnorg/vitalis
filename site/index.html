@@ -1522,7 +1522,7 @@ details[data-k=seg][open]>summary{margin-bottom:10px}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.22.1';
+const VERSION='1.22.2';
 const EXT_VER='1.9.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -6460,28 +6460,54 @@ function campDetail(k,from,to,perTxt){
    Radar: lo que predice ventas (PROPUESTAS.md, 10 ideas).
    Todo sale de las ventas de la mesa (`team`) y de los clientes del CRM: sin tablas nuevas.
    Mientras Novara junta historia (menos de RD_MIN FTDs), los patrones usan también la de Trade24Seven y lo dicen.
+   Los números se aprenden de las ventas en cada dibujo (`*Learn`); mientras falten datos, se usa el de respaldo (`*_FIX`),
+   que salió de la historia de Trade24Seven.
    El pronóstico del mes y la curva del agente nuevo: solo team leader y admin (en Equipo).
    ============================================================ */
 const RD_MIN=400;
 const rdBase=perPass(()=>{const nv=team.filter(f=>!isArch(f.brand)),all=nv.length<RD_MIN;return {list:all?team:nv,nv:nv.length,all}});
-const rdNote=()=>{const b=rdBase();return b.all?`Con la historia de Trade24Seven: Novara lleva ${plural(b.nv,'FTD')} y desde ${RD_MIN} se usa sola.`:`Con los ${nf(b.nv)} FTDs de Novara.`};
+const rdNote=()=>{const b=rdBase();return (b.all?`Con la historia de Trade24Seven: Novara lleva ${plural(b.nv,'FTD')} y desde ${RD_MIN} se usa sola.`:`Con los ${nf(b.nv)} FTDs de Novara.`)+' Se recalcula con cada venta.'};
 const rdHour=f=>{const m=/^(\d{1,2}):/.exec(f.time||'');return m?+m[1]:null};
 const rdPais=f=>paisOf(f.country)||'';
 const rdFew=n=>`<div class="p-empty">Pocos datos todavía${n!=null?` (${n})`:''}.</div>`;
+const hmMin=s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||'');return m?+m[1]*60+ +m[2]:null};
+const quant=(a,q)=>{if(!a.length)return null;const v=[...a].sort((x,y)=>x-y),i=(v.length-1)*q,lo=Math.floor(i);return v[lo]+(v[Math.ceil(i)]-v[lo])*(i-lo)};
+const r5=x=>Math.max(5,Math.round(x/5)*5);
+const minTxt=m=>m<60?m+' min':Math.floor(m/60)+' h'+(m%60?' '+(m%60)+' min':'');
+const tenTxt=p=>{const k=Math.round(p*10);return k<=0?'casi nunca':k>=10?'casi siempre':k+' de cada 10 veces'};
 // días hábiles entre dos fechas (los del viernes vuelven el lunes)
 function bizDays(a,b){let n=0;const d=parseYMD(a),e=parseYMD(b);while(d<e){d.setDate(d.getDate()+1);const w=d.getDay();if(w!==0&&w!==6)n++}return n}
 
 /* ---------- 1) el reloj del new ---------- */
-// mismo día: la mitad deposita antes de estos minutos desde el registro (por país); 85% antes de las 2 h
-const NEW_WIN={chile:46,colombia:54,mexico:64,peru:66},NEW_DEF=52;
+// de los que depositan el mismo día: minutos del registro al FTD. Ventana fuerte = la mitad (por país); frío = pasado el 85%.
+const NEW_FIX={chile:46,colombia:54,mexico:64,peru:66},NEW_FIX_DEF=52,NEW_FIX_COLD=120,NEW_MIN=40,NEW_MIN_PAIS=15;
+const newLearn=perPass(()=>{
+  const all=[],by=new Map();
+  for(const f of rdBase().list){
+    const rg=String(f.reg||'');if(rg.length<16||isLate(f))continue; // hace falta la hora del registro
+    const a=hmMin(rg.slice(11,16)),b=hmMin(f.time);if(a==null||b==null)continue;
+    const m=b-a;if(m<0||m>14*60)continue;
+    all.push(m);const p=norm(rdPais(f));if(!p)continue;let L=by.get(p);if(!L)by.set(p,L=[]);L.push(m);
+  }
+  const ok=all.length>=NEW_MIN,win={};
+  if(ok)for(const [p,L] of by)if(L.length>=NEW_MIN_PAIS)win[p]={w:r5(quant(L,.5)),n:L.length};
+  return {ok,n:all.length,def:ok?r5(quant(all,.5)):NEW_FIX_DEF,cold:ok?Math.min(240,Math.max(60,r5(quant(all,.85)))):NEW_FIX_COLD,win};
+});
+function newWin(country){ // {w: ventana fuerte, cold: desde cuándo está frío, n: de cuántas ventas sale (0 = respaldo)}
+  const L=newLearn(),p=norm(paisOf(country)),x=L.win[p];
+  if(x)return {w:x.w,cold:Math.max(L.cold,x.w+5),n:x.n,pais:1};
+  if(L.ok)return {w:L.def,cold:Math.max(L.cold,L.def+5),n:L.n,pais:0};
+  return {w:NEW_FIX[p]||NEW_FIX_DEF,cold:NEW_FIX_COLD,n:0,pais:0};
+}
 function newClock(r){
   if(r.grp!=='new'||!r.reg||r.reg.length<=10)return '';
   const at=regAt(r);if(!at||ymd(at)!==todayS())return '';
   const m=Math.round((Date.now()-at)/6e4);if(m<0)return '';
-  const w=NEW_WIN[norm(paisOf(r.country))]||NEW_DEF,t=`La mitad de los que depositan el mismo día lo hace antes de los ${w} min del registro; 85% antes de las 2 h.`;
-  if(m<=w)return `<span class="rl on" title="${t}">ventana fuerte · ${w-m} min</span>`;
-  if(m<=120)return `<span class="rl mid" title="${t}">se enfría · ${120-m} min</span>`;
-  return `<span class="rl off" title="${t}">frío</span>`;
+  const {w,cold,n,pais}=newWin(r.country);
+  const t=`La mitad de los que depositan el mismo día lo hace antes de los ${w} min del registro; 85% antes de ${minTxt(cold)}.`+(n?` Sale de ${n} ventas${pais?' de '+(paisOf(r.country)||'su país'):' de la mesa'}.`:'');
+  if(m<=w)return `<span class="rl on" title="${esc(t)}">ventana fuerte · ${w-m} min</span>`;
+  if(m<=cold)return `<span class="rl mid" title="${esc(t)}">se enfría · ${cold-m} min</span>`;
+  return `<span class="rl off" title="${esc(t)}">frío</span>`;
 }
 
 /* ---------- 2) campaña caliente ---------- */
@@ -6490,7 +6516,20 @@ const hotCamps=perPass(()=>{
   for(const f of team){if(f.date!==te||isArch(f.brand))continue;const k=comboKey(f.aff,f.camp,f.country);let o=m.get(k);if(!o)m.set(k,o={k,n:0,txt:campTxt(f.aff,f.camp,f.country)});o.n++}
   return [...m.values()].filter(o=>o.n>=2).sort((a,b)=>b.n-a.n);
 });
-const hotChance=n=>n>=3?'casi la mitad de las veces llega otro':'1 de cada 3 veces llega otro';
+// de los días en que una campaña llegó a n FTDs, en cuántos llegó otro más
+const HOT_MIN=20;
+const hotLearn=perPass(()=>{
+  const g=new Map();
+  for(const f of rdBase().list){if(!f.aff&&!f.camp)continue;const k=f.date+'|'+comboKey(f.aff,f.camp,f.country);g.set(k,(g.get(k)||0)+1)}
+  const memo=new Map();
+  return n=>{if(memo.has(n))return memo.get(n);let a=0,b=0;for(const c of g.values())if(c>=n){a++;if(c>n)b++}const v=a>=HOT_MIN?b/a:null;memo.set(n,v);return v};
+});
+function hotChance(n){
+  const at=hotLearn();let p=null;
+  for(let k=n;k>=2&&p==null;k--)p=at(k); // con 5 hoy y pocos días así de calientes, uso lo que pasa desde 4, 3…
+  if(p==null)return n>=3?'casi la mitad de las veces llega otro':'1 de cada 3 veces llega otro';
+  return tenTxt(p)+' llega otro';
+}
 function hotMine(q){ // q: la cola de quien mira; devuelve las campañas calientes con sus clientes sin depositar
   const H=hotCamps();if(!H.length||!q)return [];
   const L=[...q.g1,...q.cb,...q.g3,...q.low];
@@ -6527,12 +6566,25 @@ function segList(q){
   }
   return out.sort((a,b)=>a.w-b.w||(regAt(b.r)||0)-(regAt(a.r)||0));
 }
+// de los que depositan otro día: cuántos días hábiles después del registro
+const SEG_FIX={d1:.47,d3:.64,d7:.87},SEG_MIN=40;
+const segLearn=perPass(()=>{
+  const d=[];
+  for(const f of rdBase().list){
+    if(!isLate(f))continue;const a=String(f.reg).slice(0,10);
+    if((parseYMD(f.date)-parseYMD(a))/864e5>60)continue; // un registro mal cargado no cuenta
+    d.push(bizDays(a,f.date));
+  }
+  if(d.length<SEG_MIN)return {...SEG_FIX,n:0};
+  const sh=x=>d.filter(v=>v<=x).length/d.length;
+  return {d1:sh(1),d3:sh(3),d7:sh(7),n:d.length};
+});
 const segTag=d=>d<=1?sp('rl on','hoy es su mejor día'):d<=3?sp('rl mid','todavía a tiempo'):d<=7?sp('rl off','última semana'):sp('rl off','poca chance');
 function segCard(q,who){
   const L=segList(q);if(!L.length)return '';
   const row=({r,d})=>`<tr><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td><td class="d">hace ${plural(d,'día hábil','días hábiles')}</td><td>${segTag(d)}</td><td>${esc(r.country)}</td>${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}
     <td class="act wr"><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
-  return `<section class="card ah-g"><details data-k="seg"${L.some(x=>x.d<=1)?' open':''}><summary class="card-h"><h3>Segundas oportunidades</h3><span class="p-sub">${L.length} que hablaron y no depositaron · de los que vuelven, la mitad lo hace al día siguiente y 9 de cada 10 en la semana</span></summary>
+  return `<section class="card ah-g"><details data-k="seg"${L.some(x=>x.d<=1)?' open':''}><summary class="card-h"><h3>Segundas oportunidades</h3><span class="p-sub">${L.length} que hablaron y no depositaron · ${(S=>`de los que vuelven, ${pct(S.d1)} lo hace al día hábil siguiente y ${pct(S.d7)} antes de los 7 días hábiles`)(segLearn())}</span></summary>
     <div class="p-tablewrap"><table class="pt ah-t"><thead><tr><th>Cliente</th><th>Status</th><th>Registro</th><th>Chance</th><th>País</th>${who?'<th>Agente</th>':''}<th class="act"></th></tr></thead><tbody>${L.slice(0,25).map(row).join('')}</tbody></table></div>
     ${L.length>25?`<p class="p-sub" style="margin-top:8px">y ${L.length-25} más.</p>`:''}</details></section>`;
 }
@@ -6638,19 +6690,36 @@ function lateCard(){
 }
 
 /* ---------- 4) pronóstico del mes (solo team leader y admin) ---------- */
-// cuánto del mes lleva la mesa a cada día: centro (mínimo–máximo) de los meses de historia
-const PACE=[[10,.34,.21,.41],[15,.52,.34,.61],[20,.70,.52,.82],[25,.85,.70,.98],[31,1,1,1]];
+// cuánto del mes lleva la mesa a cada día. Se aprende de los meses cerrados (sin el actual ni el primero, que suele estar a medias,
+// y con 30 FTDs o más): la mediana es lo más probable; el rango, del 10% al 90% (con menos de 10 meses, del peor al mejor).
+const PACE_FIX=[[10,.34,.21,.41],[15,.52,.34,.61],[20,.70,.52,.82],[25,.85,.70,.98],[31,1,1,1]],PACE_MIN=3;
+const paceLearn=perPass(()=>{
+  const months=list=>{
+    const by=new Map();for(const f of list){const ym=f.date.slice(0,7);let a=by.get(ym);if(!a)by.set(ym,a=Array(32).fill(0));a[+f.date.slice(8,10)]++}
+    const now=ymNow(),yms=[...by.keys()].sort(),out=[];
+    for(const ym of yms){if(ym>=now||ym===yms[0])continue;const a=by.get(ym),tot=a.reduce((x,v)=>x+v,0);if(tot<30)continue;const c=[0];for(let d=1;d<32;d++)c[d]=c[d-1]+a[d];out.push(c.map(v=>v/tot))}
+    return out;
+  };
+  let M=months(rdBase().list);if(M.length<PACE_MIN)M=months(team); // cómo cierra un mes es de la mesa, no de la marca
+  return M.length>=PACE_MIN?M:null;
+});
 function paceAt(day){
   if(day<8)return null;
-  if(day<=10){const k=day/10;return {mid:PACE[0][1]*k,lo:PACE[0][2]*k,hi:PACE[0][3]*k}}
-  for(let i=1;i<PACE.length;i++){const a=PACE[i-1],b=PACE[i];if(day<=b[0]){const k=(day-a[0])/(b[0]-a[0]),f=j=>a[j]+(b[j]-a[j])*k;return {mid:f(1),lo:f(2),hi:f(3)}}}
-  return {mid:1,lo:1,hi:1};
+  const M=paceLearn();
+  if(M){
+    const v=M.map(c=>c[Math.min(31,day)]),q=M.length>=10?[.1,.9]:[0,1],cl=x=>Math.min(1,Math.max(.05,x));
+    return {mid:cl(quant(v,.5)),lo:cl(quant(v,q[0])),hi:cl(quant(v,q[1])),n:M.length};
+  }
+  const P=PACE_FIX;
+  if(day<=10){const k=day/10;return {mid:P[0][1]*k,lo:P[0][2]*k,hi:P[0][3]*k,n:0}}
+  for(let i=1;i<P.length;i++){const a=P[i-1],b=P[i];if(day<=b[0]){const k=(day-a[0])/(b[0]-a[0]),f=j=>a[j]+(b[j]-a[j])*k;return {mid:f(1),lo:f(2),hi:f(3),n:0}}}
+  return {mid:1,lo:1,hi:1,n:0};
 }
-function proj(n,day){const p=paceAt(day);if(!p)return null;return {mid:Math.round(n/p.mid),lo:Math.max(n,Math.round(n/p.hi)),hi:Math.max(n,Math.round(n/p.lo))}}
+function proj(n,day){const p=paceAt(day);if(!p)return null;return {mid:Math.max(n,Math.round(n/p.mid)),lo:Math.max(n,Math.round(n/p.hi)),hi:Math.max(n,Math.round(n/p.lo)),months:p.n}}
 function pronCard(){
   if(!isLeader())return '';
   const ym=ymNow(),day=new Date().getDate(),L=team.filter(f=>f.date.slice(0,7)===ym),tg=+targets[ym]||0,P=proj(L.length,day);
-  const head=`<div class="card-h"><h3>Pronóstico del mes</h3><span class="p-sub">solo team leader y admin · según cómo cerraron los meses de historia</span></div>`;
+  const head=`<div class="card-h"><h3>Pronóstico del mes</h3><span class="p-sub">solo team leader y admin · según cómo cerraron ${(m=>m?plural(m,'mes','meses')+' de historia':'los meses de historia')((paceAt(Math.max(8,day))||{}).n)}</span></div>`;
   if(!P)return head+`<div class="p-empty">Antes del día 8 es muy temprano para proyectar.</div>`;
   const verdict=(p,t)=>!t?'':p.lo>=t?sp('ok b','llega'):p.hi<t?sp('hot b','no llega a este ritmo'):p.mid>=t?sp('ok','en camino'):sp('warn','justo');
   const rows=sellers(team).filter(m=>!isLeadUid(m.id)||L.some(f=>f.uid===m.id)).map(m=>{const n=L.filter(f=>f.uid===m.id).length;return {m,n,p:proj(n,day),t:utOf(m.id,ym)}}).sort((a,b)=>b.n-a.n);
