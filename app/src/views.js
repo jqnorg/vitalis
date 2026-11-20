@@ -696,6 +696,7 @@ function addMemberModal(){
 /* ---------- clientes new: registro y conversión ---------- */
 let clPer='hoy',clWho='me',clQ='',clShow=60;
 const CLP=[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['todo','Todo']];
+const clPerTxt=()=>({hoy:'hoy',semana:'esta semana',mes:'este mes',todo:'desde siempre'})[clPer]||'';
 function clRange(){const te=todayS();return clPer==='hoy'?[te,te]:clPer==='semana'?[weekStart(te),te]:clPer==='mes'?[te.slice(0,8)+'01',te]:['0000-01-01','9999-12-31']}
 const clUid=()=>clWho==='me'?me:clWho==='all'?null:clWho;
 function soldMap(){const m=new Map();for(const f of [...team].sort(byDate)){const k=norm(f.id);if(!m.has(k))m.set(k,f)}return m}
@@ -706,6 +707,13 @@ V.clientes={
     $('#clWho').addEventListener('change',e=>{clWho=e.target.value;clShow=60;this.render({})});
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
+    // campañas: afiliado · campaña · país
+    const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
+    let cqt=null;
+    cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
+    cmpEl.addEventListener('change',e=>{const f=e.target.closest('[data-cmpf]');if(!f||f.dataset.cmpf==='q')return;cmp[f.dataset.cmpf]=f.value;this.render({})});
+    cmpEl.addEventListener('click',e=>{if(e.target.closest('[data-cmpm]')){cmp.open=true;this.render({});return}const tr=e.target.closest('tr[data-cmp]');if(tr)cmpOpen(tr.dataset.cmp)});
+    cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
       if(b.dataset.cl==='ficha')return openFicha(l.id);
       if(b.dataset.cl==='ag')return agendarCliente(l.id,l.name);
@@ -723,6 +731,8 @@ V.clientes={
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
     crmLoad();$('#clKpis').innerHTML=convCardsX(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    {const el=$('#clCamp'),qi=el.querySelector('[data-cmpf=q]'),foc=qi&&document.activeElement===qi,cc=campCard(from,to,clPerTxt());el.hidden=!cc;el.innerHTML=cc;
+      if(foc){const n=el.querySelector('[data-cmpf=q]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}}} // campañas (sin perder lo que escribís)
     if(crm.ok){const nuevos=crmAll().filter(r=>!isArch(r.brand)&&r.first&&ymd(new Date(r.first))===te).length,fh=team.filter(f=>f.date===te&&!isArch(f.brand)),en=fh.filter(f=>crmStatusOf(f.id)).length;
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;

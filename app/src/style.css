@@ -1028,3 +1028,19 @@ body.dark .ah-n{color:var(--pri-h)}
 
 .eq-who{display:inline-flex;align-items:center;gap:8px}.eq-who .av{width:24px;height:24px;font-size:10px}
 .eq-calls td b.ok{color:var(--ok)}
+
+/* ---------- campañas: afiliado · campaña · país ---------- */
+.cmp-f{display:flex;gap:6px;flex-wrap:wrap}.cmp-f select,.cmp-f input{max-width:180px}
+.cmp-t tbody tr{cursor:pointer}.cmp-t tbody tr:hover{background:var(--soft)}.cmp-t tbody tr:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
+.cmp-t td.num,.cmp-t th.num{text-align:right;white-space:nowrap}.cmp-t td .d{font-size:12px}
+.cmp-t td.few{opacity:.55}
+.cmp-n{display:flex;flex-direction:column;min-width:0}.cmp-n b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}.cmp-n .d{font-size:12px}
+.cb-bar{display:flex;height:9px;min-width:120px;border-radius:99px;overflow:hidden;background:var(--soft)}.cb-bar i{display:block;height:100%}
+.fi-combo .cb-bar{margin:4px 0 10px}
+.cg-new,.cmp-leg .cg-new{background:#5fa9ea}.cg-gone{background:#9cc6ee}.cg-na{background:#a7b0a9}.cg-call_again{background:#7fcf95}.cg-hang_up{background:#b8dcb9}.cg-callback{background:#d08a4a}.cg-pending{background:#e7b47e}
+.cg-low_potential{background:#8f8a82}.cg-not_interested{background:#6b706c}.cg-failed{background:#d9534f}.cg-invalid{background:#e8a3a1}.cg-dnc{background:#b0303f}.cg-ftd{background:var(--pri)}.cg-otro{background:#cfd4cd}
+.cmp-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 14px;font-size:12.5px;color:var(--dim)}.cmp-leg span{display:inline-flex;align-items:center;gap:6px}.cmp-leg i{width:9px;height:9px;border-radius:3px;display:inline-block}.cmp-leg b{color:var(--fg)}
+.cmp-k{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 14px}.cmp-k>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.cmp-k span{font-size:12px;color:var(--dim)}.cmp-k b{font-family:var(--display);font-size:22px}.cmp-k small{font-size:12px;color:var(--dim)}
+.cmp-h{margin:16px 0 8px;font-size:14px}.fi-cline{margin:0 0 6px;font-size:13.5px}
+@media (max-width:760px){.cmp-k{grid-template-columns:repeat(2,minmax(0,1fr))}.cmp-t th:nth-child(6),.cmp-t td:nth-child(6),.cmp-t th:nth-child(7),.cmp-t td:nth-child(7){display:none}}

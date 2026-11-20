@@ -1041,6 +1041,22 @@ body.dark .ah-n{color:var(--pri-h)}
 
 .eq-who{display:inline-flex;align-items:center;gap:8px}.eq-who .av{width:24px;height:24px;font-size:10px}
 .eq-calls td b.ok{color:var(--ok)}
+
+/* ---------- campañas: afiliado · campaña · país ---------- */
+.cmp-f{display:flex;gap:6px;flex-wrap:wrap}.cmp-f select,.cmp-f input{max-width:180px}
+.cmp-t tbody tr{cursor:pointer}.cmp-t tbody tr:hover{background:var(--soft)}.cmp-t tbody tr:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
+.cmp-t td.num,.cmp-t th.num{text-align:right;white-space:nowrap}.cmp-t td .d{font-size:12px}
+.cmp-t td.few{opacity:.55}
+.cmp-n{display:flex;flex-direction:column;min-width:0}.cmp-n b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px}.cmp-n .d{font-size:12px}
+.cb-bar{display:flex;height:9px;min-width:120px;border-radius:99px;overflow:hidden;background:var(--soft)}.cb-bar i{display:block;height:100%}
+.fi-combo .cb-bar{margin:4px 0 10px}
+.cg-new,.cmp-leg .cg-new{background:#5fa9ea}.cg-gone{background:#9cc6ee}.cg-na{background:#a7b0a9}.cg-call_again{background:#7fcf95}.cg-hang_up{background:#b8dcb9}.cg-callback{background:#d08a4a}.cg-pending{background:#e7b47e}
+.cg-low_potential{background:#8f8a82}.cg-not_interested{background:#6b706c}.cg-failed{background:#d9534f}.cg-invalid{background:#e8a3a1}.cg-dnc{background:#b0303f}.cg-ftd{background:var(--pri)}.cg-otro{background:#cfd4cd}
+.cmp-leg{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 14px;font-size:12.5px;color:var(--dim)}.cmp-leg span{display:inline-flex;align-items:center;gap:6px}.cmp-leg i{width:9px;height:9px;border-radius:3px;display:inline-block}.cmp-leg b{color:var(--fg)}
+.cmp-k{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 14px}.cmp-k>div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column}
+.cmp-k span{font-size:12px;color:var(--dim)}.cmp-k b{font-family:var(--display);font-size:22px}.cmp-k small{font-size:12px;color:var(--dim)}
+.cmp-h{margin:16px 0 8px;font-size:14px}.fi-cline{margin:0 0 6px;font-size:13.5px}
+@media (max-width:760px){.cmp-k{grid-template-columns:repeat(2,minmax(0,1fr))}.cmp-t th:nth-child(6),.cmp-t td:nth-child(6),.cmp-t th:nth-child(7),.cmp-t td:nth-child(7){display:none}}
 </style>
 </head>
 <body class="auth">
@@ -1208,6 +1224,7 @@ body.dark .ah-n{color:var(--pri-h)}
     <div class="card-h"><h3>Clientes new por día</h3><div class="legend"><span><i class="sw s1"></i>Ya depositó</span><span><i class="sw sx"></i>Todavía no</span></div><span class="grow"></span><span class="p-sub" id="clChartSub"></span></div>
     <div class="chart" id="clChart"></div>
   </section>
+  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
   <section class="card">
     <p class="note" id="clSeen" style="margin:0 0 10px" hidden></p>
     <div class="card-h"><h3 id="clListT">Registro</h3><span class="p-sub" id="clCount"></span><span class="grow"></span><input id="clQ" type="search" placeholder="Buscar nombre o ID" autocomplete="off" aria-label="Buscar cliente"></div>
@@ -1391,7 +1408,7 @@ body.dark .ah-n{color:var(--pri-h)}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.18.2';
+const VERSION='1.19.0';
 const EXT_VER='1.8.4'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -3801,6 +3818,7 @@ function addMemberModal(){
 /* ---------- clientes new: registro y conversión ---------- */
 let clPer='hoy',clWho='me',clQ='',clShow=60;
 const CLP=[['hoy','Hoy'],['semana','Semana'],['mes','Mes'],['todo','Todo']];
+const clPerTxt=()=>({hoy:'hoy',semana:'esta semana',mes:'este mes',todo:'desde siempre'})[clPer]||'';
 function clRange(){const te=todayS();return clPer==='hoy'?[te,te]:clPer==='semana'?[weekStart(te),te]:clPer==='mes'?[te.slice(0,8)+'01',te]:['0000-01-01','9999-12-31']}
 const clUid=()=>clWho==='me'?me:clWho==='all'?null:clWho;
 function soldMap(){const m=new Map();for(const f of [...team].sort(byDate)){const k=norm(f.id);if(!m.has(k))m.set(k,f)}return m}
@@ -3811,6 +3829,13 @@ V.clientes={
     $('#clWho').addEventListener('change',e=>{clWho=e.target.value;clShow=60;this.render({})});
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
+    // campañas: afiliado · campaña · país
+    const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
+    let cqt=null;
+    cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
+    cmpEl.addEventListener('change',e=>{const f=e.target.closest('[data-cmpf]');if(!f||f.dataset.cmpf==='q')return;cmp[f.dataset.cmpf]=f.value;this.render({})});
+    cmpEl.addEventListener('click',e=>{if(e.target.closest('[data-cmpm]')){cmp.open=true;this.render({});return}const tr=e.target.closest('tr[data-cmp]');if(tr)cmpOpen(tr.dataset.cmp)});
+    cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
       if(b.dataset.cl==='ficha')return openFicha(l.id);
       if(b.dataset.cl==='ag')return agendarCliente(l.id,l.name);
@@ -3828,6 +3853,8 @@ V.clientes={
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
     crmLoad();$('#clKpis').innerHTML=convCardsX(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
+    {const el=$('#clCamp'),qi=el.querySelector('[data-cmpf=q]'),foc=qi&&document.activeElement===qi,cc=campCard(from,to,clPerTxt());el.hidden=!cc;el.innerHTML=cc;
+      if(foc){const n=el.querySelector('[data-cmpf=q]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}}} // campañas (sin perder lo que escribís)
     if(crm.ok){const nuevos=crmAll().filter(r=>!isArch(r.brand)&&r.first&&ymd(new Date(r.first))===te).length,fh=team.filter(f=>f.date===te&&!isArch(f.brand)),en=fh.filter(f=>crmStatusOf(f.id)).length;
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;
@@ -4818,7 +4845,7 @@ function flData(){
   const ok=f=>flBrand==='all'||norm(f.brand)===norm(flBrand);
   const w=flWin(flDays),pw=flWin(flDays,1);
   const list=team.filter(f=>ok(f)&&f.date>=w.from&&f.date<=w.to),prev=team.filter(f=>ok(f)&&f.date>=pw.from&&f.date<=pw.to);
-  const dims={camp:f=>flVal(f.camp),aff:f=>flVal(f.aff),pais:f=>flVal(f.country),combo:f=>flVal(f.camp)&&flVal(f.aff)?`${flVal(f.camp)} · ${flVal(f.aff)}`:''};
+  const dims={camp:f=>flVal(f.camp),aff:f=>flVal(f.aff),pais:f=>flVal(f.country),combo:f=>flVal(f.camp)||flVal(f.aff)?campTxt(flVal(f.aff),flVal(f.camp),f.country):''}; // la campaña es afiliado · campaña · país
   const G={},P={};for(const d in dims){G[d]=flGroup(list,dims[d]);P[d]=new Map(flGroup(prev,dims[d]).map(g=>[g.key,g.n]))}
   // lates (se registraron un día anterior al del depósito): qué campañas y afiliadores los convierten
   const L=list.filter(isLate),PL=prev.filter(isLate);
@@ -4876,8 +4903,8 @@ V.filtros={
     if(!D.list.length){$('#flBody').innerHTML=`<section class="card"><div class="p-empty">${team.length?`Sin FTDs en la mesa ${flDays===1?'hoy':'en este período'}. Probá con más días${flBrand!=='all'?' u otra marca':''}.`:'Cuando la mesa cargue ventas, acá vas a ver qué conviene filtrar.'}</div></section>`;return}
     const few=D.list.length<5?`<p class="note fl-few">Son pocos FTDs: tomalo como pista, o ampliá el período.</p>`:'';
     $('#flBody').innerHTML=few+flRec(D)+
-      `<div class="g2">${flRank('camp','Campañas',D.G.camp,D.P.camp)}${flRank('aff','Afiliadores',D.G.aff,D.P.aff)}</div>`+
-      `<div class="g2">${flRank('combo','Campaña + afiliador',D.G.combo,D.P.combo,false)}${flRank('pais','Países',D.G.pais,D.P.pais)}</div>`+
+      `<div class="g2">${flRank('combo','Afiliado · campaña · país',D.G.combo,D.P.combo,false)}${flRank('aff','Afiliadores',D.G.aff,D.P.aff)}</div>`+
+      `<div class="g2">${flRank('camp','Campañas (todas las de ese nombre)',D.G.camp,D.P.camp)}${flRank('pais','Países',D.G.pais,D.P.pais)}</div>`+
       `<div class="g2">${flRank('lcamp','Campañas que convierten lates',D.G.lcamp,D.P.lcamp,true,'Lates')}${flRank('laff','Afiliadores que convierten lates',D.G.laff,D.P.laff,true,'Lates')}</div>`+
       `<section class="card"><div class="card-h"><h3>Hora de los FTDs</h3><span class="p-sub">Hora del depósito en el CRM</span></div><div id="flHrC"></div></section>`;
     let h0=D.hours.findIndex(n=>n>0),h1=23-[...D.hours].reverse().findIndex(n=>n>0);if(h0<0){h0=8;h1=20}h0=Math.max(0,Math.min(h0,8));h1=Math.min(23,Math.max(h1,20));
@@ -5751,24 +5778,6 @@ let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
 
-/* ---------- números de la campaña y del afiliado ---------- */
-async function dimStats(col,val){
-  const k=norm(val),get=f=>col==='camp'?f.camp:String(f.aff||'');
-  const sales=team.filter(f=>norm(get(f))===k&&!isArch(f.brand));
-  const d30=addDays(todayS(),-29),s30=sales.filter(f=>f.date>=d30),lat=sales.filter(isLate).length,last=sales.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
-  let seen=null;
-  if(crm.ok!==false){try{const rows=(await crmPage(()=>sb.from('crm_clients').select('*').neq('brand',ARCH).eq(col,String(val)).order('client_id'),5000)).map(C2X);pass++;const S=soldIdx();
-    let dep=0,nw=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){dep++;if(!isLate(f))nw++}else if(paidCrm(r)){dep++;if(r.ftd&&r.ftd.slice(0,10)===regDay(r))nw++}}seen={n:rows.length,dep,nw}}catch(e){}}
-  return {n:sales.length,n30:s30.length,lat,last,seen};
-}
-function statHTML(t,val,s){
-  if(!val)return `<div class="fi-c"><h4>${t}</h4><p class="p-sub" style="margin:0">El CRM no la muestra en la lista.</p></div>`;
-  const rw2=(k,v)=>`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`;
-  return `<div class="fi-c"><h4>${t} <span class="fi-v" title="${esc(val)}">${esc(val)}</span></h4>${s&&s.n?
-    rw2('FTDs en 30 días',s.n30)+rw2('FTDs en total',`${s.n} · ${pct(s.lat/s.n)} late`)+(s.last?rw2('Último FTD',`${esc(s.last.date===todayS()?'hoy':dm(s.last.date))} ${esc(s.last.time||'')}`):'')
-    :'<p class="p-sub" style="margin:0 0 6px">Sin FTDs en Novara todavía.</p>'}${s&&s.seen&&s.seen.n?rw2('Depositaron',`${s.seen.dep} · ${pct(s.seen.dep/s.seen.n)}`)+rw2('Mismo día (new)',s.seen.nw):''}</div>`;
-}
-
 /* ---------- los datos de la ficha ---------- */
 async function fichaData(id,force){
   const c=fichaCache.get(id);if(c&&!force&&Date.now()-c.at<30e3)return c.d;
@@ -5778,8 +5787,8 @@ async function fichaData(id,force){
   const ld=leads.find(l=>norm(l.id)===norm(id)),f=soldOf(id,r&&r.brand);
   const country=r&&r.country||ld&&ld.country||f&&f.country||'',aff=String(r&&r.aff||f&&f.aff||''),camp=r&&r.camp||f&&f.camp||'',pais=paisOf(country);
   if(bk.ok==null)await bkLoad(true);
-  const [sc,sa,camps,coms,reqs]=await Promise.all([camp?dimStats('camp',camp):null,aff?dimStats('aff',aff):null,aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[]]);
-  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp,sc,sa,camps,coms,reqs};
+  const [cs,camps,coms,reqs]=await Promise.all([comboStats(aff,camp,country),aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[]]);
+  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs};
   fichaCache.set(id,{at:Date.now(),d});
   return d;
 }
@@ -5814,7 +5823,7 @@ function fichaHTML(d){
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
       ${fiPayHTML(d)}${fiCampsHTML(d)}</div>
-      <div class="fi-col">${fiComsHTML(d)}<div class="fi-pair">${statHTML('Campaña',d.camp,d.sc)}${statHTML('Afiliado',d.aff,d.sa)}</div></div>
+      <div class="fi-col">${fiComsHTML(d)}${comboHTML(d)}</div>
     </div></div>`;
 }
 // cómo hacerlo depositar: lo que anda en su país, por tipo de pago, y el flujo de su banco
@@ -6082,6 +6091,130 @@ document.addEventListener('click',e=>{
   if(a==='ficha')return openFicha(b.dataset.id);
   if(a==='min')return minModal();
 });
+
+/* ============================================================
+   Campañas: la unidad es afiliado · campaña · país (en todo Vitalis). Información para todos, dentro de Clientes.
+   De los registrados en el período (lo que vio la extensión en el CRM): cuántos atienden, cuántos depositaron
+   (en el mismo día o después) y dónde se quedan. Los FTD del período salen de las ventas. Lo que promete el anuncio, de campaign_info.
+   ============================================================ */
+const camN=c=>{c=String(c??'').trim();return /^(null|undefined|-|—)$/i.test(c)?'':c};
+const comboKey=(aff,cp,pais)=>norm(String(aff||''))+'|'+norm(camN(cp))+'|'+norm(paisOf(pais));
+const campTxt=(aff,cp,pais)=>[String(aff||'')||'sin afiliado',camN(cp)||'sin campaña',paisOf(pais)||'sin país'].join(' · ');
+const ATIENDEN=['callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd'],NO_ATIENDEN=['na','invalid','dnc'];
+const POCOS=10; // con menos registrados, los porcentajes van con "pocos datos"
+// dónde se quedan: los grupos de status, en orden y con su color
+const CG=[['new','New / Talking'],['gone','Salió de Talking'],['na','NA'],['call_again','Call Again'],['hang_up','Hang Up'],['callback','CallBack'],['pending','Pending'],['low_potential','Low potential'],['not_interested','Not interested'],['failed','Depósito trabado'],['invalid','Inválido'],['dnc','Do Not Call'],['ftd','FTD'],['otro','Otros']];
+const CGK=new Set(CG.map(x=>x[0]));
+let cmp={key:'',rows:[],info:[],busy:null,at:0,pais:'',aff:'',q:'',open:false};
+
+async function campLoad(from,to,force){
+  const key=from+'|'+to;
+  if(cmp.busy)return cmp.busy;
+  if(!force&&cmp.key===key&&Date.now()-cmp.at<60e3)return;
+  cmp.busy=(async()=>{
+    try{
+      const base=()=>{let q=sb.from('crm_clients').select('*').neq('brand',ARCH);if(from>'0000')q=q.gte('reg',from);if(to<'9999')q=q.lte('reg',to+' 23:59');return q.order('client_id')};
+      const [rows,info]=await Promise.all([crmPage(base,30000),ficOk===false?Promise.resolve([]):QO(sb.from('campaign_info').select('*'))]);
+      Object.assign(cmp,{key,rows:rows.map(C2X),info,at:Date.now()});
+      if(ready&&cur==='clientes')V.clientes.render({});
+    }catch(e){}finally{cmp.busy=null}
+  })();
+  return cmp.busy;
+}
+const regIn=(r,from,to)=>{const d=regDay(r);return d>=from&&d<=to};
+// los números de cada combinación: de los registrados (rows) y de las ventas del período (sales)
+function campStats(rows,sales){
+  const S=soldIdx(),m=new Map();
+  const get=(aff,cp,pais)=>{const k=comboKey(aff,cp,pais);let g=m.get(k);if(!g)m.set(k,g={k,aff:String(aff||''),camp:camN(cp),pais:paisOf(pais),reg:0,at:0,no:0,dep:0,nw:0,lt:0,grp:{},ftd:0,fnw:0,flt:0,rows:[]});return g};
+  for(const r of rows){
+    const g=get(r.aff,r.camp,r.country),f=S.get(ckey(r.brand,r.id)),paid=!!f||paidCrm(r),grp=paid?'ftd':CGK.has(r.grp)?r.grp:'otro';
+    g.reg++;g.rows.push(r);g.grp[grp]=(g.grp[grp]||0)+1;
+    if(paid||ATIENDEN.includes(r.grp))g.at++;else if(NO_ATIENDEN.includes(r.grp))g.no++;
+    if(paid){g.dep++;const same=f?!isLate(f):!!(r.ftd&&r.ftd.slice(0,10)===regDay(r));if(same)g.nw++;else g.lt++}
+  }
+  for(const f of sales){const g=get(f.aff,f.camp,f.country);g.ftd++;if(isLate(f))g.flt++;else g.fnw++}
+  return [...m.values()];
+}
+const infoOf=(aff,cp,pais)=>cmp.info.find(i=>comboKey(i.aff,i.camp,i.country)===comboKey(aff,cp,pais))||null;
+const pctTxt=(a,b)=>b?Math.round(a/b*100)+'%':'—';
+function stBar(g){
+  const tot=g.reg||1;
+  return `<span class="cb-bar" title="${esc(CG.filter(([k])=>g.grp[k]).map(([k,l])=>`${l}: ${g.grp[k]}`).join(' · '))}">${CG.filter(([k])=>g.grp[k]).map(([k])=>`<i class="cg-${k}" style="width:${(g.grp[k]/tot*100).toFixed(1)}%"></i>`).join('')}</span>`;
+}
+// la línea de la ficha: "de cada 10 de esta campaña, 6 atienden y 1 deposita"
+function campLine(g){
+  if(!g||!g.reg)return '';
+  if(g.reg<POCOS)return `${plural(g.reg,'registrado')} visto${g.reg===1?'':'s'}: ${g.at} ${g.at===1?'atendió':'atendieron'} y ${g.dep} ${g.dep===1?'depositó':'depositaron'} <span class="d">(pocos datos todavía)</span>`;
+  const dec=g.at+g.no,a=dec?Math.round(g.at/dec*10):null,dp=Math.round(g.dep/g.reg*10);
+  return `De cada 10 de esta campaña${a!=null?`, ${a} ${a===1?'atiende':'atienden'}`:''} y ${dp} ${dp===1?'deposita':'depositan'}`;
+}
+// en la ficha: los números de la combinación del cliente (todo lo visto, sin fechas)
+async function comboStats(aff,cp,pais){
+  if(!aff&&!camN(cp))return null;
+  let rows=[];
+  if(crm.ok!==false){try{let q=()=>{let x=sb.from('crm_clients').select('*').neq('brand',ARCH);x=aff?x.eq('aff',String(aff)):x;x=camN(cp)?x.eq('camp',camN(cp)):x;return x.order('client_id')};
+    rows=(await crmPage(q,5000)).map(C2X).filter(r=>comboKey(r.aff,r.camp,r.country)===comboKey(aff,cp,pais))}catch(e){}}
+  pass++;
+  const sales=team.filter(f=>!isArch(f.brand)&&comboKey(f.aff,f.camp,f.country)===comboKey(aff,cp,pais));
+  const g=campStats(rows,sales).find(x=>x.k===comboKey(aff,cp,pais))||null;
+  if(g){g.last=sales.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);g.f30=sales.filter(f=>f.date>=addDays(todayS(),-29)).length}
+  return g;
+}
+function comboHTML(d){
+  const g=d.cs,rw2=(k,v)=>`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`;
+  if(!d.aff&&!d.camp)return `<div class="fi-c"><h4>Campaña</h4><p class="p-sub" style="margin:0">El CRM no la muestra en la lista.</p></div>`;
+  return `<div class="fi-c fi-combo"><h4>Campaña <span class="fi-v" title="${esc(campTxt(d.aff,d.camp,d.pais))}">${esc(campTxt(d.aff,d.camp,d.pais))}</span></h4>
+    ${g&&g.reg?`<p class="fi-cline">${campLine(g)}</p>${stBar(g)}`:''}
+    ${g&&g.reg?rw2('Registrados vistos',g.reg)+rw2('Atienden',`${g.at} · ${pctTxt(g.at,g.at+g.no)}`)+rw2('Depositaron',`${g.dep} · ${pctTxt(g.dep,g.reg)}${g.dep?` <span class="d">(${g.nw} new · ${g.lt} late)</span>`:''}`):''}
+    ${g&&g.ftd?rw2('FTDs en 30 días',g.f30)+rw2('FTDs en total',`${g.ftd} · ${pctTxt(g.flt,g.ftd)} late`)+(g.last?rw2('Último FTD',`${esc(g.last.date===todayS()?'hoy':dm(g.last.date))} ${esc(g.last.time||'')}`):''):(g&&g.reg?'':'<p class="p-sub" style="margin:0">Sin datos de esta campaña todavía.</p>')}</div>`;
+}
+
+/* ---------- la parte de Campañas en Clientes ---------- */
+function campCard(from,to,perTxt){
+  if(crm.ok===false)return '';
+  campLoad(from,to);
+  const loading=cmp.key!==from+'|'+to;
+  const sales=team.filter(f=>!isArch(f.brand)&&f.date>=from&&f.date<=to);
+  const rows=loading?[]:cmp.rows.filter(r=>regIn(r,from,to));
+  let L=campStats(rows,sales);
+  const affs=[...new Set(L.map(g=>g.aff).filter(Boolean))].sort(),q=norm(cmp.q).trim();
+  L=L.filter(g=>(!cmp.pais||g.pais===cmp.pais)&&(!cmp.aff||g.aff===cmp.aff)&&(!q||norm(campTxt(g.aff,g.camp,g.pais)).includes(q)))
+    .sort((a,b)=>b.reg-a.reg||b.ftd-a.ftd||a.k.localeCompare(b.k));
+  const tot=L.reduce((a,g)=>{a.reg+=g.reg;a.at+=g.at;a.no+=g.no;a.dep+=g.dep;a.ftd+=g.ftd;return a},{reg:0,at:0,no:0,dep:0,ftd:0});
+  const few=g=>g.reg&&g.reg<POCOS?' few" title="Pocos datos todavía':'';
+  const row=g=>{const i=infoOf(g.aff,g.camp,g.pais);return `<tr data-cmp="${esc(g.k)}" tabindex="0"><td><div class="cmp-n"><b>${esc(g.camp||'sin campaña')}</b><span class="d">${esc(g.aff||'sin afiliado')} · ${esc(g.pais||'sin país')}</span></div></td>
+    <td class="num">${g.reg||'<span class="d">—</span>'}</td><td class="num${few(g)}">${g.at+g.no?`${pctTxt(g.at,g.at+g.no)} <span class="d">${g.at}/${g.at+g.no}</span>`:'<span class="d">—</span>'}</td>
+    <td class="num${few(g)}">${g.reg?`${pctTxt(g.dep,g.reg)} <span class="d">${g.nw} new · ${g.lt} late</span>`:'<span class="d">—</span>'}</td>
+    <td class="num">${g.ftd?`<b>${g.ftd}</b> <span class="d">${g.fnw} · ${g.flt}</span>`:'<span class="d">—</span>'}</td>
+    <td>${g.reg?stBar(g):''}</td><td class="trunc">${i&&i.min_amount?esc(i.min_amount):'<span class="d">—</span>'}</td></tr>`};
+  const sel=`<select data-cmpf="pais" aria-label="País"><option value="">Todos los países</option>${PAISES.map(p=>`<option${cmp.pais===p?' selected':''}>${esc(p)}</option>`).join('')}</select>
+    <select data-cmpf="aff" aria-label="Afiliado"><option value="">Todos los afiliados</option>${affs.map(a=>`<option${cmp.aff===a?' selected':''}>${esc(a)}</option>`).join('')}</select>
+    <input data-cmpf="q" type="search" placeholder="Buscar campaña" value="${esc(cmp.q)}" aria-label="Buscar campaña" autocomplete="off">`;
+  return `<div class="card-h"><h3>Campañas</h3><span class="p-sub">afiliado · campaña · país · registrados ${esc(perTxt)}</span><span class="grow"></span><div class="cmp-f">${sel}</div></div>
+    ${loading?'<div class="p-empty">Cargando…</div>':L.length?`<p class="note" style="margin:0 0 10px">${tot.reg} registrados: ${pctTxt(tot.at,tot.at+tot.no)} atienden, ${pctTxt(tot.dep,tot.reg)} depositaron · ${tot.ftd} FTDs en el período. Los registrados y su status salen de lo que vio la extensión en el CRM; los FTDs, de las ventas.</p>
+      <div class="p-tablewrap"><table class="pt cmp-t"><thead><tr><th>Campaña</th><th class="num">Registrados</th><th class="num" title="De los que ya tienen resultado: atendieron contra NA, número inválido o Do Not Call">Atienden</th><th class="num" title="De los registrados en el período">Depositaron</th><th class="num" title="Ventas del período (new · late)">FTDs</th><th>Dónde se quedan</th><th>Mínimo del anuncio</th></tr></thead><tbody>${L.slice(0,cmp.open?500:40).map(row).join('')}</tbody></table></div>
+      ${L.length>40&&!cmp.open?`<button type="button" class="btn sm rk-more" data-cmpm>Ver las ${L.length}</button>`:''}`:'<div class="p-empty">Sin campañas con ese filtro.</div>'}`;
+}
+function campDetail(k,from,to,perTxt){
+  pass++;
+  const sales=team.filter(f=>!isArch(f.brand)&&f.date>=from&&f.date<=to);
+  const g=campStats(cmp.rows.filter(r=>regIn(r,from,to)),sales).find(x=>x.k===k);if(!g)return;
+  const d={aff:g.aff,pais:g.pais,camp:g.camp,camps:[{camp:g.camp,info:infoOf(g.aff,g.camp,g.pais),mine:true}],reqs:[]};
+  const i=d.camps[0].info,ed=bkEd();
+  const body=()=>`<p class="mp">${esc(g.aff||'sin afiliado')} · ${esc(g.pais||'sin país')} · registrados ${esc(perTxt)}</p>
+    ${g.reg?`<p class="fi-cline">${campLine(g)}</p>${stBar(g)}<div class="cmp-leg">${CG.filter(([x])=>g.grp[x]).map(([x,l])=>`<span><i class="cg-${x}"></i>${esc(l)} <b>${g.grp[x]}</b></span>`).join('')}</div>`:'<p class="p-sub">Sin registrados en el período.</p>'}
+    <div class="cmp-k"><div><span>Registrados</span><b>${g.reg}</b></div><div><span>Atienden</span><b>${pctTxt(g.at,g.at+g.no)}</b></div><div><span>Depositaron</span><b>${pctTxt(g.dep,g.reg)}</b><small>${g.nw} new · ${g.lt} late</small></div><div><span>FTDs del período</span><b>${g.ftd}</b><small>${g.fnw} new · ${g.flt} late</small></div></div>
+    <div class="fi-c"><h4>El anuncio</h4>${g.camp?(i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}<button type="button" class="lnk" data-cma="${ed?'edit':'req'}">${ed?'Editar':'Pedir un cambio'}</button>`:`<p class="p-sub" style="margin:0 0 6px">Sin datos todavía.</p><button type="button" class="btn sm" data-cma="add">Agregar</button>`):'<p class="p-sub" style="margin:0">Sin campaña.</p>'}</div>
+    ${g.rows.length?`<h4 class="cmp-h">Sus clientes</h4><div class="p-tablewrap"><table class="pt"><thead><tr><th>Cliente</th><th>Status</th><th>Registro</th><th>Agente</th></tr></thead><tbody>${g.rows.sort(byRegDesc).slice(0,150).map(r=>`<tr><td><button type="button" class="lnkp" data-cmo="${esc(r.id)}"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td><td class="d">${esc(r.reg||'')}</td><td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td></tr>`).join('')}</tbody></table></div>`:''}`;
+  modal({title:esc(g.camp||'Sin campaña'),wide:true,body:body(),
+    onOpen:api=>api.box.addEventListener('click',e=>{
+      const o=e.target.closest('[data-cmo]');if(o){api.close();openFicha(o.dataset.cmo);return}
+      const a=e.target.closest('[data-cma]');if(!a)return;
+      const after=async()=>{await campLoad(from,to,true);api.close();campDetail(k,from,to,perTxt)};
+      if(a.dataset.cma==='req')return campReqModal(d,g.camp);
+      campModal(d,g.camp,a.dataset.cma==='edit',after);
+    }),actions:[{l:'Cerrar'}]});
+}
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.

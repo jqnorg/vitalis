@@ -6,24 +6,6 @@ let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
 
-/* ---------- números de la campaña y del afiliado ---------- */
-async function dimStats(col,val){
-  const k=norm(val),get=f=>col==='camp'?f.camp:String(f.aff||'');
-  const sales=team.filter(f=>norm(get(f))===k&&!isArch(f.brand));
-  const d30=addDays(todayS(),-29),s30=sales.filter(f=>f.date>=d30),lat=sales.filter(isLate).length,last=sales.reduce((a,f)=>!a||byDate(f,a)>0?f:a,null);
-  let seen=null;
-  if(crm.ok!==false){try{const rows=(await crmPage(()=>sb.from('crm_clients').select('*').neq('brand',ARCH).eq(col,String(val)).order('client_id'),5000)).map(C2X);pass++;const S=soldIdx();
-    let dep=0,nw=0;for(const r of rows){const f=S.get(ckey(r.brand,r.id));if(f){dep++;if(!isLate(f))nw++}else if(paidCrm(r)){dep++;if(r.ftd&&r.ftd.slice(0,10)===regDay(r))nw++}}seen={n:rows.length,dep,nw}}catch(e){}}
-  return {n:sales.length,n30:s30.length,lat,last,seen};
-}
-function statHTML(t,val,s){
-  if(!val)return `<div class="fi-c"><h4>${t}</h4><p class="p-sub" style="margin:0">El CRM no la muestra en la lista.</p></div>`;
-  const rw2=(k,v)=>`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`;
-  return `<div class="fi-c"><h4>${t} <span class="fi-v" title="${esc(val)}">${esc(val)}</span></h4>${s&&s.n?
-    rw2('FTDs en 30 días',s.n30)+rw2('FTDs en total',`${s.n} · ${pct(s.lat/s.n)} late`)+(s.last?rw2('Último FTD',`${esc(s.last.date===todayS()?'hoy':dm(s.last.date))} ${esc(s.last.time||'')}`):'')
-    :'<p class="p-sub" style="margin:0 0 6px">Sin FTDs en Novara todavía.</p>'}${s&&s.seen&&s.seen.n?rw2('Depositaron',`${s.seen.dep} · ${pct(s.seen.dep/s.seen.n)}`)+rw2('Mismo día (new)',s.seen.nw):''}</div>`;
-}
-
 /* ---------- los datos de la ficha ---------- */
 async function fichaData(id,force){
   const c=fichaCache.get(id);if(c&&!force&&Date.now()-c.at<30e3)return c.d;
@@ -33,8 +15,8 @@ async function fichaData(id,force){
   const ld=leads.find(l=>norm(l.id)===norm(id)),f=soldOf(id,r&&r.brand);
   const country=r&&r.country||ld&&ld.country||f&&f.country||'',aff=String(r&&r.aff||f&&f.aff||''),camp=r&&r.camp||f&&f.camp||'',pais=paisOf(country);
   if(bk.ok==null)await bkLoad(true);
-  const [sc,sa,camps,coms,reqs]=await Promise.all([camp?dimStats('camp',camp):null,aff?dimStats('aff',aff):null,aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[]]);
-  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp,sc,sa,camps,coms,reqs};
+  const [cs,camps,coms,reqs]=await Promise.all([comboStats(aff,camp,country),aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[]]);
+  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs};
   fichaCache.set(id,{at:Date.now(),d});
   return d;
 }
@@ -69,7 +51,7 @@ function fichaHTML(d){
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
       ${fiPayHTML(d)}${fiCampsHTML(d)}</div>
-      <div class="fi-col">${fiComsHTML(d)}<div class="fi-pair">${statHTML('Campaña',d.camp,d.sc)}${statHTML('Afiliado',d.aff,d.sa)}</div></div>
+      <div class="fi-col">${fiComsHTML(d)}${comboHTML(d)}</div>
     </div></div>`;
 }
 // cómo hacerlo depositar: lo que anda en su país, por tipo de pago, y el flujo de su banco
