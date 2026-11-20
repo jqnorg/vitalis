@@ -649,6 +649,7 @@ begin
 end $$;
 drop trigger if exists chat_cards_guard on public.chat_cards;
 create trigger chat_cards_guard before insert on public.chat_cards for each row execute function public.card_guard();
+revoke all on function public.card_guard() from public, anon, authenticated; -- es de un trigger: nadie la llama
 
 -- crear un grupo con gente de la mesa (quien lo crea queda adentro)
 create or replace function public.chat_create(nm text, people uuid[]) returns uuid
