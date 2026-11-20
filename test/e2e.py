@@ -641,7 +641,7 @@ async def main():
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(500)
             pool = await A.evaluate("(()=>{const P=dayPool(me);return {t:P.total,d:P.done,ids:P.items.map(x=>x.r.id).sort(),due:P.due.map(x=>x.r.id).sort()}})()")
             ok(pool['ids'] == ['500002', '500003', '500004', '500005', '500009'] and pool['d'] == 0, f'el pool del día: news de hoy, NA 1 a 4, CA y HU (sin depositados, Do Not Call ni Low potential) ({pool})')
-            ok(await A.is_visible('#iCielo .sky') and await A.locator('#iCielo .sky-wrap .st').count() == 5 and await A.locator('#iCielo .sky-wrap .st.off').count() == 5, 'en el inicio, tu cielo de hoy: 5 estrellas apagadas')
+            ok(await A.is_visible('#iCielo .sky') and await A.locator('#iCielo .sky-wrap .st').count() == 5 and await A.locator('#iCielo .sky-wrap .st.off').count() == 5, 'en el inicio, tu pool de hoy: 5 estrellas apagadas')
             band = await A.inner_text('#hoyBand') if await A.is_visible('#hoyBand') else ''
             ok('Faltan 2 news por repasar' in band and '500002' in band and '500003' in band, f'la franja: los news del día sin llamar ({band[:120]!r})')
             res = await A.evaluate("""()=>crmSeenFromExt([{id:'500003',brand:'Novara Markets',ln:'omega',at:new Date().toISOString(),k:'c1'},{id:'500003',brand:'Novara Markets',ln:'gizat',at:new Date(Date.now()+5000).toISOString(),k:'c2'},
@@ -649,9 +649,9 @@ async def main():
             ok(res.get('keys') == ['c1', 'c2', 'c3', 'c4', 'c5'] and sql("select count(*)::int c from public.calls")[0]['c'] == 4, f'las llamadas se guardan; el mismo toque a la misma línea en menos de 30 s cuenta uno ({res})')
             await A.wait_for_timeout(500)
             ok(await A.locator('#iCielo .sky-wrap .st.full').count() == 1 and await A.locator('#iCielo .sky-wrap .st.half').count() == 1, 'llamado por las 3 líneas: encendida; por una: a medias')
-            ok('Sin pool ni llamadas todavía' in await A.inner_text('#iCielo'), 'los de la mesa sin pool van en una línea, sin cielos vacíos')
-            hm = await A.inner_text('#iCielo .hmeters')
-            ok('4/250' in hm.replace('\n', '') and '2/5' in hm.replace('\n', ''), f'tu avance: llamadas y pool del día ({hm[:160]!r})')
+            hm = await A.inner_text('#iCielo .pool-h')
+            ok('4/250 llamadas' in hm and '2/5 llamados' in hm and 'Pool de hoy' in hm and 'cielo' not in (await A.inner_text('#iCielo')).lower(), f'tu avance: llamadas y pool de hoy ({hm[:160]!r})')
+            ok((await A.locator('#iCielo').bounding_box())['height'] < 260 and await A.locator('#iCielo .sky-mini').count() == 0, 'chico, y sin el pool de los demás en el inicio')
             ok(not await A.is_visible('#hoyBand'), 'repasados los news, la franja se va')
             await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
             g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
@@ -659,10 +659,12 @@ async def main():
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(400)
             await A.locator('#iCielo').screenshot(path=OUT / 'h1_cielo.png')
             await D.evaluate("go('inicio');crmLoad(true)"); await D.wait_for_timeout(1500); await D.evaluate("calls=[];callsFetch().then(x=>{callsApply(x);refresh()})"); await D.wait_for_timeout(1200)
-            mesa = await D.inner_text('#iCielo') if await D.is_visible('#iCielo') else ''
-            ok('El cielo de la mesa' in mesa and 'Joaquín' in mesa, f'el team leader ve el cielo de la mesa ({mesa[:120]!r})')
-            await D.locator('#iCielo').screenshot(path=OUT / 'h2_cielo_mesa.png')
-            await D.click('#iCielo [data-hy=min]'); await D.wait_for_timeout(300); await D.fill('#mcN', '200'); await D.click('.mbox .mf .pri'); await D.wait_for_timeout(800)
+            ok(not await D.is_visible('#iCielo'), 'el team leader no tiene pool propio en el inicio')
+            await D.evaluate("go('equipo')"); await D.wait_for_timeout(800)
+            mesa = await D.inner_text('#eqPool') if await D.is_visible('#eqPool') else ''
+            ok('Pool de hoy' in mesa and 'Joaquín' in mesa and 'Sin pool ni llamadas todavía' in mesa, f'el pool de cada uno está en Equipo (los que no tienen, en una línea) ({mesa[:120]!r})')
+            await D.locator('#eqPool').screenshot(path=OUT / 'h2_pool_mesa.png')
+            await D.click('#eqPool [data-hy=min]'); await D.wait_for_timeout(300); await D.fill('#mcN', '200'); await D.click('.mbox .mf .pri'); await D.wait_for_timeout(800)
             ok(sql('select min_calls from public.teams')[0]['min_calls'] == 200, 'el team leader fija el mínimo de llamadas')
             sql('update public.teams set min_calls = 250')
             await A.evaluate("go('ventas',{f:{desde:todayS(),hasta:todayS()}})"); await A.wait_for_timeout(500)

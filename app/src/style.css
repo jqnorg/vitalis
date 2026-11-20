@@ -1061,3 +1061,7 @@ body.dark .ah-n{color:var(--pri-h)}
 .smh{display:flex;align-items:center;gap:8px;font-size:12.5px}.smh .av{width:22px;height:22px;font-size:10px}.smh .d{color:#a8c5b0}.smh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:760px){.hmeters{grid-template-columns:minmax(0,1fr)}.hoy-band{margin-top:0}}
 @media (prefers-reduced-motion:reduce){.sky .st .ring,.hb-dot{animation:none}}
+
+.pool-h{display:flex;align-items:baseline;gap:6px 16px;flex-wrap:wrap;margin-bottom:10px}.pool-h h3{margin:0;font-size:15px;margin-right:4px}
+.pool-k{font-size:13px;color:var(--dim)}.pool-k b{font-family:var(--display);font-size:16px;color:var(--fg)}.pool-k.hot b{color:var(--acc)}
+.pool .sky-wrap{border-radius:12px}
