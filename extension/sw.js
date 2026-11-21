@@ -57,7 +57,7 @@ async function playSound(tone = 'agenda') {
 function ftdOverlay(items) {
   const ID = 'ftd-agenda-overlay';
   // estilo Claro, vivo: tarjeta blanca con un borde grueso de color arriba según la urgencia (rojo, ámbar o azul) y un ícono de trazo según el tipo
-  const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#0f7a55"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21.5c-.7 6 .7 11.5 3.5 14.8 1.1 1.3 2.6 1.9 4.5 1.9s3.4-.6 4.5-1.9c2.8-3.3 4.2-8.8 3.5-14.8"/><path d="M13.5 21.5h21"/><path d="M26.5 21.5 31 11h4"/></g></svg>';
+  const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#00875a"/><path d="M14 19 23.4 34.6" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/><path d="M23.4 34.6 34.2 13.4" stroke="#fff" stroke-width="8" stroke-linecap="round"/></svg>';
   const IC = {
     campana: '<path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2H5zM10.5 20.5a1.8 1.8 0 0 0 3 0"/>',
     cliente: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.7 3.7-5.6 7-5.6s6.1 1.9 7 5.6"/>',

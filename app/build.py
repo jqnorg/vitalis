@@ -5,9 +5,9 @@ ROOT=pathlib.Path(__file__).resolve().parent.parent
 S=ROOT/'app'/'src'; D=ROOT/'site'; D.mkdir(exist_ok=True)
 import re, urllib.parse
 body=(S/'body.html').read_text()
-mate=re.search(r'<symbol id="mate" viewBox="0 0 48 48">(.*?)</symbol>', body, re.S).group(1)
-fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>"+re.sub(r'\s+',' ',mate).replace('"',"'")+"</svg>"
-(D/'mate.svg').write_text(fav_svg.replace("'",'"'))
+logo=re.search(r'<symbol id="logo" viewBox="0 0 48 48">(.*?)</symbol>', body, re.S).group(1)
+fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>"+re.sub(r'\s+',' ',logo).replace('"',"'")+"</svg>"
+(D/'logo.svg').write_text(fav_svg.replace("'",'"'))
 fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
 js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','ficha.js','hoy.js','campanas.js','radar.js','estacion.js','share.js','auth.js'])
 js=js.replace('\nboot();\n','\n')+'\nboot();\n'
@@ -19,7 +19,7 @@ SUPA='supabase.'+hashlib.sha256(vend).hexdigest()[:10]+'.js'   # con el hash en 
 cfgjs='window.VITALIS_CONFIG = '+json.dumps(cfg)+';'
 # antes de que cargue nada: el tema guardado y la pantalla de entrada (nunca se ve la app sin sesión)
 pre='''<script>try{var t=JSON.parse(localStorage.getItem('vitalis.tema'))||'auto';if(t==='oscuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))document.body.classList.add('dark')}catch(e){}</script>
-<div id="auth"><div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"><div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div></div></div></div>
+<div id="auth"><div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div><div id="abox"><div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div></div></div></div>
 '''
 html=f'''<!DOCTYPE html>
 <html lang="es">

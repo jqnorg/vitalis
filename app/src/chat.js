@@ -257,7 +257,7 @@ function fmtBody(t){
 }
 function chDay(d){const t=todayS();return d===t?'Hoy':d===addDays(t,-1)?'Ayer':`${DIAL[parseYMD(d).getDay()]} ${dm(d)}`}
 function chatIcon(c){
-  if(c.kind==='team')return `<span class="ch-ic team"><svg aria-hidden="true"><use href="#mate"/></svg></span>`;
+  if(c.kind==='team')return `<span class="ch-ic team"><svg aria-hidden="true"><use href="#logo"/></svg></span>`;
   if(c.kind==='dm')return avatar(memberName(dmOther(c)));
   return `<span class="ch-ic" style="--h:${avHue(c.name)}">${esc(initials(c.name))}</span>`;
 }

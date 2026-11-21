@@ -6,7 +6,7 @@
 <meta name="vitalis" content="app">
 <meta name="theme-color" content="#f6f7f8">
 <title>Vitalis</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2048%2048%27%3E%3Crect%20x%3D%272%27%20y%3D%272%27%20width%3D%2744%27%20height%3D%2744%27%20rx%3D%2712%27%20fill%3D%27%230f7a55%27/%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M16%2021.500c-.7%206%20.7%2011.500%203.500%2014.800%201.100%201.300%202.600%201.900%204.500%201.900s3.400-.6%204.500-1.900c2.800-3.300%204.200-8.800%203.500-14.800%27/%3E%3Cpath%20d%3D%27M13.500%2021.500h21%27/%3E%3Cpath%20d%3D%27M26.500%2021.500%2031%2011h4%27/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2048%2048%27%3E%3Crect%20x%3D%272%27%20y%3D%272%27%20width%3D%2744%27%20height%3D%2744%27%20rx%3D%2712%27%20fill%3D%27%2300875a%27/%3E%3Cpath%20d%3D%27M14%2019%2023.4%2034.6%27%20stroke%3D%27%23fff%27%20stroke-opacity%3D%27.6%27%20stroke-width%3D%278%27%20stroke-linecap%3D%27round%27/%3E%3Cpath%20d%3D%27M23.4%2034.6%2034.2%2013.4%27%20stroke%3D%27%23fff%27%20stroke-width%3D%278%27%20stroke-linecap%3D%27round%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://exmxdkiqodxjqkhdykpj.supabase.co" crossorigin>
 <link rel="preload" href="supabase.a867edbcfb.js" as="script">
 <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
@@ -1296,9 +1296,10 @@ svg.ic{stroke-width:2.3}
 </head>
 <body class="auth">
 <script>try{var t=JSON.parse(localStorage.getItem('vitalis.tema'))||'auto';if(t==='oscuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))document.body.classList.add('dark')}catch(e){}</script>
-<div id="auth"><div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"><div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div></div></div></div>
+<div id="auth"><div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div><div id="abox"><div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div></div></div></div>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
+    <symbol id="logo" viewBox="0 0 48 48"><rect x="2" y="2" width="44" height="44" rx="12" fill="#00875a"/><path d="M14 19 23.4 34.6" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/><path d="M23.4 34.6 34.2 13.4" stroke="#fff" stroke-width="8" stroke-linecap="round"/></symbol>
     <symbol id="mate" viewBox="0 0 48 48"><rect x="2" y="2" width="44" height="44" rx="12" fill="#0f7a55"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21.500c-.7 6 .7 11.500 3.500 14.800 1.100 1.300 2.600 1.900 4.500 1.900s3.400-.6 4.500-1.900c2.800-3.300 4.200-8.800 3.500-14.800"/><path d="M13.500 21.500h21"/><path d="M26.500 21.500 31 11h4"/></g></symbol>
     <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></symbol>
     <symbol id="i-ventas" viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4M11 16V7M16 16v-6M20.5 5.5 16 10l-3-3-4 4"/></symbol>
@@ -1332,7 +1333,7 @@ svg.ic{stroke-width:2.3}
 </svg>
 
 <aside id="side">
-  <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
+  <div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-g="cliente" data-v="cliente" class="nv-cli" title="Cliente actual (L)"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><span class="nb cli" id="nbCli"></span><kbd>L</kbd></button>
@@ -1357,7 +1358,7 @@ svg.ic{stroke-width:2.3}
 </aside>
 
 <header id="bar">
-  <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
+  <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
   <button type="button" class="pill" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
   <div class="pill turno" id="sTurno"></div>
@@ -1619,8 +1620,8 @@ svg.ic{stroke-width:2.3}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.25.0';
-const EXT_VER='1.10.1'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.25.1';
+const EXT_VER='1.10.2'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -4761,7 +4762,7 @@ function fmtBody(t){
 }
 function chDay(d){const t=todayS();return d===t?'Hoy':d===addDays(t,-1)?'Ayer':`${DIAL[parseYMD(d).getDay()]} ${dm(d)}`}
 function chatIcon(c){
-  if(c.kind==='team')return `<span class="ch-ic team"><svg aria-hidden="true"><use href="#mate"/></svg></span>`;
+  if(c.kind==='team')return `<span class="ch-ic team"><svg aria-hidden="true"><use href="#logo"/></svg></span>`;
   if(c.kind==='dm')return avatar(memberName(dmOther(c)));
   return `<span class="ch-ic" style="--h:${avHue(c.name)}">${esc(initials(c.name))}</span>`;
 }
@@ -7340,12 +7341,12 @@ function authScreen(mode, msg, x) {
   document.body.classList.add('auth');
   let A = $('#auth');
   if (!A) { A = document.createElement('div'); A.id = 'auth'; document.body.appendChild(A); }
-  A.innerHTML = `<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"></div></div>`;
+  A.innerHTML = `<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div><div id="abox"></div></div>`;
   (AUTH[mode] || AUTH.error)(A.querySelector('#abox'), msg, x);
 }
 
 const AUTH = {
-  loading(box) { box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div>`; },
+  loading(box) { box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div>`; },
 
   setup(box) {
     box.innerHTML = `<h2>Conectar la base de datos</h2><p class="lead">Pegá los datos de tu proyecto de Supabase (Project Settings → API).</p>
@@ -7369,7 +7370,7 @@ const AUTH = {
       loadRoster().then((r) => { local.set('roster', r); if (JSON.stringify(r) !== JSON.stringify(keep) && document.body.contains(box) && box.querySelector('.people')) { roster = r; AUTH.whoDraw(box, msg); } }).catch(() => {});
       return;
     }
-    box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div>`;
+    box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div>`;
     try { roster = await loadRoster(); local.set('roster', roster); }
     catch (x) { box.innerHTML = `<h2>No se pudo conectar</h2><p class="lead">${esc(authErr(x))}</p><button class="btn pri big" type="button" id="aRe">Reintentar</button>`; box.querySelector('#aRe').onclick = () => authScreen('who', '', true); return; }
     AUTH.whoDraw(box, msg);

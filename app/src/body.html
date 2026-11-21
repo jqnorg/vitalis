@@ -1,5 +1,6 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
+    <symbol id="logo" viewBox="0 0 48 48"><rect x="2" y="2" width="44" height="44" rx="12" fill="#00875a"/><path d="M14 19 23.4 34.6" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/><path d="M23.4 34.6 34.2 13.4" stroke="#fff" stroke-width="8" stroke-linecap="round"/></symbol>
     <symbol id="mate" viewBox="0 0 48 48"><rect x="2" y="2" width="44" height="44" rx="12" fill="#0f7a55"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21.500c-.7 6 .7 11.500 3.500 14.800 1.100 1.300 2.600 1.900 4.500 1.900s3.400-.6 4.500-1.900c2.800-3.300 4.200-8.800 3.500-14.800"/><path d="M13.500 21.500h21"/><path d="M26.500 21.500 31 11h4"/></g></symbol>
     <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></symbol>
     <symbol id="i-ventas" viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M6 16v-4M11 16V7M16 16v-6M20.5 5.5 16 10l-3-3-4 4"/></symbol>
@@ -33,7 +34,7 @@
 </svg>
 
 <aside id="side">
-  <div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
+  <div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-g="cliente" data-v="cliente" class="nv-cli" title="Cliente actual (L)"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><span class="nb cli" id="nbCli"></span><kbd>L</kbd></button>
@@ -58,7 +59,7 @@
 </aside>
 
 <header id="bar">
-  <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div>
+  <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
   <button type="button" class="pill" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
   <div class="pill turno" id="sTurno"></div>

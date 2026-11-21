@@ -50,12 +50,12 @@ function authScreen(mode, msg, x) {
   document.body.classList.add('auth');
   let A = $('#auth');
   if (!A) { A = document.createElement('div'); A.id = 'auth'; document.body.appendChild(A); }
-  A.innerHTML = `<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#mate"/></svg><span class="word">vitalis</span></div><div id="abox"></div></div>`;
+  A.innerHTML = `<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div><div id="abox"></div></div>`;
   (AUTH[mode] || AUTH.error)(A.querySelector('#abox'), msg, x);
 }
 
 const AUTH = {
-  loading(box) { box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div>`; },
+  loading(box) { box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div>`; },
 
   setup(box) {
     box.innerHTML = `<h2>Conectar la base de datos</h2><p class="lead">Pegá los datos de tu proyecto de Supabase (Project Settings → API).</p>
@@ -79,7 +79,7 @@ const AUTH = {
       loadRoster().then((r) => { local.set('roster', r); if (JSON.stringify(r) !== JSON.stringify(keep) && document.body.contains(box) && box.querySelector('.people')) { roster = r; AUTH.whoDraw(box, msg); } }).catch(() => {});
       return;
     }
-    box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#mate"/></svg>Cebando…</div>`;
+    box.innerHTML = `<div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div>`;
     try { roster = await loadRoster(); local.set('roster', roster); }
     catch (x) { box.innerHTML = `<h2>No se pudo conectar</h2><p class="lead">${esc(authErr(x))}</p><button class="btn pri big" type="button" id="aRe">Reintentar</button>`; box.querySelector('#aRe').onclick = () => authScreen('who', '', true); return; }
     AUTH.whoDraw(box, msg);
