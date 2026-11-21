@@ -56,7 +56,7 @@ async function playSound(tone = 'agenda') {
 // Esta función se inyecta en la página: tiene que ser autocontenida.
 function ftdOverlay(items) {
   const ID = 'ftd-agenda-overlay';
-  // estilo Claro: tarjeta blanca, borde fino, una franja según la urgencia (roja, ámbar o verde) y un ícono de trazo según el tipo
+  // estilo Claro, vivo: tarjeta blanca con un borde grueso de color arriba según la urgencia (rojo, ámbar o azul) y un ícono de trazo según el tipo
   const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#0f7a55"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21.5c-.7 6 .7 11.5 3.5 14.8 1.1 1.3 2.6 1.9 4.5 1.9s3.4-.6 4.5-1.9c2.8-3.3 4.2-8.8 3.5-14.8"/><path d="M13.5 21.5h21"/><path d="M26.5 21.5 31 11h4"/></g></svg>';
   const IC = {
     campana: '<path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2H5zM10.5 20.5a1.8 1.8 0 0 0 3 0"/>',
@@ -76,31 +76,30 @@ function ftdOverlay(items) {
     (document.body || document.documentElement).appendChild(host);
     host.attachShadow({ mode: 'open' }).innerHTML = `<style>
       .stack{display:flex;flex-direction:column;gap:10px;width:min(372px,calc(100vw - 32px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-      .card{--c:#d12f45;background:#fff;color:#0f1720;border:1px solid #e6e9ed;border-radius:16px;padding:12px 14px 13px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);position:relative;overflow:hidden;animation:in .22s ease-out}
-      .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
-      .card.urg{--c:#d12f45}
-      .card.imp{--c:#b45309}
-      .card.info{--c:#0f7a55}
+      .card{--c:#e11d48;--cb:#f43f5e;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-top:5px solid var(--cb);border-radius:18px;padding:12px 14px 13px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 14px 36px rgba(16,24,40,.18);animation:in .22s ease-out}
+      .card.urg{--c:#e11d48;--cb:#f43f5e}
+      .card.imp{--c:#c2410c;--cb:#f59e0b}
+      .card.info{--c:#2563eb;--cb:#3b82f6}
       .card.urg,.card.imp{animation:in .22s ease-out,nudge .5s ease-in-out .3s 2}
       @keyframes in{from{opacity:0;transform:translateY(-8px)}}
-      @keyframes nudge{50%{transform:translateX(-3px)}}
+      @keyframes nudge{50%{transform:rotate(-1.2deg) scale(1.02)}}
       @media (prefers-reduced-motion:reduce){.card{animation:none!important}}
       .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
       .mk{width:20px;height:20px;flex:none}
       .tag{font-weight:700;font-size:14.5px;letter-spacing:-.035em}
       .t{flex:1;display:flex;align-items:center;gap:5px;min-width:0;color:var(--c);font-weight:600;font-size:12.5px}
-      .t svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+      .t svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2.3;stroke-linecap:round;stroke-linejoin:round}
       .x{all:unset;cursor:pointer;color:#6b7684;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;font-size:13px}.x:hover{background:#eef0f3;color:#0f1720}
       .id{font-size:22px;font-weight:650;letter-spacing:-.03em;line-height:1.2;word-break:break-word}
       .kw{margin:3px 0 1px;word-break:break-word}
       .kw:empty{display:none}
       .m{color:#6b7684;font-size:12.5px}
       .b{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
-      .b button{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:#0f1720;background:#fff;border:1px solid #e6e9ed;border-radius:10px;padding:6px 12px}
+      .b button{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;color:#0f1720;background:#fff;border:1.5px solid #dde2e7;border-radius:10px;padding:6px 12px}
       .b button:hover{border-color:#6b7684}
-      .b button.p{background:#0f7a55;border-color:#0f7a55;color:#fff}
-      .b button.p:hover{background:#0c6647;border-color:#0c6647}
-      .b button:focus-visible,.x:focus-visible{outline:2px solid #0f7a55;outline-offset:2px}
+      .b button.p{background:#00875a;border-color:#00875a;color:#fff}
+      .b button.p:hover{background:#006e49;border-color:#006e49}
+      .b button:focus-visible,.x:focus-visible{outline:2px solid #00875a;outline-offset:2px}
     </style><div class="stack"></div>`;
   }
   const stack = host.shadowRoot.querySelector('.stack');
@@ -109,7 +108,7 @@ function ftdOverlay(items) {
     if (had && (had.dataset.v || '') === (d.v || '')) continue;
     if (had) had.remove(); // misma tarjeta con algo nuevo (otro mensaje del mismo chat)
     const card = document.createElement('div');
-    // color según importancia: urgente (agenda) rojo, importante (clientes new, tareas, el team leader te nombra) ámbar, el resto (chat, social) verde
+    // color según importancia: urgente (agenda) rojo, importante (clientes new, tareas, el team leader te nombra) ámbar, el resto (chat, social) azul
     const lvl = d.lvl || (d.kind === 'crm' ? 'imp' : d.kind === 'social' ? (/^so:t:/.test(d.k) ? 'imp' : 'info') : 'urg');
     card.className = 'card ' + lvl + (d.kind ? ' ' + d.kind : ''); card.dataset.k = d.k; card.dataset.v = d.v || ''; card.setAttribute('role', 'alert');
     card.innerHTML = `<div class="h">${SEAL}<span class="tag">vitalis</span><span class="t"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[icOf(d)]}</svg><span></span></span><button class="x" data-a="close" title="Cerrar" aria-label="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>`;

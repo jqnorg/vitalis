@@ -401,7 +401,7 @@
     h.style.cssText = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;';
     const root = h.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>
-      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1px solid #e6e9ed;border-radius:16px;padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);min-width:272px;max-width:372px}
+      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-top:5px solid #00b36b;border-radius:18px;padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);min-width:272px;max-width:372px}
       .h{display:flex;align-items:center;gap:8px}
       .mk{width:20px;height:20px;flex:none}
       .tag{font-weight:700;font-size:15px;letter-spacing:-.035em}
@@ -409,25 +409,25 @@
       .t{flex:1;color:#6b7684;font-size:12px;text-align:right}
       .x{all:unset;cursor:pointer;color:#6b7684;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;font-size:15px}.x:hover{background:#eef0f3;color:#0f1720}
       .sec{margin-top:10px}[hidden]{display:none!important}
-      .sec+.sec{border-top:1px solid #eef0f3;padding-top:10px}
-      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#0f7a55;color:#fff;font-weight:600;border-radius:12px;padding:8px 12px}
-      .go:hover{background:#0c6647}
-      .go[disabled]{background:#eef0f3;color:#6b7684;cursor:default;font-weight:500}
-      .go.alt{background:#fff;color:#0f1720;border:1px solid #e6e9ed}
+      .sec+.sec{border-top:1.5px solid #eef0f3;padding-top:10px}
+      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#00875a;color:#fff;font-weight:700;border-radius:12px;padding:8px 12px;box-shadow:0 2px 0 #00573a}
+      .go:hover{background:#006e49}
+      .go[disabled]{background:#eef0f3;color:#6b7684;cursor:default;font-weight:600;box-shadow:none}
+      .go.alt{background:#fff;color:#0f1720;border:1.5px solid #dde2e7;box-shadow:none}
       .go.alt:hover{border-color:#6b7684}
-      .go:focus-visible,select:focus-visible,.x:focus-visible,.lnk:focus-visible{outline:2px solid #0f7a55;outline-offset:2px}
+      .go:focus-visible,select:focus-visible,.x:focus-visible,.lnk:focus-visible{outline:2px solid #00875a;outline-offset:2px}
       .row{display:flex;gap:6px;align-items:center}
       .row .go{flex:1}
-      select{font:inherit;font-size:12.5px;background:#fff;color:#0f1720;border:1px solid #e6e9ed;border-radius:10px;padding:6px 8px;width:100%;box-sizing:border-box}
+      select{font:inherit;font-size:12.5px;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-radius:10px;padding:6px 8px;width:100%;box-sizing:border-box}
       .ids{margin-top:7px;color:#6b7684;font-size:12px;word-break:break-word}
       .ids b{color:#0f1720;font-weight:600}
       .ids:empty{display:none}
       .st{color:#6b7684;font-size:12px;margin-bottom:7px}
-      .on{color:#0f7a55;font-weight:600}
+      .on{color:#00875a;font-weight:700}
       .msg{margin-top:8px;font-size:12.5px;font-weight:500}
       .msg:empty{display:none}
-      .ok{color:#0f7a55}.warn{color:#b45309}.err{color:#d12f45}
-      .lnk{all:unset;cursor:pointer;color:#0f7a55;text-decoration:underline;margin-left:6px}
+      .ok{color:#00875a}.warn{color:#c2410c}.err{color:#e11d48}
+      .lnk{all:unset;cursor:pointer;color:#00875a;text-decoration:underline;margin-left:6px}
       .min .sec{display:none}
     </style><div class="box"><div class="h">${SEAL}<span class="tag">vitalis</span><span class="vv">${escH(VER)}</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar" aria-label="Minimizar">–</button></div>
       <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
@@ -671,7 +671,7 @@
     if (!h) { h = document.createElement('div'); h.id = 'vitalis-cur-pill'; h.attachShadow({ mode: 'open' }); document.documentElement.appendChild(h); }
     const diag = r && r.diag, ok = r && r.sent;
     const txt = diag ? 'no encuentro el ID de esta ficha' : !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
-    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1px solid #e6e9ed;padding:7px 12px 7px 11px;border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.14);display:flex;gap:8px;align-items:center}i{width:8px;height:8px;border-radius:50%;background:${ok ? '#0f7a55' : '#b45309'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:600;color:#0f1720;background:#fff;border:1px solid #e6e9ed;border-radius:999px;padding:3px 10px;cursor:pointer}button:hover{border-color:#6b7684}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
+    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1.5px solid ${ok ? '#00b36b' : '#f59e0b'};padding:7px 12px 7px 11px;border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.16);display:flex;gap:8px;align-items:center}i{width:9px;height:9px;border-radius:50%;background:${ok ? '#00b36b' : '#f59e0b'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:700;color:#0f1720;background:#fff;border:1.5px solid #dde2e7;border-radius:999px;padding:3px 10px;cursor:pointer}button:hover{border-color:#6b7684}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
     const btn = h.shadowRoot.querySelector('button');
     if (btn) btn.onclick = () => navigator.clipboard.writeText(diagCur()).then(() => { btn.textContent = 'Copiado: mandáselo a quien mantiene Vitalis'; }, () => { btn.textContent = 'No pude copiar'; });
     clearTimeout(pillT); pillT = setTimeout(() => h.remove(), diag ? 20000 : 4500);

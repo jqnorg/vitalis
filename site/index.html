@@ -15,11 +15,12 @@
 
 /* ---------- tokens: estilo Claro (blanco, gris suave, verde profundo) ---------- */
 :root{color-scheme:light;
-  --bg:#f6f7f8;--panel:#fff;--raised:#f9fafb;--fg:#0f1720;--dim:#6b7684;--line:#e6e9ed;--soft:#eef0f3;
-  --pri:#0f7a55;--pri-h:#0c6647;--pri-ink:#fff;--pri-soft:#e9f4ef;
-  --cuero:#b45309;--cuero-soft:#fdf1e3;--alpaca:#c9ced3;
-  --ok:#0f7a55;--acc:#b45309;--err:#d12f45;--info:#2563eb;
-  --s1:#0f7a55;--s2:#e0a03a;--sx:#d5dae0;
+  --bg:#f6f7f8;--panel:#fff;--raised:#f9fafb;--fg:#0f1720;--dim:#6b7684;--line:#dde2e7;--soft:#eef0f3;
+  --pri:#00875a;--pri-h:#006e49;--pri-ink:#fff;--pri-soft:#dcf5ea;
+  --cuero:#d97706;--cuero-soft:#fdf1e3;--alpaca:#c9ced3;
+  --ok:#00875a;--acc:#c2410c;--err:#e11d48;--info:#2563eb;
+  --s1:#00875a;--s2:#f59e0b;--sx:#d5dae0;
+  --v-ok:#00b36b;--v-warn:#f59e0b;--v-err:#f43f5e;--v-info:#3b82f6;
   --hero:#fff;--hero-2:#f9fafb;--hero-ink:#0f1720;--hero-dim:#6b7684;
   --r:16px;--r-sm:10px;--sh:0 1px 2px rgba(16,24,40,.04);
   --display:"Geist",ui-sans-serif,system-ui,sans-serif;
@@ -1275,6 +1276,22 @@ body.dark #nav button.nv-cli.on{color:#fff}
 .st-t td{white-space:nowrap}
 .st-t .st-off td{color:var(--dim)}
 .st-t .st-off b{font-weight:500}
+/* VIVO: el mismo Claro con colores más vivos y trazos más gruesos.
+   --v-*: colores para pintar (bordes, barras), no para texto sobre blanco. */
+.card,.kpi{border-width:1.5px}
+svg.ic{stroke-width:2.3}
+.btn{font-weight:700}
+.btn.pri{box-shadow:0 2px 0 color-mix(in srgb,var(--pri) 55%,#000)}
+#nav button.on{box-shadow:inset 4px 0 0 var(--v-ok);font-weight:650}
+.track .rail,.track.lite .rail,.track .fill,.track.lite .fill{height:14px;top:43px}
+.track .fill,.track.lite .fill{background:var(--v-ok)}
+.track .glow{box-shadow:0 0 0 3px var(--v-ok),0 0 14px 5px color-mix(in srgb,var(--v-ok) 55%,transparent),0 0 34px 14px color-mix(in srgb,var(--v-ok) 22%,transparent)}
+.track .st,.track.lite .st{width:5px;margin-left:-2.5px}
+.kpi .v{font-weight:700}
+/* borde de color arriba (como las tarjetas de la extensión): la tarjeta del mes y los avisos */
+.hero{border-top:6px solid var(--v-ok)}
+.toast.alert,.toast.imp,.toast.info{border:1.5px solid var(--line);border-top:5px solid var(--k);font-weight:500}
+.toast.alert{--k:var(--v-err);font-weight:650}.toast.imp{--k:var(--v-warn);font-weight:600}.toast.info{--k:var(--v-info)}
 </style>
 </head>
 <body class="auth">
@@ -1602,8 +1619,8 @@ body.dark #nav button.nv-cli.on{color:#fff}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.24.0';
-const EXT_VER='1.10.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.25.0';
+const EXT_VER='1.10.1'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
