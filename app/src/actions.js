@@ -279,20 +279,20 @@ async function marcar(kind,hv=''){
     }
     r=markTime(hv);if(r.err)return toast(r.err,'err');
     nt={date:todayS(),in:r.ms,out:null,breaks:[]};msg=`▶ Entrada <b>${hhmm(r.ms)}</b> · salida ${hhmm(r.ms+jorMs())}`;
-  }else if(kind==='d10'||kind==='d30'){
-    const k=kind==='d10'?10:30;
+  }else if(kind==='d10'||kind==='d30'||kind==='bano'){
+    const k=kind==='d10'?10:kind==='d30'?30:0;
     if(!t)return toast('Sin entrada marcada.','warn');
-    const b=breakAbierto(t);if(b)return toast(`Ya estás en el descanso de ${b.k}' (desde ${hhmm(b.s)}).`,'warn');
+    const b=breakAbierto(t);if(b)return toast(`Ya estás en el ${brTxt(b)} (desde ${hhmm(b.s)}).`,'warn');
     r=markTime(hv,lastMark(t));if(r.err)return toast(r.err,'err');
     nt={...t,breaks:[...t.breaks,{k,s:r.ms,e:null}]};
-    if(hv&&r.ms+k*6e4<=Date.now())alerted[t.date+':'+r.ms]=Date.now(); // marca hacia atrás: sin alarma inmediata
-    const ya=t.breaks.filter(x=>x.k===k).length;
-    msg=`☕ Descanso de ${k}' desde <b>${hhmm(r.ms)}</b> · hasta ${hhmm(r.ms+k*6e4)}${ya?` · ${sp('warn',(ya+1)+'º de '+k+"' hoy")}`:''}`;
+    if(k&&hv&&r.ms+k*6e4<=Date.now())alerted[t.date+':'+r.ms]=Date.now(); // marca hacia atrás: sin alarma inmediata
+    const ya=t.breaks.filter(x=>(x.k||0)===k).length;
+    msg=k?`☕ Descanso de ${k}' desde <b>${hhmm(r.ms)}</b> · hasta ${hhmm(r.ms+k*6e4)}${ya?` · ${sp('warn',(ya+1)+'º de '+k+"' hoy")}`:''}`:`Baño desde <b>${hhmm(r.ms)}</b>${ya?` · ${ya+1}º de hoy`:''}. Cuando vuelvas, tocá <b>Volví</b>.`;
   }else if(kind==='vuelta'){
     const b=breakAbierto(t);if(!b)return toast(t?'No estás en un descanso.':'No hay un turno abierto.','warn');
     r=markTime(hv,b.s);if(r.err)return toast(r.err,'err');
     nt={...t,breaks:t.breaks.map(x=>x===b?{...x,e:r.ms}:x)};
-    const d=r.ms-b.s,ex=d-b.k*6e4;msg=`↩ Volviste <b>${hhmm(r.ms)}</b> · descanso de ${b.k}': ${mins(d)} min${ex>=6e4?' '+sp('warn','(+'+mins(ex)+' min)'):''}`;
+    const d=r.ms-b.s,ex=isBano(b)?0:d-b.k*6e4;msg=`↩ Volviste <b>${hhmm(r.ms)}</b> · ${brTxt(b)}: ${mins(d)} min${ex>=6e4?' '+sp('warn','(+'+mins(ex)+' min)'):''}`;
     const a=$('#toasts [data-key="brk"]');if(a)a.remove();
   }else if(kind==='salida'){
     if(!t){const h=turnos[todayS()];return toast(h&&h.out?`Ya marcaste salida a las ${hhmm(h.out)}.`:'Sin entrada marcada.','warn')}
@@ -313,8 +313,8 @@ async function deshacer(){
   let nt={...t,breaks:t.breaks.map(b=>({...b}))},txt;
   const lb=nt.breaks[nt.breaks.length-1];
   if(nt.out){txt=`salida ${hhmm(nt.out)}`;for(const x of nt.breaks)if(x.e===nt.out)x.e=null;nt.out=null}
-  else if(lb&&lb.e){txt=`vuelta del descanso de ${lb.k}' (${hhmm(lb.e)})`;lb.e=null}
-  else if(lb){txt=`descanso de ${lb.k}' (${hhmm(lb.s)})`;nt.breaks.pop()}
+  else if(lb&&lb.e){txt=`vuelta del ${brTxt(lb)} (${hhmm(lb.e)})`;lb.e=null}
+  else if(lb){txt=`${brTxt(lb)} (${hhmm(lb.s)})`;nt.breaks.pop()}
   else{
     if(!await confirmar('Borrar jornada',`¿Borrar la entrada de las ${hhmm(t.in)} (el turno entero)?`,'borrar',true))return;
     if(await B.delTurno(t.date))toast('✔ Turno borrado.');turnoBar(true);return;
@@ -326,7 +326,7 @@ function editTurno(date){
   if(!noRO())return;
   const isNew=!date,t=date?turnos[date]:null,d0=date||todayS();
   const hm=ms=>ms?hhmm(ms):'';
-  const brow=b=>`<div class="brow"><select aria-label="Tipo de descanso"><option value="10"${b&&b.k===10?' selected':''}>10'</option><option value="30"${b&&b.k===30?' selected':''}>30'</option></select><input type="time" class="bs" value="${b?hm(b.s):''}" aria-label="Inicio"><input type="time" class="be" value="${b?hm(b.e):''}" aria-label="Fin"><button type="button" class="ib del" data-rm aria-label="Quitar">Quitar</button></div>`;
+  const brow=b=>`<div class="brow"><select aria-label="Tipo de descanso"><option value="10"${b&&b.k===10?' selected':''}>10'</option><option value="30"${b&&b.k===30?' selected':''}>30'</option><option value="0"${b&&!b.k?' selected':''}>Baño</option></select><input type="time" class="bs" value="${b?hm(b.s):''}" aria-label="Inicio"><input type="time" class="be" value="${b?hm(b.e):''}" aria-label="Fin"><button type="button" class="ib del" data-rm aria-label="Quitar">Quitar</button></div>`;
   const body=`<div class="fgrid">
     ${isNew?`<label class="fld full"><span>Fecha</span><input type="date" name="tdate" max="${todayS()}" value="${d0}"></label>`:''}
     <label class="fld"><span>Entrada</span><input type="time" name="tin" value="${t?hm(t.in):''}"></label>
@@ -610,7 +610,7 @@ function tick(){
   if(!ready)return;
   const now=new Date();$('#sClock').textContent=`${z(now.getHours())}:${z(now.getMinutes())}`;
   turnoBar();if(cur==='inicio')V.inicio.turno();
-  const t=openTurno(),b=breakAbierto(t);if(!b)return;
+  const t=openTurno(),b=breakAbierto(t);if(!b||isBano(b))return; // el baño no tiene alarma
   const end=b.s+b.k*6e4,ms=Date.now();if(ms<end)return;
   const key=t.date+':'+b.s;
   if(alerted[key]&&ms-alerted[key]<5*6e4)return;
@@ -705,7 +705,7 @@ const hv=el=>el.closest('#iTurno')&&$('#itHora')?($('#itHora').value||''):'';
 const ACT={
   locks:()=>locksModal(), // Ajustes: privacidad (solo el administrador)
   importar:()=>importar(),exportar:()=>exportar(),ayuda:()=>ayuda(),
-  entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
+  entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),bano:el=>marcar('bano',hv(el)),ayuda:()=>pedirAyuda(),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
   deshacer:()=>deshacer(),editHoy:()=>{const t=openTurno()||turnos[todayS()];editTurno(t?t.date:null)},
   cargarJornada:()=>editTurno(null),editTurno:el=>editTurno(el.dataset.d),
   editFtd:el=>{const f=team.find(x=>x._id===el.dataset.id);if(f&&canEdit(f))ftdForm(f)},

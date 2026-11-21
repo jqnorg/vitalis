@@ -7,12 +7,13 @@ const KIND={
   d10:{label:'Salir a los 10',ask:'¿alguien sale a los 10?',askTo:'¿salimos a los 10?',replies:[['si','Dale'],['luego','En 5'],['no','Ahora no']],wait:3*6e4},
   d30:{label:'Salir a la media',ask:'¿alguien sale a la media?',askTo:'¿salimos a la media?',replies:[['si','Dale'],['luego','En 5'],['no','Ahora no']],wait:3*6e4},
   msg:{label:'Mensaje',ask:'',askTo:'',replies:[['si','👍']],wait:15e3},
+  ayuda:{label:'Pedir ayuda',ask:'pide ayuda',askTo:'te pide ayuda',replies:[['si','Voy']],wait:60e3}, // al team leader y a los administradores
   toque:{label:'Dar un toque',ask:'te dio un toque 👉',askTo:'te dio un toque 👉',replies:[['si','Devolver el toque']],wait:2*6e4},
 };
 const first=uid=>memberName(uid).split(/\s+/)[0];
 const replyTxt=(p,r=p.reply)=>{if(p.kind==='toque')return 'te devolvió el toque 👈';const k=KIND[p.kind]||KIND.msg;const x=k.replies.find(y=>y[0]===r);return x?x[1]:r};
 const askTxt=p=>p.kind==='msg'?p.body:(p.to?KIND[p.kind].askTo:KIND[p.kind].ask);
-const forMe=p=>p.from!==me&&(p.to===me||p.to===null);
+const forMe=p=>p.from!==me&&(p.kind==='ayuda'?isLeader():(p.to===me||p.to===null)); // el pedido de ayuda es para el team leader y los administradores
 // los mates a los que dijiste "ahora no" (no cierran el pedido: queda abierto para otro)
 const soNo=()=>new Set(local.get('soNo',[]));
 function soNoAdd(id){const a=local.get('soNo',[]).filter(x=>x!==id);a.push(id);local.set('soNo',a.slice(-100))}
@@ -41,6 +42,7 @@ const pageAway=()=>document.hidden||!document.hasFocus();
 function feedTxt(p){ // "Matias pide un mate", "Le pediste un mate a Sofía", "Sofía → vos: ¿salimos a los 10?"
   const mine=p.from===me,X=`<b>${esc(first(p.from))}</b>`,Y=p.to===me?'vos':`<b>${esc(first(p.to||''))}</b>`;
   if(p.kind==='toque')return mine?`Le diste un toque a ${Y} 👉`:`${X} te dio un toque 👉`;
+  if(p.kind==='ayuda')return mine?'<b>Vos</b> pediste ayuda':`${X} pidió ayuda`;
   if(p.kind==='mate'){
     if(!p.to)return mine?'<b>Vos</b> pediste un mate':`${X} pide un mate`;
     return mine?`Le pediste un mate a ${Y}`:p.to===me?`${X} te pide un mate`:`${X} le pide un mate a ${Y}`;
@@ -54,13 +56,15 @@ function socialEvent(p,type,prev){
   if(type==='INSERT'){
     if(!forMe(p)||p.reply)return;
     if(Date.now()-new Date(p.at)>10*6e4)return; // viejo (por ejemplo al reconectar)
-    if(quiet())return;
+    if(quiet()&&p.kind!=='ayuda')return; // un pedido de ayuda no se calla
     socialAlert(p);
     return;
   }
   if(type==='UPDATE'&&p.reply&&!(prev&&prev.reply)){
     closeToast('so'+p._id);closeToast('nocebo'+p._id);extSocialClose(p._id);
     if(p.from===me&&p.by!==me){ // me contestaron (en un mate, solo el primer sí)
+      if(p.kind==='ayuda'){closeToast('ayuda');toast(`<b>${esc(first(p.by))}</b> va para allá.`,'ok',{ms:15000,key:'sor'+p._id});pop();
+        if(pageAway())extSocial({k:'so:'+p._id,lvl:'imp',title:'Ayuda',id:first(p.by)+' va para allá',kw:'',meta:'',btns:[['close','Ok',1]]});return}
       const txt=p.kind==='toque'?`<b>${esc(first(p.by))}</b> te devolvió el toque 👈`:`<b>${esc(first(p.by))}</b>: ${esc(replyTxt(p))}${p.kind==='msg'?'':' · '+esc(KIND[p.kind].label.toLowerCase())}`;
       toast(txt,'info',{ms:9000,key:'sor'+p._id});
       if(!quiet()){pop();if(pageAway())extSocial({k:'so:'+p._id,title:'Te contestaron',id:first(p.by)+': '+replyTxt(p),kw:p.kind==='msg'?p.body:KIND[p.kind].label,meta:'',btns:[['close','Ok',1]]})}
@@ -71,6 +75,12 @@ function socialGone(id){closeToast('so'+id);extSocialClose(id)}
 function socialAlert(p){
   const who=first(p.from),q=askTxt(p),k=KIND[p.kind]||KIND.msg;
   pop();
+  if(p.kind==='ayuda'){ // urgente: queda hasta que alguien diga "Voy" (y se cierra para los demás)
+    toast(`<b>${esc(who)}</b> pide ayuda`,'alert',{sticky:1,key:'so'+p._id,actions:[{l:'Voy',fn:()=>B.replyPing(p._id,'si')},{l:'Ver perfil',fn:()=>openProfile(p.from)}]});
+    beep(2);flash();
+    extSocial({k:'so:'+p._id,lvl:'urg',title:'Piden ayuda',id:who+' pide ayuda',kw:'',meta:'Para el team leader y los administradores',btns:[['r:si','Voy',1],['close','Ok']]});
+    return;
+  }
   if(p.kind==='toque'){ // liviano: no queda fijo
     toast(`<b>${esc(who)}</b> te dio un toque 👉`,'ok',{ms:12000,key:'so'+p._id,actions:[{l:'Devolver el toque',fn:()=>B.replyPing(p._id,'si')},{l:'Ver perfil',fn:()=>openProfile(p.from)}]});
     if(pageAway())extSocial({k:'so:'+p._id,title:'Toque',id:who+' te dio un toque 👉',kw:'',meta:'',btns:[['r:si','Devolver el toque',1],['close','Ok']]});
@@ -88,6 +98,13 @@ function extSocialClose(id){if(extOn())postTop({type:'ftd-agenda-social-close',v
 async function setQuiet(ms){
   const until=ms==null?null:ms==='siempre'?'2100-01-01T00:00:00Z':ms==='manana'?(()=>{const d=new Date();d.setDate(d.getDate()+1);d.setHours(8,0,0,0);return d.toISOString()})():new Date(Date.now()+ms).toISOString();
   if(await B.setQuiet(until))toast(until?`Avisos sociales silenciados ${ms==='siempre'?'hasta que los actives':ms==='manana'?'hasta mañana a las 8':'por 1 hora'}.`:'Avisos sociales activados.',ms==null?'ok':'warn',{key:'quiet'});
+}
+// el agente pide ayuda: le llega al team leader y a los administradores (el primero que dice "Voy" se lo lleva)
+async function pedirAyuda(){
+  if(!ready||!noRO())return;
+  const g=await B.ping('ayuda',null);if(!g)return;
+  toast('Listo: le avisamos al team leader y a los administradores.','ok',{ms:12000,key:'ayuda',actions:[{l:'Cancelar',fn:async()=>{
+    try{await Q(sb.from('pings').delete().eq('id',g._id));pings=pings.filter(x=>x._id!==g._id);refresh();toast('Pedido de ayuda cancelado.','ok')}catch(e){toast(esc(errMsg(e)),'err')}}}]});
 }
 // comandos que vienen de la tarjeta de la extensión
 function socialCmd(d){

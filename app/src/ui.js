@@ -193,6 +193,7 @@ function status(){
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
    const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
   {const f=typeof bkFallas==='function'&&bk.ok?bkFallas().length:0;$('#nbBk').textContent=f?'⚠ '+f:''}
+  $('#sAyuda').hidden=!profile||profile.role==='leader';
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
@@ -207,11 +208,12 @@ function turnoBar(force){
   const btn=(act,label,title,cls='')=>`<button type="button" class="tb wr ${cls}" data-act="${act}" title="${title}">${label}</button>`;
   if(force||key!==turnoKey){
     turnoKey=key;
-    if(!t)el.innerHTML=h&&h.out?`Turno de hoy <b>${durS(h.out-h.in)}</b>&nbsp;`:`Sin entrada ${btn('entrada','Entrada','Marcar entrada','go')}`;
-    else if(b)el.innerHTML=`Descanso ${b.k}' <span class="tLive"></span> ${btn('vuelta','Volví','Volver del descanso','go')}`;
-    else el.innerHTML=`<span class="tLive"></span> ${btn('d10',"10'",'Descanso de 10 minutos')}${btn('d30',"30'",'Descanso de 30 minutos')}${btn('salida','Salida','Marcar salida')}`;
+    if(!t)el.innerHTML=h&&h.out?`Turno de hoy <b>${durS(h.out-h.in)}</b>&nbsp;`:btn('entrada','Marcar entrada','Marcar la entrada de hoy','go');
+    else if(b)el.innerHTML=`${isBano(b)?'En el baño':`Descanso ${b.k}'`} <span class="tLive"></span> ${btn('vuelta','Volví','Volver','go')}`;
+    else el.innerHTML=`<span class="tLive"></span> ${btn('bano','Baño','Ir al baño')}${btn('d10','10 min','Descanso de 10 minutos')}${btn('d30','30 min','Descanso de media hora')}${btn('salida','Salida','Marcar salida')}`;
   }
   const live=el.querySelector('.tLive');if(!live||!t)return;
+  if(b&&isBano(b)){live.innerHTML=`<b>${mmss(now-b.s)}</b>`;return}
   if(b){const left=b.s+b.k*6e4-now;live.innerHTML=left>=0?`<b>${mmss(left)}</b>`:`<b class="hot">+${mmss(-left)}</b>`}
   else{const rest=t.in+jorMs()-now;live.innerHTML=`<b>${durS(now-t.in)}</b> <span class="dim">${rest>0?'salís '+hhmm(t.in+jorMs()):''}</span>${rest>0?'':` <span class="hot">+${durS(-rest)}</span>`}`}
 }

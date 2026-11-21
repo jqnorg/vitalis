@@ -254,6 +254,17 @@ ok(!r.error, 'a otra persona sí puede darle un toque');
 R = await rpc(C, 'select public.reply_ping($1, $2) j', [toqueB, 'si']);
 ok(R.ok === true, 'C le devuelve el toque');
 
+// pedir ayuda (al team leader y a los administradores)
+r = await ping(B, 'ayuda');
+ok(!r.error, 'B pide ayuda');
+const ayudaB = r.rows[0].id;
+r = await ping(B, 'ayuda');
+ok(!!r.error && /COOLDOWN/.test(r.error) && /ayuda/.test(r.error), 'otra vez enseguida: ya les llegó (pausa de un minuto)');
+R = await rpc(M, 'select public.reply_ping($1, $2) j', [ayudaB, 'si']);
+ok(R.ok === true, 'el team leader dice "Voy"');
+R = await rpc(A, 'select public.reply_ping($1, $2) j', [ayudaB, 'si']);
+ok(R.ok === false && R.taken === true, 'si otro ya va, queda tomado');
+
 // ---------- chat ----------
 const team = (await db.query('select id from public.chats where kind = $1', ['team'])).rows;
 ok(team.length === 1, 'hay un chat de toda la mesa (aunque el SQL se corra dos veces)');

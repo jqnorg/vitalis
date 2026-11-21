@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.27.0';
+const VERSION='1.28.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -264,7 +264,8 @@ const B={ // todas las escrituras pasan por acá
   },
   async ping(kind,to,body){ // social: pedir un mate, salir a los 10 / a la media, mensaje
     try{const row=await Q(sb.from('pings').insert({kind,to_id:to||null,body:body||null}).select().single());const g=G2P(row);pings=pings.filter(x=>x._id!==g._id);pings.unshift(g);refresh();if(kind==='mate')mateWait(g);return g}
-    catch(e){toast(esc(errMsg(e)),String(e.message||'').startsWith('COOLDOWN')?'warn':'err');return null}
+    catch(e){if(kind==='ayuda'&&/pings_kind_check|check constraint/i.test(String(e&&(e.message||e.details)||''))){toast('Pedir ayuda se activa en un rato: falta actualizar la base. Mientras, avisale al team leader por el chat.','warn');return null}
+      toast(esc(errMsg(e)),String(e.message||'').startsWith('COOLDOWN')?'warn':'err');return null}
   },
   async replyPing(id,r){
     try{const res=await Q(sb.rpc('reply_ping',{pid:id,r}));const p=pings.find(x=>x._id===id);
@@ -799,11 +800,13 @@ function openTurno(){ // el de hoy, o el de ayer si cruzó la medianoche
   return ty&&!ty.out&&Date.now()-ty.in<16*36e5?ty:null;
 }
 const breakAbierto=t=>t&&t.breaks.find(b=>!b.e);
+const isBano=b=>!b.k; // el baño: un descanso sin tiempo fijo (no tiene exceso ni alarma)
+const brTxt=b=>isBano(b)?'baño':`descanso de ${b.k}'`;
 function lastMark(t){let m=t.in;for(const b of t.breaks){m=Math.max(m,b.s,b.e||0)}return Math.max(m,t.out||0)}
 function metr(t,now=Date.now()){
   const end=t.out||now,total=end-t.in;
   let desc=0,exceso=0;
-  const br=t.breaks.map(b=>{const e=b.e||end,d=e-b.s,ex=Math.max(0,d-b.k*6e4);desc+=d;exceso+=ex;return {...b,d,ex}});
+  const br=t.breaks.map(b=>{const e=b.e||end,d=e-b.s,ex=isBano(b)?0:Math.max(0,d-b.k*6e4);desc+=d;exceso+=ex;return {...b,d,ex}});
   const ftd=ftds.filter(f=>f.date===t.date).length;
   const cont=pend.filter(p=>p.done&&p.doneAt&&ymd(new Date(p.doneAt))===t.date).length;
   const horas=total/36e5;

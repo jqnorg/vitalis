@@ -1,7 +1,7 @@
 /* ---------- la ficha del cliente y el "cliente actual" ----------
    El cliente actual es el que tenés abierto en el CRM (la extensión lo manda), el último new que entró o el que abriste
    desde una lista. Va en su propia sección (Cliente, tecla L), del tamaño de cualquier otra: solo quedan el menú y la barra.
-   La ficha: el cliente, cómo hacerlo depositar (Banking chico), las campañas de su afiliador en su país y los comentarios. */
+   La ficha: el cliente, el depósito (el camino de Banking, con su país), las campañas de su afiliador en su país y los comentarios. */
 let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen=0,cuAt=0;
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
@@ -56,18 +56,30 @@ function fichaHTML(d){
       <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}${comboHTML(d)}</div>
     </div></div>`;
 }
-// cómo hacerlo depositar: lo que anda en su país, por tipo de pago, y el flujo de su banco
+// Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
+let fiPayT={id:'',t:'',bank:'',all:false};
+const FI_OPTS=6; // las primeras que andan; el resto, con "Ver todas"
 function fiPayHTML(d){
-  const pais=PAISES.includes(d.pais)?d.pais:'';
-  if(!bk.ok)return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar</h4><p class="p-sub" style="margin:0">Banking todavía no cargó.</p></div>`;
-  if(!pais)return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar</h4><p class="p-sub" style="margin:0">${d.country?`${esc(d.country)} no está entre los países de la mesa.`:'No sé de qué país es.'}</p></div>`;
-  const grp=k=>{const l=bkOptions(pais,k);return `<div class="fi-pk"><span class="fi-pl">${KINDS[k]}</span><div class="bk-chips">${l.length?l.map(o=>`<span class="bk-chip ${o.falla?'avoid':'use'}" title="${esc(o.falla?(failsIn(o.p,pais)?o.p.status_note:o.x.status_note)||'Está fallando':o.p.notes||'')}">${o.falla?'⚠ ':''}${esc(o.x.m.name)} · ${esc(o.p.name)}${o.falla?' · falla':''}</span>`).join(''):'<span class="dim">Nada cargado</span>'}</div></div>`};
-  const hasAny=['efectivo','transferencia','tarjeta'].some(k=>bkOptions(pais,k).length);
-  const banks=bk.banks.filter(b=>!b.country||b.country===pais);
-  return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar <span class="fi-v">${esc(pais)}</span></h4>
-    ${hasAny?['efectivo','transferencia','tarjeta'].map(grp).join(''):`<p class="p-sub" style="margin:0 0 6px">Todavía no hay métodos cargados para ${esc(pais)}.${bkEd()?' Cargalos en Banking para que el resto de la mesa los tenga.':' Pedíselo a tu team leader para poder ofrecerle cómo pagar.'}</p>`}
-    ${banks.length?`<label class="fi-pk"><span class="fi-pl">Su banco</span><select data-fbank><option value="">Elegí el banco del cliente</option>${banks.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')}</select></label><div class="fi-bflow"></div>`:''}
-    <button type="button" class="lnk" data-fa="banking" data-pais="${esc(pais)}">Ver en Banking</button></div>`;
+  const pais=PAISES.includes(d.pais)?d.pais:'',H=`<h4>Depósito${pais?` <span class="fi-v">${esc(pais)}</span>`:''}</h4>`;
+  if(!bk.ok)return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0">Banking todavía no cargó.</p></div>`;
+  if(!pais)return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0">${d.country?`${esc(d.country)} no está entre los países de la mesa.`:'No sé de qué país es.'}</p></div>`;
+  if(fiPayT.id!==String(d.id))fiPayT={id:String(d.id),t:'',bank:'',all:false}; // otro cliente: el camino arranca de cero
+  const KS=['efectivo','transferencia','tarjeta'],has=k=>bkOptions(pais,k).some(o=>!o.falla);
+  if(!KS.some(k=>bkOptions(pais,k).length))return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0 0 6px">Todavía no hay métodos cargados para ${esc(pais)}.${bkEd()?' Cargalos en Banking para que el resto de la mesa los tenga.':' Pedíselo a tu team leader para poder ofrecerle cómo pagar.'}</p></div>`;
+  const t=fiPayT.t,dig=['digital','transferencia','tarjeta'].includes(t),fin=KS.includes(t);
+  const seg=(lab,items,on)=>`<div class="fi-step"><span class="fi-pl">${lab}</span><div class="seg" role="group" aria-label="${esc(lab)}">${items.map(([k,l,ok])=>`<button type="button" data-fpt="${k}" class="${on(k)?'on':''}"${ok?'':' title="No hay nada que ande ahora"'}>${esc(l)}${ok?'':' <span class="dim">(no hay)</span>'}</button>`).join('')}</div></div>`;
+  let h=seg('1. ¿Paga en efectivo o digital?',[['efectivo','Efectivo',has('efectivo')],['digital','Digital',has('transferencia')||has('tarjeta')]],k=>k==='digital'?dig:t===k);
+  if(dig)h+=seg('2. ¿Con tarjeta o transferencia?',[['tarjeta','Tarjeta',has('tarjeta')],['transferencia','Transferencia',has('transferencia')]],k=>t===k);
+  if(fin){
+    const L=bkOptions(pais,t),ok=L.filter(o=>!o.falla),bad=L.filter(o=>o.falla),show=fiPayT.all?ok:ok.slice(0,FI_OPTS);
+    h+=`<div class="fi-opts"><span class="fi-pl">${dig?'3':'2'}. Ofrecele ${esc(KINDS[t].toLowerCase())}:</span>
+      ${ok.length?show.map(bkOptHTML).join('')+(ok.length>show.length?`<button type="button" class="lnk" data-fpall>Ver las ${ok.length} que andan</button>`:''):`<p class="p-sub" style="margin:0">Ahora no anda ningún${t==='tarjeta'?'a tarjeta':t==='efectivo'?' efectivo':'a transferencia'} en ${esc(pais)}. Probá con otra forma de pago.</p>`}
+      ${bad.length?`<p class="fi-bad"><b>No ofrecer ahora (fallan):</b> ${bad.map(o=>esc(o.x.m.name+' · '+o.p.name)).join(', ')}</p>`:''}</div>`;
+  }
+  const banks=bk.banks.filter(b=>!b.country||b.country===pais),bk1=banks.find(b=>b.id===fiPayT.bank);
+  return `<div class="fi-c fi-pay">${H}${h}
+    ${banks.length?`<label class="fi-pk"><span class="fi-pl">¿Sabés su banco? (opcional)</span><select data-fbank><option value="">Elegí el banco del cliente</option>${banks.map(b=>`<option value="${esc(b.id)}"${b.id===fiPayT.bank?' selected':''}>${esc(b.name)}</option>`).join('')}</select></label><div class="fi-bflow">${bk1?fiBankFlow(bk1):''}</div>`:''}
+    <button type="button" class="lnk" data-fa="banking" data-pais="${esc(pais)}">Ver todo en Banking</button></div>`;
 }
 function fiBankFlow(b){
   if(!b)return '';
@@ -186,7 +198,12 @@ function fiComsHTML(d){
 }
 // los botones de la ficha (en el modal y en el panel)
 function fichaWire(root,getD,rerender){
-  root.addEventListener('change',e=>{const s=e.target.closest('[data-fbank]');if(!s)return;const box=s.closest('.fi-pay').querySelector('.fi-bflow');box.innerHTML=fiBankFlow(bk.banks.find(b=>b.id===s.value))});
+  root.addEventListener('change',e=>{const s=e.target.closest('[data-fbank]');if(!s)return;fiPayT.bank=s.value;const box=s.closest('.fi-pay').querySelector('.fi-bflow');box.innerHTML=fiBankFlow(bk.banks.find(b=>b.id===s.value))});
+  root.addEventListener('click',e=>{ // el camino del depósito
+    const pt=e.target.closest('[data-fpt]'),pa=e.target.closest('[data-fpall]');if(!pt&&!pa)return;const d=getD(),box=e.target.closest('.fi-pay');if(!d||!box)return;
+    if(pt){const v=pt.dataset.fpt;fiPayT.t=v==='digital'&&['tarjeta','transferencia'].includes(fiPayT.t)?fiPayT.t:v;fiPayT.all=false}else fiPayT.all=true;
+    box.outerHTML=fiPayHTML(d);
+  });
   root.addEventListener('click',async e=>{
     const b=e.target.closest('[data-fa]');if(!b)return;const a=b.dataset.fa,d=getD();if(!d)return;
     if(a==='banking'){bkPais=b.dataset.pais||'';bkTipo='';closeAllModals();go('banking');return}
@@ -331,7 +348,7 @@ function cuTopHTML(){
 async function cuRender(force){
   const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
   if(!top.contains(document.activeElement)||force)top.innerHTML=cuTopHTML(); // sin pisar el ID que estás escribiendo
-  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con el perfil, cómo hacerlo depositar, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
+  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con el perfil, el depósito, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
   const id=curCl.id;
   // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
   if(!force&&body.dataset.fid===id&&Date.now()-cuAt<30e3)return;

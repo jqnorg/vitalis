@@ -62,15 +62,16 @@ V.inicio={
     if(force||key!==this.k){
       this.k=key;let bt='';
       if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">Reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">Marcar entrada</button>';
-      else if(b)bt='<button type="button" class="btn pri big" data-act="vuelta">Volví del descanso</button>';
-      else bt=`<button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
+      else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">Volví ${isBano(b)?'del baño':'del descanso'}</button>`;
+      else bt=`<button type="button" class="btn big" data-act="bano">Baño</button><button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
       if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-act="deshacer" title="Deshacer la última marca">Deshacer</button><button type="button" class="ib" data-act="editHoy" title="Editar las horas de hoy">Editar</button>';
       $('#itBtns').innerHTML=bt;
     }
     let st='<span class="dim">Todavía no marcaste entrada hoy.</span>';
     if(day){
       const m=metr(day,now);
-      if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>Descanso de ${b.k}': ${left>=0?'volvés a las '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
+      if(b&&isBano(b))st=`<span class="big">${mmss(now-b.s)}</span><span>En el baño desde las ${hhmm(b.s)}</span>`;
+      else if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>Descanso de ${b.k}': ${left>=0?'volvés a las '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
       else if(t){const rest=m.salidaEst-now;st=`<span class="big">${durS(m.total)}</span><span>${rest>0?`Salís a las ${hhmm(m.salidaEst)}, faltan ${dur(rest)}`:sp('hot','+'+dur(-rest)+' extra')}</span>`}
       else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
@@ -81,14 +82,14 @@ V.inicio={
 function timeline(t,now){
   const end=t.out||now,tgt=t.in+jorMs(),span=Math.max(end,tgt)-t.in||1,P=ms=>Math.max(0,Math.min(100,(ms-t.in)/span*100));
   let s=`<div class="seg wk" style="left:0;width:${P(end)}%"></div>`;
-  for(const b of t.breaks){const e=b.e||end,ex=e-b.s>b.k*6e4+6e4;s+=`<div class="seg br${ex?' x':''}" style="left:${P(b.s)}%;width:${Math.max(.8,P(e)-P(b.s))}%" title="descanso ${b.k}' ${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}"></div>`}
+  for(const b of t.breaks){const e=b.e||end,ex=!isBano(b)&&e-b.s>b.k*6e4+6e4;s+=`<div class="seg br${ex?' x':''}" style="left:${P(b.s)}%;width:${Math.max(.8,P(e)-P(b.s))}%" title="${brTxt(b)} ${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}"></div>`}
   s+=`<div class="seg" style="left:calc(${P(tgt)}% - 2px);width:0;border-left:2px dashed var(--fg);opacity:.7" title="fin de jornada ${hhmm(tgt)}"></div>`;
   if(!t.out)s+=`<div class="now" style="left:calc(${P(now)}% - 1px)"></div>`;
   return `<div class="tl" role="img" aria-label="Jornada desde ${hhmm(t.in)}">${s}</div><div class="tll"><span>${hhmm(t.in)}</span><span>${t.out?'salida '+hhmm(t.out):'fin '+hhmm(tgt)}</span></div>`;
 }
 function marksHTML(t){
   const p=[`Entrada <b>${hhmm(t.in)}</b>`];
-  for(const b of t.breaks){const d=(b.e||Date.now())-b.s,ex=d-b.k*6e4;p.push(`Descanso ${b.k}' <b>${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}</b>${b.e?` ${mins(d)} min${ex>=6e4?' '+sp('hot','+'+mins(ex)):''}`:''}`)}
+  for(const b of t.breaks){const d=(b.e||Date.now())-b.s,ex=isBano(b)?0:d-b.k*6e4;p.push(`${isBano(b)?'Baño':`Descanso ${b.k}'`} <b>${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}</b>${b.e?` ${mins(d)} min${ex>=6e4?' '+sp('hot','+'+mins(ex)):''}`:''}`)}
   if(t.out)p.push(`Salida <b>${hhmm(t.out)}</b>`);
   return p.map(x=>`<span>${x}</span>`).join('');
 }

@@ -1156,7 +1156,7 @@ h3 svg.ic{color:var(--acc)}
 .tg-fill{background:var(--pri)}.tg-ideal{background:var(--fg)}
 
 /* barra de arriba sin pastillas: solo la hora, el aviso de sin conexión y Venta (lo demás ya está en el menú y en el Inicio) */
-#bar #sMes,#bar #sLiq,#bar #sTurno,#bar #sPend,#bar #sTask{display:none}
+#bar #sMes,#bar #sLiq,#bar #sPend,#bar #sTask{display:none} /* el turno y Pedir ayuda sí (los pidió el dueño) */
 .people{margin-top:22px}
 
 /* ---------- Radar y lo que predice ventas (radar.js) ---------- */
@@ -1366,6 +1366,20 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
   .sg-r{flex-direction:column;align-items:stretch;gap:8px}.sg-rb .btn{flex:1}
 }
 .sg-rnote{color:var(--dim);font-size:13px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* barra de arriba: Pedir ayuda y el turno (Entrada · Baño · 10 min · 30 min · Salida), grandes y claros */
+#bar .pill{height:38px;font-size:14px}
+#bar .pill.turno{gap:6px;padding:0 4px 0 12px}
+#bar .pill.turno:not(:has(.tLive)){padding-left:4px}
+#bar .tb{height:30px;padding:0 13px;font-size:13.5px}
+.pill.ayuda{gap:6px;font-weight:700;color:var(--acc);border:1.5px solid color-mix(in srgb,var(--acc) 55%,var(--line));cursor:pointer}
+.pill.ayuda:hover{background:color-mix(in srgb,var(--acc) 10%,var(--panel))}
+.pill.ayuda svg.ic{width:17px;height:17px}
+@media (max-width:820px){#bar .pill{height:34px;font-size:13px}#bar .tb{height:28px;padding:0 10px}}
+/* ficha: el camino del depósito */
+.fi-step{display:flex;flex-direction:column;gap:5px;margin:8px 0}
+.fi-step .seg button{font-size:14px;padding:7px 14px}
+.fi-opts{display:grid;gap:6px;margin-top:10px}
+.fi-bad{margin:4px 0 0;font-size:13px;color:var(--err)}
 </style>
 </head>
 <body class="auth">
@@ -1436,6 +1450,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
   <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
   <button type="button" class="pill" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
+  <button type="button" class="pill ayuda wr" id="sAyuda" data-act="ayuda" title="Le avisa al team leader y a los administradores" hidden><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Pedir ayuda</button>
   <div class="pill turno" id="sTurno"></div>
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
   <button type="button" class="pill" id="sTask" data-go="tareas" title="Tareas pendientes" hidden></button>
@@ -1703,7 +1718,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.27.0';
+const VERSION='1.28.0';
 const EXT_VER='1.11.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1964,7 +1979,8 @@ const B={ // todas las escrituras pasan por acá
   },
   async ping(kind,to,body){ // social: pedir un mate, salir a los 10 / a la media, mensaje
     try{const row=await Q(sb.from('pings').insert({kind,to_id:to||null,body:body||null}).select().single());const g=G2P(row);pings=pings.filter(x=>x._id!==g._id);pings.unshift(g);refresh();if(kind==='mate')mateWait(g);return g}
-    catch(e){toast(esc(errMsg(e)),String(e.message||'').startsWith('COOLDOWN')?'warn':'err');return null}
+    catch(e){if(kind==='ayuda'&&/pings_kind_check|check constraint/i.test(String(e&&(e.message||e.details)||''))){toast('Pedir ayuda se activa en un rato: falta actualizar la base. Mientras, avisale al team leader por el chat.','warn');return null}
+      toast(esc(errMsg(e)),String(e.message||'').startsWith('COOLDOWN')?'warn':'err');return null}
   },
   async replyPing(id,r){
     try{const res=await Q(sb.rpc('reply_ping',{pid:id,r}));const p=pings.find(x=>x._id===id);
@@ -2499,11 +2515,13 @@ function openTurno(){ // el de hoy, o el de ayer si cruzó la medianoche
   return ty&&!ty.out&&Date.now()-ty.in<16*36e5?ty:null;
 }
 const breakAbierto=t=>t&&t.breaks.find(b=>!b.e);
+const isBano=b=>!b.k; // el baño: un descanso sin tiempo fijo (no tiene exceso ni alarma)
+const brTxt=b=>isBano(b)?'baño':`descanso de ${b.k}'`;
 function lastMark(t){let m=t.in;for(const b of t.breaks){m=Math.max(m,b.s,b.e||0)}return Math.max(m,t.out||0)}
 function metr(t,now=Date.now()){
   const end=t.out||now,total=end-t.in;
   let desc=0,exceso=0;
-  const br=t.breaks.map(b=>{const e=b.e||end,d=e-b.s,ex=Math.max(0,d-b.k*6e4);desc+=d;exceso+=ex;return {...b,d,ex}});
+  const br=t.breaks.map(b=>{const e=b.e||end,d=e-b.s,ex=isBano(b)?0:Math.max(0,d-b.k*6e4);desc+=d;exceso+=ex;return {...b,d,ex}});
   const ftd=ftds.filter(f=>f.date===t.date).length;
   const cont=pend.filter(p=>p.done&&p.doneAt&&ymd(new Date(p.doneAt))===t.date).length;
   const horas=total/36e5;
@@ -2705,6 +2723,7 @@ function status(){
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
    const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
   {const f=typeof bkFallas==='function'&&bk.ok?bkFallas().length:0;$('#nbBk').textContent=f?'⚠ '+f:''}
+  $('#sAyuda').hidden=!profile||profile.role==='leader';
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
   $('#sDb').hidden=navigator.onLine;
@@ -2719,11 +2738,12 @@ function turnoBar(force){
   const btn=(act,label,title,cls='')=>`<button type="button" class="tb wr ${cls}" data-act="${act}" title="${title}">${label}</button>`;
   if(force||key!==turnoKey){
     turnoKey=key;
-    if(!t)el.innerHTML=h&&h.out?`Turno de hoy <b>${durS(h.out-h.in)}</b>&nbsp;`:`Sin entrada ${btn('entrada','Entrada','Marcar entrada','go')}`;
-    else if(b)el.innerHTML=`Descanso ${b.k}' <span class="tLive"></span> ${btn('vuelta','Volví','Volver del descanso','go')}`;
-    else el.innerHTML=`<span class="tLive"></span> ${btn('d10',"10'",'Descanso de 10 minutos')}${btn('d30',"30'",'Descanso de 30 minutos')}${btn('salida','Salida','Marcar salida')}`;
+    if(!t)el.innerHTML=h&&h.out?`Turno de hoy <b>${durS(h.out-h.in)}</b>&nbsp;`:btn('entrada','Marcar entrada','Marcar la entrada de hoy','go');
+    else if(b)el.innerHTML=`${isBano(b)?'En el baño':`Descanso ${b.k}'`} <span class="tLive"></span> ${btn('vuelta','Volví','Volver','go')}`;
+    else el.innerHTML=`<span class="tLive"></span> ${btn('bano','Baño','Ir al baño')}${btn('d10','10 min','Descanso de 10 minutos')}${btn('d30','30 min','Descanso de media hora')}${btn('salida','Salida','Marcar salida')}`;
   }
   const live=el.querySelector('.tLive');if(!live||!t)return;
+  if(b&&isBano(b)){live.innerHTML=`<b>${mmss(now-b.s)}</b>`;return}
   if(b){const left=b.s+b.k*6e4-now;live.innerHTML=left>=0?`<b>${mmss(left)}</b>`:`<b class="hot">+${mmss(-left)}</b>`}
   else{const rest=t.in+jorMs()-now;live.innerHTML=`<b>${durS(now-t.in)}</b> <span class="dim">${rest>0?'salís '+hhmm(t.in+jorMs()):''}</span>${rest>0?'':` <span class="hot">+${durS(-rest)}</span>`}`}
 }
@@ -3009,20 +3029,20 @@ async function marcar(kind,hv=''){
     }
     r=markTime(hv);if(r.err)return toast(r.err,'err');
     nt={date:todayS(),in:r.ms,out:null,breaks:[]};msg=`▶ Entrada <b>${hhmm(r.ms)}</b> · salida ${hhmm(r.ms+jorMs())}`;
-  }else if(kind==='d10'||kind==='d30'){
-    const k=kind==='d10'?10:30;
+  }else if(kind==='d10'||kind==='d30'||kind==='bano'){
+    const k=kind==='d10'?10:kind==='d30'?30:0;
     if(!t)return toast('Sin entrada marcada.','warn');
-    const b=breakAbierto(t);if(b)return toast(`Ya estás en el descanso de ${b.k}' (desde ${hhmm(b.s)}).`,'warn');
+    const b=breakAbierto(t);if(b)return toast(`Ya estás en el ${brTxt(b)} (desde ${hhmm(b.s)}).`,'warn');
     r=markTime(hv,lastMark(t));if(r.err)return toast(r.err,'err');
     nt={...t,breaks:[...t.breaks,{k,s:r.ms,e:null}]};
-    if(hv&&r.ms+k*6e4<=Date.now())alerted[t.date+':'+r.ms]=Date.now(); // marca hacia atrás: sin alarma inmediata
-    const ya=t.breaks.filter(x=>x.k===k).length;
-    msg=`☕ Descanso de ${k}' desde <b>${hhmm(r.ms)}</b> · hasta ${hhmm(r.ms+k*6e4)}${ya?` · ${sp('warn',(ya+1)+'º de '+k+"' hoy")}`:''}`;
+    if(k&&hv&&r.ms+k*6e4<=Date.now())alerted[t.date+':'+r.ms]=Date.now(); // marca hacia atrás: sin alarma inmediata
+    const ya=t.breaks.filter(x=>(x.k||0)===k).length;
+    msg=k?`☕ Descanso de ${k}' desde <b>${hhmm(r.ms)}</b> · hasta ${hhmm(r.ms+k*6e4)}${ya?` · ${sp('warn',(ya+1)+'º de '+k+"' hoy")}`:''}`:`Baño desde <b>${hhmm(r.ms)}</b>${ya?` · ${ya+1}º de hoy`:''}. Cuando vuelvas, tocá <b>Volví</b>.`;
   }else if(kind==='vuelta'){
     const b=breakAbierto(t);if(!b)return toast(t?'No estás en un descanso.':'No hay un turno abierto.','warn');
     r=markTime(hv,b.s);if(r.err)return toast(r.err,'err');
     nt={...t,breaks:t.breaks.map(x=>x===b?{...x,e:r.ms}:x)};
-    const d=r.ms-b.s,ex=d-b.k*6e4;msg=`↩ Volviste <b>${hhmm(r.ms)}</b> · descanso de ${b.k}': ${mins(d)} min${ex>=6e4?' '+sp('warn','(+'+mins(ex)+' min)'):''}`;
+    const d=r.ms-b.s,ex=isBano(b)?0:d-b.k*6e4;msg=`↩ Volviste <b>${hhmm(r.ms)}</b> · ${brTxt(b)}: ${mins(d)} min${ex>=6e4?' '+sp('warn','(+'+mins(ex)+' min)'):''}`;
     const a=$('#toasts [data-key="brk"]');if(a)a.remove();
   }else if(kind==='salida'){
     if(!t){const h=turnos[todayS()];return toast(h&&h.out?`Ya marcaste salida a las ${hhmm(h.out)}.`:'Sin entrada marcada.','warn')}
@@ -3043,8 +3063,8 @@ async function deshacer(){
   let nt={...t,breaks:t.breaks.map(b=>({...b}))},txt;
   const lb=nt.breaks[nt.breaks.length-1];
   if(nt.out){txt=`salida ${hhmm(nt.out)}`;for(const x of nt.breaks)if(x.e===nt.out)x.e=null;nt.out=null}
-  else if(lb&&lb.e){txt=`vuelta del descanso de ${lb.k}' (${hhmm(lb.e)})`;lb.e=null}
-  else if(lb){txt=`descanso de ${lb.k}' (${hhmm(lb.s)})`;nt.breaks.pop()}
+  else if(lb&&lb.e){txt=`vuelta del ${brTxt(lb)} (${hhmm(lb.e)})`;lb.e=null}
+  else if(lb){txt=`${brTxt(lb)} (${hhmm(lb.s)})`;nt.breaks.pop()}
   else{
     if(!await confirmar('Borrar jornada',`¿Borrar la entrada de las ${hhmm(t.in)} (el turno entero)?`,'borrar',true))return;
     if(await B.delTurno(t.date))toast('✔ Turno borrado.');turnoBar(true);return;
@@ -3056,7 +3076,7 @@ function editTurno(date){
   if(!noRO())return;
   const isNew=!date,t=date?turnos[date]:null,d0=date||todayS();
   const hm=ms=>ms?hhmm(ms):'';
-  const brow=b=>`<div class="brow"><select aria-label="Tipo de descanso"><option value="10"${b&&b.k===10?' selected':''}>10'</option><option value="30"${b&&b.k===30?' selected':''}>30'</option></select><input type="time" class="bs" value="${b?hm(b.s):''}" aria-label="Inicio"><input type="time" class="be" value="${b?hm(b.e):''}" aria-label="Fin"><button type="button" class="ib del" data-rm aria-label="Quitar">Quitar</button></div>`;
+  const brow=b=>`<div class="brow"><select aria-label="Tipo de descanso"><option value="10"${b&&b.k===10?' selected':''}>10'</option><option value="30"${b&&b.k===30?' selected':''}>30'</option><option value="0"${b&&!b.k?' selected':''}>Baño</option></select><input type="time" class="bs" value="${b?hm(b.s):''}" aria-label="Inicio"><input type="time" class="be" value="${b?hm(b.e):''}" aria-label="Fin"><button type="button" class="ib del" data-rm aria-label="Quitar">Quitar</button></div>`;
   const body=`<div class="fgrid">
     ${isNew?`<label class="fld full"><span>Fecha</span><input type="date" name="tdate" max="${todayS()}" value="${d0}"></label>`:''}
     <label class="fld"><span>Entrada</span><input type="time" name="tin" value="${t?hm(t.in):''}"></label>
@@ -3340,7 +3360,7 @@ function tick(){
   if(!ready)return;
   const now=new Date();$('#sClock').textContent=`${z(now.getHours())}:${z(now.getMinutes())}`;
   turnoBar();if(cur==='inicio')V.inicio.turno();
-  const t=openTurno(),b=breakAbierto(t);if(!b)return;
+  const t=openTurno(),b=breakAbierto(t);if(!b||isBano(b))return; // el baño no tiene alarma
   const end=b.s+b.k*6e4,ms=Date.now();if(ms<end)return;
   const key=t.date+':'+b.s;
   if(alerted[key]&&ms-alerted[key]<5*6e4)return;
@@ -3435,7 +3455,7 @@ const hv=el=>el.closest('#iTurno')&&$('#itHora')?($('#itHora').value||''):'';
 const ACT={
   locks:()=>locksModal(), // Ajustes: privacidad (solo el administrador)
   importar:()=>importar(),exportar:()=>exportar(),ayuda:()=>ayuda(),
-  entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
+  entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),bano:el=>marcar('bano',hv(el)),ayuda:()=>pedirAyuda(),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
   deshacer:()=>deshacer(),editHoy:()=>{const t=openTurno()||turnos[todayS()];editTurno(t?t.date:null)},
   cargarJornada:()=>editTurno(null),editTurno:el=>editTurno(el.dataset.d),
   editFtd:el=>{const f=team.find(x=>x._id===el.dataset.id);if(f&&canEdit(f))ftdForm(f)},
@@ -3544,15 +3564,16 @@ V.inicio={
     if(force||key!==this.k){
       this.k=key;let bt='';
       if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">Reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">Marcar entrada</button>';
-      else if(b)bt='<button type="button" class="btn pri big" data-act="vuelta">Volví del descanso</button>';
-      else bt=`<button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
+      else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">Volví ${isBano(b)?'del baño':'del descanso'}</button>`;
+      else bt=`<button type="button" class="btn big" data-act="bano">Baño</button><button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
       if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-act="deshacer" title="Deshacer la última marca">Deshacer</button><button type="button" class="ib" data-act="editHoy" title="Editar las horas de hoy">Editar</button>';
       $('#itBtns').innerHTML=bt;
     }
     let st='<span class="dim">Todavía no marcaste entrada hoy.</span>';
     if(day){
       const m=metr(day,now);
-      if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>Descanso de ${b.k}': ${left>=0?'volvés a las '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
+      if(b&&isBano(b))st=`<span class="big">${mmss(now-b.s)}</span><span>En el baño desde las ${hhmm(b.s)}</span>`;
+      else if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>Descanso de ${b.k}': ${left>=0?'volvés a las '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
       else if(t){const rest=m.salidaEst-now;st=`<span class="big">${durS(m.total)}</span><span>${rest>0?`Salís a las ${hhmm(m.salidaEst)}, faltan ${dur(rest)}`:sp('hot','+'+dur(-rest)+' extra')}</span>`}
       else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
@@ -3563,14 +3584,14 @@ V.inicio={
 function timeline(t,now){
   const end=t.out||now,tgt=t.in+jorMs(),span=Math.max(end,tgt)-t.in||1,P=ms=>Math.max(0,Math.min(100,(ms-t.in)/span*100));
   let s=`<div class="seg wk" style="left:0;width:${P(end)}%"></div>`;
-  for(const b of t.breaks){const e=b.e||end,ex=e-b.s>b.k*6e4+6e4;s+=`<div class="seg br${ex?' x':''}" style="left:${P(b.s)}%;width:${Math.max(.8,P(e)-P(b.s))}%" title="descanso ${b.k}' ${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}"></div>`}
+  for(const b of t.breaks){const e=b.e||end,ex=!isBano(b)&&e-b.s>b.k*6e4+6e4;s+=`<div class="seg br${ex?' x':''}" style="left:${P(b.s)}%;width:${Math.max(.8,P(e)-P(b.s))}%" title="${brTxt(b)} ${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}"></div>`}
   s+=`<div class="seg" style="left:calc(${P(tgt)}% - 2px);width:0;border-left:2px dashed var(--fg);opacity:.7" title="fin de jornada ${hhmm(tgt)}"></div>`;
   if(!t.out)s+=`<div class="now" style="left:calc(${P(now)}% - 1px)"></div>`;
   return `<div class="tl" role="img" aria-label="Jornada desde ${hhmm(t.in)}">${s}</div><div class="tll"><span>${hhmm(t.in)}</span><span>${t.out?'salida '+hhmm(t.out):'fin '+hhmm(tgt)}</span></div>`;
 }
 function marksHTML(t){
   const p=[`Entrada <b>${hhmm(t.in)}</b>`];
-  for(const b of t.breaks){const d=(b.e||Date.now())-b.s,ex=d-b.k*6e4;p.push(`Descanso ${b.k}' <b>${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}</b>${b.e?` ${mins(d)} min${ex>=6e4?' '+sp('hot','+'+mins(ex)):''}`:''}`)}
+  for(const b of t.breaks){const d=(b.e||Date.now())-b.s,ex=isBano(b)?0:d-b.k*6e4;p.push(`${isBano(b)?'Baño':`Descanso ${b.k}'`} <b>${hhmm(b.s)}–${b.e?hhmm(b.e):'…'}</b>${b.e?` ${mins(d)} min${ex>=6e4?' '+sp('hot','+'+mins(ex)):''}`:''}`)}
   if(t.out)p.push(`Salida <b>${hhmm(t.out)}</b>`);
   return p.map(x=>`<span>${x}</span>`).join('');
 }
@@ -4363,12 +4384,13 @@ const KIND={
   d10:{label:'Salir a los 10',ask:'¿alguien sale a los 10?',askTo:'¿salimos a los 10?',replies:[['si','Dale'],['luego','En 5'],['no','Ahora no']],wait:3*6e4},
   d30:{label:'Salir a la media',ask:'¿alguien sale a la media?',askTo:'¿salimos a la media?',replies:[['si','Dale'],['luego','En 5'],['no','Ahora no']],wait:3*6e4},
   msg:{label:'Mensaje',ask:'',askTo:'',replies:[['si','👍']],wait:15e3},
+  ayuda:{label:'Pedir ayuda',ask:'pide ayuda',askTo:'te pide ayuda',replies:[['si','Voy']],wait:60e3}, // al team leader y a los administradores
   toque:{label:'Dar un toque',ask:'te dio un toque 👉',askTo:'te dio un toque 👉',replies:[['si','Devolver el toque']],wait:2*6e4},
 };
 const first=uid=>memberName(uid).split(/\s+/)[0];
 const replyTxt=(p,r=p.reply)=>{if(p.kind==='toque')return 'te devolvió el toque 👈';const k=KIND[p.kind]||KIND.msg;const x=k.replies.find(y=>y[0]===r);return x?x[1]:r};
 const askTxt=p=>p.kind==='msg'?p.body:(p.to?KIND[p.kind].askTo:KIND[p.kind].ask);
-const forMe=p=>p.from!==me&&(p.to===me||p.to===null);
+const forMe=p=>p.from!==me&&(p.kind==='ayuda'?isLeader():(p.to===me||p.to===null)); // el pedido de ayuda es para el team leader y los administradores
 // los mates a los que dijiste "ahora no" (no cierran el pedido: queda abierto para otro)
 const soNo=()=>new Set(local.get('soNo',[]));
 function soNoAdd(id){const a=local.get('soNo',[]).filter(x=>x!==id);a.push(id);local.set('soNo',a.slice(-100))}
@@ -4397,6 +4419,7 @@ const pageAway=()=>document.hidden||!document.hasFocus();
 function feedTxt(p){ // "Matias pide un mate", "Le pediste un mate a Sofía", "Sofía → vos: ¿salimos a los 10?"
   const mine=p.from===me,X=`<b>${esc(first(p.from))}</b>`,Y=p.to===me?'vos':`<b>${esc(first(p.to||''))}</b>`;
   if(p.kind==='toque')return mine?`Le diste un toque a ${Y} 👉`:`${X} te dio un toque 👉`;
+  if(p.kind==='ayuda')return mine?'<b>Vos</b> pediste ayuda':`${X} pidió ayuda`;
   if(p.kind==='mate'){
     if(!p.to)return mine?'<b>Vos</b> pediste un mate':`${X} pide un mate`;
     return mine?`Le pediste un mate a ${Y}`:p.to===me?`${X} te pide un mate`:`${X} le pide un mate a ${Y}`;
@@ -4410,13 +4433,15 @@ function socialEvent(p,type,prev){
   if(type==='INSERT'){
     if(!forMe(p)||p.reply)return;
     if(Date.now()-new Date(p.at)>10*6e4)return; // viejo (por ejemplo al reconectar)
-    if(quiet())return;
+    if(quiet()&&p.kind!=='ayuda')return; // un pedido de ayuda no se calla
     socialAlert(p);
     return;
   }
   if(type==='UPDATE'&&p.reply&&!(prev&&prev.reply)){
     closeToast('so'+p._id);closeToast('nocebo'+p._id);extSocialClose(p._id);
     if(p.from===me&&p.by!==me){ // me contestaron (en un mate, solo el primer sí)
+      if(p.kind==='ayuda'){closeToast('ayuda');toast(`<b>${esc(first(p.by))}</b> va para allá.`,'ok',{ms:15000,key:'sor'+p._id});pop();
+        if(pageAway())extSocial({k:'so:'+p._id,lvl:'imp',title:'Ayuda',id:first(p.by)+' va para allá',kw:'',meta:'',btns:[['close','Ok',1]]});return}
       const txt=p.kind==='toque'?`<b>${esc(first(p.by))}</b> te devolvió el toque 👈`:`<b>${esc(first(p.by))}</b>: ${esc(replyTxt(p))}${p.kind==='msg'?'':' · '+esc(KIND[p.kind].label.toLowerCase())}`;
       toast(txt,'info',{ms:9000,key:'sor'+p._id});
       if(!quiet()){pop();if(pageAway())extSocial({k:'so:'+p._id,title:'Te contestaron',id:first(p.by)+': '+replyTxt(p),kw:p.kind==='msg'?p.body:KIND[p.kind].label,meta:'',btns:[['close','Ok',1]]})}
@@ -4427,6 +4452,12 @@ function socialGone(id){closeToast('so'+id);extSocialClose(id)}
 function socialAlert(p){
   const who=first(p.from),q=askTxt(p),k=KIND[p.kind]||KIND.msg;
   pop();
+  if(p.kind==='ayuda'){ // urgente: queda hasta que alguien diga "Voy" (y se cierra para los demás)
+    toast(`<b>${esc(who)}</b> pide ayuda`,'alert',{sticky:1,key:'so'+p._id,actions:[{l:'Voy',fn:()=>B.replyPing(p._id,'si')},{l:'Ver perfil',fn:()=>openProfile(p.from)}]});
+    beep(2);flash();
+    extSocial({k:'so:'+p._id,lvl:'urg',title:'Piden ayuda',id:who+' pide ayuda',kw:'',meta:'Para el team leader y los administradores',btns:[['r:si','Voy',1],['close','Ok']]});
+    return;
+  }
   if(p.kind==='toque'){ // liviano: no queda fijo
     toast(`<b>${esc(who)}</b> te dio un toque 👉`,'ok',{ms:12000,key:'so'+p._id,actions:[{l:'Devolver el toque',fn:()=>B.replyPing(p._id,'si')},{l:'Ver perfil',fn:()=>openProfile(p.from)}]});
     if(pageAway())extSocial({k:'so:'+p._id,title:'Toque',id:who+' te dio un toque 👉',kw:'',meta:'',btns:[['r:si','Devolver el toque',1],['close','Ok']]});
@@ -4444,6 +4475,13 @@ function extSocialClose(id){if(extOn())postTop({type:'ftd-agenda-social-close',v
 async function setQuiet(ms){
   const until=ms==null?null:ms==='siempre'?'2100-01-01T00:00:00Z':ms==='manana'?(()=>{const d=new Date();d.setDate(d.getDate()+1);d.setHours(8,0,0,0);return d.toISOString()})():new Date(Date.now()+ms).toISOString();
   if(await B.setQuiet(until))toast(until?`Avisos sociales silenciados ${ms==='siempre'?'hasta que los actives':ms==='manana'?'hasta mañana a las 8':'por 1 hora'}.`:'Avisos sociales activados.',ms==null?'ok':'warn',{key:'quiet'});
+}
+// el agente pide ayuda: le llega al team leader y a los administradores (el primero que dice "Voy" se lo lleva)
+async function pedirAyuda(){
+  if(!ready||!noRO())return;
+  const g=await B.ping('ayuda',null);if(!g)return;
+  toast('Listo: le avisamos al team leader y a los administradores.','ok',{ms:12000,key:'ayuda',actions:[{l:'Cancelar',fn:async()=>{
+    try{await Q(sb.from('pings').delete().eq('id',g._id));pings=pings.filter(x=>x._id!==g._id);refresh();toast('Pedido de ayuda cancelado.','ok')}catch(e){toast(esc(errMsg(e)),'err')}}}]});
 }
 // comandos que vienen de la tarjeta de la extensión
 function socialCmd(d){
@@ -5477,7 +5515,7 @@ function turnoHoy(uid){ // estado del turno de hoy de alguien
   const t=uid===me?(openTurno()||turnos[todayS()]):((teamSh[uid]||{})[todayS()]);
   if(!t||!t.in)return {txt:'—',cls:'dim'};
   if(t.out)return {txt:`salió ${hhmm(t.out)}`,cls:'dim'};
-  const b=t.breaks.find(x=>!x.e);if(b)return {txt:`descanso desde ${hhmm(b.s)}`,cls:'warn'};
+  const b=t.breaks.find(x=>!x.e);if(b)return {txt:`${isBano(b)?'en el baño':'descanso'} desde ${hhmm(b.s)}`,cls:'warn'};
   return {txt:`en turno desde ${hhmm(t.in)}`,cls:'ok'};
 }
 function agOf(uid){return uid===me?pend:teamAg.filter(p=>p.uid===uid)}
@@ -6293,7 +6331,7 @@ function bankView(b){
 /* ---------- la ficha del cliente y el "cliente actual" ----------
    El cliente actual es el que tenés abierto en el CRM (la extensión lo manda), el último new que entró o el que abriste
    desde una lista. Va en su propia sección (Cliente, tecla L), del tamaño de cualquier otra: solo quedan el menú y la barra.
-   La ficha: el cliente, cómo hacerlo depositar (Banking chico), las campañas de su afiliador en su país y los comentarios. */
+   La ficha: el cliente, el depósito (el camino de Banking, con su país), las campañas de su afiliador en su país y los comentarios. */
 let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen=0,cuAt=0;
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
@@ -6348,18 +6386,30 @@ function fichaHTML(d){
       <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}${comboHTML(d)}</div>
     </div></div>`;
 }
-// cómo hacerlo depositar: lo que anda en su país, por tipo de pago, y el flujo de su banco
+// Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
+let fiPayT={id:'',t:'',bank:'',all:false};
+const FI_OPTS=6; // las primeras que andan; el resto, con "Ver todas"
 function fiPayHTML(d){
-  const pais=PAISES.includes(d.pais)?d.pais:'';
-  if(!bk.ok)return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar</h4><p class="p-sub" style="margin:0">Banking todavía no cargó.</p></div>`;
-  if(!pais)return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar</h4><p class="p-sub" style="margin:0">${d.country?`${esc(d.country)} no está entre los países de la mesa.`:'No sé de qué país es.'}</p></div>`;
-  const grp=k=>{const l=bkOptions(pais,k);return `<div class="fi-pk"><span class="fi-pl">${KINDS[k]}</span><div class="bk-chips">${l.length?l.map(o=>`<span class="bk-chip ${o.falla?'avoid':'use'}" title="${esc(o.falla?(failsIn(o.p,pais)?o.p.status_note:o.x.status_note)||'Está fallando':o.p.notes||'')}">${o.falla?'⚠ ':''}${esc(o.x.m.name)} · ${esc(o.p.name)}${o.falla?' · falla':''}</span>`).join(''):'<span class="dim">Nada cargado</span>'}</div></div>`};
-  const hasAny=['efectivo','transferencia','tarjeta'].some(k=>bkOptions(pais,k).length);
-  const banks=bk.banks.filter(b=>!b.country||b.country===pais);
-  return `<div class="fi-c fi-pay"><h4>Cómo hacerlo depositar <span class="fi-v">${esc(pais)}</span></h4>
-    ${hasAny?['efectivo','transferencia','tarjeta'].map(grp).join(''):`<p class="p-sub" style="margin:0 0 6px">Todavía no hay métodos cargados para ${esc(pais)}.${bkEd()?' Cargalos en Banking para que el resto de la mesa los tenga.':' Pedíselo a tu team leader para poder ofrecerle cómo pagar.'}</p>`}
-    ${banks.length?`<label class="fi-pk"><span class="fi-pl">Su banco</span><select data-fbank><option value="">Elegí el banco del cliente</option>${banks.map(b=>`<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('')}</select></label><div class="fi-bflow"></div>`:''}
-    <button type="button" class="lnk" data-fa="banking" data-pais="${esc(pais)}">Ver en Banking</button></div>`;
+  const pais=PAISES.includes(d.pais)?d.pais:'',H=`<h4>Depósito${pais?` <span class="fi-v">${esc(pais)}</span>`:''}</h4>`;
+  if(!bk.ok)return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0">Banking todavía no cargó.</p></div>`;
+  if(!pais)return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0">${d.country?`${esc(d.country)} no está entre los países de la mesa.`:'No sé de qué país es.'}</p></div>`;
+  if(fiPayT.id!==String(d.id))fiPayT={id:String(d.id),t:'',bank:'',all:false}; // otro cliente: el camino arranca de cero
+  const KS=['efectivo','transferencia','tarjeta'],has=k=>bkOptions(pais,k).some(o=>!o.falla);
+  if(!KS.some(k=>bkOptions(pais,k).length))return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0 0 6px">Todavía no hay métodos cargados para ${esc(pais)}.${bkEd()?' Cargalos en Banking para que el resto de la mesa los tenga.':' Pedíselo a tu team leader para poder ofrecerle cómo pagar.'}</p></div>`;
+  const t=fiPayT.t,dig=['digital','transferencia','tarjeta'].includes(t),fin=KS.includes(t);
+  const seg=(lab,items,on)=>`<div class="fi-step"><span class="fi-pl">${lab}</span><div class="seg" role="group" aria-label="${esc(lab)}">${items.map(([k,l,ok])=>`<button type="button" data-fpt="${k}" class="${on(k)?'on':''}"${ok?'':' title="No hay nada que ande ahora"'}>${esc(l)}${ok?'':' <span class="dim">(no hay)</span>'}</button>`).join('')}</div></div>`;
+  let h=seg('1. ¿Paga en efectivo o digital?',[['efectivo','Efectivo',has('efectivo')],['digital','Digital',has('transferencia')||has('tarjeta')]],k=>k==='digital'?dig:t===k);
+  if(dig)h+=seg('2. ¿Con tarjeta o transferencia?',[['tarjeta','Tarjeta',has('tarjeta')],['transferencia','Transferencia',has('transferencia')]],k=>t===k);
+  if(fin){
+    const L=bkOptions(pais,t),ok=L.filter(o=>!o.falla),bad=L.filter(o=>o.falla),show=fiPayT.all?ok:ok.slice(0,FI_OPTS);
+    h+=`<div class="fi-opts"><span class="fi-pl">${dig?'3':'2'}. Ofrecele ${esc(KINDS[t].toLowerCase())}:</span>
+      ${ok.length?show.map(bkOptHTML).join('')+(ok.length>show.length?`<button type="button" class="lnk" data-fpall>Ver las ${ok.length} que andan</button>`:''):`<p class="p-sub" style="margin:0">Ahora no anda ningún${t==='tarjeta'?'a tarjeta':t==='efectivo'?' efectivo':'a transferencia'} en ${esc(pais)}. Probá con otra forma de pago.</p>`}
+      ${bad.length?`<p class="fi-bad"><b>No ofrecer ahora (fallan):</b> ${bad.map(o=>esc(o.x.m.name+' · '+o.p.name)).join(', ')}</p>`:''}</div>`;
+  }
+  const banks=bk.banks.filter(b=>!b.country||b.country===pais),bk1=banks.find(b=>b.id===fiPayT.bank);
+  return `<div class="fi-c fi-pay">${H}${h}
+    ${banks.length?`<label class="fi-pk"><span class="fi-pl">¿Sabés su banco? (opcional)</span><select data-fbank><option value="">Elegí el banco del cliente</option>${banks.map(b=>`<option value="${esc(b.id)}"${b.id===fiPayT.bank?' selected':''}>${esc(b.name)}</option>`).join('')}</select></label><div class="fi-bflow">${bk1?fiBankFlow(bk1):''}</div>`:''}
+    <button type="button" class="lnk" data-fa="banking" data-pais="${esc(pais)}">Ver todo en Banking</button></div>`;
 }
 function fiBankFlow(b){
   if(!b)return '';
@@ -6478,7 +6528,12 @@ function fiComsHTML(d){
 }
 // los botones de la ficha (en el modal y en el panel)
 function fichaWire(root,getD,rerender){
-  root.addEventListener('change',e=>{const s=e.target.closest('[data-fbank]');if(!s)return;const box=s.closest('.fi-pay').querySelector('.fi-bflow');box.innerHTML=fiBankFlow(bk.banks.find(b=>b.id===s.value))});
+  root.addEventListener('change',e=>{const s=e.target.closest('[data-fbank]');if(!s)return;fiPayT.bank=s.value;const box=s.closest('.fi-pay').querySelector('.fi-bflow');box.innerHTML=fiBankFlow(bk.banks.find(b=>b.id===s.value))});
+  root.addEventListener('click',e=>{ // el camino del depósito
+    const pt=e.target.closest('[data-fpt]'),pa=e.target.closest('[data-fpall]');if(!pt&&!pa)return;const d=getD(),box=e.target.closest('.fi-pay');if(!d||!box)return;
+    if(pt){const v=pt.dataset.fpt;fiPayT.t=v==='digital'&&['tarjeta','transferencia'].includes(fiPayT.t)?fiPayT.t:v;fiPayT.all=false}else fiPayT.all=true;
+    box.outerHTML=fiPayHTML(d);
+  });
   root.addEventListener('click',async e=>{
     const b=e.target.closest('[data-fa]');if(!b)return;const a=b.dataset.fa,d=getD();if(!d)return;
     if(a==='banking'){bkPais=b.dataset.pais||'';bkTipo='';closeAllModals();go('banking');return}
@@ -6623,7 +6678,7 @@ function cuTopHTML(){
 async function cuRender(force){
   const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
   if(!top.contains(document.activeElement)||force)top.innerHTML=cuTopHTML(); // sin pisar el ID que estás escribiendo
-  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con el perfil, cómo hacerlo depositar, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
+  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con el perfil, el depósito, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
   const id=curCl.id;
   // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
   if(!force&&body.dataset.fid===id&&Date.now()-cuAt<30e3)return;

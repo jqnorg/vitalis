@@ -148,7 +148,7 @@ create table if not exists public.pings (
 );
 create index if not exists pings_team_created on public.pings (team_id, created_at desc);
 alter table public.pings drop constraint if exists pings_kind_check;  -- 'toque': un toque a alguien desde su perfil
-alter table public.pings add constraint pings_kind_check check (kind in ('mate','d10','d30','msg','toque'));
+alter table public.pings add constraint pings_kind_check check (kind in ('mate','d10','d30','msg','toque','ayuda')); -- 'ayuda': el agente le pide ayuda al team leader y a los administradores
 
 -- ---------- chat: toda la mesa, grupos y privados ----------
 create table if not exists public.chats (
@@ -523,12 +523,12 @@ begin
     if new.body is null then raise exception 'PING_EMPTY: escribí el mensaje'; end if;
   else new.body := null; end if;
   if new.kind = 'toque' and new.to_id is null then raise exception 'PING_TO: el toque es para alguien'; end if;
-  wait := case new.kind when 'mate' then interval '20 minutes' when 'msg' then interval '15 seconds' when 'toque' then interval '2 minutes' else interval '3 minutes' end;
+  wait := case new.kind when 'mate' then interval '20 minutes' when 'msg' then interval '15 seconds' when 'toque' then interval '2 minutes' when 'ayuda' then interval '1 minute' else interval '3 minutes' end;
   select max(created_at) into last from public.pings
    where from_id = new.from_id and kind = new.kind and (new.kind = 'mate' or to_id is not distinct from new.to_id);
   if last is not null and last > now() - wait then
     left_s := ceil(extract(epoch from last + wait - now()))::int;
-    raise exception 'COOLDOWN: %', case new.kind when 'mate' then 'ya pediste un mate, podés volver a pedir en ' when 'toque' then 'ya le diste un toque, podés de nuevo en ' else 'ya lo mandaste, esperá ' end
+    raise exception 'COOLDOWN: %', case new.kind when 'mate' then 'ya pediste un mate, podés volver a pedir en ' when 'toque' then 'ya le diste un toque, podés de nuevo en ' when 'ayuda' then 'ya pediste ayuda (ya les llegó), podés de nuevo en ' else 'ya lo mandaste, esperá ' end
       || case when left_s >= 60 then ceil(left_s / 60.0)::int || ' min' else left_s || ' segundos' end;
   end if;
   if (select count(*) from public.pings where from_id = new.from_id and created_at > now() - interval '1 hour') >= 40 then

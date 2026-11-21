@@ -118,7 +118,7 @@ function turnoHoy(uid){ // estado del turno de hoy de alguien
   const t=uid===me?(openTurno()||turnos[todayS()]):((teamSh[uid]||{})[todayS()]);
   if(!t||!t.in)return {txt:'—',cls:'dim'};
   if(t.out)return {txt:`salió ${hhmm(t.out)}`,cls:'dim'};
-  const b=t.breaks.find(x=>!x.e);if(b)return {txt:`descanso desde ${hhmm(b.s)}`,cls:'warn'};
+  const b=t.breaks.find(x=>!x.e);if(b)return {txt:`${isBano(b)?'en el baño':'descanso'} desde ${hhmm(b.s)}`,cls:'warn'};
   return {txt:`en turno desde ${hhmm(t.in)}`,cls:'ok'};
 }
 function agOf(uid){return uid===me?pend:teamAg.filter(p=>p.uid===uid)}
