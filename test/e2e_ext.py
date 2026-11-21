@@ -204,7 +204,7 @@ async def main():
             await Nv.screenshot(path=OUT / 'x2b_crm_novara.png')
             await A2.evaluate("go('ahora')"); await A2.wait_for_timeout(1500)
             t = await A2.locator('#ahBody').inner_text()
-            ok('880104' in t and '880101' in t and t.index('880104') < t.index('880103') < t.index('880102') < t.index('880101'), 'en Ahora: Call Again, Hang Up y después NA por día')
+            ok('880104' in t and '880101' in t and t.index('880101') < t.index('880103') < t.index('880102') < t.index('880104'), 'en la Cola: primero el que hace más tiempo que nadie toca')
             ok('NA 3.1' in t, 'con la última nota a la vista')
             await A2.screenshot(path=OUT / 'x2c_ahora_novara.png')
             # el cliente abierto en el CRM (su ficha) queda como "cliente actual" en Vitalis

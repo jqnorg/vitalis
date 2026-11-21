@@ -2,6 +2,7 @@
 # Uso: cd test && python3 e2e.py   → capturas en test/shots/
 import re, asyncio, base64, subprocess, time, json, urllib.request, pathlib, sys
 from playwright.async_api import async_playwright
+from datetime import date, timedelta
 PORT = 54410
 URL = f'http://localhost:{PORT}/'
 OUT = pathlib.Path(__file__).parent / 'shots'; OUT.mkdir(exist_ok=True)
@@ -706,10 +707,17 @@ async def main():
             await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900)
             await A.evaluate("go('ahora')"); await A.wait_for_timeout(600)
             body = await A.inner_text('#ahBody')
-            g1 = await A.inner_text('#ahBody .ah-g >> nth=0')
+            steps = await A.locator('#ahBody .sg-step h3').all_inner_texts()
+            ok(steps and steps[0] == 'Primero, los nuevos' and 'Volver a llamar: No Answer, Call Again y Hang Up' in steps, f'la cola del agente: pasos en orden, cada uno con su porqué ({steps})')
+            g1 = await A.inner_text('#ahBody .sg-list >> nth=0')
             ok('500002' in g1 and '500001' in g1 and g1.index('500002') < g1.index('500001') and '500008' not in g1 and '70001' not in g1, f'1) new: los míos, el más nuevo primero, sin los que ya depositaron ({g1[:200]!r})')
-            g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
+            ok(g1.count('todavía no lo llamaste') == 2, 'cada new dice por qué se sugiere')
+            g3 = await A.inner_text('#ahBody .sg-g3 >> nth=0')
             ok(g3.index('500003') < g3.index('500005') < g3.index('500009') < g3.index('500004'), f'3) Call Again, Hang Up y después NA (No Answer, NA-2…), en ese orden ({g3[:220]!r})')
+            ok('Sin llamar hoy' in g3 and 'Nadie los llamó todavía hoy' in g3 and 'sin ningún contacto registrado' in g3, 'agrupados por el motivo, y cada cliente con el suyo')
+            one = await A.evaluate("(()=>{const q=queueOf(me);return colaSug({...q,g1:q.g1.slice(0,1)})})()")
+            ok('Primero, los nuevos' not in one, 'con un solo new no se sugiere (ya avisa la notificación)')
+            await A.screenshot(path=OUT / 'q0_cola_agente.png', full_page=True)
             ok('500006' not in body and '500007' not in body, 'Do Not Call y Low potential no están en la cola')
             out = await A.inner_text('#ahBody .ah-out')
             ok('Do Not Call 1' in out and 'Low potential 1' in out, f'y se cuentan aparte ({out[:120]!r})')
@@ -722,8 +730,8 @@ async def main():
             ok(sql('select queue_cap from public.teams')[0]['queue_cap'] == 3, 'el team leader cambia el tope del grupo 3')
             await A.reload(); await A.wait_for_timeout(2500); await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(800)
             await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
-            g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
-            ok('Son 4' in g3 and '500009' not in g3 and '500003' in g3, f'con más que el tope, solo los registrados en el mes ({g3[:160]!r})')
+            g3 = await A.inner_text('#ahBody .sg-g3 >> nth=0')
+            ok('van solo los registrados' in await A.inner_text('#ahBody') and '500009' not in g3 and '500003' in g3, f'con más que el tope, solo los registrados en el mes ({g3[:160]!r})')
             sql('update public.teams set queue_cap = 60')
             # datos viejos: un cliente que la extensión no ve hace +12 h sale de la cola (lo del 70604) y se avisa
             wh = await A.evaluate('''()=>{const t=(...a)=>new Date(...a).getTime();return [
@@ -745,6 +753,20 @@ async def main():
             ok('500005' in body and 'datos viejos' not in body, f'con toda la mesa sin leer el CRM, la cola no se vacía ({body[-160:]!r})')
             sql("update public.crm_clients set last_seen = now()")
             sql("update public.crm_clients set last_seen = now() where client_id='500005'")
+            ayer = (date.fromisoformat(te) - timedelta(days=1)).isoformat()
+            await A.evaluate(f'''()=>crmSeenFromExt([
+              {{id:'500020',name:'Con boleto',country:'Peru',status:'Pending Payment',reg:'{ym}-05 10:00',agent:'Joaquín Or',k:'p1'}},
+              {{id:'500021',name:'Pidió',country:'Chile',status:'CallBack',reg:'{ym}-05 10:00',agent:'Joaquín Or',k:'p2'}},
+              {{id:'500022',name:'Sin plata ayer',country:'Peru',status:'Low potential',reg:'{ayer} 10:00',agent:'Joaquín Or',k:'p3'}}])''')
+            await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900); await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
+            steps = await A.locator('#ahBody .sg-step h3').all_inner_texts()
+            ok(steps[:2] == ['Primero, los nuevos', 'Después, los que esperan tu llamada'] and steps[-1] == 'Low potential con chance hoy', f'después de los new, los que esperan tu llamada; abajo, los Low potential con chance ({steps})')
+            two = await A.inner_text('#ahBody .sg-list >> nth=1')
+            ok('500020' in two and 'Boleto' in two and 'preguntale si ya pudo pagar' in two and '500021' in two and 'Pidió que lo llamen' in two, f'2) Pending Payment y CallBack sueltos, cada uno con su porqué ({two[:200]!r})')
+            low4 = await A.inner_text('#ahBody .sg-g3 >> nth=-1')
+            ok('500022' in low4 and 'hoy es su mejor día' in low4 and '500007' not in low4, f'4) el Low potential que el Radar ve con chance, con el motivo ({low4[:160]!r})')
+            sql("delete from public.crm_clients where client_id in ('500020','500021','500022')")
+            await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(600)
             await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(600)
             # la ficha del new: después del aviso, se abre sola al volver a Vitalis
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
@@ -804,8 +826,9 @@ async def main():
             ok(await A.locator('#iCielo').count() == 0 and await A.locator('.sky').count() == 0, 'sin el pool con estrellas')
             ok(not await A.is_visible('#hoyBand'), 'repasados los news, la franja se va')
             await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
-            g3 = await A.inner_text('#ahBody .ah-g >> nth=2')
-            ok(g3.index('500005') < g3.index('500004') < g3.index('500003'), f'en la cola, los que ya llamaste hoy van al final de su grupo ({g3[:220]!r})')
+            gs = await A.evaluate("Object.fromEntries([...document.querySelectorAll('#ahBody details[data-k^=sg-]')].map(d=>[d.dataset.k,{t:d.textContent,open:d.open}]))")
+            ok('500005' in gs['sg-nunca']['t'] and '500004' in gs['sg-nunca']['t'] and '500003' in gs['sg-poco']['t'] and '500003' not in gs['sg-nunca']['t'] and not gs['sg-poco']['open'], f'en la cola, los que ya llamaste hace poco van al final, en su grupo y cerrado ({list(gs)})')
+            ok('dejalos para más tarde' in gs['sg-poco']['t'] and 'lo llamaron a las' in gs['sg-poco']['t'], 'y dice por qué')
             await D.evaluate("go('inicio');crmLoad(true)"); await D.wait_for_timeout(1500); await D.evaluate("calls=[];callsFetch().then(x=>{callsApply(x);refresh()})"); await D.wait_for_timeout(1200)
             await D.evaluate("go('equipo')"); await D.wait_for_timeout(800)
             mesa = await D.inner_text('#eqPool') if await D.is_visible('#eqPool') else ''

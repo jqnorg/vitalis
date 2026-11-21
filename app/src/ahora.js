@@ -192,7 +192,8 @@ V.ahora={
   render(){
     crmLoad();
     if(!ahWho||(ahWho==='me'&&isLeadUid(me)))ahWho=tlView()||isLeadUid(me)?'all':'me';
-    const sel=$('#ahWho');
+    if(!isLeader())ahWho='me'; // el agente ve solo lo suyo (sin elegir)
+    const sel=$('#ahWho');sel.hidden=!isLeader();
     if(sel!==document.activeElement){
       const ms=isLeader()?members.filter(m=>m.active&&m.id!==me):[];
       sel.innerHTML=(isLeadUid(me)?'':`<option value="me">Mis clientes</option>`)+`<option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
@@ -201,6 +202,15 @@ V.ahora={
     const uid=ahWho==='me'?me:ahWho==='all'?null:ahWho,who=uid!==me;
     if(crm.ok===false){$('#ahSub').textContent='';$('#ahBody').innerHTML='<section class="card"><div class="p-empty">La cola se activa en un rato (falta actualizar la base).</div></section>';return}
     const q=queueOf(uid),now=new Date();
+    if(uid===me&&!isLeadUid(me)){
+      $('#ahSub').innerHTML=`A quién llamar, en orden, y por qué.${extOn()?'':' '+sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
+      hotNotify();
+      const el=$('#ahBody'),op=openKeys(el),cl=new Set([...el.querySelectorAll('details[data-k]:not([open])')].map(d=>d.dataset.k));
+      el.innerHTML=colaSug(q)+fueraHTML(q,false);
+      for(const d of el.querySelectorAll('details[data-k]')){if(op.has(d.dataset.k))d.open=true;else if(cl.has(d.dataset.k))d.open=false} // lo que abriste o cerraste queda igual
+      return;
+    }
+    document.body.classList.remove('sg-news');
     $('#ahSub').innerHTML=`En el orden de la mesa: new, agendas, y después Call Again, Hang Up y NA del día 1 al ${NA_MAX}. ${extOn()?'':sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
     const sec=(n,t,sub,body,empty)=>`<section class="card ah-g"><div class="card-h"><span class="ah-n">${n}</span><h3>${t}</h3><span class="p-sub">${sub}</span></div>${body||`<div class="p-empty" style="padding:10px 0">${empty}</div>`}</section>`;
     const lim=g=>ahMore[g]?0:40,more=(g,l)=>l.length>40&&!ahMore[g]?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${g}">Ver los ${l.length}</button>`:'';
@@ -212,13 +222,16 @@ V.ahora={
       sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas')+(q.cb.length?` · ${plural(q.cb.length,'CallBack o Pending Payment','CallBack o Pending Payment')} sin agenda en Vitalis`:''),
         agBody+(q.cb.length?`<p class="p-sub" style="margin:10px 0 6px">Tienen cita en el CRM: agendalos en Vitalis para que te avise.</p>`+ahTable(q.cb,who,lim('cb'))+more('cb',q.cb):''),'Nada agendado para ahora.')+
       sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+segCard(q,who)+
-      `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
+      fueraHTML(q,who);
+  },
+};
+function fueraHTML(q,who){
+  return `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}
         ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">No tienen el dinero ahora: van agendados para el día que dijeron.${q.lowSin?` <span class="hot">${plural(q.lowSin,'está','están')} sin agenda: sin cita, CRM los puede mover.</span>`:''}</p>`+ahTable(q.low,who):''}
         ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p>${q.nStale?`<p class="note" style="margin-top:6px">${plural(q.nStale,'cliente oculto','clientes ocultos')} por datos viejos: la extensión no los ve hace rato (seguro ya rotaron o cambiaron en el CRM). Abrí el CRM con la extensión para refrescarlos.</p>`:''}</section>`;
-  },
-};
+}
 function capModal(){
   if(!isLeader())return;
   modal({title:'Tope del grupo 3',body:`<p class="mp">Si hay hasta este número de Call Again, Hang Up y NA, se llaman todos. Si hay más, solo los registrados en el mes, hasta que se limpie.</p><label class="fld" style="max-width:160px"><span>Tope</span><input id="capN" inputmode="numeric" value="${qCap()}"></label><div class="ebox" id="capE"></div>`,

@@ -82,7 +82,7 @@ function shMark(){
   const v=document.getElementById('v-'+cur);if(!v||v.hidden)return;
   for(const el of v.querySelectorAll(SH_SEL)){
     if(el.hidden||!el.getClientRects().length||el.closest('.mbox')||el.parentElement.closest(SH_SEL)||el.querySelector(':scope > .sh-btn'))continue;
-    if(el.matches('.wr,.turno-mini')||!el.textContent.trim())continue; // formularios y la franja del turno no
+    if(el.matches('.wr,.turno-mini,.sg-g3')||!el.textContent.trim())continue; // formularios, la franja del turno y las listas de la Cola no
     const b=document.createElement('button');b.type='button';b.className='sh-btn';b.dataset.share='';b.title='Compartir en el chat';b.setAttribute('aria-label','Compartir en el chat');
     b.innerHTML='<svg class="ic" aria-hidden="true"><use href="#i-share"/></svg>';
     el.classList.add('sh-abs');el.appendChild(b); // arriba a la derecha, siempre en el mismo lugar

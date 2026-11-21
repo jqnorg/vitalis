@@ -1298,14 +1298,74 @@ svg.ic{stroke-width:2.3}
 #lock .brand .mark{width:46px;height:46px}
 #lock .brand .word{font-size:36px}
 body.locked #toasts{display:none}
-.ch-lock{display:flex;justify-content:center;padding:min(8vh,60px) 16px 30px}
-.ch-lock .abox{width:min(420px,100%)}
+.ch-lock{flex:1;display:flex;justify-content:center;align-items:flex-start;padding:min(9vh,72px) 16px 30px}
+.ch-lock .abox{width:min(360px,100%);background:var(--panel);border:1.5px solid var(--line);border-radius:20px;padding:26px 26px 18px;box-shadow:0 10px 30px rgba(16,24,40,.08)}
+.ch-lock .abox h2{font-size:26px}
+.ch-lock .lead{margin-bottom:0}
+.ch-lock .dots{margin:18px 0 4px}
+.ch-lock .pad{grid-template-columns:repeat(3,72px);gap:8px;margin-top:12px}
+.ch-lock .pad button{height:50px;font-size:21px;border-radius:14px}
+.ch-lock .pad button.fn{font-size:13px}
 .lk-ic{width:56px;height:56px;border-radius:18px;background:var(--pri-soft);color:var(--pri);display:grid;place-items:center;margin:0 auto 12px}
 .lk-ic svg.ic{width:28px;height:28px}
 .lk-set{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--raised)}
 .lk-set span{flex:1;min-width:200px}
 @media (max-width:600px){#lock{padding-top:28px}}
 .pad button.fn{white-space:nowrap;padding:0 2px}
+/* la Cola del agente (cola.js): a quién llamar, en orden, y por qué */
+body.sg-news[data-view=ahora] #hoyBand{display:none}
+.sg-step{display:flex;gap:12px;align-items:flex-start;margin:22px 2px 10px}
+.sg-step:first-child{margin-top:4px}
+.sg-sn{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--pri);color:var(--pri-ink);font-weight:800;font-size:15px}
+.sg-step h3{margin:2px 0 2px;font-size:19px;letter-spacing:-.02em}
+.sg-step p{margin:0;color:var(--dim);font-size:14.5px;max-width:75ch}
+.sg-list{display:flex;flex-direction:column;gap:10px}
+.sg-c{display:flex;align-items:center;gap:16px;background:var(--panel);border:1.5px solid var(--line);border-left:5px solid var(--k,var(--v-ok));border-radius:14px;padding:12px 16px}
+.sg-c.sg-new{--k:var(--v-warn)}.sg-c.sg-ag{--k:var(--v-err)}.sg-c.sg-pend{--k:var(--v-info)}.sg-c.sg-cb{--k:var(--v-info)}
+.sg-m{flex:1;min-width:0}
+.sg-t{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap}
+.sg-tag{font-size:12.5px;font-weight:700;padding:3px 10px;border-radius:99px;white-space:nowrap;background:var(--soft)}
+.sg-tag.sg-new{background:#fff1d6;color:#8a4b00}.sg-tag.sg-ag{background:#ffe1e6;color:#a1122f}.sg-tag.sg-pend,.sg-tag.sg-cb{background:#e2ecff;color:#1d4ed8}
+body.dark .sg-tag.sg-new{background:#3a2a10;color:#ffd79a}body.dark .sg-tag.sg-ag{background:#3b1720;color:#ffb3c0}body.dark .sg-tag.sg-pend,body.dark .sg-tag.sg-cb{background:#16233f;color:#a9c4ff}
+.sg-cid{font-size:22px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.sg-nm{font-size:16px;font-weight:650}
+.sg-pl{color:var(--dim);font-size:13.5px}
+.sg-crm{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:0 6px;color:var(--dim)}
+svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
+.sg-why{margin:5px 0 0;font-size:15px;line-height:1.4}
+.sg-note{margin:3px 0 0;font-size:13.5px}
+.sg-side{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.sg-ok{display:inline-flex;align-items:center;gap:4px;color:var(--ok);font-weight:700;font-size:13px}.sg-ok svg.ic{width:15px;height:15px;stroke-width:3}
+.sg-no{color:var(--dim);font-size:13px}
+.sg-b{display:flex;gap:8px}
+.sg-b .btn{font-size:15px;padding:10px 16px;border-radius:12px}
+.sg-later{display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--dim);font-size:14px;margin:10px 4px 0}
+.sg-later svg.ic{width:18px;height:18px}
+.sg-g3{padding:6px 16px 10px}
+.sg-sub{border-top:1px solid var(--line)}
+.sg-sub:first-child{border-top:0}
+.sg-sub>summary{cursor:pointer;list-style:none;padding:14px 2px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:16px}
+.sg-sub>summary::-webkit-details-marker{display:none}
+.sg-sub>summary::before{content:"";width:8px;height:8px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(-45deg);margin:0 4px 0 2px;transition:transform .15s}
+.sg-sub[open]>summary::before{transform:rotate(45deg)}
+.sg-sub>summary b{display:inline-flex;align-items:center;gap:6px}
+.sg-n{min-width:24px;padding:0 7px;border-radius:99px;background:var(--soft);font-weight:700;font-size:13px;text-align:center}
+.sg-sw{flex-basis:100%;color:var(--dim);font-size:14px;padding-left:20px}
+.sg-r{display:flex;align-items:center;gap:12px;padding:11px 2px;border-top:1px solid var(--line)}
+.sg-sub>.sg-r:first-of-type{border-top:0}
+.sg-rl{flex:1;min-width:0}
+.sg-rt{display:flex;align-items:center;gap:8px;min-width:0}
+.sg-rid{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.sg-rn{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sg-rs{color:var(--dim);font-size:13.5px;margin-top:2px}
+.sg-st{color:var(--fg);font-weight:600}
+.sg-rb{display:flex;gap:6px;flex:none}
+.sg-rb .btn{padding:8px 14px;font-size:14px}
+@media (max-width:700px){
+  .sg-c{flex-direction:column;align-items:stretch;gap:10px}.sg-side{flex-direction:row;justify-content:space-between;align-items:center}.sg-b .btn{padding:10px 14px}
+  .sg-r{flex-direction:column;align-items:stretch;gap:8px}.sg-rb .btn{flex:1}
+}
+.sg-rnote{color:var(--dim);font-size:13px;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 </style>
 </head>
 <body class="auth">
@@ -1643,7 +1703,7 @@ body.locked #toasts{display:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.26.0';
+const VERSION='1.27.0';
 const EXT_VER='1.11.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -5748,7 +5808,8 @@ V.ahora={
   render(){
     crmLoad();
     if(!ahWho||(ahWho==='me'&&isLeadUid(me)))ahWho=tlView()||isLeadUid(me)?'all':'me';
-    const sel=$('#ahWho');
+    if(!isLeader())ahWho='me'; // el agente ve solo lo suyo (sin elegir)
+    const sel=$('#ahWho');sel.hidden=!isLeader();
     if(sel!==document.activeElement){
       const ms=isLeader()?members.filter(m=>m.active&&m.id!==me):[];
       sel.innerHTML=(isLeadUid(me)?'':`<option value="me">Mis clientes</option>`)+`<option value="all">Toda la mesa</option>`+ms.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join('');
@@ -5757,6 +5818,15 @@ V.ahora={
     const uid=ahWho==='me'?me:ahWho==='all'?null:ahWho,who=uid!==me;
     if(crm.ok===false){$('#ahSub').textContent='';$('#ahBody').innerHTML='<section class="card"><div class="p-empty">La cola se activa en un rato (falta actualizar la base).</div></section>';return}
     const q=queueOf(uid),now=new Date();
+    if(uid===me&&!isLeadUid(me)){
+      $('#ahSub').innerHTML=`A quién llamar, en orden, y por qué.${extOn()?'':' '+sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
+      hotNotify();
+      const el=$('#ahBody'),op=openKeys(el),cl=new Set([...el.querySelectorAll('details[data-k]:not([open])')].map(d=>d.dataset.k));
+      el.innerHTML=colaSug(q)+fueraHTML(q,false);
+      for(const d of el.querySelectorAll('details[data-k]')){if(op.has(d.dataset.k))d.open=true;else if(cl.has(d.dataset.k))d.open=false} // lo que abriste o cerraste queda igual
+      return;
+    }
+    document.body.classList.remove('sg-news');
     $('#ahSub').innerHTML=`En el orden de la mesa: new, agendas, y después Call Again, Hang Up y NA del día 1 al ${NA_MAX}. ${extOn()?'':sp('hot','Abrí el CRM con la extensión para que lleguen los clientes.')}`;
     const sec=(n,t,sub,body,empty)=>`<section class="card ah-g"><div class="card-h"><span class="ah-n">${n}</span><h3>${t}</h3><span class="p-sub">${sub}</span></div>${body||`<div class="p-empty" style="padding:10px 0">${empty}</div>`}</section>`;
     const lim=g=>ahMore[g]?0:40,more=(g,l)=>l.length>40&&!ahMore[g]?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${g}">Ver los ${l.length}</button>`:'';
@@ -5768,13 +5838,16 @@ V.ahora={
       sec(2,'Agendas',plural(q.ag.length,'para hoy o vencida','para hoy o vencidas')+(q.cb.length?` · ${plural(q.cb.length,'CallBack o Pending Payment','CallBack o Pending Payment')} sin agenda en Vitalis`:''),
         agBody+(q.cb.length?`<p class="p-sub" style="margin:10px 0 6px">Tienen cita en el CRM: agendalos en Vitalis para que te avise.</p>`+ahTable(q.cb,who,lim('cb'))+more('cb',q.cb):''),'Nada agendado para ahora.')+
       sec(3,'Call Again, Hang Up y NA',g3sub+(isLeader()?` · <button type="button" class="lnk" data-ah="cap">cambiar el tope</button>`:''),ahTable(q.g3,who,lim('g3'))+more('g3',q.g3),'Nadie para volver a llamar.')+segCard(q,who)+
-      `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
+      fueraHTML(q,who);
+  },
+};
+function fueraHTML(q,who){
+  return `<section class="card ah-g ah-out"><div class="card-h"><h3>Fuera de la cola</h3><span class="p-sub">NA día 5 ${q.rep.length} · Low potential ${q.low.length}${q.lowSin?` (${q.lowSin} sin agenda)`:''} · depósito trabado ${q.failed.length} · Not interested ${q.ni} · Do Not Call ${q.dnc}${q.inv?` · inválidos ${q.inv}`:''}${q.otro?` · otros ${q.otro}`:''}</span><span class="grow"></span>
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA día 5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA del día 5 en adelante: solo para repasos.</p>`+ahTable(q.rep,who):''}
         ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">No tienen el dinero ahora: van agendados para el día que dijeron.${q.lowSin?` <span class="hot">${plural(q.lowSin,'está','están')} sin agenda: sin cita, CRM los puede mover.</span>`:''}</p>`+ahTable(q.low,who):''}
         ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p>${q.nStale?`<p class="note" style="margin-top:6px">${plural(q.nStale,'cliente oculto','clientes ocultos')} por datos viejos: la extensión no los ve hace rato (seguro ya rotaron o cambiaron en el CRM). Abrí el CRM con la extensión para refrescarlos.</p>`:''}</section>`;
-  },
-};
+}
 function capModal(){
   if(!isLeader())return;
   modal({title:'Tope del grupo 3',body:`<p class="mp">Si hay hasta este número de Call Again, Hang Up y NA, se llaman todos. Si hay más, solo los registrados en el mes, hasta que se limpie.</p><label class="fld" style="max-width:160px"><span>Tope</span><input id="capN" inputmode="numeric" value="${qCap()}"></label><div class="ebox" id="capE"></div>`,
@@ -7127,6 +7200,155 @@ V.radar={
   },
 };
 
+/* ============================================================
+   La Cola del agente: a quién llamar, en orden, y por qué (cada cliente y cada grupo dice su motivo).
+   1) Los new, solo si hay más de uno (uno solo ya lo avisa la notificación): sueltos, uno tras otro.
+   2) Las agendas que ya llegaron, los Pending Payment y los CallBack: sueltos, uno tras otro.
+   3) NA (día 1 a 4), Call Again y Hang Up, agrupados por el motivo para volver a llamarlos
+      (campaña caliente, sin llamar hoy, sin tocar hace más de 2 h, llamados hace poco) y en orden.
+   4) Los Low potential que el Radar ve con chance hoy.
+   El team leader, y quien mira la cola de otro, siguen con la vista de la mesa (ahora.js).
+   ============================================================ */
+const SG_STALE=2*36e5; // "sin tocar hace más de 2 h"
+const sgPlain=r=>{ // el status en palabras simples
+  if(!r)return '';const g=r.grp,s=norm(r.status);
+  if(g==='new')return /talk|habl/.test(s)?'Nuevo, ya habló':'Nuevo';
+  if(g==='na')return `No atendió · día ${naNum(r.status)}`;
+  if(g==='call_again')return 'Volver a llamar';
+  if(g==='hang_up')return 'Cortó';
+  if(g==='callback')return 'Pidió que lo llamen';
+  if(g==='pending')return 'Tiene un boleto sin pagar';
+  if(g==='low_potential')return 'No tenía el dinero';
+  return r.status||'';
+};
+const sgPlace=r=>{if(!r||!r.country)return '';const t=cliTime(r.country);return esc(r.country)+(t?` · allá son las ${t}`:'')};
+const sgFlame='<svg class="ic sg-fl" aria-hidden="true"><use href="#i-racha"/></svg>';
+const sgCalled=k=>k.today&&k.last?`<span class="sg-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Llamado hoy ${hhmm(k.last)}</span>`:'<span class="sg-no">Sin llamar hoy</span>';
+const sgDay=r=>{const d=statusDay(r);return d?Math.min(d,5):0};
+// en qué días del mes deposita más su país (Radar: días de cobro); '' si hoy no es uno de esos días
+function sgPayDay(country){
+  const o=payDaysBy().find(x=>norm(x.p)===norm(paisOf(country)));if(!o)return '';
+  const day=new Date().getDate(),i=BUCK.findIndex(([a,z])=>day>=a&&day<=z);
+  return i>=0&&o.ix[i].ix>=1.25?`en ${o.p} se deposita más ${bTxt(i)} (días de cobro)`:'';
+}
+
+/* ---------- 1) y 2): tarjetas sueltas ---------- */
+function sgCard({r,p,c,tag,why,k}){ // compacta: arriba el cliente, abajo el porqué; los botones a la derecha
+  const id=r?r.id:p.id,name=r?r.name:'',note=r&&r.note,crmSt=r&&r.status&&!(c==='new'&&r.grp==='new'&&!/talk/i.test(r.status))?r.status:'';
+  return `<div class="sg-c sg-${c}"${p?` data-pid="${esc(p._id)}"`:''}>
+    <div class="sg-m"><div class="sg-t"><span class="sg-tag sg-${c}">${esc(tag)}</span><button type="button" class="lnkp sg-cid" data-ah="ficha" data-id="${esc(id)}" title="Ver la ficha">${esc(id)}</button>${r&&r.hot?sgFlame:''}${name?`<span class="sg-nm">${esc(name)}</span>`:''}${r&&r.country?`<span class="sg-pl">${sgPlace(r)}</span>`:''}${crmSt?`<span class="sg-crm" title="Status en el CRM">${esc(crmSt)}</span>`:''}</div>
+      <p class="sg-why">${why}</p>${note?`<p class="sg-note"><span class="d">Nota del CRM:</span> ${esc(note)}</p>`:''}</div>
+    <div class="sg-side">${k?sgCalled(k):''}<div class="sg-b">${p?`<button type="button" class="btn pri" data-act="pHecho">Ya lo llamé</button>`:''}<button type="button" class="btn${p?'':' pri'}" data-ah="ficha" data-id="${esc(id)}">Ficha</button>${p?'':`<button type="button" class="btn" data-ah="ag" data-id="${esc(id)}">Agendar</button>`}</div></div>
+  </div>`;
+}
+function sgNewWhy(r,k){
+  const now=Date.now(),a=regAt(r),m=a?Math.round((now-a)/6e4):null;
+  if(k.last&&now-k.last<REPASO)return `Ya lo llamaste ${esc(rel(new Date(k.last)))}. Volvé a probar antes de las <b>${hhmm(k.last+REPASO)}</b>.`;
+  if(k.last)return `Lo llamaste ${esc(rel(new Date(k.last)))} y no depositó: toca repasarlo.`;
+  if(m==null)return 'Todavía no lo llamaste.';
+  const {w,cold}=newWin(r.country);
+  return `Se registró ${esc(rel(a))} y todavía no lo llamaste${m<=w?': <b>es su mejor momento</b>.':m<=cold?': todavía está a tiempo.':'.'}`;
+}
+
+/* ---------- 3): NA, Call Again y Hang Up, agrupados por el motivo ---------- */
+function sgRow(r,k,why){
+  return `<div class="sg-r"><div class="sg-rl"><div class="sg-rt"><button type="button" class="lnkp sg-rid" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha">${esc(r.id)}</button>${r.hot?sgFlame:''}<span class="sg-rn">${esc(r.name)}</span></div>
+    <div class="sg-rs"><span class="sg-st">${esc(sgPlain(r))}</span> · ${why}</div>${r.note?`<div class="sg-rnote" title="${esc(r.note)}">Nota del CRM: ${esc(clip(r.note,90))}</div>`:''}</div>
+    <div class="sg-rb"><button type="button" class="btn sm" data-ah="ficha" data-id="${esc(r.id)}">Ficha</button><button type="button" class="btn sm" data-ah="ag" data-id="${esc(r.id)}">Agendar</button></div></div>`;
+}
+function sgRowWhy(r,k){
+  const now=Date.now(),bits=[];
+  if(!k.last)bits.push('sin ningún contacto registrado');
+  else if(k.today)bits.push(`lo llamaron a las ${hhmm(k.last)} (${esc(rel(new Date(k.last)))})`);
+  else bits.push(`sin tocar ${esc(rel(new Date(k.last)))}`);
+  const d=sgDay(r);if(d>=4&&r.grp!=='na')bits.push(`<b>día ${d} de 5</b>: ${d>=5?'hoy':'mañana'} pasa a Not interested`);
+  if(r.grp==='na'&&naNum(r.status)>=3)bits.push('probá con las tres líneas');
+  return bits.join(' · ');
+}
+function sgGroup(key,list,head,why,open=true){
+  if(!list.length)return '';
+  const lim=ahMore[key]?list.length:12;
+  const rows=list.slice(0,lim).map(x=>sgRow(x.r,x.k,sgRowWhy(x.r,x.k))).join('');
+  const more=list.length>lim?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="${key}">Ver los ${list.length}</button>`:'';
+  return `<details class="sg-sub" data-k="sg-${key}"${open?' open':''}><summary><b>${head}</b> <span class="sg-n">${list.length}</span><span class="sg-sw">${why}</span></summary>${rows}${more}</details>`;
+}
+
+/* ---------- 4): Low potential con chance según el Radar ---------- */
+function sgLowWhy(r,te){
+  const out=[];let w=99;
+  if(r.hot){out.push(`su campaña lleva ${r.hot.n} FTDs hoy`);w=Math.min(w,0)}
+  const rd=regDay(r);
+  if(rd&&rd<te){const d=bizDays(rd,te);
+    if(d<=1){out.push('se registró ayer: hoy es su mejor día para volver');w=Math.min(w,1)}
+    else if(d<=3){out.push(`se registró hace ${d} días hábiles: todavía está a tiempo`);w=Math.min(w,3)}
+    else if(d<=7){out.push(`se registró hace ${d} días hábiles: es su última semana con buena chance`);w=Math.min(w,4)}}
+  const pd=sgPayDay(r.country);if(pd){out.push(pd);w=Math.min(w,2)}
+  return out.length?{why:out.slice(0,2).join(' · '),w}:null;
+}
+
+function colaSug(q){
+  const S=new Set(),now=Date.now(),te=todayS(),H=hotMine(q),hot=new Map();
+  for(const h of H)for(const r of h.cl)hot.set(norm(r.id),h);
+  const mark=r=>{r.hot=hot.get(norm(r.id))||null;return r};
+  const kOf=new Map(),K=r=>{let k=kOf.get(r);if(!k)kOf.set(r,k=contactOf(r));return k};
+  let html='',step=0;
+  const stepH=(t,sub)=>`<div class="sg-step"><span class="sg-sn">${++step}</span><div><h3>${t}</h3><p>${sub}</p></div></div>`;
+
+  // 1) los new: solo si hay más de uno
+  const news=q.g1.map(mark);
+  if(news.length>1){
+    const due=r=>{const k=K(r);return !k.last||now-k.last>=REPASO};
+    const L=[...news].sort((a,b)=>(due(b)?1:0)-(due(a)?1:0)||(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
+    const n=L.filter(due).length;
+    html+=stepH('Primero, los nuevos',`Tenés ${plural(news.length,'nuevo','nuevos')} sin depositar${n?`; ${n===news.length?'a todos':`a ${n}`} toca llamarlos ahora`:''}. Depositan más en las primeras horas, y se repasan cada menos de 2 horas.`)+
+      `<div class="sg-list">${L.map(r=>sgCard({r,c:'new',tag:'Nuevo',k:K(r),why:sgNewWhy(r,K(r))})).join('')}</div>`;
+  }
+  document.body.classList.toggle('sg-news',news.length>1);
+
+  // 2) agendas que ya llegaron, Pending Payment y CallBack
+  const agNow=q.ag.filter(p=>parseDue(p.due)<=new Date()),agLater=q.ag.filter(p=>parseDue(p.due)>new Date());
+  const cb=q.cb.map(mark),cbRank=r=>(K(r).today?2:0)+(r.grp==='pending'?0:1);
+  const two=[...agNow.map(p=>({p,r:crmStatusOf(p.id)})),...[...cb].sort((a,b)=>cbRank(a)-cbRank(b)||byRegDesc(a,b)).map(r=>({r}))];
+  if(two.length){
+    html+=stepH('Después, los que esperan tu llamada',`${[agNow.length&&plural(agNow.length,'agenda que ya llegó','agendas que ya llegaron'),cb.filter(r=>r.grp==='pending').length&&plural(cb.filter(r=>r.grp==='pending').length,'boleto sin pagar','boletos sin pagar'),cb.filter(r=>r.grp==='callback').length&&plural(cb.filter(r=>r.grp==='callback').length,'cliente que pidió que lo llamen','clientes que pidieron que los llamen')].filter(Boolean).join(', ')}. Ya tienen un compromiso: no los dejes esperando.`)+
+      `<div class="sg-list">${two.map(({p,r})=>{
+        if(p){const d=parseDue(p.due),late=now-d>5*6e4;
+          return sgCard({p,r:r?mark(r):null,c:'ag',tag:'Agenda',k:r?K(r):null,why:`Quedaste en llamarlo a las <b>${esc(p.due.slice(11,16))}</b>${late?` (${esc(rel(d))})`:''}.${p.kw?` Palabra clave: <b>${esc(p.kw)}</b>.`:''}`})}
+        const k=K(r),d=sgDay(r),called=k.today?` Ya lo llamaste hoy a las ${hhmm(k.last)}.`:'';
+        if(r.grp==='pending')return sgCard({r,c:'pend',tag:'Boleto',k,why:`Tiene un boleto sin pagar: preguntale si ya pudo pagar y ayudalo a terminar.${called}`});
+        return sgCard({r,c:'cb',tag:'Pidió que lo llamen',k,why:`Tiene cita en el CRM${d?` (día ${d} de 5)`:''}. Si te da una hora, agendalo para que Vitalis te avise.${called}`});
+      }).join('')}</div>`;
+  }
+  if(agLater.length)html+=`<p class="sg-later"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Más tarde: ${agLater.map(p=>`<b>${esc(p.due.slice(11,16))}</b> ${esc(p.id)}`).join(' · ')}. <span class="d">Te avisa a la hora.</span></p>`;
+
+  // 3) NA, Call Again y Hang Up, por el motivo. Un cliente va en un solo lugar: los que tienen agenda abierta los avisa la agenda
+  const agIds=new Set(pend.filter(p=>!p.done).map(p=>norm(p.id)));
+  const g3=q.g3.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r)})),by=(a,b)=>(a.k.last||0)-(b.k.last||0); // primero el que hace más que nadie toca (a la par, queda el orden de la mesa: Call Again, Hang Up, NA)
+  const recent=x=>x.k.today&&x.k.last&&now-x.k.last<=SG_STALE;
+  const hotL=g3.filter(x=>x.r.hot&&!recent(x)).sort(by),rest=g3.filter(x=>!(x.r.hot&&!recent(x)));
+  const nunca=rest.filter(x=>!x.k.today).sort(by),viejos=rest.filter(x=>x.k.today&&!recent(x)).sort(by),poco=rest.filter(recent).sort(by);
+  if(g3.length){
+    const pend3=hotL.length+nunca.length+viejos.length;
+    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para repasar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
+      `<section class="card sg-g3">`+
+      sgGroup('hot',hotL,`${sgFlame}Su campaña está depositando hoy`,`${H.map(h=>esc(h.txt)+` lleva ${h.n} FTDs hoy`).join(' · ')}: es el mejor momento para esos clientes.`)+
+      sgGroup('nunca',nunca,'Sin llamar hoy','Nadie los llamó todavía hoy.')+
+      sgGroup('viejos',viejos,'Sin tocar hace más de 2 horas','Los llamaron hoy pero hace rato: probá otra vez.')+
+      sgGroup('poco',poco,'Llamados hace poco','Los llamaron hace menos de 2 horas: dejalos para más tarde.',!(hotL.length+nunca.length+viejos.length))+
+      `</section>`;
+  }
+
+  // 4) Low potential con chance
+  const low=q.low.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r),x:sgLowWhy(r,te)})).filter(o=>o.x)
+    .sort((a,b)=>(recent(a)?1:0)-(recent(b)?1:0)||a.x.w-b.x.w||byRegDesc(a.r,b.r));
+  if(low.length){
+    html+=stepH('Low potential con chance hoy','No tenían el dinero, pero según el Radar hoy pueden entrar. Los que tienen agenda no van acá: te avisa la agenda.')+
+      `<section class="card sg-g3">${low.slice(0,ahMore.low4?low.length:12).map(o=>sgRow(o.r,o.k,o.x.why+(o.k.today?` · lo llamaron a las ${hhmm(o.k.last)}`:''))).join('')}${low.length>12&&!ahMore.low4?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="low4">Ver los ${low.length}</button>`:''}</section>`;
+  }
+  if(!step)html+=`<section class="card"><div class="p-empty">${crm.rows.size?'Nada pendiente: tu cola está al día.':esc(noCrm())}</div></section>`;
+  return html;
+}
+
 /* ---------- estación: las pestañas propias del CRM en el Chrome del team leader ---------- */
 // Cada vista (News, Transactions, Cola, Agendables, Cerrados) es una pestaña que la extensión fija, actualiza a su ritmo y
 // vuelve a abrir si se cierra, solo en horario. La extensión late cada 30 s por la pestaña de Vitalis de esa compu
@@ -7281,7 +7503,7 @@ function shMark(){
   const v=document.getElementById('v-'+cur);if(!v||v.hidden)return;
   for(const el of v.querySelectorAll(SH_SEL)){
     if(el.hidden||!el.getClientRects().length||el.closest('.mbox')||el.parentElement.closest(SH_SEL)||el.querySelector(':scope > .sh-btn'))continue;
-    if(el.matches('.wr,.turno-mini')||!el.textContent.trim())continue; // formularios y la franja del turno no
+    if(el.matches('.wr,.turno-mini,.sg-g3')||!el.textContent.trim())continue; // formularios, la franja del turno y las listas de la Cola no
     const b=document.createElement('button');b.type='button';b.className='sh-btn';b.dataset.share='';b.title='Compartir en el chat';b.setAttribute('aria-label','Compartir en el chat');
     b.innerHTML='<svg class="ic" aria-hidden="true"><use href="#i-share"/></svg>';
     el.classList.add('sh-abs');el.appendChild(b); // arriba a la derecha, siempre en el mismo lugar
