@@ -706,11 +706,24 @@ async def main():
             ok('Son 4' in g3 and '500009' not in g3 and '500003' in g3, f'con más que el tope, solo los registrados en el mes ({g3[:160]!r})')
             sql('update public.teams set queue_cap = 60')
             # datos viejos: un cliente que la extensión no ve hace +12 h sale de la cola (lo del 70604) y se avisa
-            sql("update public.crm_clients set last_seen = now() - interval '13 hours' where client_id='500005'")
+            wh = await A.evaluate('''()=>{const t=(...a)=>new Date(...a).getTime();return [
+              workHours(t(2026,10,20,16,0),t(2026,10,23,9,30)),  // viernes 16:00 → lunes 9:30: 1,5 h de trabajo
+              workHours(t(2026,10,19,15,0),t(2026,10,20,15,0)),  // jueves 15:00 → viernes 15:00: 8 h
+              workHours(t(2026,10,21,8,0),t(2026,10,22,20,0)),   // sábado y domingo: nada
+              workHours(t(2026,10,20,18,0),t(2026,10,23,8,0))]}''')  # viernes a la noche → lunes antes de entrar
+            ok(wh == [1.5, 8, 0, 0], f'solo cuentan las horas de trabajo: la noche y el fin de semana no hacen viejo a nadie ({wh})')
+            sql("update public.crm_clients set last_seen = now() - interval '7 days' where client_id='500005'")
             await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(800)
             await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
             body = await A.inner_text('#ahBody')
-            ok('500005' not in body and '1 cliente oculto por datos viejos' in body, f'un cliente con datos viejos sale de la cola y se avisa ({body[-220:]!r})')
+            ok('500005' not in body and '1 cliente oculto por datos viejos' in body, f'un cliente que la mesa no ve en una jornada de lectura sale de la cola y se avisa ({body[-220:]!r})')
+            # si nadie leyó el CRM (fin de semana, sin estación), no se esconde a nadie: cuenta hasta la última lectura de la mesa
+            sql("update public.crm_clients set last_seen = now() - interval '7 days'")
+            await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(800)
+            await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
+            body = await A.inner_text('#ahBody')
+            ok('500005' in body and 'datos viejos' not in body, f'con toda la mesa sin leer el CRM, la cola no se vacía ({body[-160:]!r})')
+            sql("update public.crm_clients set last_seen = now()")
             sql("update public.crm_clients set last_seen = now() where client_id='500005'")
             await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(600)
             # la ficha del new: después del aviso, se abre sola al volver a Vitalis

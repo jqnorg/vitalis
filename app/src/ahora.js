@@ -115,8 +115,27 @@ async function crmSeenFromExt(rows){
 const naNum=s=>{const m=norm(s).match(/(?:^|[^a-z])na\D*([2-9])/);return m?+m[1]:1};
 const NA_MAX=4; // los NA se llaman del día 1 al 4; el 5 queda para repasos
 const paidCrm=r=>r.grp==='ftd'||!!r.ftd; // el CRM ya lo marca con FTD
-const STALE_MS=12*3600e3; // la extensión no lo ve hace +12 h: dato viejo (seguro ya rotó o cambió en el CRM), fuera de la cola
-const stale=r=>{const t=r.last?Date.parse(r.last):0;return t>0&&Date.now()-t>STALE_MS};
+// dato viejo: desde que la extensión lo vio por última vez, la mesa siguió leyendo el CRM una jornada entera y no apareció
+// (seguro ya rotó o cambió en el CRM): fuera de la cola. Solo cuentan las horas de trabajo (lunes a viernes, 9 a 17) y hasta
+// la última lectura de la mesa: la noche, el fin de semana o un día en que nadie leyó el CRM no esconden a nadie.
+const WORK_H=[9,17],STALE_WH=8;
+function workHours(a,b){
+  let h=0;if(!(b>a))return h;
+  const d=new Date(a);d.setHours(0,0,0,0);
+  for(let i=0;d.getTime()<b&&i<400;i++,d.setDate(d.getDate()+1)){
+    const wd=d.getDay();if(wd===0||wd===6)continue;
+    const s=new Date(d).setHours(WORK_H[0],0,0,0),e=new Date(d).setHours(WORK_H[1],0,0,0),x=Math.max(a,s),y=Math.min(b,e);
+    if(y>x)h+=(y-x)/36e5;
+  }
+  return h;
+}
+const staleSet=perPass(()=>{
+  const rows=crmAll();let feed=0;const at=new Map();
+  for(const r of rows){const t=r.last?Date.parse(r.last):0;if(t>0){at.set(r,t);if(t>feed)feed=t}}
+  const out=new Set();for(const [r,t] of at)if(workHours(t,feed)>=STALE_WH)out.add(ckey(r.brand,r.id));
+  return out;
+});
+const stale=r=>staleSet().has(ckey(r.brand,r.id));
 // día del status para los de "5 días seguidos" (cuenta desde que Vitalis lo vio cambiar)
 const statusDay=r=>{if(!DAYS5.includes(r.grp)||!r.since)return 0;return Math.max(1,Math.round((parseYMD(todayS())-parseYMD(ymd(new Date(r.since))))/864e5)+1)};
 const dayTag=r=>{const n=statusDay(r);return n?` <span class="d${n>=5?' hot b':''}" title="Al 5º día seguido pasa a Not interested">día ${Math.min(n,5)}/5</span>`:''};

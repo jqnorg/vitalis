@@ -290,21 +290,23 @@
 
   // todos los clientes que se ven en esta pestaña → registro de clientes de Vitalis (status, registro, agente, campaña)
   const sentSig = new Map((() => { try { return JSON.parse(sessionStorage.getItem('vitalis-seen') || '[]'); } catch (e) { return []; } })());
+  const sentAt = new Map(); // cuándo lo mandé: aunque no cambie, cada 20 min va de nuevo, así Vitalis sabe que se sigue viendo (last_seen)
+  const HEART = 20 * 6e4;
   const flying = new Map(); // mandados, esperando que la extensión confirme
   function reportSeen(all) {
     if (!all || !all.length) return;
-    const rows = [];
+    const rows = [], now = Date.now();
     for (const c of all) {
       if (!c.id) continue;
       const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country, c.call, c.note, c.ftd, c.desk].join('|');
-      if (sentSig.get(k) === sig || flying.get(k) === sig) continue;
+      if ((sentSig.get(k) === sig && now - (sentAt.get(k) || 0) < HEART) || flying.get(k) === sig) continue;
       flying.set(k, sig);
       rows.push({ k, sig, row: { id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note, ftd: c.ftd, desk: c.desk } });
     }
     for (let i = 0; i < rows.length; i += 300) {
       const part = rows.slice(i, i + 300);
       sendSure({ type: 'crm-seen', rows: part.map((x) => x.row) }).then((r) => {
-        for (const x of part) { if (flying.get(x.k) === x.sig) flying.delete(x.k); if (r) sentSig.set(x.k, x.sig); } // recién ahí cuenta como mandado
+        for (const x of part) { if (flying.get(x.k) === x.sig) flying.delete(x.k); if (r) { sentSig.set(x.k, x.sig); sentAt.set(x.k, Date.now()); } } // recién ahí cuenta como mandado
         if (r) { try { sessionStorage.setItem('vitalis-seen', JSON.stringify([...sentSig].slice(-5000))); } catch (e) {} } else again();
       });
     }

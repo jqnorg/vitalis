@@ -272,6 +272,11 @@ async def main():
             await Nd.wait_for_timeout(4500)
             st = {x['client_id']: x['status'] for x in sql("select client_id, status from public.crm_clients where client_id like '8802%' or client_id like '8803%'")}
             ok(st == {'880201': 'Call Again', '880202': 'Call Again', '880203': 'NA - DAY2'}, f'con "Status" de registro y "Sales Status", vale el de venta, y "Llamar de nuevo" es Call Again ({st})')
+            # aunque no cambien, los que se ven se vuelven a mandar (al recargar, y cada 20 min): así Vitalis sabe que se siguen viendo
+            sql("update public.crm_clients set last_seen = now() - interval '3 hours' where client_id like '8802%'")
+            await Nd.reload(); await Nd.wait_for_timeout(4500)
+            fr = sql("select count(*)::int c from public.crm_clients where client_id like '8802%' and last_seen > now() - interval '1 minute'")[0]['c']
+            ok(fr == 3, f'los que se ven se vuelven a mandar aunque no cambien: last_seen al día ({fr} de 3)')
             ok(await Nt.locator('#ftd-crm-button').count() == 0, 'la tabla de transacciones no es una lista de clientes (ni pide diagnóstico)')
             await Nd.close(); await Nt.close()
             # al actualizar la extensión, la copia nueva entra en la pestaña abierta y la vieja se apaga (sin recargar el CRM)
