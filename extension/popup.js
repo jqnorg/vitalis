@@ -33,7 +33,8 @@ async function render() {
   }
 }
 const NO_SE_VE = 'Aviso enviado: tarjeta en la pestaña + sonido.';
-function showRes(cls, txt) { const r = document.getElementById('res'); r.hidden = false; r.className = 'st ' + cls; r.textContent = txt; }
+function showRes(cls, txt) { const r = document.getElementById('res'); r.hidden = false; r.className = 'st box ' + cls; r.textContent = txt; }
+const dotLine = (el, cls, txt) => { el.textContent = ''; const d = document.createElement('span'); d.className = 'dot' + (cls ? ' ' + cls : ''); el.append(d, txt); };
 document.getElementById('test').addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'test' }, (res) => {
     if (chrome.runtime.lastError || !res) return showRes('bad', 'No pude hablar con la extensión. Recargala en chrome://extensions.');
@@ -53,9 +54,21 @@ async function renderWatch() { // páginas del CRM que se actualizan solas
   const ws = Object.values(watches), el = document.getElementById('watch');
   if (!ws.length) { el.hidden = true; return; }
   const last = Math.max(0, ...ws.map((w) => w.lastRefresh || 0)), inNew = ws.reduce((a, w) => a + (w.inNew || 0), 0);
-  el.hidden = false; el.className = 'st ok';
-  el.textContent = `${ws.length === 1 ? 'Una página' : ws.length + ' páginas'} del CRM se actualizan solas cada 10 s${inNew ? ' · ' + inNew + ' en new' : ''}${last ? ' · ' + new Date(last).toTimeString().slice(0, 8) : ''}`;
+  el.hidden = false;
+  dotLine(el, '', `${ws.length === 1 ? 'Una pestaña' : ws.length + ' pestañas'} del CRM se ${ws.length === 1 ? 'actualiza' : 'actualizan'} sola${ws.length === 1 ? '' : 's'} cada 10 s${inNew ? ' · ' + inNew + ' en new' : ''}${last ? ' · ' + new Date(last).toTimeString().slice(0, 5) : ''}`);
 }
+async function renderStation() { // la estación (el Chrome del team leader): cuántas vistas tiene y si está leyendo
+  const { station = { views: {} }, stationHours = null } = await chrome.storage.local.get(['station', 'stationHours']);
+  const vs = Object.keys(station.views || {}), el = document.getElementById('station');
+  if (!vs.length) { el.hidden = true; return; }
+  let runs = {}; try { runs = (await chrome.storage.session.get('stRuns')).stRuns || {}; } catch (e) {}
+  const h = stationHours || { days: [1, 2, 3, 4, 5], from: 540, to: 1050 }, d = new Date(), m = d.getHours() * 60 + d.getMinutes(), on = h.days.includes(d.getDay()) && m >= h.from && m < h.to;
+  const bad = vs.filter((v) => runs[v] && runs[v].problem), last = Math.max(0, ...vs.map((v) => (runs[v] && runs[v].lastOk) || 0));
+  el.hidden = false;
+  dotLine(document.getElementById('stTxt'), !on ? 'off' : bad.length ? 'bad' : '', `Estación: ${vs.length} de 5 vistas · ${!on ? 'fuera de horario' : bad.length ? plural(bad.length, 'con problema', 'con problemas') : last ? 'leyendo, ' + ago(last) : 'arrancando'}`);
+  document.getElementById('stOff').onclick = () => chrome.runtime.sendMessage({ type: 'station-off' }, () => renderStation());
+}
+const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
 async function renderCrm() { // en un sitio https que no es Vitalis: ofrecer usarlo como CRM
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || !/^https:\/\//.test(tab.url || '') || /vitalis\.joaquin-or24\.workers\.dev|vitaliscrm\.netlify\.app/.test(tab.url)) return;
@@ -69,4 +82,5 @@ async function renderCrm() { // en un sitio https que no es Vitalis: ofrecer usa
 }
 render();
 renderWatch();
+renderStation();
 renderCrm();

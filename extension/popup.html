@@ -3,39 +3,55 @@
 <head>
 <meta charset="utf-8">
 <style>
-  body{margin:0;width:330px;background:#f1f4ef;color:#15201a;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-  header{display:flex;align-items:center;gap:8px;padding:12px 14px 6px}
-  header img{width:28px;height:28px}
-  header b{font-weight:800;font-size:20px;letter-spacing:-.04em}
-  header span{flex:1;text-align:right;color:#5b685f;font-size:12px}
-  main{padding:4px 14px 10px}
-  .st{margin-bottom:8px}
-  .dim{color:#5b685f}.hot{color:#b0620a;font-weight:700}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:6px 0 10px}
-  .stats div{background:#fff;border:1px solid #dfe5dc;border-radius:12px;padding:6px 8px}
-  .stats b{display:block;font-size:18px;font-weight:800}
-  .stats small{color:#5b685f;font-size:11.5px}
-  h4{margin:8px 0 6px;font-size:12.5px;color:#5b685f}
-  ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px}
-  li{display:grid;grid-template-columns:auto auto 1fr;gap:8px;padding:6px 9px;background:#fff;border:1px solid #dfe5dc;border-radius:10px}
-  li .t{font-variant-numeric:tabular-nums;font-weight:600;font-size:12.5px}
-  li .i{font-weight:800}
-  li .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#5b685f}
-  .ok{color:#1b874a;font-weight:700}.bad{color:#cf3049;font-weight:700}
-  #res{background:#fff;border:1px solid #dfe5dc;border-radius:10px;padding:7px 9px}
-  .empty{color:#5b685f;padding:8px 0;text-align:center}
-  footer{display:flex;gap:6px;padding:10px 14px 14px}
-  button{font:inherit;font-size:12.5px;font-weight:700;color:#15201a;background:#fff;border:1px solid #dfe5dc;border-radius:999px;padding:6px 12px;cursor:pointer}
-  button:hover{border-color:#5b685f}
-  button.p{background:#1b874a;border-color:#1b874a;color:#fff}
+  @font-face{font-family:"Geist";src:url(fonts/geist.woff2) format("woff2");font-weight:100 900}
+  :root{color-scheme:light;--bg:#f6f7f8;--panel:#fff;--fg:#0f1720;--dim:#6b7684;--line:#e6e9ed;--soft:#eef0f3;--pri:#0f7a55;--pri-h:#0c6647;--pri-soft:#e9f4ef;--acc:#b45309;--err:#d12f45}
+  @media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#0d1114;--panel:#151a1f;--fg:#eef1f4;--dim:#94a0ad;--line:#262d35;--soft:#1c232a;--pri:#2fae81;--pri-h:#45c497;--pri-soft:#12291f;--acc:#f0a23a;--err:#ff6a7c}}
+  *{box-sizing:border-box}
+  body{margin:0;width:340px;background:var(--bg);color:var(--fg);font:13px/1.5 "Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  header{display:flex;align-items:center;gap:9px;padding:14px 16px 8px}
+  header img{width:26px;height:26px}
+  header b{font-weight:700;font-size:19px;letter-spacing:-.035em}
+  header span{flex:1;text-align:right;color:var(--dim);font-size:12px}
+  main{padding:2px 16px 8px}
+  .st{margin-bottom:10px}
+  .dim{color:var(--dim)}.hot{color:var(--acc);font-weight:600}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 12px}
+  .stats div{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+  .stats b{display:block;font-size:19px;font-weight:650;letter-spacing:-.03em}
+  .stats small{color:var(--dim);font-size:11.5px}
+  h4{margin:6px 0 6px;font-size:12px;font-weight:500;color:var(--dim)}
+  ul{list-style:none;margin:0;padding:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  li{display:grid;grid-template-columns:auto auto 1fr;gap:10px;padding:8px 11px}
+  li+li{border-top:1px solid var(--soft)}
+  li .t{font-variant-numeric:tabular-nums;font-weight:500;font-size:12.5px;color:var(--dim)}
+  li .t.hot{color:var(--acc)}
+  li .i{font-weight:650}
+  li .k{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--dim)}
+  ul:empty{display:none}
+  .ok{color:var(--pri);font-weight:600}.bad{color:var(--err);font-weight:600}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+  .box .row{display:flex;align-items:center;gap:8px}
+  .box .row span{flex:1}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--pri);margin-right:7px;vertical-align:1px}
+  .dot.off{background:var(--line)}.dot.bad{background:var(--err)}
+  .empty{color:var(--dim);padding:6px 0;text-align:center}
+  footer{display:flex;gap:8px;padding:10px 16px 16px}
+  button{font:inherit;font-size:12.5px;font-weight:600;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 13px;cursor:pointer}
+  button:hover{border-color:var(--dim)}
+  button.p{background:var(--pri);border-color:var(--pri);color:#fff}
+  button.p:hover{background:var(--pri-h);border-color:var(--pri-h)}
+  button.sm{padding:4px 10px;font-size:12px;border-radius:10px}
+  button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+  select{font:inherit;font-size:12.5px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+  details summary{cursor:pointer;color:var(--dim);font-size:12.5px}
 </style>
 </head>
 <body>
 <header><img src="icons/48.png" alt=""><b>vitalis</b><span id="who"></span></header>
-<main><div class="st" id="watch" hidden></div><div class="st dim" id="st"></div><div class="stats" id="stats"></div><div class="st" id="res" hidden></div><h4>Agenda</h4><ul id="list"></ul></main>
+<main><div class="st box" id="watch" hidden></div><div class="st box" id="station" hidden><div class="row"><span id="stTxt"></span><button id="stOff" type="button" class="sm">Apagar</button></div></div><div class="st dim" id="st"></div><div class="stats" id="stats"></div><div class="st box" id="res" hidden></div><h4>Agenda</h4><ul id="list"></ul></main>
 <footer><button id="open" type="button" class="p">Abrir Vitalis</button><button id="test" type="button">Probar aviso</button></footer>
-<div id="crmBox" hidden style="padding:0 14px 14px"><details><summary style="cursor:pointer;color:#5b685f;font-size:12.5px">¿Esta página es un CRM? Usar Vitalis acá</summary>
-<div style="display:flex;gap:6px;margin-top:8px"><select id="crmBrand" style="flex:1;font:inherit;font-size:12.5px;border:1px solid #dfe5dc;border-radius:999px;padding:5px 8px"><option>Trade24Seven</option><option>Novara Markets</option></select><button id="crmAdd" type="button">Usar acá</button></div>
+<div id="crmBox" hidden style="padding:0 16px 16px"><details><summary>¿Esta página es un CRM? Usar Vitalis acá</summary>
+<div style="display:flex;gap:8px;margin-top:8px"><select id="crmBrand" style="flex:1"><option>Trade24Seven</option><option>Novara Markets</option></select><button id="crmAdd" type="button">Usar acá</button></div>
 <div class="dim" id="crmRes" style="font-size:12px;margin-top:6px"></div></details></div>
 <script src="popup.js"></script>
 </body>

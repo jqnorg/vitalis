@@ -877,6 +877,36 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("delete from public.client_keywords where client_id='70390'");
 }
 
+// ---------- estación: el Chrome del team leader avisa cómo le fue con cada vista del CRM ----------
+{
+  const ts = new Date().toISOString();
+  let q = await as(M, "insert into public.station_state (team_id, vista) values ((select team_id from public.profiles where id = auth.uid()), 'news') returning 1");
+  ok(!!q.error, 'nadie escribe directo en station_state');
+  let R = await rpc(B, "select public.station_beat('[]'::jsonb) j");
+  ok(!!R.error, 'un agente no puede latir como estación');
+  R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([
+    { vista: 'news', ok: ts, try: ts, n: 3, statuses: { New: 2, Talking: 1 } },
+    { vista: 'cola', ok: ts, try: ts, n: 8, total: 634, statuses: { 'NA - DAY2': 3, 'Call Again': 2, 'Hang Up': 1, New: 1, 'Not Interested': 1 } },
+    { vista: 'agen', ok: ts, try: ts, n: 6, statuses: { New: 5, CallBack: 1 } },
+    { vista: 'trx', try: ts, n: 0, problem: 'login' },
+    { vista: 'nada', n: 1 },
+  ])]);
+  ok(!R.error && R.n === 4, 'el team leader late con sus vistas (las que no existen se ignoran)');
+  q = await as(B, 'select vista, n, total, off_pct, problem, last_ok is not null ok from public.station_state order by vista');
+  const S = Object.fromEntries(q.rows.map((x) => [x.vista, x]));
+  ok(q.rows.length === 4 && S.news.problem === '' && S.news.off_pct === 0 && S.cola.total === 634, 'la mesa ve el estado de cada vista');
+  ok(S.cola.off_pct === 25 && S.cola.problem === '', 'unos pocos clientes de otra vista no son un filtro perdido (25%)');
+  ok(S.agen.off_pct === 83 && S.agen.problem === 'filtro', 'una vista llena de status que no son suyos: perdió el filtro');
+  ok(S.trx.problem === 'login' && !S.trx.ok, 'una vista sin sesión del CRM queda marcada, sin lectura buena');
+  R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([{ vista: 'news', try: ts, n: 0, ok: 'mañana' }])]);
+  q = await as(B, 'select vista, last_ok is not null ok from public.station_state');
+  ok(!R.error && q.rows.length === 1 && q.rows[0].vista === 'news' && q.rows[0].ok, 'las vistas que ya no vienen salen; una hora rara no borra la última lectura buena');
+  q = await as(X, 'select * from public.station_state');
+  ok(q.rows.length === 0, 'otra mesa no ve la estación');
+  await rpc(M, "select public.station_beat('[]'::jsonb) j");
+  ok((await db.query('select count(*)::int c from public.station_state')).rows[0].c === 0, 'sin vistas, la estación queda vacía');
+}
+
 // ---------- Vitalis felicita las ventas de hoy ----------
 {
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);

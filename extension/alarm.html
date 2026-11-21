@@ -2,22 +2,31 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<title>Vitalis · aviso</title>
+<title>vitalis · aviso</title>
 <style>
-  body{margin:0;background:#f1f4ef;color:#15201a;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  @font-face{font-family:"Geist";src:url(fonts/geist.woff2) format("woff2");font-weight:100 900}
+  :root{color-scheme:light;--bg:#f6f7f8;--panel:#fff;--fg:#0f1720;--dim:#6b7684;--line:#e6e9ed;--soft:#eef0f3;--pri:#0f7a55;--pri-h:#0c6647}
+  @media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#0d1114;--panel:#151a1f;--fg:#eef1f4;--dim:#94a0ad;--line:#262d35;--soft:#1c232a;--pri:#2fae81;--pri-h:#45c497}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 "Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
   main{padding:12px;display:flex;flex-direction:column;gap:10px}
-  .card{--c:#e08a1e;background:#fff;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px}
-  .card.crm{--c:#2f7fd0}
-  .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-  .mk{width:22px;height:22px}
-  .tag{font-weight:800;font-size:15px;letter-spacing:-.03em}
-  .t{color:var(--c);font-weight:800;font-size:12.5px}
-  .id{font-size:24px;font-weight:800;letter-spacing:-.02em}
-  .m{color:#5b685f;font-size:12.5px}
-  .b{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
-  button{font:inherit;font-size:13px;font-weight:700;color:#15201a;background:#fff;border:1px solid #dfe5dc;border-radius:999px;padding:5px 12px;cursor:pointer}
-  button:hover{border-color:#5b685f}
-  button.p{background:#1b874a;border-color:#1b874a;color:#fff}
+  .card{--c:#d12f45;position:relative;overflow:hidden;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px 13px}
+  .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+  .card.urg{--c:#d12f45}.card.imp{--c:#b45309}.card.info{--c:var(--pri)}
+  .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .mk{width:20px;height:20px}
+  .tag{font-weight:700;font-size:14.5px;letter-spacing:-.035em}
+  .t{display:flex;align-items:center;gap:5px;color:var(--c);font-weight:600;font-size:12.5px}
+  .t svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .id{font-size:22px;font-weight:650;letter-spacing:-.03em;line-height:1.2;word-break:break-word}
+  .kw{margin:3px 0 1px}.kw:empty{display:none}
+  .m{color:var(--dim);font-size:12.5px}
+  .b{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+  button{font:inherit;font-size:12.5px;font-weight:600;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px;cursor:pointer}
+  button:hover{border-color:var(--dim)}
+  button.p{background:var(--pri);border-color:var(--pri);color:#fff}
+  button.p:hover{background:var(--pri-h);border-color:var(--pri-h)}
+  button:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
 </style>
 </head>
 <body><main id="list"></main><script src="alarm.js"></script></body>

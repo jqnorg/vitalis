@@ -1704,6 +1704,66 @@ end $$;
 revoke all on function public.calls_add(jsonb), public.set_min_calls(integer) from public, anon;
 grant execute on function public.calls_add(jsonb), public.set_min_calls(integer) to authenticated;
 
+-- ---------- estación: el Chrome del team leader con una pestaña propia por vista del CRM ----------
+-- news (New y Talking) · trx (depósitos) · cola (NA, Call Again, Hang Up) · agen (CallBack, Pending, Low Potential, Failed) · cerr (cerrados).
+-- La extensión de la estación avisa cada 30 s (en horario) cómo le fue con cada vista; Vitalis muestra hace cuánto se leyó cada una
+-- y avisa si la estación se calla, queda sin sesión del CRM o una vista perdió su filtro (aparecen status que no son de esa vista).
+create table if not exists public.station_state (
+  team_id    uuid not null references public.teams(id) on delete cascade,
+  vista      text not null check (vista in ('news', 'trx', 'cola', 'agen', 'cerr')),
+  last_ok    timestamptz,                    -- última lectura buena de esa vista
+  last_try   timestamptz,                    -- último intento
+  n          integer not null default 0,     -- filas que vio (clientes, o depósitos en trx)
+  total      integer,                        -- el total que dice el CRM, si lo muestra
+  off_pct    integer,                        -- % de clientes que no son de esa vista
+  problem    text not null default '',       -- '' · login · sin-tabla · cerrada · filtro
+  by_user    uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  primary key (team_id, vista));
+alter table public.station_state enable row level security;
+drop policy if exists station_read on public.station_state;
+create policy station_read on public.station_state for select to authenticated using (team_id = public.my_team());
+-- p = todas las vistas de la estación (las que no vienen ya no son parte de ella)
+create or replace function public.station_beat(p jsonb) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); r jsonb; v text; want text[]; prob text; off int; tot int; bad int; k text; c text; got text[] := '{}'; nv int := 0;
+  ts_ok timestamptz; ts_try timestamptz;
+begin
+  if t is null then raise exception 'sin mesa'; end if;
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  for r in select x from jsonb_array_elements(case when jsonb_typeof(p) = 'array' then p else '[]'::jsonb end) x limit 10 loop
+    v := r->>'vista';
+    if v is null or v not in ('news', 'trx', 'cola', 'agen', 'cerr') or v = any(got) then continue; end if;
+    got := got || v;
+    want := case v when 'news' then array['new'] when 'cola' then array['na', 'call_again', 'hang_up']
+      when 'agen' then array['callback', 'pending', 'low_potential', 'failed'] when 'cerr' then array['not_interested', 'dnc', 'invalid', 'ftd', 'crm', 'otro'] end;
+    prob := case when r->>'problem' in ('login', 'sin-tabla', 'cerrada') then r->>'problem' else '' end;
+    ts_ok := case when r->>'ok' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((r->>'ok')::timestamptz, now()) end;
+    ts_try := case when r->>'try' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((r->>'try')::timestamptz, now()) end;
+    off := null;
+    if want is not null and jsonb_typeof(r->'statuses') = 'object' then
+      tot := 0; bad := 0;
+      for k, c in select key, value from jsonb_each_text(r->'statuses') limit 80 loop
+        if c !~ '^\d{1,6}$' then continue; end if;
+        tot := tot + c::int;
+        if not (public.crm_group(k, t) = any(want)) then bad := bad + c::int; end if;
+      end loop;
+      if tot > 0 then off := round(100.0 * bad / tot); end if;
+      if prob = '' and tot >= 5 and off > 30 then prob := 'filtro'; end if;
+    end if;
+    insert into public.station_state (team_id, vista, last_ok, last_try, n, total, off_pct, problem, by_user, updated_at)
+      values (t, v, ts_ok, ts_try, case when r->>'n' ~ '^\d{1,6}$' then (r->>'n')::int else 0 end,
+        case when r->>'total' ~ '^\d{1,7}$' then (r->>'total')::int end, off, prob, auth.uid(), now())
+      on conflict (team_id, vista) do update set last_ok = coalesce(excluded.last_ok, station_state.last_ok), last_try = coalesce(excluded.last_try, station_state.last_try),
+        n = excluded.n, total = excluded.total, off_pct = excluded.off_pct, problem = excluded.problem, by_user = excluded.by_user, updated_at = now();
+    nv := nv + 1;
+  end loop;
+  delete from public.station_state where team_id = t and not (vista = any(got));
+  return json_build_object('ok', true, 'n', nv);
+end $$;
+revoke all on function public.station_beat(jsonb) from public, anon;
+grant execute on function public.station_beat(jsonb) to authenticated;
+
 -- ---------- cambios en vivo ----------
 do $$
 declare t text;

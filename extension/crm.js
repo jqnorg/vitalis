@@ -208,13 +208,15 @@
   let known = null, queued = new Set();
   const qset = (q) => new Set((q || []).map((x) => norm(x.brand) + '|' + norm(x.id)));
   const prep = () => { if (known && !known.idSet) { known.idSet = new Set(known.ids || []); known.txSet = new Set(known.txs || []); } };
-  chrome.storage.local.get(['known', 'importQ', 'watches']).then((s) => { known = s.known || null; queued = qset(s.importQ); setWatch(s.watches); refresh(); }).catch(() => {});
+  chrome.storage.local.get(['known', 'importQ', 'watches', 'station', 'stationHours']).then((s) => { known = s.known || null; queued = qset(s.importQ); setWatch(s.watches); setStation(s.station); stHoursCfg = s.stationHours || null; refresh(); }).catch(() => {});
   chrome.storage.onChanged.addListener((ch, area) => {
     if (area !== 'local') return;
     if (ch.known) known = ch.known.newValue || null;
     if (ch.importQ) queued = qset(ch.importQ.newValue);
     if (ch.watches) setWatch(ch.watches.newValue);
-    if (ch.known || ch.importQ || ch.watches) refresh();
+    if (ch.station) setStation(ch.station.newValue);
+    if (ch.stationHours) stHoursCfg = ch.stationHours.newValue || null;
+    if (ch.known || ch.importQ || ch.watches || ch.station || ch.stationHours) refresh();
   });
   const isKnown = (s) => { if (!known) return false; prep(); const b = norm(s.brand); return (s.tx && known.txSet.has(b + '|' + s.tx)) || known.idSet.has(b + '|' + norm(s.id)); };
   const isQueued = (s) => queued.has(norm(s.brand) + '|' + norm(s.id));
@@ -222,7 +224,13 @@
   /* ================= vigilancia: una sola pestaña, la que se elige con el botón ================= */
   // la elegida se actualiza cada 10 s y avisa de los new; las demás quedan quietas y solo suman clientes al registro
   let myTab = null, watches = {}, watch = null, watched = false, owner = null, noTableSince = 0;
-  send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; setWatch(watches); refresh(); });
+  // estación (el Chrome del team leader): esta pestaña puede ser la de una vista; la extensión la actualiza a su ritmo, solo en horario
+  const SV = [['news', 'News', 10], ['trx', 'Transactions', 15], ['cola', 'Cola', 30], ['agen', 'Agendables', 60], ['cerr', 'Cerrados', 600]];
+  const ST_HOURS = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 17 * 60 + 30 };
+  let station = { views: {} }, stView = '', stHoursCfg = null;
+  function setStation(s) { station = s || { views: {} }; stView = myTab == null ? '' : (Object.entries(station.views || {}).find(([, c]) => c.tabId === myTab) || [''])[0]; }
+  const stInHours = () => { const h = stHoursCfg || ST_HOURS, d = new Date(), m = d.getHours() * 60 + d.getMinutes(); return h.days.includes(d.getDay()) && m >= h.from && m < h.to; };
+  send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; setWatch(watches); setStation(station); refresh(); });
   function setWatch(all) {
     watches = all || {}; watch = myTab != null ? watches[myTab] || null : null; watched = !!watch;
     owner = Object.values(watches).find((w) => w && w.tabId !== myTab) || null; // otra pestaña ya tiene la vigilancia
@@ -384,7 +392,8 @@
   const markTried = (list) => { for (const x of list) tried.add(norm(x.brand) + '|' + norm(x.id)); try { sessionStorage.setItem('vitalis-auto', JSON.stringify([...tried].slice(-2000))); } catch (e) {} };
 
   /* ================= botón ================= */
-  let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, seen = null, whoSel = '';
+  const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#0f7a55"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21.5c-.7 6 .7 11.5 3.5 14.8 1.1 1.3 2.6 1.9 4.5 1.9s3.4-.6 4.5-1.9c2.8-3.3 4.2-8.8 3.5-14.8"/><path d="M13.5 21.5h21"/><path d="M26.5 21.5 31 11h4"/></g></svg>';
+  let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, seen = null, whoSel = '', stMsg = null, stMsgT = null;
   const isLeader = () => !!(desk && (desk.role === 'leader' || desk.role === 'admin'));
   function build() {
     const h = document.createElement('div');
@@ -392,36 +401,45 @@
     h.style.cssText = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;';
     const root = h.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>
-      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-radius:16px;padding:10px 12px;box-shadow:0 14px 40px rgba(0,0,0,.22);min-width:260px;max-width:370px}
+      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1px solid #e6e9ed;border-radius:16px;padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);min-width:272px;max-width:372px}
       .h{display:flex;align-items:center;gap:8px}
-      .mk{width:22px;height:22px;flex:none}
-      .tag{font-weight:800;font-size:16px;letter-spacing:-.03em}
-      .t{flex:1;color:#5b685f;font-size:12px;text-align:right}
-      .x{all:unset;cursor:pointer;color:#5b685f;padding:0 6px;border-radius:6px;font-size:15px}.x:hover{background:#ecf0e9;color:#15201a}
-      .sec{margin-top:9px}[hidden]{display:none!important}
-      .sec+.sec{border-top:1px solid #ecf0e9;padding-top:9px}
-      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#1b874a;color:#fff;font-weight:700;border-radius:999px;padding:7px 12px}
-      .go:hover{background:#156f3c}
-      .go[disabled]{background:#ecf0e9;color:#5b685f;cursor:default;font-weight:600}
-      .go.alt{background:#fff;color:#15201a;border:1px solid #dfe5dc}
-      .go.alt:hover{border-color:#5b685f}
+      .mk{width:20px;height:20px;flex:none}
+      .tag{font-weight:700;font-size:15px;letter-spacing:-.035em}
+      .vv{color:#6b7684;font-size:11px;font-weight:500;margin-left:-2px}
+      .t{flex:1;color:#6b7684;font-size:12px;text-align:right}
+      .x{all:unset;cursor:pointer;color:#6b7684;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;font-size:15px}.x:hover{background:#eef0f3;color:#0f1720}
+      .sec{margin-top:10px}[hidden]{display:none!important}
+      .sec+.sec{border-top:1px solid #eef0f3;padding-top:10px}
+      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#0f7a55;color:#fff;font-weight:600;border-radius:12px;padding:8px 12px}
+      .go:hover{background:#0c6647}
+      .go[disabled]{background:#eef0f3;color:#6b7684;cursor:default;font-weight:500}
+      .go.alt{background:#fff;color:#0f1720;border:1px solid #e6e9ed}
+      .go.alt:hover{border-color:#6b7684}
+      .go:focus-visible,select:focus-visible,.x:focus-visible,.lnk:focus-visible{outline:2px solid #0f7a55;outline-offset:2px}
       .row{display:flex;gap:6px;align-items:center}
       .row .go{flex:1}
-      select{font:inherit;font-size:12.5px;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-radius:999px;padding:5px 8px}
-      .ids{margin-top:6px;color:#5b685f;font-size:12px;word-break:break-word}
-      .ids b{color:#15201a}
-      .st{color:#5b685f;font-size:12px;margin-bottom:6px}
-      .on{color:#1b874a;font-weight:700}
-      .msg{margin-top:7px;font-size:12.5px;font-weight:600}
-      .ok{color:#1b874a}.warn{color:#b0620a}.err{color:#cf3049}
-      .lnk{all:unset;cursor:pointer;color:#2f7fd0;text-decoration:underline;margin-left:6px}
+      select{font:inherit;font-size:12.5px;background:#fff;color:#0f1720;border:1px solid #e6e9ed;border-radius:10px;padding:6px 8px;width:100%;box-sizing:border-box}
+      .ids{margin-top:7px;color:#6b7684;font-size:12px;word-break:break-word}
+      .ids b{color:#0f1720;font-weight:600}
+      .ids:empty{display:none}
+      .st{color:#6b7684;font-size:12px;margin-bottom:7px}
+      .on{color:#0f7a55;font-weight:600}
+      .msg{margin-top:8px;font-size:12.5px;font-weight:500}
+      .msg:empty{display:none}
+      .ok{color:#0f7a55}.warn{color:#b45309}.err{color:#d12f45}
+      .lnk{all:unset;cursor:pointer;color:#0f7a55;text-decoration:underline;margin-left:6px}
       .min .sec{display:none}
-      .vv{color:#5b685f;font-size:11px;font-weight:600;margin-left:-3px}
-    </style><div class="box"><div class="h"><img class="mk" src="${chrome.runtime.getURL('icons/48.png')}" alt=""><span class="tag">vitalis</span><span class="vv">${escH(VER)}</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar">–</button></div>
+    </style><div class="box"><div class="h">${SEAL}<span class="tag">vitalis</span><span class="vv">${escH(VER)}</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar" aria-label="Minimizar">–</button></div>
       <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
-      <div class="sec" id="sWatch"><div class="st" id="wst"></div><button class="go" id="wbtn"></button><div class="ids" id="wids"></div></div></div>`;
+      <div class="sec" id="sWatch"><div class="st" id="wst"></div><button class="go" id="wbtn"></button><div class="ids" id="wids"></div></div>
+      <div class="sec" id="sStation" hidden><div class="st" id="stst"></div><select id="stv" aria-label="Qué vista de la estación es esta pestaña"></select><div class="ids" id="stids"></div></div></div>`;
     root.getElementById('go').addEventListener('click', () => (ui.diag ? diagnostic() : sendSales(false)));
     root.getElementById('wbtn').addEventListener('click', () => watchBtn());
+    root.getElementById('stv').addEventListener('change', async (e) => { // estación: qué vista es esta pestaña
+      const v = e.target.value, r = await send({ type: 'station-set', view: v });
+      stMsg = !r || r.err ? ['err', (r && r.err) || 'La extensión se actualizó: recargá la página.'] : ['ok', v ? 'Listo: la fijé y se actualiza sola, solo en horario. Si la cerrás, vuelve.' : 'Ya no es parte de la estación.'];
+      clearTimeout(stMsgT); stMsgT = setTimeout(() => { stMsg = null; render(); }, 8000); render();
+    });
     root.getElementById('who').addEventListener('change', (e) => { whoSel = e.target.value; render(); });
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
     root.getElementById('wids').addEventListener('click', (e) => { if (e.target.closest('[data-diag]')) diagClients(); });
@@ -470,8 +488,22 @@
     $('msg').className = 'msg ' + (msg ? msg.cls : '');
     $('msg').innerHTML = msg ? msg.html : (sales && !known ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
     // vigilancia: una sola pestaña se actualiza; las demás suman clientes
-    $('sWatch').hidden = !(sales || seen);
-    if (sales || seen) {
+    // estación: el team leader (o el admin) elige qué vista es esta pestaña; esa ya no hace falta elegirla para actualizarse
+    const stOk = isLeader() && !!(sales || seen || stView);
+    $('sStation').hidden = !stOk;
+    if (stOk) {
+      const other = new Set(Object.entries(station.views || {}).filter(([, c]) => c.tabId !== myTab).map(([k]) => k));
+      const opts = [['', 'No es parte de la estación'], ...SV.map(([k, n, e]) => [k, `${n}, cada ${e < 60 ? e + ' s' : e / 60 + ' min'}${other.has(k) ? ' (ya hay una: la reemplaza)' : ''}`])];
+      const sel = $('stv'), sig = opts.map((o) => o.join(':')).join('|');
+      if (sel.dataset.sig !== sig) { sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${escH(l)}</option>`).join(''); sel.dataset.sig = sig; }
+      sel.value = stView;
+      const sv = SV.find((x) => x[0] === stView), nv = Object.keys(station.views || {}).length;
+      $('stst').innerHTML = stView ? `<span class="on">Estación: la pestaña de ${escH(sv[1])}</span>${stInHours() ? '' : ' · fuera de horario, quieta'}` : `Estación${nv ? ` · ${nv} de 5 vistas` : ''}: ¿qué vista es esta pestaña?`;
+      $('stids').className = 'ids' + (stMsg ? ' ' + stMsg[0] : '');
+      $('stids').textContent = stMsg ? stMsg[1] : stView ? 'Fijada: se actualiza sola y, si la cerrás, vuelve.' : '';
+    }
+    $('sWatch').hidden = !(sales || seen) || !!stView;
+    if ((sales || seen) && !stView) {
       const n = clients ? clients.length : 0, b = $('wbtn');
       if (clients && !sales) head.push(`${n} en new`);
       const tot = seen && seen.length ? ` · ${plural(seen.length, 'cliente')} a la vista` : '';
@@ -639,7 +671,7 @@
     if (!h) { h = document.createElement('div'); h.id = 'vitalis-cur-pill'; h.attachShadow({ mode: 'open' }); document.documentElement.appendChild(h); }
     const diag = r && r.diag, ok = r && r.sent;
     const txt = diag ? 'no encuentro el ID de esta ficha' : !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
-    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:600 12.5px system-ui,sans-serif;background:${ok ? '#1f7a4d' : '#8a5a1c'};color:#fff;padding:7px 12px;border-radius:999px;box-shadow:0 6px 18px rgba(0,0,0,.25);display:flex;gap:8px;align-items:center}b{font-weight:800}button{font:inherit;color:#fff;background:rgba(255,255,255,.18);border:0;border-radius:999px;padding:3px 9px;cursor:pointer}</style><div><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
+    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1px solid #e6e9ed;padding:7px 12px 7px 11px;border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.14);display:flex;gap:8px;align-items:center}i{width:8px;height:8px;border-radius:50%;background:${ok ? '#0f7a55' : '#b45309'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:600;color:#0f1720;background:#fff;border:1px solid #e6e9ed;border-radius:999px;padding:3px 10px;cursor:pointer}button:hover{border-color:#6b7684}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
     const btn = h.shadowRoot.querySelector('button');
     if (btn) btn.onclick = () => navigator.clipboard.writeText(diagCur()).then(() => { btn.textContent = 'Copiado: mandáselo a quien mantiene Vitalis'; }, () => { btn.textContent = 'No pude copiar'; });
     clearTimeout(pillT); pillT = setTimeout(() => h.remove(), diag ? 20000 : 4500);
@@ -647,10 +679,10 @@
   // la ficha cambió: lo miro enseguida (aparte de la lectura de la lista, que espera a que la página se quede quieta), como mucho ~1 vez por segundo
   let curT = null, curLast = 0;
   function schedCur() {
-    if (watched || curT || document.visibilityState !== 'visible') return;
+    if (watched || stView || curT || document.visibilityState !== 'visible') return;
     curT = setTimeout(() => { curT = null; curLast = Date.now(); if (live()) reportCurrent(); }, Math.max(120, Math.max(700, curMs * 25) - (Date.now() - curLast)));
   }
-  document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible') { reportCurrent(true); } });
+  document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible' && !stView) { reportCurrent(true); } });
   let lastMs = 0, againT = null;
   const again = () => { clearTimeout(againT); againT = setTimeout(() => { if (live()) refresh(); }, 3000); }; // algo no llegó a la extensión: vuelvo a leer y lo mando
   function refresh(force) {
@@ -671,6 +703,7 @@
     reportLeads(clients);
     reportSeen(seen);
     goneCheck(seen);
+    if (stView) stReport();
     if (!sales && !seen && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
     render();
@@ -726,6 +759,29 @@
     let box = el; for (let i = 0; i < 6 && box && box.parentElement; i++) box = box.parentElement;
     const html = (box ? box.outerHTML : document.body.outerHTML).slice(0, 15000);
     navigator.clipboard.writeText(html).then(() => setMsg('Copiado. Mandáselo a quien mantiene Vitalis para ajustar el botón.', 'ok', 10000), () => setMsg('No pude copiar.', 'err'));
+  }
+
+  // ---- estación: lo que vio esta pestaña al leer (filas, status de cada una, si hay sesión, el total que dice el CRM) ----
+  let stLast = '', stLastAt = 0;
+  function stReport() {
+    const trx = stView === 'trx', list = trx ? sales : seen, statuses = {};
+    if (!trx && seen) for (const c of seen) { const k = String(c.status || '').slice(0, 60); if (k) statuses[k] = (statuses[k] || 0) + 1; }
+    const m = { type: 'station-scan', login: loginPage(), table: !!list, n: list ? list.length : 0, total: pagerTotal(), statuses };
+    const sig = JSON.stringify([m.login, m.table, m.n, m.total, statuses]);
+    if (sig === stLast && Date.now() - stLastAt < 8000) return;
+    stLast = sig; stLastAt = Date.now();
+    send(m);
+  }
+  function pagerTotal() { // el total que dice el CRM debajo de la lista ("Page 1 of 7 (634 items)", "1-100 of 634", "Total: 634")
+    const els = [...document.querySelectorAll('.dx-info,.dx-pages,.ant-pagination-total-text,.ant-pagination,[class*=pager],[class*=pagination],[class*=total]')].slice(0, 30);
+    for (const e of els) {
+      if (isMine(e)) continue;
+      const t = (e.textContent || '').replace(/\s+/g, ' ').slice(0, 200);
+      const m = t.match(/\((\d[\d.,]*)\s*(?:items|registros|elementos|filas|results|resultados|entries)\)/i)
+        || (!/p[aá]g/i.test(t) && t.match(/\b(?:of|de)\s+(\d[\d.,]*)\b/i)) || t.match(/total\s*:?\s*(\d[\d.,]*)/i);
+      if (m) { const n = parseInt(m[1].replace(/[.,]/g, ''), 10); if (n >= 0 && n < 1e7) return n; }
+    }
+    return null;
   }
 
   // la página cambió: leo de nuevo cuando se queda quieta 0,6 s, y como mucho a los 2 s aunque no pare de moverse (un reloj, una animación).

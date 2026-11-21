@@ -56,33 +56,51 @@ async function playSound(tone = 'agenda') {
 // Esta función se inyecta en la página: tiene que ser autocontenida.
 function ftdOverlay(items) {
   const ID = 'ftd-agenda-overlay';
+  // estilo Claro: tarjeta blanca, borde fino, una franja según la urgencia (roja, ámbar o verde) y un ícono de trazo según el tipo
+  const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#0f7a55"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21.5c-.7 6 .7 11.5 3.5 14.8 1.1 1.3 2.6 1.9 4.5 1.9s3.4-.6 4.5-1.9c2.8-3.3 4.2-8.8 3.5-14.8"/><path d="M13.5 21.5h21"/><path d="M26.5 21.5 31 11h4"/></g></svg>';
+  const IC = {
+    campana: '<path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2H5zM10.5 20.5a1.8 1.8 0 0 0 3 0"/>',
+    cliente: '<circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.7 3.7-5.6 7-5.6s6.1 1.9 7 5.6"/>',
+    tareas: '<path d="M9 4.5H7.5A2.5 2.5 0 0 0 5 7v11.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V7a2.5 2.5 0 0 0-2.5-2.5H15"/><rect x="9" y="3" width="6" height="3.2" rx="1.2"/><path d="m9 13.5 2.2 2.2L15.5 11"/>',
+    chat: '<path d="M3.5 6.5A2.5 2.5 0 0 1 6 4h8a2.5 2.5 0 0 1 2.5 2.5v5A2.5 2.5 0 0 1 14 14H9.5L6 17v-3a2.5 2.5 0 0 1-2.5-2.5z"/><path d="M19.6 8.6a2.4 2.4 0 0 1 .9 1.9v5a2.5 2.5 0 0 1-2.5 2.5v3l-3.5-3h-3.2a2.5 2.5 0 0 1-2-1"/>',
+    banking: '<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10.5h18M7 15h3"/>',
+    alerta: '<path d="M12 4 21 19.5H3z"/><path d="M12 10v4.5M12 17v.1"/>',
+    social: '<path d="M6.6 9.5h10.8c.3 4.6-.7 8.5-2.6 10.4-.7.7-1.6 1.1-2.8 1.1s-2.1-.4-2.8-1.1C7.3 18 6.3 14.1 6.6 9.5z"/><path d="M6 9.5h12M13.5 9.2 15.6 4c.3-.6.7-.9 1.4-.9h1"/>',
+  };
+  const icOf = (d) => /^crm:(login|stlogin|nowatch)|^so:st:/.test(d.k) ? 'alerta' : /^crm:/.test(d.k) ? 'cliente' : /^so:t:/.test(d.k) ? 'tareas' : /^so:c:/.test(d.k) ? 'chat' : /^so:b:/.test(d.k) ? 'banking' : d.kind === 'social' ? 'social' : 'campana';
   let host = document.getElementById(ID);
   if (!host) {
     host = document.createElement('div');
     host.id = ID;
-    host.style.cssText = 'all:initial;position:fixed;top:14px;right:14px;z-index:2147483647;';
+    host.style.cssText = 'all:initial;position:fixed;top:16px;right:16px;z-index:2147483647;';
     (document.body || document.documentElement).appendChild(host);
     host.attachShadow({ mode: 'open' }).innerHTML = `<style>
-      .stack{display:flex;flex-direction:column;gap:10px;width:min(370px,calc(100vw - 28px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-      .card{--c:#cf3049;background:#fff;color:#15201a;border:1px solid #dfe5dc;border-top:5px solid var(--c);border-radius:18px;padding:12px 14px 13px;box-shadow:0 18px 48px rgba(0,0,0,.28);animation:in .25s ease-out,nudge .6s ease-in-out .3s 2}
-      .card.urg{--c:#cf3049}
-      .card.imp{--c:#c9661f}
-      .card.info{--c:#2f7fd0;animation:in .25s ease-out}
-      @keyframes in{from{opacity:0;transform:translateY(-10px)}}
-      @keyframes nudge{50%{transform:rotate(-1.2deg) scale(1.02)}}
-      .h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-      .mk{width:22px;height:22px}
-      .tag{font-weight:800;font-size:15px;letter-spacing:-.03em}
-      .t{color:var(--c);font-weight:800;flex:1;font-size:12.5px;text-transform:none}
-      .x{all:unset;cursor:pointer;color:#5b685f;padding:0 6px;border-radius:6px}.x:hover{background:#ecf0e9;color:#15201a}
-      .id{font-size:24px;font-weight:800;letter-spacing:-.02em}
-      .kw{margin:2px 0 4px;word-break:break-word}
-      .m{color:#5b685f;font-size:12.5px}
-      .b{display:flex;gap:6px;margin-top:11px;flex-wrap:wrap}
-      .b button{all:unset;cursor:pointer;font-size:13px;font-weight:700;color:#15201a;border:1px solid #dfe5dc;border-radius:999px;padding:5px 12px}
-      .b button:hover{border-color:#5b685f}
-      .b button.p{background:var(--c);border-color:var(--c);color:#fff}
-      .b button.p:hover{filter:brightness(.92)}
+      .stack{display:flex;flex-direction:column;gap:10px;width:min(372px,calc(100vw - 32px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+      .card{--c:#d12f45;background:#fff;color:#0f1720;border:1px solid #e6e9ed;border-radius:16px;padding:12px 14px 13px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);position:relative;overflow:hidden;animation:in .22s ease-out}
+      .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c)}
+      .card.urg{--c:#d12f45}
+      .card.imp{--c:#b45309}
+      .card.info{--c:#0f7a55}
+      .card.urg,.card.imp{animation:in .22s ease-out,nudge .5s ease-in-out .3s 2}
+      @keyframes in{from{opacity:0;transform:translateY(-8px)}}
+      @keyframes nudge{50%{transform:translateX(-3px)}}
+      @media (prefers-reduced-motion:reduce){.card{animation:none!important}}
+      .h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+      .mk{width:20px;height:20px;flex:none}
+      .tag{font-weight:700;font-size:14.5px;letter-spacing:-.035em}
+      .t{flex:1;display:flex;align-items:center;gap:5px;min-width:0;color:var(--c);font-weight:600;font-size:12.5px}
+      .t svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+      .x{all:unset;cursor:pointer;color:#6b7684;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;font-size:13px}.x:hover{background:#eef0f3;color:#0f1720}
+      .id{font-size:22px;font-weight:650;letter-spacing:-.03em;line-height:1.2;word-break:break-word}
+      .kw{margin:3px 0 1px;word-break:break-word}
+      .kw:empty{display:none}
+      .m{color:#6b7684;font-size:12.5px}
+      .b{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+      .b button{all:unset;cursor:pointer;font-size:12.5px;font-weight:600;color:#0f1720;background:#fff;border:1px solid #e6e9ed;border-radius:10px;padding:6px 12px}
+      .b button:hover{border-color:#6b7684}
+      .b button.p{background:#0f7a55;border-color:#0f7a55;color:#fff}
+      .b button.p:hover{background:#0c6647;border-color:#0c6647}
+      .b button:focus-visible,.x:focus-visible{outline:2px solid #0f7a55;outline-offset:2px}
     </style><div class="stack"></div>`;
   }
   const stack = host.shadowRoot.querySelector('.stack');
@@ -91,14 +109,13 @@ function ftdOverlay(items) {
     if (had && (had.dataset.v || '') === (d.v || '')) continue;
     if (had) had.remove(); // misma tarjeta con algo nuevo (otro mensaje del mismo chat)
     const card = document.createElement('div');
-    // color según importancia: urgente (agenda) rojo, importante (clientes new, tareas, el team leader te nombra) naranja, el resto (chat, social) celeste
+    // color según importancia: urgente (agenda) rojo, importante (clientes new, tareas, el team leader te nombra) ámbar, el resto (chat, social) verde
     const lvl = d.lvl || (d.kind === 'crm' ? 'imp' : d.kind === 'social' ? (/^so:t:/.test(d.k) ? 'imp' : 'info') : 'urg');
     card.className = 'card ' + lvl + (d.kind ? ' ' + d.kind : ''); card.dataset.k = d.k; card.dataset.v = d.v || ''; card.setAttribute('role', 'alert');
-    card.innerHTML = '<div class="h"><img class="mk" alt=""><span class="tag">vitalis</span><span class="t"></span><button class="x" data-a="close" title="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>';
-    try { card.querySelector('.mk').src = chrome.runtime.getURL('icons/48.png'); } catch (e) { card.querySelector('.mk').remove(); }
-    card.querySelector('.t').textContent = d.title || 'Contactar';
+    card.innerHTML = `<div class="h">${SEAL}<span class="tag">vitalis</span><span class="t"><svg viewBox="0 0 24 24" aria-hidden="true">${IC[icOf(d)]}</svg><span></span></span><button class="x" data-a="close" title="Cerrar" aria-label="Cerrar">✕</button></div><div class="id"></div><div class="kw"></div><div class="m"></div><div class="b"></div>`;
+    card.querySelector('.t span').textContent = d.title || 'Contactar';
     card.querySelector('.id').textContent = d.id;
-    card.querySelector('.kw').textContent = d.kw;
+    card.querySelector('.kw').textContent = d.kw || '';
     card.querySelector('.m').textContent = d.meta || '';
     for (const [a, l, p] of d.btns || [['done', 'Hecho', 1], ['snooze', '+15 min'], ['open', 'Abrir Vitalis']]) {
       const b = document.createElement('button'); b.dataset.a = a; b.textContent = l; if (p) b.className = 'p'; card.querySelector('.b').appendChild(b);
@@ -194,7 +211,7 @@ async function alertItem(it, { snooze = false } = {}) {
   const sound = await playSound('agenda');
   const where = await showNow();
   const sys = await createN('n|' + Date.now() + '|' + it.k, {
-    type: 'basic', iconUrl: 'icons/128.png', title: `📞 Contactar ${it.id}`, message: info.kw,
+    type: 'basic', iconUrl: 'icons/128.png', title: `Contactar ${it.id}`, message: info.kw,
     contextMessage: info.meta,
     priority: 2, requireInteraction: true, buttons: [{ title: 'Abrir Vitalis' }, { title: 'Recordar en 15 min' }],
   });
@@ -430,7 +447,7 @@ async function crmClients(tabId, m) {
   if (m.login) { // se cerró la sesión del CRM: aviso una vez por hora
     if (now - (w.loginAt || 0) > 3600e3) {
       await updW(tabId, (c) => (c ? { ...c, loginAt: now } : c));
-      await alertCard({ k: 'crm:login', kind: 'crm', title: 'El CRM cerró la sesión', id: 'Volvé a entrar al CRM', kw: 'Mientras tanto no puedo ver los clientes nuevos.', meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', '⚠ El CRM cerró la sesión', 'Volvé a entrar para seguir vigilando los clientes nuevos.');
+      await alertCard({ k: 'crm:login', kind: 'crm', title: 'El CRM cerró la sesión', id: 'Volvé a entrar al CRM', kw: 'Mientras tanto no puedo ver los clientes nuevos.', meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', 'El CRM cerró la sesión', 'Volvé a entrar para seguir vigilando los clientes nuevos.');
     }
     return { watched: true };
   }
@@ -449,7 +466,7 @@ async function crmClients(tabId, m) {
   for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
   for (const c of fresh.slice(0, 5)) {
     await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
-      btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `🆕 Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
+      btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
   }
   if (fresh.length > 5) await alertCard({ k: 'crm:mas' + now, kind: 'crm', title: 'Clientes nuevos en el CRM', id: `+${fresh.length - 5} más`, kw: 'Hay más clientes en new.', meta: hm(now), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, null);
   return { watched: true, fresh: fresh.length };
@@ -470,6 +487,139 @@ async function focusCrm() { // la pestaña de clientes (la que tiene clientes en
   if (tab) { await chrome.tabs.update(tab.id, { active: true }); await chrome.windows.update(tab.windowId, { focused: true }); }
   else if (w) await chrome.tabs.create({ url: w.url });
 }
+
+/* ---------- estación: el Chrome del team leader con una pestaña propia por vista del CRM ---------- */
+// El team leader arma cada vista una vez (filtro, orden, filas por página) y en el botón de Vitalis del CRM dice cuál es.
+// Desde ahí la extensión la fija, la actualiza a su ritmo (con un poco de variación) y, si se cierra, la vuelve a abrir.
+// Solo en horario: fuera de hora no toca el CRM. Cada 30 s le cuenta a Vitalis cómo le fue con cada vista (latido).
+const SVIEWS = { news: { n: 'News', every: 10 }, trx: { n: 'Transactions', every: 15 }, cola: { n: 'Cola', every: 30 }, agen: { n: 'Agendables', every: 60 }, cerr: { n: 'Cerrados', every: 600 } };
+const ST_HOURS = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 17 * 60 + 30 }; // lunes a viernes, 9:00 a 17:30
+async function stGet() { return (await chrome.storage.local.get('station')).station || { views: {} }; }
+const stUpd = (fn) => lock('station', async () => { const s = await stGet(), n = fn(s); if (n && n !== s) await chrome.storage.local.set({ station: n }); return n || s; }); // fn devuelve la nueva (o null si no cambia)
+const stRun = (v, patch) => lock('stRuns', async () => { const all = await sess.get('stRuns', {}); all[v] = { ...(all[v] || {}), ...patch }; await sess.set('stRuns', all); return all[v]; });
+async function stHours() {
+  const h = (await chrome.storage.local.get('stationHours')).stationHours || ST_HOURS, d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  return h.days.includes(d.getDay()) && m >= h.from && m < h.to;
+}
+let stCache = { views: {} }; chrome.storage.local.get('station').then((s) => { stCache = s.station || { views: {} }; }); chrome.storage.onChanged.addListener((ch) => { if (ch.station) stCache = ch.station.newValue || { views: {} }; });
+const stationOf = (tabId) => (Object.entries(stCache.views || {}).find(([, c]) => c.tabId === tabId) || [null])[0];
+async function stationSet(tab, view) { // "Esta pestaña es la de…" desde el botón del CRM ('' = ya no es parte de la estación)
+  if (!['leader', 'admin'].includes(await deskRole())) return { err: 'Solo el team leader o el administrador' };
+  if (view && !SVIEWS[view]) return { err: 'vista desconocida' };
+  let freed = null;
+  await stUpd((s) => {
+    const views = { ...s.views };
+    for (const [k, c] of Object.entries(views)) if (c.tabId === tab.id) delete views[k];
+    if (view) { if (views[view]) freed = views[view].tabId; views[view] = { tabId: tab.id, url: tab.url, title: tab.title || '', at: Date.now() }; }
+    return { ...s, views };
+  });
+  if (freed != null && freed !== tab.id) { try { await chrome.tabs.update(freed, { pinned: false }); } catch (e) {} } // la que tenía esa vista antes queda como una pestaña común
+  try { await chrome.tabs.update(tab.id, view ? { pinned: true, autoDiscardable: false } : { pinned: false }); } catch (e) {}
+  if (view) {
+    if (await getW(tab.id)) await watchStop(tab.id); // si se actualizaba para los news, ahora la maneja la estación
+    await stRun(view, { nextAt: 0, problem: '', noTable: 0 });
+  }
+  await stLoop(); stFlushSoon();
+  return { ok: true };
+}
+async function stationOff() { // apagar la estación entera (desde el ícono): las pestañas quedan como pestañas comunes
+  const s = await stGet();
+  for (const c of Object.values(s.views)) { try { await chrome.tabs.update(c.tabId, { pinned: false }); } catch (e) {} }
+  await stUpd((x) => ({ ...x, views: {} }));
+  await stLoop(); await stFlush();
+  return { ok: true };
+}
+async function stReopen(v, cfg, s) { // se cerró: la abro de nuevo, fija y en segundo plano, al lado de las otras de la estación
+  let windowId;
+  for (const o of Object.values(s.views)) { if (o.tabId === cfg.tabId) continue; try { windowId = (await chrome.tabs.get(o.tabId)).windowId; break; } catch (e) {} }
+  if (windowId == null) { try { const w = await chrome.windows.getLastFocused({ windowTypes: ['normal'] }); windowId = w && w.id; } catch (e) {} }
+  try {
+    const t = await chrome.tabs.create({ url: cfg.url, pinned: true, active: false, ...(windowId != null ? { windowId } : {}) });
+    try { await chrome.tabs.update(t.id, { autoDiscardable: false }); } catch (e) {}
+    await stUpd((st) => (st.views[v] ? { ...st, views: { ...st.views, [v]: { ...st.views[v], tabId: t.id } } } : null));
+    await stRun(v, { nextAt: Date.now() + 8000, noTable: 0 }); // recién abierta: se lee sola al cargar
+    return t;
+  } catch (e) { return null; }
+}
+async function stVitalis() { // la estación necesita Vitalis abierto: por ahí llegan los clientes a la base
+  if ((await vitalisTabs()).length) return;
+  const { url } = await state(); if (!url) return;
+  if (Date.now() - (await sess.get('stVitAt', 0)) < 5 * 6e4) return;
+  await sess.set('stVitAt', Date.now());
+  try { const t = await chrome.tabs.create({ url, pinned: true, active: false }); await chrome.tabs.update(t.id, { autoDiscardable: false }); } catch (e) {}
+}
+let stBusy = false;
+async function stTick() {
+  if (stBusy) return; stBusy = true;
+  try {
+    const s = await stGet(), views = Object.entries(s.views);
+    if (!views.length || !(await stHours())) return; // fuera de horario no se toca el CRM
+    const runs = await sess.get('stRuns', {}), now = Date.now();
+    for (const [v, cfg] of views) {
+      const r = runs[v] || {};
+      let tab = null; try { tab = await chrome.tabs.get(cfg.tabId); } catch (e) {}
+      if (!tab || !(await isCrmUrl(tab.url || tab.pendingUrl || ''))) {
+        if (now - (r.reopenAt || 0) < 6e4) continue; // no la abro una y otra vez
+        await stRun(v, { reopenAt: now });
+        if (!(await stReopen(v, cfg, s))) await stRun(v, { problem: 'cerrada', lastTry: now });
+        continue;
+      }
+      if ((r.nextAt || 0) > now) continue;
+      await stRun(v, { lastTry: now, nextAt: now + SVIEWS[v].every * 1000 * (0.7 + Math.random() * 0.6) }); // un poco de variación: no es un reloj exacto
+      if (tab.discarded) { try { await chrome.tabs.reload(tab.id); } catch (e) {} continue; }
+      let res = null; try { res = await withTimeout(chrome.tabs.sendMessage(tab.id, { type: 'crm-refresh' }), 5000); } catch (e) {}
+      if (!res && tab.status === 'complete') { try { await chrome.tabs.reload(tab.id); } catch (e) {} } // la página no responde: la recargo
+    }
+    await stVitalis();
+  } finally { stBusy = false; }
+}
+// lo que vio una pestaña de la estación al leer (lo manda crm.js después de cada lectura)
+async function stScan(tabId, m, url) {
+  const v = Object.entries((await stGet()).views).find(([, c]) => c.tabId === tabId);
+  if (!v) return { station: null };
+  const [view] = v, now = Date.now(), prev = (await sess.get('stRuns', {}))[view] || {};
+  const patch = { n: Math.max(0, +m.n || 0), total: m.total == null ? null : +m.total, statuses: m.statuses || {}, seenAt: now };
+  if (m.login) { patch.problem = 'login'; patch.noTable = 0; }
+  else if (m.table) { patch.problem = ''; patch.lastOk = now; patch.noTable = 0; }
+  else if (!prev.noTable) patch.noTable = now; // la lista desaparece un momento al actualizar: recién a los 20 s es un problema
+  else if (now - prev.noTable > 2e4) patch.problem = 'sin-tabla';
+  await stRun(view, patch);
+  if (url && await isCrmUrl(url)) await stUpd((s) => (s.views[view] && s.views[view].url !== url ? { ...s, views: { ...s.views, [view]: { ...s.views[view], url } } } : null)); // el filtro puede vivir en la dirección: guardo la última
+  if ((patch.problem ?? prev.problem ?? '') !== (prev.problem || '')) {
+    stFlushSoon();
+    if (patch.problem === 'login' && now - (await sess.get('stLoginAt', 0)) > 3600e3) { // el team leader está ahí: se lo digo en su Chrome (una vez por hora)
+      await sess.set('stLoginAt', now);
+      await alertCard({ k: 'crm:stlogin', kind: 'crm', title: 'La estación quedó sin sesión', id: 'Volvé a entrar al CRM', kw: `La pestaña de ${SVIEWS[view].n} pide entrar de nuevo. Mientras tanto no se leen clientes.`, meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', 'La estación quedó sin sesión del CRM', 'Volvé a entrar para que siga leyendo.');
+    }
+  }
+  return { station: view };
+}
+// cada 30 s (y cuando algo cambia) le cuento a Vitalis cómo está cada vista; al apagarla, una vez más vacía
+async function stFlush() {
+  const s = await stGet(), views = Object.keys(s.views);
+  if (views.length && !(await stHours())) return false; // fuera de horario no hay nada que contar
+  if (!views.length && !(await sess.get('stWasOn', false))) return false; // acá nunca hubo estación
+  const runs = await sess.get('stRuns', {}), iso = (ms) => (ms ? new Date(ms).toISOString() : null);
+  const rows = views.map((v) => { const r = runs[v] || {}; return { vista: v, ok: iso(r.lastOk), try: iso(r.lastTry || r.seenAt), n: r.n || 0, total: r.total ?? null, statuses: r.statuses || {}, problem: r.problem || '' }; });
+  let sent = false; // a todas las pestañas de Vitalis: lo guarda la del team leader (o admin); las demás lo ignoran
+  for (const t of await vitalisTabs()) { try { const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'station', views: rows }), 8000); if (r && r.ok) sent = true; } catch (e) {} }
+  if (sent) await sess.set('stWasOn', views.length > 0);
+  return sent;
+}
+let stFlushT = null;
+const stFlushSoon = () => { clearTimeout(stFlushT); stFlushT = setTimeout(() => stFlush(), 1500); };
+// temporizador propio cada 5 s (las alarmas no bajan de 30 s); la alarma "st" lo revive si Chrome lo frena
+let stT = null, stOn = false;
+async function stLoop() {
+  if (!Object.keys((await stGet()).views).length) { stOn = false; clearTimeout(stT); return chrome.alarms.clear('st'); }
+  if (!(await chrome.alarms.get('st'))) await chrome.alarms.create('st', { periodInMinutes: 0.5, delayInMinutes: 0.5 });
+  if (stOn) return;
+  stOn = true; clearTimeout(stT);
+  const step = async () => { if (!stOn) return; try { await stTick(); } catch (e) {} stT = setTimeout(step, 5000); };
+  stT = setTimeout(step, 1000);
+}
+chrome.runtime.onStartup.addListener(() => stLoop());
+stLoop();
 
 async function tellCrm(res) {
   for (const t of await chrome.tabs.query({ url: await crmUrls() })) { try { await chrome.tabs.sendMessage(t.id, { type: 'import-result', res }); } catch (e) {} }
@@ -514,7 +664,10 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }
-  if (msg.type === 'crm-current' && msg.id && sender.tab && watchedTab(sender.tab.id)) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news no cuenta (copias viejas de crm.js)
+  if (msg.type === 'crm-current' && msg.id && sender.tab && (watchedTab(sender.tab.id) || stationOf(sender.tab.id))) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news y las de la estación no cuentan (copias viejas de crm.js)
+  if (msg.type === 'station-set' && sender.tab) { stationSet(sender.tab, String(msg.view || '')).then(reply).catch((e) => reply({ err: String(e && e.message || e) })); return true; }
+  if (msg.type === 'station-scan' && sender.tab) { stScan(sender.tab.id, msg, sender.tab.url).then(reply).catch(() => reply(null)); return true; }
+  if (msg.type === 'station-off') { stationOff().then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-current' && msg.id) { // el cliente abierto en el CRM: Vitalis lo muestra como cliente actual (en la cola queda solo el último)
     (async () => {
       const c = { cmd: 'actual', k: String(msg.id).slice(0, 60), r: String(msg.name || '').slice(0, 120), at: Date.now() };
@@ -584,11 +737,13 @@ async function tickVitalis() {
   if (st.crmQ.length) deliverSeen();
   if (st.leadQ.length) deliverLeads();
   if ((await liveNow()).length) { const { tab } = await cardTab(); if (tab) injectInto(tab.id); }
+  stFlush(); // la estación (si esta compu lo es): el latido
 }
 chrome.alarms.get('vt').then((a) => { if (!a) chrome.alarms.create('vt', { periodInMinutes: 0.5 }); });
 chrome.alarms.onAlarm.addListener(async (a) => {
   if (a.name === 'vt') return tickVitalis();
   if (a.name === 'crm-watch') return ensureLoop(); // revive el temporizador de 10 s si Chrome lo frenó
+  if (a.name === 'st') return stLoop(); // y el de la estación
   const snooze = a.name.startsWith('s:');
   if (!snooze && !a.name.startsWith('p:')) return;
   const k = a.name.slice(2);

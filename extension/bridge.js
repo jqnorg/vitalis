@@ -26,6 +26,14 @@
       setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ noPanel: true }); delete waiting[reqId]; } }, 18000);
       return true;
     }
+    if (msg && msg.type === 'station' && Array.isArray(msg.views)) { // la estación (pestañas propias del CRM): cómo le fue con cada vista → Vitalis lo guarda
+      if (!alive) { reply({ noPanel: true }); return false; }
+      const t = (v, n) => (v == null ? null : String(v).slice(0, n));
+      const views = msg.views.slice(0, 10).map((v) => ({ vista: t(v.vista, 8), ok: t(v.ok, 30), try: t(v.try, 30), n: Number(v.n) || 0, total: v.total == null ? null : Number(v.total) || 0, problem: t(v.problem, 12) || '',
+        statuses: v.statuses && typeof v.statuses === 'object' ? Object.fromEntries(Object.entries(v.statuses).slice(0, 80).map(([k, n]) => [String(k).slice(0, 60), Number(n) || 0])) : {} }));
+      post({ type: 'ftd-agenda-station', v: 1, views }); reply({ ok: true });
+      return false;
+    }
     if (msg && msg.type === 'import') { // ventas del botón del CRM → a Vitalis
       if (!alive) { reply({ noPanel: true }); return false; }
       const reqId = 'r' + Date.now() + Math.random().toString(36).slice(2);

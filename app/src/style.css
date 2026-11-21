@@ -1256,3 +1256,9 @@ body.dark #nav button.nv-cli.on{color:#fff}
 .sh-av b svg.ic{color:var(--acc)}
 .sh-av small{display:block;color:var(--dim);margin-top:2px;line-height:1.4}
 .toast .tm svg.ic{color:var(--acc);margin-right:2px}
+
+/* Equipo: la estación del CRM (estacion.js) */
+.st-line{margin:2px 2px 12px;font-size:14px}
+.st-t td{white-space:nowrap}
+.st-t .st-off td{color:var(--dim)}
+.st-t .st-off b{font-weight:500}

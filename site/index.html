@@ -1269,6 +1269,12 @@ body.dark #nav button.nv-cli.on{color:#fff}
 .sh-av b svg.ic{color:var(--acc)}
 .sh-av small{display:block;color:var(--dim);margin-top:2px;line-height:1.4}
 .toast .tm svg.ic{color:var(--acc);margin-right:2px}
+
+/* Equipo: la estación del CRM (estacion.js) */
+.st-line{margin:2px 2px 12px;font-size:14px}
+.st-t td{white-space:nowrap}
+.st-t .st-off td{color:var(--dim)}
+.st-t .st-off b{font-weight:500}
 </style>
 </head>
 <body class="auth">
@@ -1578,6 +1584,7 @@ body.dark #nav button.nv-cli.on{color:#fff}
   </div>
   <section class="card" id="eqPron" aria-label="Pronóstico del mes" hidden></section>
   <section class="card" id="eqPool" aria-label="Llamadas de hoy de cada uno" hidden></section>
+  <section class="card" id="eqStation" aria-label="Estación del CRM" hidden></section>
   <section class="card" id="eqCurva" aria-label="Curva del agente nuevo" hidden></section>
   <section class="card" id="eqCola" aria-label="La cola de cada uno" hidden></section>
   <section class="card"><div class="card-h"><h3>Agentes</h3><span class="p-sub" id="eqCount"></span><span class="grow"></span><span class="p-sub">Tocá <b>Ficha</b> para ver su agenda, turnos, clientes y tareas</span></div><div class="p-tablewrap" id="eqTable"></div></section>
@@ -1595,8 +1602,8 @@ body.dark #nav button.nv-cli.on{color:#fff}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.23.7';
-const EXT_VER='1.9.5'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.24.0';
+const EXT_VER='1.10.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -3147,6 +3154,7 @@ window.addEventListener('message',e=>{
     crmSeenFromExt(d.rows).then(res=>{try{src.postMessage({type:'ftd-agenda-seen-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
     return;
   }
+  if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return} // la extensión de esta compu es la estación: cómo le fue con cada vista
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
@@ -3960,6 +3968,7 @@ V.equipo={
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);
     {const pr=eqYm===now?pronCard():'';$('#eqPron').hidden=!pr;$('#eqPron').innerHTML=pr;const cv=eqYm===now?curvaCard():'';$('#eqCurva').hidden=!cv;$('#eqCurva').innerHTML=cv} // pronóstico y curva del agente nuevo: solo team leader y admin
     {const pm=eqYm===now?callsMesaCard():'';$('#eqPool').hidden=!pm;$('#eqPool').innerHTML=pm} // las llamadas de hoy de cada uno
+    stDraw();stLoad().then(()=>{if(cur==='equipo')stDraw()}); // la estación: hace cuánto se leyó cada vista del CRM
     crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
@@ -4213,6 +4222,7 @@ function onReady(){
   let h='';try{h=location.hash.slice(1)}catch(e){}
   go(VIEWS.includes(h)?h:'inicio');
   status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
+  if(isLeader()){setTimeout(stationCheck,5000);setInterval(stationCheck,6e4)} // la estación del CRM: avisos a team leader y admin
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
 }
@@ -7058,6 +7068,76 @@ V.radar={
     $('#rdBody').innerHTML=`<div class="rd-grid">${mapCard()}${cobroCardRd()}${radarCard()}${lateCard()}</div>`;
   },
 };
+
+/* ---------- estación: las pestañas propias del CRM en el Chrome del team leader ---------- */
+// Cada vista (News, Transactions, Cola, Agendables, Cerrados) es una pestaña que la extensión fija, actualiza a su ritmo y
+// vuelve a abrir si se cierra, solo en horario. La extensión late cada 30 s por la pestaña de Vitalis de esa compu
+// (station_beat); acá se ve hace cuánto se leyó cada vista y se avisa a team leader y admin si algo anda mal.
+const ST_VIEWS=[['news','News',10],['trx','Transactions',15],['cola','Cola',30],['agen','Agendables',60],['cerr','Cerrados',600]];
+const ST_HOURS={days:[1,2,3,4,5],from:9*60,to:17*60+30}; // lunes a viernes, 9:00 a 17:30 (igual que la extensión)
+const ST_QUIET=3*6e4; // sin latido en horario: la estación se calló
+let stRows=[],stAt=0,stSent=0,stOkErr=0,stLoaded=false;
+const stInHours=(d=new Date())=>{const m=d.getHours()*60+d.getMinutes();return ST_HOURS.days.includes(d.getDay())&&m>=ST_HOURS.from&&m<ST_HOURS.to};
+const stAgo=ms=>{const s=Math.round((Date.now()-ms)/1e3);return s<45?'recién':s<3600?`hace ${Math.max(1,Math.round(s/60))} min`:s<86400?`hace ${Math.round(s/3600)} h`:`hace ${Math.round(s/86400)} días`};
+const lc1=t=>t.charAt(0).toLowerCase()+t.slice(1); // "Sin sesión del CRM" → "sin sesión del CRM"
+const stEvery=v=>(ST_VIEWS.find(x=>x[0]===v)||[0,0,30])[2];
+const stLate=r=>!r.last_ok||Date.now()-Date.parse(r.last_ok)>Math.max(90e3,3*stEvery(r.vista)*1e3); // tres vueltas sin una lectura buena
+const stBeatAt=()=>Math.max(0,...stRows.map(r=>Date.parse(r.updated_at)||0));
+const stQuiet=()=>stRows.length&&stInHours()&&Date.now()-stBeatAt()>ST_QUIET;
+
+async function stLoad(force){
+  if(!ready||!isLeader())return;
+  if(!force&&Date.now()-stAt<50e3)return;
+  stAt=Date.now();
+  try{stRows=await Q(sb.from('station_state').select('vista,last_ok,last_try,n,total,off_pct,problem,updated_at'))||[];stLoaded=true}catch(e){}
+}
+// lo que manda la extensión de esta compu (si es la estación): a la base, como mucho cada 20 s
+async function stationFromExt(views){
+  if(!ready||readOnly||!isLeader()||Date.now()-stSent<2e4&&views.length)return;
+  stSent=Date.now();
+  const clean=views.slice(0,10).map(v=>({vista:String(v.vista||'').slice(0,8),ok:v.ok||null,try:v.try||null,n:+v.n||0,total:v.total==null?null:+v.total,problem:String(v.problem||'').slice(0,12),
+    statuses:v.statuses&&typeof v.statuses==='object'?Object.fromEntries(Object.entries(v.statuses).slice(0,80).map(([k,n])=>[String(k).slice(0,60),Math.max(0,Math.min(999999,+n||0))])):{}}));
+  try{await Q(sb.rpc('station_beat',{p:clean}));stAt=0;if(cur==='equipo')stDraw()}catch(e){if(Date.now()-stOkErr>36e5){stOkErr=Date.now();toast('La estación no pudo avisar su estado a la base.','warn')}}
+}
+function stState(r){
+  if(r.problem==='login')return ['err','Sin sesión del CRM'];
+  if(r.problem==='cerrada')return ['err','Pestaña cerrada'];
+  if(r.problem==='sin-tabla')return ['hot','No ve la lista'];
+  if(r.problem==='filtro')return ['hot',`Perdió el filtro (${r.off_pct}% no son de acá)`];
+  if(stInHours()&&stLate(r))return ['hot','Atrasada'];
+  return ['ok','Al día'];
+}
+function stationCard(){
+  if(!isLeader())return '';
+  const head=`<div class="card-h"><h3>Estación</h3><span class="p-sub">las pestañas del CRM que lee el Chrome del team leader</span></div>`;
+  if(!stRows.length)return head+`<p class="p-sub" style="margin:4px 2px 0">Sin estación. En el Chrome del team leader, abrí cada vista del CRM con su filtro (News, Transactions, Cola, Agendables, Cerrados) y elegila en el botón de Vitalis del CRM. Desde ahí se actualiza sola, solo en horario.</p>`;
+  const by=Object.fromEntries(stRows.map(r=>[r.vista,r]));
+  const line=!stInHours()?'<span class="d">Fuera de horario: quieta hasta el próximo día hábil a las 9.</span>'
+    :stQuiet()?`<b class="err">Callada ${esc(stAgo(stBeatAt()))}</b>: fijate que el Chrome del team leader esté prendido y con Vitalis abierto.`
+    :`<span class="ok">Leyendo</span> <span class="d">· último aviso ${esc(stAgo(stBeatAt()))}</span>`;
+  const rows=ST_VIEWS.map(([v,name,every])=>{
+    const r=by[v];
+    if(!r)return `<tr class="st-off"><td><b>${esc(name)}</b></td><td class="d">Sin pestaña</td><td></td><td></td><td></td></tr>`;
+    const [cls,txt]=stState(r);
+    return `<tr><td><b>${esc(name)}</b><span class="d"> · cada ${every<60?every+' s':every/60+' min'}</span></td><td><span class="${cls}">${esc(txt)}</span></td><td>${nf(r.n||0)}</td><td>${r.total==null?'<span class="d">—</span>':nf(r.total)}</td><td>${r.last_ok?esc(stAgo(Date.parse(r.last_ok))):'<span class="d">nunca</span>'}</td></tr>`;
+  }).join('');
+  return head+`<p class="st-line">${line}</p><div class="p-tablewrap"><table class="pt st-t"><thead><tr><th>Vista</th><th>Estado</th><th>Vio</th><th>Total en el CRM</th><th>Última lectura buena</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function stDraw(){const el=$('#eqStation');if(!el)return;const h=stLoaded?stationCard():'';el.hidden=!h;el.innerHTML=h}
+// cada minuto, para team leader y admin: avisos si la estación se calla, queda sin sesión, se cierra una pestaña o pierde el filtro
+let stWarn={};
+async function stationCheck(){
+  if(!ready||!isLeader())return;
+  await stLoad(true);
+  if(cur==='equipo')stDraw();
+  if(!stRows.length||!stInHours()){stWarn={};return}
+  const once=(k,html,kind,card)=>{if(stWarn[k])return;stWarn[k]=Date.now();toast(html,kind,{key:'st-'+k,sticky:kind==='alert',actions:[{l:'Ver Equipo',fn:()=>go('equipo')}]});if(card)extSocial({k:'so:st:'+k,lvl:kind==='alert'?'urg':'imp',title:'Estación del CRM',id:card,kw:'Abrí Equipo en Vitalis para ver qué vista.',meta:'',btns:[['close','Ok',1]]})};
+  const quiet=stQuiet(),dead=stRows.filter(r=>r.problem==='login'||r.problem==='cerrada'),soft=stRows.filter(r=>r.problem==='filtro'||r.problem==='sin-tabla');
+  if(quiet)once('quiet','<b>La estación dejó de leer el CRM.</b> Fijate que el Chrome del team leader esté prendido y con Vitalis abierto.','alert','Dejó de leer el CRM');else delete stWarn.quiet;
+  if(!quiet&&dead.length)once('dead:'+dead.map(r=>r.vista+r.problem).join(),`<b>La estación tiene un problema:</b> ${dead.map(r=>esc((ST_VIEWS.find(x=>x[0]===r.vista)||[0,r.vista])[1])+': '+esc(lc1(stState(r)[1]))).join(' · ')}.`,'alert',dead.some(r=>r.problem==='login')?'Quedó sin sesión del CRM':'Se cerró una pestaña');
+  if(!dead.length)for(const k of Object.keys(stWarn))if(k.startsWith('dead:'))delete stWarn[k];
+  if(!quiet&&soft.length)once('soft:'+soft.map(r=>r.vista+r.problem).join(),`La estación: ${soft.map(r=>esc((ST_VIEWS.find(x=>x[0]===r.vista)||[0,r.vista])[1])+' '+esc(lc1(stState(r)[1]))).join(' · ')}. Revisá esa pestaña en el Chrome del team leader.`,'warn');
+}
 
 /* ---------- compartir datos en el chat, y avisos del team leader o un administrador ---------- */
 // Cada tarjeta de datos tiene su botón Compartir: al chat va una foto de la tarjeta tal como se ve, con la hora, sin botones ni formularios.
