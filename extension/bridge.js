@@ -9,7 +9,7 @@
   chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (!isVitalis()) return false;
     if (msg && msg.type === 'cmds') { if (alive) { deliver(msg.cmds); reply({ ok: true }); } else reply({ ok: false }); return false; }
-    if (msg && msg.type === 'tick') { if (alive) post({ type: 'ftd-agenda-tick', v: 1 }); return false; } // despierta a Vitalis en segundo plano
+    if (msg && msg.type === 'tick') { if (alive) post({ type: 'ftd-agenda-tick', v: 1, idle: typeof msg.idle === 'number' ? msg.idle : null }); return false; } // despierta a Vitalis en segundo plano
     if (msg && msg.type === 'leads') { // clientes new del CRM → al registro de Vitalis
       if (!alive) { reply({ noPanel: true }); return false; }
       const reqId = 'L' + Date.now() + Math.random().toString(36).slice(2);

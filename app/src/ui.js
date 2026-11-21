@@ -119,7 +119,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -131,7 +131,7 @@ const GROUPS=[
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
-  {g:'analisis',views:['ventas','clientes','filtros','radar'],tabs:['Ventas','Campañas','Filtros','Radar']},
+  {g:'analisis',views:['ventas','clientes','campanas','filtros','radar'],tabs:['Ventas','Clientes','Campañas','Filtros','Radar']}, // Clientes: solo team leader y admin
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
@@ -142,13 +142,15 @@ const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis'
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
+  if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
+  if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
   const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
   const sn=$('#subnav');sn.hidden=G.views.length<2;
-  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>x!=='equipo'||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
+  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>(x!=='equipo'&&x!=='clientes')||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready)V[v].render(opts||{});

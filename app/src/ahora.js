@@ -82,7 +82,7 @@ function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
   const by=new Map();for(const x of m.values())if(!isArch(x.brand)&&!by.has(norm(x.id)))by.set(norm(x.id),x);
   const was=crm.ok;crm.rows=m;crm.byId=by;crm.rot=rot||[];crm.ok=true;crm.at=Date.now();
-  if(ready&&(!was||['ahora','inicio','clientes','equipo','agenda','cliente'].includes(cur)))refresh();
+  if(ready&&(!was||['ahora','inicio','clientes','campanas','equipo','agenda','cliente'].includes(cur)))refresh();
 }
 let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}

@@ -1886,3 +1886,21 @@ begin
 end $$;
 grant execute on function public.vitalis_say(text, uuid) to authenticated;
 revoke all on function public.vitalis_say(text, uuid) from public, anon;
+
+-- Privacidad: tras idle_min minutos sin usar la compu, Vitalis se tapa y pide el PIN (por detrás sigue andando);
+-- el chat pide el PIN si hace chat_lock_min minutos que no lo mirás. Los cambia el administrador.
+alter table public.teams add column if not exists idle_min integer not null default 15;
+alter table public.teams add column if not exists chat_lock_min integer not null default 10;
+do $$ begin alter table public.teams add constraint teams_idle_min check (idle_min between 5 and 240); exception when duplicate_object then null; end $$;
+do $$ begin alter table public.teams add constraint teams_chat_lock_min check (chat_lock_min between 1 and 240); exception when duplicate_object then null; end $$;
+create or replace function public.set_locks(idle integer, chat integer) returns json
+  language plpgsql security definer set search_path = public as $$
+begin
+  if coalesce(public.my_role(), '') <> 'admin' then raise exception 'Solo el administrador'; end if;
+  if idle is null or idle < 5 or idle > 240 then raise exception 'LOCK: Vitalis se cierra entre los 5 y los 240 minutos'; end if;
+  if chat is null or chat < 1 or chat > 240 then raise exception 'LOCK: el chat pide el PIN entre 1 y 240 minutos'; end if;
+  update public.teams set idle_min = idle, chat_lock_min = chat where id = public.my_team();
+  return json_build_object('ok', true, 'idle', idle, 'chat', chat);
+end $$;
+revoke all on function public.set_locks(integer, integer) from public, anon;
+grant execute on function public.set_locks(integer, integer) to authenticated;

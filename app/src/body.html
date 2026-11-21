@@ -26,6 +26,7 @@
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.100"/></symbol>
     <symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 4 21 19.500H3z"/><path d="M12 10v4.500M12 17v.100"/></symbol>
     <symbol id="i-racha" viewBox="0 0 24 24"><path d="M12 3c.5 3.500 5 5.500 5 10.500a5 5 0 0 1-10 0c0-1.800.8-3 1.800-4 .3 1.700 1.200 2.500 2.200 2.500C11 9 10.500 6 12 3z"/></symbol>
+    <symbol id="i-candado" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2.5"/></symbol>
     <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M6.500 16.500V11a5.500 5.500 0 0 1 9-4.200M17.500 11v5.500l1.500 2H8M10.500 20.500a1.800 1.800 0 0 0 3 0M4 4l16 16"/></symbol>
     <symbol id="i-campana" viewBox="0 0 24 24"><path d="M6.500 16.500V11a5.500 5.500 0 0 1 11 0v5.500l1.500 2H5zM10.500 20.500a1.800 1.800 0 0 0 3 0"/></symbol>
     <symbol id="i-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><circle cx="12" cy="12" r="4.500"/><path d="M12 12v.100"/></symbol>
@@ -122,9 +123,8 @@
 </section>
 
 <section class="view" id="v-clientes" hidden>
-  <div class="vh"><div><h1>Campañas</h1><p class="sub" id="clSub"></p></div><span class="grow"></span>
+  <div class="vh"><div><h1>Clientes</h1><p class="sub" id="clSub"></p></div><span class="grow"></span>
     <div class="tools"><span class="seg" id="clPer"></span><select id="clWho" aria-label="De quién"></select><button type="button" class="btn pri wr" data-act="nuevoCliente"><svg><use href="#i-plus"/></svg>Cliente</button></div></div>
-  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
   <div class="conv3" id="clKpis"></div>
   <section class="card">
     <div class="card-h"><h3>Clientes new por día</h3><div class="legend"><span><i class="sw s1"></i>Ya depositó</span><span><i class="sw sx"></i>Todavía no</span></div><span class="grow"></span><span class="p-sub" id="clChartSub"></span></div>
@@ -136,6 +136,13 @@
     <div class="p-tablewrap" id="clTable"></div>
     <button class="btn sm rk-more" type="button" id="clMore" hidden>Ver más</button>
   </section>
+</section>
+
+<section class="view" id="v-campanas" hidden>
+  <div class="vh"><div><h1>Campañas</h1><p class="sub" id="cmSub">Afiliador · campaña · país: cuántos atienden, cuántos depositan y dónde se quedan.</p></div><span class="grow"></span>
+    <div class="tools"><span class="seg" id="cmPer"></span></div></div>
+  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
+  <div class="p-empty" id="cmEmpty" hidden>Todavía no hay clientes del CRM en este período.</div>
 </section>
 
 <section class="view" id="v-agenda" hidden>
@@ -203,6 +210,7 @@
 </section>
 
 <section class="view" id="v-chat" hidden>
+  <div class="ch-lock" id="chLock" hidden></div>
   <div class="chat" id="vChat">
     <aside class="ch-side">
       <div class="ch-lh"><h1>Chat</h1><span class="grow"></span><button type="button" class="btn sm pri" id="chNew">Nuevo</button></div>
@@ -246,6 +254,7 @@
       <div class="seg" id="cfTemas"></div>
     </section>
     <section class="card" id="cfTeamCard" hidden><div class="card-h"><h3>Mesa</h3><span class="p-sub" id="cfTeamName"></span><span class="grow"></span><button type="button" class="btn sm pri" id="cfAddM">Sumar persona</button></div>
+      <div class="lk-set" id="cfLocks" hidden></div>
       <div class="note" style="margin-top:0">Cada uno entra eligiendo su nombre en vitalis.joaquin-or24.workers.dev y la primera vez pone 0000. "Nombre en el CRM" sirve para que las ventas que pasa el team leader le lleguen a cada uno.</div>
       <div id="cfMembers" style="margin-top:12px"></div>
       <div id="cfFormers" hidden></div>

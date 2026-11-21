@@ -1279,3 +1279,17 @@ svg.ic{stroke-width:2.3}
 .hero{border-top:6px solid var(--v-ok)}
 .toast.alert,.toast.imp,.toast.info{border:1.5px solid var(--line);border-top:5px solid var(--k);font-weight:500}
 .toast.alert{--k:var(--v-err);font-weight:650}.toast.imp{--k:var(--v-warn);font-weight:600}.toast.info{--k:var(--v-info)}
+/* privacidad (lock.js): Vitalis tapado tras un rato sin uso, y el PIN del chat */
+#lock{position:fixed;inset:0;z-index:1000;overflow:auto;background:var(--bg);display:flex;justify-content:center;align-items:flex-start;padding:min(10vh,90px) 20px 40px}
+#lock .brand{margin-bottom:28px;justify-content:center}
+#lock .brand .mark{width:46px;height:46px}
+#lock .brand .word{font-size:36px}
+body.locked #toasts{display:none}
+.ch-lock{display:flex;justify-content:center;padding:min(8vh,60px) 16px 30px}
+.ch-lock .abox{width:min(420px,100%)}
+.lk-ic{width:56px;height:56px;border-radius:18px;background:var(--pri-soft);color:var(--pri);display:grid;place-items:center;margin:0 auto 12px}
+.lk-ic svg.ic{width:28px;height:28px}
+.lk-set{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--raised)}
+.lk-set span{flex:1;min-width:200px}
+@media (max-width:600px){#lock{padding-top:28px}}
+.pad button.fn{white-space:nowrap;padding:0 2px}

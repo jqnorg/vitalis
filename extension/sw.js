@@ -729,8 +729,18 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 });
 
 // cada 30 s despierto a Vitalis si está en segundo plano (Chrome frena sus relojes): se pone al día con lo social y el chat
+// hace cuánto no se toca la compu (teclado o mouse, en cualquier programa): con eso Vitalis se tapa y pide el PIN
+async function idleMs() {
+  try {
+    const st = await chrome.idle.queryState(60), now = Date.now();
+    let { idleAct: act } = await chrome.storage.session.get('idleAct');
+    if (st === 'active' || !act) { act = st === 'active' ? now : now - 60e3; await chrome.storage.session.set({ idleAct: act }); }
+    return Math.max(0, now - act);
+  } catch (e) { return null; }
+}
 async function tickVitalis() {
-  for (const t of await vitalisTabs()) { try { await chrome.tabs.sendMessage(t.id, { type: 'tick' }); } catch (e) {} }
+  const idle = await idleMs();
+  for (const t of await vitalisTabs()) { try { await chrome.tabs.sendMessage(t.id, { type: 'tick', idle }); } catch (e) {} }
   // lo que quedó en cola (Vitalis estaba cargando o cerrado) se vuelve a intentar; y el aviso pendiente sigue a la vista
   const st = await state();
   if (st.crmQ.length) deliverSeen();

@@ -532,7 +532,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -703,6 +703,7 @@ function ayuda(){
 /* ---------- clicks y teclas ---------- */
 const hv=el=>el.closest('#iTurno')&&$('#itHora')?($('#itHora').value||''):'';
 const ACT={
+  locks:()=>locksModal(), // Ajustes: privacidad (solo el administrador)
   importar:()=>importar(),exportar:()=>exportar(),ayuda:()=>ayuda(),
   entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
   deshacer:()=>deshacer(),editHoy:()=>{const t=openTurno()||turnos[todayS()];editTurno(t?t.date:null)},
@@ -731,6 +732,7 @@ document.addEventListener('pointerdown',primeAudio);
 document.addEventListener('mousedown',e=>{if(e.target.closest('.chip'))e.preventDefault()}); // los chips no se quedan con el foco: Enter sigue guardando
 document.addEventListener('keydown',e=>{
   primeAudio();
+  if(padUp())return;
   if(modals.length)return;
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}

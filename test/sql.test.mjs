@@ -945,6 +945,22 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("delete from public.messages where user_id = (select id from public.profiles where bot limit 1) and body in ('Mensaje de un agente','Hola desde el admin','A un grupo')");
 }
 
+// ---------- privacidad: cuándo se tapa Vitalis y cuándo el chat pide el PIN ----------
+{
+  let q = await as(B, 'select idle_min, chat_lock_min from public.teams');
+  ok(q.rows[0].idle_min === 15 && q.rows[0].chat_lock_min === 10, 'arranca en 15 min sin uso y 10 min sin mirar el chat');
+  let R = await rpc(B, 'select public.set_locks(20, 5) j');
+  ok(!!R.error, 'un agente no lo cambia');
+  R = await rpc(M, 'select public.set_locks(20, 5) j');
+  ok(!!R.error, 'el team leader tampoco (solo el administrador)');
+  R = await rpc(A, 'select public.set_locks(2, 5) j');
+  ok(!!R.error, 'menos de 5 minutos no');
+  R = await rpc(A, 'select public.set_locks(20, 5) j');
+  q = await as(B, 'select idle_min, chat_lock_min from public.teams');
+  ok(R.ok && q.rows[0].idle_min === 20 && q.rows[0].chat_lock_min === 5, 'el administrador lo cambia y la mesa lo ve');
+  await rpc(A, 'select public.set_locks(15, 10) j');
+}
+
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');

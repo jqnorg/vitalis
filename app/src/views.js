@@ -648,6 +648,7 @@ V.cuenta={
     $('#cfTeamCard').hidden=!isLeader();
     if(!isLeader())return;
     const adm=isAdmin();$('#cfAddM').hidden=!adm;
+    {const el=$('#cfLocks');el.hidden=!adm;if(adm)el.innerHTML=`<span><b>Privacidad</b> · ${esc(locksTxt())}</span><button type="button" class="btn sm" data-act="locks">Cambiar</button>`}
     $('#cfTeamName').textContent=teamInfo.name;
     const list=members.filter(m=>!m.former).sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name)),fm=members.filter(m=>m.former).sort((a,b)=>a.name.localeCompare(b.name));
     const crmIn=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.crm;if(crmIn)return; // no pisar lo que estás escribiendo
@@ -696,13 +697,6 @@ V.clientes={
     $('#clWho').addEventListener('change',e=>{clWho=e.target.value;clShow=60;this.render({})});
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
-    // campañas: afiliador · campaña · país
-    const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
-    let cqt=null;
-    cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
-    cmpEl.addEventListener('change',e=>{const f=e.target.closest('[data-cmpf]');if(!f||f.dataset.cmpf==='q')return;cmp[f.dataset.cmpf]=f.value;this.render({})});
-    cmpEl.addEventListener('click',e=>{if(e.target.closest('[data-cmpm]')){cmp.open=true;this.render({});return}const tr=e.target.closest('tr[data-cmp]');if(tr)cmpOpen(tr.dataset.cmp)});
-    cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
       if(b.dataset.cl==='ficha')return openFicha(l.id);
       if(b.dataset.cl==='ag')return agendarCliente(l.id);
@@ -720,8 +714,6 @@ V.clientes={
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
     crmLoad();$('#clKpis').innerHTML=convCardsX(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
-    {const el=$('#clCamp'),qi=el.querySelector('[data-cmpf=q]'),foc=qi&&document.activeElement===qi,cc=campCard(from,to,clPerTxt());el.hidden=!cc;el.innerHTML=cc;
-      if(foc){const n=el.querySelector('[data-cmpf=q]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}}} // campañas (sin perder lo que escribís)
     if(crm.ok){const nuevos=crmAll().filter(r=>!isArch(r.brand)&&r.first&&ymd(new Date(r.first))===te).length,fh=team.filter(f=>f.date===te&&!isArch(f.brand)),en=fh.filter(f=>crmStatusOf(f.id)).length;
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;
@@ -745,6 +737,27 @@ V.clientes={
         <td class="act wr">${f?'':`<button type="button" class="ib" data-cl="ag" data-id="${esc(l._id)}">Agendar</button>`}${l.uid===me||isLeader()?`<button type="button" class="ib del" data-cl="del" data-id="${esc(l._id)}">Borrar</button>`:''}</td></tr>`}).join('')+'</tbody></table>'
       :`<div class="p-empty">${clQ?'No hay clientes con esa búsqueda.':clPer==='hoy'?'Todavía no entró ningún cliente hoy.':'Sin clientes en este período.'}</div>`;
     $('#clMore').hidden=rows.length<=clShow;
+  },
+};
+
+// Campañas (afiliador · campaña · país), con el mismo período que Clientes
+V.campanas={
+  build(){
+    $('#cmPer').innerHTML=CLP.map(([k,l])=>`<button type="button" data-clp="${k}">${l}</button>`).join('');
+    $('#cmPer').addEventListener('click',e=>{const b=e.target.closest('[data-clp]');if(!b)return;clPer=b.dataset.clp;clShow=60;this.render({})});
+    const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
+    let cqt=null;
+    cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
+    cmpEl.addEventListener('change',e=>{const f=e.target.closest('[data-cmpf]');if(!f||f.dataset.cmpf==='q')return;cmp[f.dataset.cmpf]=f.value;this.render({})});
+    cmpEl.addEventListener('click',e=>{if(e.target.closest('[data-cmpm]')){cmp.open=true;this.render({});return}const tr=e.target.closest('tr[data-cmp]');if(tr)cmpOpen(tr.dataset.cmp)});
+    cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
+  },
+  render(){
+    $$('[data-clp]',$('#cmPer')).forEach(b=>b.classList.toggle('on',b.dataset.clp===clPer));
+    crmLoad();
+    const [from,to]=clRange(),el=$('#clCamp'),qi=el.querySelector('[data-cmpf=q]'),foc=qi&&document.activeElement===qi,cc=campCard(from,to,clPerTxt());
+    el.hidden=!cc;el.innerHTML=cc;$('#cmEmpty').hidden=!!cc;
+    if(foc){const n=el.querySelector('[data-cmpf=q]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}} // sin perder lo que escribís
   },
 };
 
@@ -842,9 +855,8 @@ function onReady(){
   ready=true;applyTheme();
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
   $('#navEquipo').hidden=!isLeader();
-  let h='';try{h=location.hash.slice(1)}catch(e){}
-  go(VIEWS.includes(h)?h:'inicio');
-  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
+  go(landing()); // la primera vez del día, Inicio; después, directo al Panel
+  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(lockCheck,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   if(isLeader()){setTimeout(stationCheck,5000);setInterval(stationCheck,6e4)} // la estación del CRM: avisos a team leader y admin
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});

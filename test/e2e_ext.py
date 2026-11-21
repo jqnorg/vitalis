@@ -572,6 +572,9 @@ async def main():
             ok(not any(pin), f'y sus pestañas quedan como pestañas comunes ({pin})')
             await sw.evaluate("chrome.storage.local.remove('stationHours')")
             await sw.evaluate(f"chrome.storage.local.set({{desk:{json.dumps(desk0)}}})")
+            # privacidad: la extensión le dice a Vitalis hace cuánto no se toca la compu
+            ms = await sw.evaluate('idleMs()')
+            ok(isinstance(ms, (int, float)) and 0 <= ms < 120e3, f'la extensión mide hace cuánto no se usa la compu ({ms})')
             await ctx.close()
     finally:
         srv.terminate()

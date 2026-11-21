@@ -1292,6 +1292,20 @@ svg.ic{stroke-width:2.3}
 .hero{border-top:6px solid var(--v-ok)}
 .toast.alert,.toast.imp,.toast.info{border:1.5px solid var(--line);border-top:5px solid var(--k);font-weight:500}
 .toast.alert{--k:var(--v-err);font-weight:650}.toast.imp{--k:var(--v-warn);font-weight:600}.toast.info{--k:var(--v-info)}
+/* privacidad (lock.js): Vitalis tapado tras un rato sin uso, y el PIN del chat */
+#lock{position:fixed;inset:0;z-index:1000;overflow:auto;background:var(--bg);display:flex;justify-content:center;align-items:flex-start;padding:min(10vh,90px) 20px 40px}
+#lock .brand{margin-bottom:28px;justify-content:center}
+#lock .brand .mark{width:46px;height:46px}
+#lock .brand .word{font-size:36px}
+body.locked #toasts{display:none}
+.ch-lock{display:flex;justify-content:center;padding:min(8vh,60px) 16px 30px}
+.ch-lock .abox{width:min(420px,100%)}
+.lk-ic{width:56px;height:56px;border-radius:18px;background:var(--pri-soft);color:var(--pri);display:grid;place-items:center;margin:0 auto 12px}
+.lk-ic svg.ic{width:28px;height:28px}
+.lk-set{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--raised)}
+.lk-set span{flex:1;min-width:200px}
+@media (max-width:600px){#lock{padding-top:28px}}
+.pad button.fn{white-space:nowrap;padding:0 2px}
 </style>
 </head>
 <body class="auth">
@@ -1325,6 +1339,7 @@ svg.ic{stroke-width:2.3}
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.100"/></symbol>
     <symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 4 21 19.500H3z"/><path d="M12 10v4.500M12 17v.100"/></symbol>
     <symbol id="i-racha" viewBox="0 0 24 24"><path d="M12 3c.5 3.500 5 5.500 5 10.500a5 5 0 0 1-10 0c0-1.800.8-3 1.800-4 .3 1.700 1.200 2.500 2.200 2.500C11 9 10.500 6 12 3z"/></symbol>
+    <symbol id="i-candado" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3M12 14.5v2.5"/></symbol>
     <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M6.500 16.500V11a5.500 5.500 0 0 1 9-4.200M17.500 11v5.500l1.500 2H8M10.500 20.500a1.800 1.800 0 0 0 3 0M4 4l16 16"/></symbol>
     <symbol id="i-campana" viewBox="0 0 24 24"><path d="M6.500 16.500V11a5.500 5.500 0 0 1 11 0v5.500l1.500 2H5zM10.500 20.500a1.800 1.800 0 0 0 3 0"/></symbol>
     <symbol id="i-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><circle cx="12" cy="12" r="4.500"/><path d="M12 12v.100"/></symbol>
@@ -1421,9 +1436,8 @@ svg.ic{stroke-width:2.3}
 </section>
 
 <section class="view" id="v-clientes" hidden>
-  <div class="vh"><div><h1>Campañas</h1><p class="sub" id="clSub"></p></div><span class="grow"></span>
+  <div class="vh"><div><h1>Clientes</h1><p class="sub" id="clSub"></p></div><span class="grow"></span>
     <div class="tools"><span class="seg" id="clPer"></span><select id="clWho" aria-label="De quién"></select><button type="button" class="btn pri wr" data-act="nuevoCliente"><svg><use href="#i-plus"/></svg>Cliente</button></div></div>
-  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
   <div class="conv3" id="clKpis"></div>
   <section class="card">
     <div class="card-h"><h3>Clientes new por día</h3><div class="legend"><span><i class="sw s1"></i>Ya depositó</span><span><i class="sw sx"></i>Todavía no</span></div><span class="grow"></span><span class="p-sub" id="clChartSub"></span></div>
@@ -1435,6 +1449,13 @@ svg.ic{stroke-width:2.3}
     <div class="p-tablewrap" id="clTable"></div>
     <button class="btn sm rk-more" type="button" id="clMore" hidden>Ver más</button>
   </section>
+</section>
+
+<section class="view" id="v-campanas" hidden>
+  <div class="vh"><div><h1>Campañas</h1><p class="sub" id="cmSub">Afiliador · campaña · país: cuántos atienden, cuántos depositan y dónde se quedan.</p></div><span class="grow"></span>
+    <div class="tools"><span class="seg" id="cmPer"></span></div></div>
+  <section class="card cmp" id="clCamp" aria-label="Campañas" hidden></section>
+  <div class="p-empty" id="cmEmpty" hidden>Todavía no hay clientes del CRM en este período.</div>
 </section>
 
 <section class="view" id="v-agenda" hidden>
@@ -1502,6 +1523,7 @@ svg.ic{stroke-width:2.3}
 </section>
 
 <section class="view" id="v-chat" hidden>
+  <div class="ch-lock" id="chLock" hidden></div>
   <div class="chat" id="vChat">
     <aside class="ch-side">
       <div class="ch-lh"><h1>Chat</h1><span class="grow"></span><button type="button" class="btn sm pri" id="chNew">Nuevo</button></div>
@@ -1545,6 +1567,7 @@ svg.ic{stroke-width:2.3}
       <div class="seg" id="cfTemas"></div>
     </section>
     <section class="card" id="cfTeamCard" hidden><div class="card-h"><h3>Mesa</h3><span class="p-sub" id="cfTeamName"></span><span class="grow"></span><button type="button" class="btn sm pri" id="cfAddM">Sumar persona</button></div>
+      <div class="lk-set" id="cfLocks" hidden></div>
       <div class="note" style="margin-top:0">Cada uno entra eligiendo su nombre en vitalis.joaquin-or24.workers.dev y la primera vez pone 0000. "Nombre en el CRM" sirve para que las ventas que pasa el team leader le lleguen a cada uno.</div>
       <div id="cfMembers" style="margin-top:12px"></div>
       <div id="cfFormers" hidden></div>
@@ -1620,8 +1643,8 @@ svg.ic{stroke-width:2.3}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.25.1';
-const EXT_VER='1.10.2'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.26.0';
+const EXT_VER='1.11.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2548,7 +2571,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -2560,7 +2583,7 @@ const GROUPS=[
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
-  {g:'analisis',views:['ventas','clientes','filtros','radar'],tabs:['Ventas','Campañas','Filtros','Radar']},
+  {g:'analisis',views:['ventas','clientes','campanas','filtros','radar'],tabs:['Ventas','Clientes','Campañas','Filtros','Radar']}, // Clientes: solo team leader y admin
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
@@ -2571,13 +2594,15 @@ const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis'
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
+  if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
+  if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
   const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
   const sn=$('#subnav');sn.hidden=G.views.length<2;
-  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>x!=='equipo'||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
+  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>(x!=='equipo'&&x!=='clientes')||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready)V[v].render(opts||{});
@@ -3177,7 +3202,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -3348,6 +3373,7 @@ function ayuda(){
 /* ---------- clicks y teclas ---------- */
 const hv=el=>el.closest('#iTurno')&&$('#itHora')?($('#itHora').value||''):'';
 const ACT={
+  locks:()=>locksModal(), // Ajustes: privacidad (solo el administrador)
   importar:()=>importar(),exportar:()=>exportar(),ayuda:()=>ayuda(),
   entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
   deshacer:()=>deshacer(),editHoy:()=>{const t=openTurno()||turnos[todayS()];editTurno(t?t.date:null)},
@@ -3376,6 +3402,7 @@ document.addEventListener('pointerdown',primeAudio);
 document.addEventListener('mousedown',e=>{if(e.target.closest('.chip'))e.preventDefault()}); // los chips no se quedan con el foco: Enter sigue guardando
 document.addEventListener('keydown',e=>{
   primeAudio();
+  if(padUp())return;
   if(modals.length)return;
   const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
@@ -4043,6 +4070,7 @@ V.cuenta={
     $('#cfTeamCard').hidden=!isLeader();
     if(!isLeader())return;
     const adm=isAdmin();$('#cfAddM').hidden=!adm;
+    {const el=$('#cfLocks');el.hidden=!adm;if(adm)el.innerHTML=`<span><b>Privacidad</b> · ${esc(locksTxt())}</span><button type="button" class="btn sm" data-act="locks">Cambiar</button>`}
     $('#cfTeamName').textContent=teamInfo.name;
     const list=members.filter(m=>!m.former).sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name)),fm=members.filter(m=>m.former).sort((a,b)=>a.name.localeCompare(b.name));
     const crmIn=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.crm;if(crmIn)return; // no pisar lo que estás escribiendo
@@ -4091,13 +4119,6 @@ V.clientes={
     $('#clWho').addEventListener('change',e=>{clWho=e.target.value;clShow=60;this.render({})});
     let qt=null;$('#clQ').addEventListener('input',e=>{clearTimeout(qt);qt=setTimeout(()=>{clQ=e.target.value.trim();clShow=60;this.render({})},160)});
     $('#clMore').onclick=()=>{clShow+=100;this.render({})};
-    // campañas: afiliador · campaña · país
-    const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
-    let cqt=null;
-    cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
-    cmpEl.addEventListener('change',e=>{const f=e.target.closest('[data-cmpf]');if(!f||f.dataset.cmpf==='q')return;cmp[f.dataset.cmpf]=f.value;this.render({})});
-    cmpEl.addEventListener('click',e=>{if(e.target.closest('[data-cmpm]')){cmp.open=true;this.render({});return}const tr=e.target.closest('tr[data-cmp]');if(tr)cmpOpen(tr.dataset.cmp)});
-    cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
     $('#clTable').addEventListener('click',async e=>{const b=e.target.closest('[data-cl]');if(!b)return;const l=leads.find(x=>x._id===b.dataset.id);if(!l)return;
       if(b.dataset.cl==='ficha')return openFicha(l.id);
       if(b.dataset.cl==='ag')return agendarCliente(l.id);
@@ -4115,8 +4136,6 @@ V.clientes={
     const uid=clUid(),te=todayS(),[from,to]=clRange(),sold=soldMap();
     $('#clSub').textContent=`${clWho==='me'?'Tus':clWho==='all'?'Los de toda la mesa:':'Los de '+memberName(clWho)+':'} clientes en "new", día por día. La extensión los anota sola desde el CRM.`;
     crmLoad();$('#clKpis').innerHTML=convCardsX(uid).replace(/^<div class="conv3">|<\/div>$/g,'');
-    {const el=$('#clCamp'),qi=el.querySelector('[data-cmpf=q]'),foc=qi&&document.activeElement===qi,cc=campCard(from,to,clPerTxt());el.hidden=!cc;el.innerHTML=cc;
-      if(foc){const n=el.querySelector('[data-cmpf=q]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}}} // campañas (sin perder lo que escribís)
     if(crm.ok){const nuevos=crmAll().filter(r=>!isArch(r.brand)&&r.first&&ymd(new Date(r.first))===te).length,fh=team.filter(f=>f.date===te&&!isArch(f.brand)),en=fh.filter(f=>crmStatusOf(f.id)).length;
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;
@@ -4140,6 +4159,27 @@ V.clientes={
         <td class="act wr">${f?'':`<button type="button" class="ib" data-cl="ag" data-id="${esc(l._id)}">Agendar</button>`}${l.uid===me||isLeader()?`<button type="button" class="ib del" data-cl="del" data-id="${esc(l._id)}">Borrar</button>`:''}</td></tr>`}).join('')+'</tbody></table>'
       :`<div class="p-empty">${clQ?'No hay clientes con esa búsqueda.':clPer==='hoy'?'Todavía no entró ningún cliente hoy.':'Sin clientes en este período.'}</div>`;
     $('#clMore').hidden=rows.length<=clShow;
+  },
+};
+
+// Campañas (afiliador · campaña · país), con el mismo período que Clientes
+V.campanas={
+  build(){
+    $('#cmPer').innerHTML=CLP.map(([k,l])=>`<button type="button" data-clp="${k}">${l}</button>`).join('');
+    $('#cmPer').addEventListener('click',e=>{const b=e.target.closest('[data-clp]');if(!b)return;clPer=b.dataset.clp;clShow=60;this.render({})});
+    const cmpEl=$('#clCamp'),cmpOpen=k=>{const [from,to]=clRange();campDetail(k,from,to,clPerTxt())};
+    let cqt=null;
+    cmpEl.addEventListener('input',e=>{const f=e.target.closest('[data-cmpf=q]');if(!f)return;clearTimeout(cqt);cqt=setTimeout(()=>{cmp.q=f.value;this.render({})},200)});
+    cmpEl.addEventListener('change',e=>{const f=e.target.closest('[data-cmpf]');if(!f||f.dataset.cmpf==='q')return;cmp[f.dataset.cmpf]=f.value;this.render({})});
+    cmpEl.addEventListener('click',e=>{if(e.target.closest('[data-cmpm]')){cmp.open=true;this.render({});return}const tr=e.target.closest('tr[data-cmp]');if(tr)cmpOpen(tr.dataset.cmp)});
+    cmpEl.addEventListener('keydown',e=>{const tr=e.target.closest&&e.target.closest('tr[data-cmp]');if(tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();cmpOpen(tr.dataset.cmp)}});
+  },
+  render(){
+    $$('[data-clp]',$('#cmPer')).forEach(b=>b.classList.toggle('on',b.dataset.clp===clPer));
+    crmLoad();
+    const [from,to]=clRange(),el=$('#clCamp'),qi=el.querySelector('[data-cmpf=q]'),foc=qi&&document.activeElement===qi,cc=campCard(from,to,clPerTxt());
+    el.hidden=!cc;el.innerHTML=cc;$('#cmEmpty').hidden=!!cc;
+    if(foc){const n=el.querySelector('[data-cmpf=q]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}} // sin perder lo que escribís
   },
 };
 
@@ -4237,9 +4277,8 @@ function onReady(){
   ready=true;applyTheme();
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
   $('#navEquipo').hidden=!isLeader();
-  let h='';try{h=location.hash.slice(1)}catch(e){}
-  go(VIEWS.includes(h)?h:'inicio');
-  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
+  go(landing()); // la primera vez del día, Inicio; después, directo al Panel
+  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(lockCheck,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   if(isLeader()){setTimeout(stationCheck,5000);setInterval(stationCheck,6e4)} // la estación del CRM: avisos a team leader y admin
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
@@ -4608,7 +4647,7 @@ async function prepImg(file){ // la achico (1600 px como mucho) y la paso a webp
 }
 const b64=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=rej;r.readAsDataURL(blob)});
 let chatAtt=null; // la imagen lista para mandar
-const chatViewing=cid=>ready&&cur==='chat'&&chatCur===cid&&!document.hidden&&document.hasFocus();
+const chatViewing=cid=>ready&&cur==='chat'&&chatCur===cid&&!document.hidden&&document.hasFocus()&&!locked&&!chatPadOn;
 
 function chatsLoaded(ch,cm,rd,ms){
   chats=ch.filter(c=>c.team_id===profile.team_id);chatMem=cm;
@@ -4932,6 +4971,7 @@ V.chat={
     try{const a=await prepImg(f);this.att(a)}catch(e){toast(esc(errMsg(e)),'err')}
   },
   render(o){
+    if(chatGate(o))return; // hace rato que no lo mirás: pide el PIN
     if(o&&o.chat&&chatOf(o.chat)&&o.chat!==chatCur){this.open(o.chat);return}
     if(chatCur&&!chatOf(chatCur))chatCur=null;
     const wide=matchMedia('(min-width:821px)').matches;
@@ -5598,7 +5638,7 @@ function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
   const by=new Map();for(const x of m.values())if(!isArch(x.brand)&&!by.has(norm(x.id)))by.set(norm(x.id),x);
   const was=crm.ok;crm.rows=m;crm.byId=by;crm.rot=rot||[];crm.ok=true;crm.at=Date.now();
-  if(ready&&(!was||['ahora','inicio','clientes','equipo','agenda','cliente'].includes(cur)))refresh();
+  if(ready&&(!was||['ahora','inicio','clientes','campanas','equipo','agenda','cliente'].includes(cur)))refresh();
 }
 let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}
@@ -6681,7 +6721,7 @@ async function campLoad(from,to,force){
       const base=()=>{let q=sb.from('crm_clients').select('*').neq('brand',ARCH);if(from>'0000')q=q.gte('reg',from);if(to<'9999')q=q.lte('reg',to+' 23:59');return q.order('client_id')};
       const [rows,info]=await Promise.all([crmPage(base,30000),ficOk===false?Promise.resolve([]):QO(sb.from('campaign_info').select('*'))]);
       Object.assign(cmp,{key,rows:rows.map(C2X),info,at:Date.now()});
-      if(ready&&cur==='clientes')V.clientes.render({});
+      if(ready&&cur==='campanas')V.campanas.render({});
     }catch(e){}finally{cmp.busy=null}
   })();
   return cmp.busy;
@@ -7160,7 +7200,7 @@ async function stationCheck(){
 /* ---------- compartir datos en el chat, y avisos del team leader o un administrador ---------- */
 // Cada tarjeta de datos tiene su botón Compartir: al chat va una foto de la tarjeta tal como se ve, con la hora, sin botones ni formularios.
 // El team leader y los administradores la pueden mandar como aviso: a todos los del chat les queda hasta que lo cierren, aunque lo tengan silenciado.
-const SH_VIEWS=new Set(['inicio','sueldo','turnos','ahora','clientes','ventas','filtros','radar','equipo','cliente','banking']);
+const SH_VIEWS=new Set(['inicio','sueldo','turnos','ahora','clientes','campanas','ventas','filtros','radar','equipo','cliente','banking']);
 const SH_SEL='.card,.hero,.fi-c';
 const SH_HTML=new Set('div span p b i small br h2 h3 h4 h5 ul ol li table thead tbody tfoot tr th td section header footer details summary mark sub sup kbd s u'.split(' '));
 const SH_SVG=new Set('svg g path rect circle ellipse line polyline polygon text tspan use title'.split(' '));
@@ -7290,6 +7330,117 @@ Object.assign(B,{
 });
 
 /* ============================================================
+   Privacidad.
+   - Tras un rato sin usar la compu (teclado o mouse en cualquier programa, lo dice la extensión;
+     sin extensión, lo que se toque en Vitalis), Vitalis se tapa y pide el PIN. Por detrás sigue
+     andando: lo que llega del CRM, los avisos y la estación no se cortan. Recargar no lo destapa.
+   - El chat pide el PIN si hace un rato que no lo mirás.
+   - Al entrar: la primera vez del día, Inicio; después, directo al Panel.
+   Los tiempos los fija el administrador (teams.idle_min y teams.chat_lock_min).
+   ============================================================ */
+const LK='lock'; // en esta compu, mientras está tapado: {uid, name} (así recargar no lo destapa)
+const idleMin=()=>+(teamInfo&&teamInfo.idle_min)||15,chatMin=()=>+(teamInfo&&teamInfo.chat_lock_min)||10;
+let locked=false,lkName='',lastAct=Date.now(),chatOkAt=0,chatPadOn=false,chatWant=null;
+
+/* ---------- uso ---------- */
+const actNow=()=>{if(!locked)lastAct=Date.now()};
+for(const ev of ['pointerdown','keydown','wheel','touchstart'])document.addEventListener(ev,actNow,{capture:true,passive:true});
+{let mm=0;document.addEventListener('mousemove',()=>{const t=Date.now();if(t-mm>5e3){mm=t;actNow()}},{passive:true})}
+function extIdle(ms){if(typeof ms==='number'&&isFinite(ms)&&ms>=0)lastAct=Math.max(lastAct,Date.now()-ms)} // la extensión: hace cuánto no se toca la compu
+function lockCheck(){
+  if(!ready||!profile)return;
+  if(!locked&&Date.now()-lastAct>=idleMin()*6e4)return lockNow();
+  if(!locked&&cur==='chat'&&!chatPadOn&&!document.hidden&&chatOkAt)chatOkAt=Date.now(); // mirando el chat, no se vence
+}
+
+/* ---------- tapar y destapar ---------- */
+function lockNow(){
+  if(locked||!ready||!profile)return;
+  locked=true;chatOkAt=0;lkName=profile.name;local.set(LK,{uid:me,name:profile.name});
+  try{document.activeElement&&document.activeElement.blur()}catch(e){}
+  lockDraw();
+}
+function lockBoot(uid){const v=local.get(LK,null);if(!v||!uid||v.uid!==uid)return;locked=true;lkName=v.name||'';lockDraw()} // al abrir: si quedó tapado, sigue tapado
+function lockClear(){locked=false;local.set(LK,null);document.body.classList.remove('locked');const L=$('#lock');if(L)L.remove()}
+function lockDraw(){
+  document.body.classList.add('locked');
+  let L=$('#lock');if(!L){L=document.createElement('div');L.id='lock';L.setAttribute('role','dialog');L.setAttribute('aria-modal','true');L.setAttribute('aria-label','Vitalis cerrado');document.body.appendChild(L)}
+  const nm=(profile&&profile.name)||lkName||'';
+  L.innerHTML=`<div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div><div class="lk-box"></div></div>`;
+  pinPad(L.querySelector('.lk-box'),{
+    head:`<div class="who-big">${avatar(nm)}<div><h2>${esc(nm.split(/\s+/)[0]||'Hola')}</h2><p class="lead" style="margin:0">Vitalis se cerró porque no se usó un rato. Poné tu PIN para volver.</p></div></div>`,
+    back:['No soy yo',lockOut],
+    done:(pin,ui)=>pinCheck(pin,ui,unlock),
+  });
+}
+function unlock(){
+  lockClear();lastAct=Date.now();chatOkAt=Date.now();chatPadOff(); // acaba de poner el PIN: el chat también queda abierto
+  if(ready){go(landing());status()}
+}
+async function lockOut(){lockClear();try{await sb.auth.signOut()}catch(e){}location.reload()} // otra persona: sale del todo
+// otra pestaña de Vitalis en esta compu se tapó o se destapó
+addEventListener('storage',e=>{
+  if(e.key!=='vitalis.'+LK)return;let v=null;try{v=JSON.parse(e.newValue)}catch(x){}
+  if(v&&v.uid===me&&!locked){locked=true;chatOkAt=0;lkName=v.name||'';lockDraw()}
+  else if(!v&&locked){locked=false;document.body.classList.remove('locked');const L=$('#lock');if(L)L.remove();lastAct=Date.now();chatOkAt=Date.now();if(ready){go(landing());status()}}
+});
+// el PIN se revisa en la base (con el mismo freno de intentos que la entrada)
+async function pinCheck(pin,ui,ok){
+  const uid=me||(local.get(LK,null)||{}).uid;if(!uid||!sb)return ui.fail('Sin sesión. Recargá la página.');
+  ui.busy(true);
+  try{
+    const {data,error}=await sb.rpc('pin_login',{uid,pin});
+    if(error)throw error;
+    if(!data||!data.ok){
+      if(data&&data.error==='locked')return ui.fail(`Demasiados intentos. Probá de nuevo en ${plural(data.minutes,'minuto')}.`);
+      if(data&&data.error==='nouser')return lockOut();
+      return ui.fail(data&&data.left<=2?`PIN incorrecto. ${data.left===1?'Te queda 1 intento.':`Te quedan ${data.left} intentos.`}`:'PIN incorrecto.');
+    }
+    ok();
+  }catch(x){ui.fail(authErr(x))}finally{ui.busy(false)}
+}
+
+/* ---------- el chat ---------- */
+const chatLocked=()=>Date.now()-chatOkAt>chatMin()*6e4;
+function chatGate(o){ // true: el chat pide el PIN (se muestra el teclado en vez del chat)
+  const C=$('#vChat'),L=$('#chLock');
+  if(!chatLocked()){chatOkAt=Date.now();chatPadOff();return false}
+  if(o&&o.chat)chatWant=o.chat;
+  C.hidden=true;
+  if(locked||chatPadOn)return true; // tapado, el teclado es el de Vitalis; y si ya está a la vista, no se borra lo que vas tecleando
+  chatPadOn=true;L.hidden=false;
+  L.innerHTML=`<div class="abox"><div class="lk-box"></div></div>`;
+  pinPad(L.querySelector('.lk-box'),{
+    head:`<div class="lk-ic" aria-hidden="true"><svg class="ic"><use href="#i-candado"/></svg></div><h2>Chat</h2><p class="lead">Poné tu PIN para ver el chat.</p>`,
+    back:['Volver',()=>{chatPadOff();go('ahora')}],
+    done:(pin,ui)=>pinCheck(pin,ui,()=>{chatOkAt=Date.now();chatPadOff();const w=chatWant;chatWant=null;if(cur==='chat')V.chat.render(w?{chat:w}:{})}),
+  });
+  return true;
+}
+function chatPadOff(){ // saca el teclado del chat (su escucha de teclas se apaga sola al no estar en la página)
+  chatPadOn=false;
+  const L=$('#chLock');if(L&&!L.hidden){L.hidden=true;L.innerHTML=''}const C=$('#vChat');if(C)C.hidden=false;
+}
+const padUp=()=>locked||chatPadOn; // con un teclado de PIN a la vista, las teclas son para el PIN
+
+/* ---------- a dónde se entra ---------- */
+// la primera vez del día, Inicio (tu mes, el turno); después, directo al Panel. Tapado no cuenta: cuenta cuando entrás de verdad.
+function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return 'inicio'}return 'ahora'}
+
+/* ---------- Ajustes: los tiempos (solo el administrador) ---------- */
+function locksTxt(){return `Vitalis se tapa a los ${idleMin()} min sin usar la compu · el chat pide el PIN a los ${chatMin()} min sin mirarlo`}
+function locksModal(){
+  if(!isAdmin())return;
+  modal({title:'Privacidad',body:`<p class="mp">Tras ese rato sin usar la compu, Vitalis se tapa y pide el PIN (lo que llega del CRM y los avisos siguen andando). El chat pide el PIN si hace ese rato que no lo mirás.</p>
+    <div class="fgrid"><label class="fld"><span>Vitalis se tapa a los (minutos)</span><input id="lkI" inputmode="numeric" value="${idleMin()}"></label><label class="fld"><span>El chat pide el PIN a los (minutos)</span><input id="lkC" inputmode="numeric" value="${chatMin()}"></label></div><div class="ebox" id="lkE"></div>`,
+    actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
+      const i=parseInt(api.q('#lkI').value,10),c=parseInt(api.q('#lkC').value,10);
+      if(!(i>=5&&i<=240)){api.q('#lkE').textContent='Vitalis: entre 5 y 240 minutos.';return false}
+      if(!(c>=1&&c<=240)){api.q('#lkE').textContent='El chat: entre 1 y 240 minutos.';return false}
+      const r=await B.rpc('set_locks',{idle:i,chat:c});if(!r)return false;teamInfo.idle_min=i;teamInfo.chat_lock_min=c;toast('Listo: '+locksTxt()+'.');refresh()}}]});
+}
+
+/* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.
    La primera vez el PIN es 0000 y después creás el tuyo.
    ============================================================ */
@@ -7310,10 +7461,11 @@ async function start() {
   sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') { snapClear(); if (ready) location.reload(); } });
   // con la sesión guardada en esta computadora, se dibuja al instante con lo último que cargó (y después llega lo nuevo)
   const uid = storedUid();
+  lockBoot(uid); // si quedó tapado por no usarse, sigue tapado (recargar no lo destapa)
   const cached = uid ? await bootCached(uid) : false;
   let session = null;
   try { session = (await sb.auth.getSession()).data.session; } catch (e) {}
-  if (!session) { await snapClear(); if (cached) return location.reload(); return authScreen('who'); }
+  if (!session) { lockClear(); await snapClear(); if (cached) return location.reload(); return authScreen('who'); }
   if (cached && session.user.id !== me) { await snapClear(); return location.reload(); }
   me = session.user.id;
   if (!cached) authScreen('loading');
@@ -7407,7 +7559,7 @@ const AUTH = {
               return ui.fail(data && data.left <= 2 ? `PIN incorrecto. ${data.left === 1 ? 'Te queda 1 intento.' : `Te quedan ${data.left} intentos.`}` : 'PIN incorrecto.');
             }
             const r = await sb.auth.signInWithPassword({ email: data.email, password: data.password });
-            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
+            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); chatOkAt = lastAct = Date.now(); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
             if (!/invalid login credentials/i.test(r.error.message || '')) throw r.error;
           }
           ui.fail('No se pudo abrir la sesión. Probá de nuevo.');
@@ -7434,7 +7586,7 @@ const AUTH = {
           const wasAdmin = profile.role === 'admin';
           profile.pin_set = true; if (data && data.role) profile.role = data.role;
           const m = members.find((x) => x.id === me); if (m) Object.assign(m, { pin_set: true, role: profile.role });
-          enter();
+          chatOkAt = lastAct = Date.now(); enter();
           toast(`PIN creado. Desde ahora entrás con tu nombre y ese PIN.${!wasAdmin && profile.role === 'admin' ? '<br>Sos el administrador de la mesa: en Ajustes manejás la gente de la mesa.' : ''}`, 'ok', { ms: 9000 });
         } catch (x) { first = ''; draw(); setTimeout(() => { const mm = box.querySelector('.amsg'); mm.className = 'amsg err'; mm.textContent = authErr(x); }, 0); }
         finally { ui.busy(false); }

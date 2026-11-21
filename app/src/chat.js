@@ -103,7 +103,7 @@ async function prepImg(file){ // la achico (1600 px como mucho) y la paso a webp
 }
 const b64=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=rej;r.readAsDataURL(blob)});
 let chatAtt=null; // la imagen lista para mandar
-const chatViewing=cid=>ready&&cur==='chat'&&chatCur===cid&&!document.hidden&&document.hasFocus();
+const chatViewing=cid=>ready&&cur==='chat'&&chatCur===cid&&!document.hidden&&document.hasFocus()&&!locked&&!chatPadOn;
 
 function chatsLoaded(ch,cm,rd,ms){
   chats=ch.filter(c=>c.team_id===profile.team_id);chatMem=cm;
@@ -427,6 +427,7 @@ V.chat={
     try{const a=await prepImg(f);this.att(a)}catch(e){toast(esc(errMsg(e)),'err')}
   },
   render(o){
+    if(chatGate(o))return; // hace rato que no lo mirás: pide el PIN
     if(o&&o.chat&&chatOf(o.chat)&&o.chat!==chatCur){this.open(o.chat);return}
     if(chatCur&&!chatOf(chatCur))chatCur=null;
     const wide=matchMedia('(min-width:821px)').matches;

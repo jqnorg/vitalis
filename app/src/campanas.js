@@ -22,7 +22,7 @@ async function campLoad(from,to,force){
       const base=()=>{let q=sb.from('crm_clients').select('*').neq('brand',ARCH);if(from>'0000')q=q.gte('reg',from);if(to<'9999')q=q.lte('reg',to+' 23:59');return q.order('client_id')};
       const [rows,info]=await Promise.all([crmPage(base,30000),ficOk===false?Promise.resolve([]):QO(sb.from('campaign_info').select('*'))]);
       Object.assign(cmp,{key,rows:rows.map(C2X),info,at:Date.now()});
-      if(ready&&cur==='clientes')V.clientes.render({});
+      if(ready&&cur==='campanas')V.campanas.render({});
     }catch(e){}finally{cmp.busy=null}
   })();
   return cmp.busy;
