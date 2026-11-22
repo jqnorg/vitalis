@@ -45,7 +45,8 @@ function modal({title,body,actions=[],onOpen,onClose,wide}){
   });
   ov.appendChild(box);document.body.appendChild(ov);modals.push(api);
   onOpen&&onOpen(api);
-  setTimeout(()=>{const f=box.querySelector('[autofocus]')||box.querySelector('.mb input:not([type=hidden]),.mb select,.mb textarea')||mf.querySelector('.pri');f&&f.focus()},0);
+  setTimeout(()=>{ // el primer campo que se pueda usar (los plegados no toman el foco); si no hay, el botón principal
+    for(const f of [box.querySelector('[autofocus]'),...box.querySelectorAll('.mb input:not([type=hidden]),.mb select,.mb textarea'),mf.querySelector('.pri')]){if(!f)continue;f.focus();if(document.activeElement===f)break}},0);
   return api;
 }
 function confirmar(title,html,okL='confirmar',danger){

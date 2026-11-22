@@ -265,6 +265,7 @@ function agMesaHTML(now,te){
 V.agenda={
   build(){bindAgForm($('#agForm'))},
   render(){
+    if(agF)agF.slots();
     const now=new Date(),te=todayS();
     const open=pend.filter(p=>!p.done).sort(byDue),done=pend.filter(p=>p.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||''));
     const venc=open.filter(p=>parseDue(p.due)<=now),hoy=open.filter(p=>parseDue(p.due)>now&&p.due.slice(0,10)===te),prox=open.filter(p=>p.due.slice(0,10)>te);

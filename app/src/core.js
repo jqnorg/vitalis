@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.28.0';
+const VERSION='1.29.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -358,7 +358,7 @@ async function catchUp(force){
 // Sin tiempo real: cada 5 s con la pestaña a la vista, cada minuto escondida. Los clientes del CRM no van en tiempo real: cada 45 s a la vista.
 let hidAt=0;
 const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:10e3):Date.now()-lastCatch>5*6e4;
-setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad()},5e3);
+setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad();else newPoll()},5e3); // newPoll: los new de la estación, liviano
 addEventListener('online',()=>catchUp(true));
 addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});

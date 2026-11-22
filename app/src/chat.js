@@ -129,11 +129,14 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
+// mientras el chat pide el PIN (o Vitalis está tapado), los avisos dicen quién escribió pero no lo que escribió
+const chatShut=()=>locked||chatLocked();
+const SHUT_TXT='Abrí el chat para verlo.';
 // Vitalis escribe en "Toda la mesa" (felicita una venta o anuncia algo): avisa a todos aunque el chat esté silenciado.
 let botAsk=0;
 function cheerEvent(m,c){
   if(Date.now()-m.t>10*6e4)return;
-  const txt=clip(msgTxt(m.body),160);
+  const txt=clip(msgTxt(m.body),160); // lo de Vitalis (felicitar una venta, anunciar algo a la mesa) no es privado: se ve aunque el chat pida el PIN
   toast(`<b>${esc(memberName(m.uid))}</b>: ${esc(txt)}`,'win',{ms:9000,key:'venta'+m._id,actions:chatViewing(c.id)?[]:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();pop()}
   if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:'info',title:'Vitalis en el chat',id:'Toda la mesa',kw:txt,meta:'',btns:[['open','Abrir chat',1],['close','Ok']]});
@@ -153,18 +156,19 @@ function chatEvent(m){
   const force=isLeadUid(m.uid)&&(nm_||td),men=nm_||rp||force;
   if(muted(c.id)&&!men)return;
   const n=unread(c.id),who=first(m.uid),where=c.kind==='dm'?'':` en ${esc(chatName(c))}`,how=nm_?' te nombró':td&&force?' (a todos)':rp?' te respondió':'';
-  toast(`<b>${esc(who)}</b>${where}${how}: ${esc(clip(msgTxt(m.body),140))}${n>1?` <span class="dim">· ${n} sin leer</span>`:''}`,force?'imp':'info',{ms:force?15000:9000,key:'ch'+c.id,actions:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
+  const sh=chatShut(),txt=sh?SHUT_TXT:clip(msgTxt(m.body),140);
+  toast(`<b>${esc(who)}</b>${where}${how}: ${sh?`<span class="dim">${SHUT_TXT}</span>`:esc(txt)}${n>1?` <span class="dim">· ${n} sin leer</span>`:''}`,force?'imp':'info',{ms:force?15000:9000,key:'ch'+c.id,actions:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();if(force)beep(1);else pop()}
-  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:force?'imp':'info',title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+how,kw:clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
+  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:force?'imp':'info',title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+how,kw:sh?SHUT_TXT+' (te pide el PIN)':clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
 }
 // el aviso queda hasta que lo cierres (en Vitalis y en la tarjeta de la extensión); al entrar, los de hoy que no leíste
 function avisoEvent(m,c){
   if(m.uid===me||Date.now()-m.t>12*36e5||m.t<=readT(c.id))return;
   const seen=local.get('avisos',[]);if(seen.includes(m._id))return;local.set('avisos',[...seen.slice(-60),m._id]);
-  const who=first(m.uid),k=msgCard(m.body),txt=k?(k.title||'Datos')+(k.rest?': '+k.rest:''):msgTxt(m.body),where=c.kind==='team'?'':` en ${c.kind==='dm'?'tu privado':esc(chatName(c))}`;
+  const sh=chatShut(),who=first(m.uid),k=sh?null:msgCard(m.body),txt=sh?SHUT_TXT:k?(k.title||'Datos')+(k.rest?': '+k.rest:''):msgTxt(m.body),where=c.kind==='team'?'':` en ${c.kind==='dm'?'tu privado':esc(chatName(c))}`;
   toast(`<b><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Aviso de ${esc(who)}</b>${where}: ${esc(clip(txt,180))}${k?' <span class="dim">(con datos)</span>':''}`,'imp',{sticky:true,key:'av'+m._id,actions:[{l:'Ver',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();beep(1)}
-  if(pageAway())extSocial({k:'so:c:'+c.id+':a'+m._id,v:m._id,lvl:'imp',title:'Aviso de '+who,id:clip(k?(k.title||'Datos'):msgTxt(m.body),90),kw:clip(k?k.rest:'',200),meta:(c.kind==='team'?'Toda la mesa':chatName(c))+' · '+hhmm(m.t),btns:[['open','Ver',1],['close','Ok']]});
+  if(pageAway())extSocial({k:'so:c:'+c.id+':a'+m._id,v:m._id,lvl:'imp',title:'Aviso de '+who,id:sh?SHUT_TXT:clip(k?(k.title||'Datos'):msgTxt(m.body),90),kw:sh?'Te pide el PIN.':clip(k?k.rest:'',200),meta:(c.kind==='team'?'Toda la mesa':chatName(c))+' · '+hhmm(m.t),btns:[['open','Ver',1],['close','Ok']]});
 }
 function avisoCheck(){if(!ready)return;for(const c of chats)for(const m of (msgs[c.id]||[]).filter(x=>x.aviso&&!chatViewing(c.id)).slice(-3))avisoEvent(m,c)}
 function markRead(cid){

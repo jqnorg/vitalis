@@ -398,6 +398,12 @@ async def main():
             await A2.evaluate('catchUp(true)'); await F.wait_for_timeout(2500)
             cards = F.locator('#ftd-agenda-overlay .card.social:has-text("Toda la mesa")')
             ok(await cards.count() == 1 and 'Es urgente' in await cards.inner_text(), 'otro mensaje del mismo chat actualiza la misma tarjeta (no se apilan)')
+            # un new que Vitalis vio por la estación: la misma tarjeta de cliente nuevo que la de la pestaña vigilada
+            await A2.evaluate("extSocial({k:'crm:id:990077',v:'990077',lvl:'imp',title:'Cliente nuevo en el CRM',id:'990077',kw:'Por la estación',meta:'Chile · entró 10:00',btns:[['crm','Ver en el CRM',1],['close','Ok']]})"); await F.wait_for_timeout(1500)
+            nc = F.locator('#ftd-agenda-overlay .card.crm:has-text("990077")')
+            ok(await nc.count() == 1 and 'Ver en el CRM' in await nc.inner_text(), 'un new que Vitalis vio por la estación llega como tarjeta de cliente nuevo')
+            await F.screenshot(path=OUT / 'x7b_new_estacion.png')
+            await nc.locator('.x').click(); await F.wait_for_timeout(700)
             await F.screenshot(path=OUT / 'x8_chat_tarjeta.png')
             await cards.locator('[data-a=open]').click(); await F.wait_for_timeout(2500)
             ok(await A2.evaluate("cur") == 'chat' and 'Es urgente' in await A2.inner_text('#chMsgs'), '"Abrir chat" abre Vitalis en ese chat')

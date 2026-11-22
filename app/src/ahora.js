@@ -82,9 +82,48 @@ function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
   const by=new Map();for(const x of m.values())if(!isArch(x.brand)&&!by.has(norm(x.id)))by.set(norm(x.id),x);
   const was=crm.ok;crm.rows=m;crm.byId=by;crm.rot=rot||[];crm.ok=true;crm.at=Date.now();
+  newCheck();
   if(ready&&(!was||['ahora','inicio','clientes','campanas','equipo','agenda','cliente'].includes(cur)))refresh();
 }
 let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
+/* ---------- los new que entran por la estación ----------
+   El CRM del team leader (la estación) lee los new cada 10 s y los guarda en crm_clients: a cada agente le avisa de los
+   suyos (Sales Rep), aunque no tenga una pestaña propia vigilando. Uno solo por cliente: lo que ya avisó la pestaña
+   vigilada de la extensión (cmd "nuevo") no se repite. El team leader no recibe (no gestiona clientes). */
+const NEW_FRESH=15*6e4;
+let newAl=null,newAt=0,newBusy=false;
+const newSeen=()=>newAl||(newAl=new Map(local.get('newAl',[])));
+function newMark(id){
+  const m=newSeen(),k=norm(id);if(!k||m.has(k))return false;
+  m.set(k,Date.now());const cut=Date.now()-2*864e5;for(const [a,t] of m)if(t<cut)m.delete(a);
+  local.set('newAl',[...m].slice(-400));return true;
+}
+function newFresh(x,now,te){
+  return x.grp==='new'&&!isArch(x.brand)&&!/talk|habland/i.test(x.status)&&!paidCrm(x)&&x.first&&now-new Date(x.first)<NEW_FRESH&&(!x.reg||regDay(x)===te);
+}
+function newCheck(){
+  if(!ready||!profile||isLeadUid(me)||readOnly)return;
+  const now=Date.now(),te=todayS(),out=[];
+  for(const x of crm.rows.values())if(newFresh(x,now,te)&&x.firstBy!==me&&crmOwner(x)===me&&!newSeen().has(norm(x.id))&&!soldOf(x.id))out.push(x); // los que viste vos en tu CRM ya los tenés
+  if(!out.length)return;
+  out.sort((a,b)=>new Date(b.first)-new Date(a.first));
+  for(const x of out)newMark(x.id);
+  const away=pageAway();
+  fichaNew(out[0].id); // pasa adelante en Cliente (o aviso con "Ver" si estás escribiendo)
+  if(out.length>1)toast(`Entraron ${out.length} news: ${out.slice(0,4).map(x=>`<b>${esc(x.id)}</b>`).join(', ')}${out.length>4?'…':''}`,'imp',{key:'news',actions:[{l:'Ver la cola',fn:()=>go('ahora')}]});
+  if(away)for(const x of out.slice(0,3))extSocial({k:'crm:id:'+x.id,v:x.id,lvl:'imp',title:'Cliente nuevo en el CRM',id:x.id,kw:x.name||'',meta:[paisOf(x.country),'entró '+hhmm(+new Date(x.first))].filter(Boolean).join(' · '),btns:[['crm','Ver en el CRM',1],['close','Ok']]});
+  else beep(1);
+}
+// consulta liviana (solo los new de los últimos minutos): con la pestaña escondida, la extensión la despierta cada 30 s
+async function newPoll(){
+  if(!ready||!sb||!profile||isLeadUid(me)||newBusy||crm.ok===false||Date.now()-newAt<25e3)return;
+  newBusy=true;newAt=Date.now();
+  try{
+    const rows=await Q(sb.from('crm_clients').select('*').neq('brand',ARCH).eq('status_group','new').gte('first_seen',new Date(Date.now()-NEW_FRESH).toISOString()).limit(200));
+    let n=0;for(const r of rows){const x=C2X(r),k=ckey(x.brand,x.id);if(!crm.rows.has(k))n++;crm.rows.set(k,x);if(!crm.byId.has(norm(x.id)))crm.byId.set(norm(x.id),x)}
+    newCheck();if(n&&['ahora','inicio','cliente'].includes(cur))refresh();
+  }catch(e){}finally{newBusy=false}
+}
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}
 async function crmLog(id){ // status y rotaciones, en orden
   const [a,b]=await Promise.all([QO(sb.from('crm_status_log').select('*').eq('client_id',String(id)).order('seen_at',{ascending:true}).limit(60)),

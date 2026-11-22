@@ -1196,6 +1196,20 @@ table.rd-map{border-collapse:separate;border-spacing:2px;font-size:12px;width:10
 .dia-mini{margin:0 0 14px;padding:10px 14px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pri);border-radius:12px;font-size:14px}
 .fi-late,.ag-hint{margin:8px 0 0;font-size:13px;color:var(--acc)}
 .ag-hint{color:var(--dim)}
+.agform .ag-id input{font-size:18px;height:48px;max-width:280px}
+.ag-l{display:block;font-weight:600;font-size:15px;margin:6px 0 8px}
+.ag-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
+.ag-s{min-height:54px;border:1.5px solid var(--line);border-radius:12px;background:var(--panel);font:inherit;font-weight:600;font-size:15px;color:var(--fg);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 8px}
+.ag-s small{font-weight:400;font-size:12px;color:var(--dim)}
+.ag-s:hover{border-color:var(--pri)}
+.ag-s.on{border-color:var(--pri);background:var(--pri-soft);color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri)}
+.ag-when{margin:10px 0 0;font-size:14px;min-height:20px}
+.ag-more,.ag-kw{margin-top:8px}
+.ag-more>summary,.ag-kw>summary{cursor:pointer;font-size:14px;color:var(--dim);padding:6px 0;width:max-content}
+.ag-more .frow{margin-top:4px}
+.ag-kwv{color:var(--fg);font-weight:600}
+.ag-kw input{width:100%;max-width:420px;margin-top:4px}
+.ag-go{display:block;margin-top:14px;min-height:48px;padding:0 32px;font-size:16px}
 details[data-k=seg]>summary{cursor:pointer;list-style:none}
 details[data-k=seg]>summary::-webkit-details-marker{display:none}
 details[data-k=seg][open]>summary{margin-bottom:10px}
@@ -1718,8 +1732,8 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.28.0';
-const EXT_VER='1.11.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.29.0';
+const EXT_VER='1.12.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2073,7 +2087,7 @@ async function catchUp(force){
 // Sin tiempo real: cada 5 s con la pestaña a la vista, cada minuto escondida. Los clientes del CRM no van en tiempo real: cada 45 s a la vista.
 let hidAt=0;
 const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:10e3):Date.now()-lastCatch>5*6e4;
-setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad()},5e3);
+setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad();else newPoll()},5e3); // newPoll: los new de la estación, liviano
 addEventListener('online',()=>catchUp(true));
 addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
@@ -2575,7 +2589,8 @@ function modal({title,body,actions=[],onOpen,onClose,wide}){
   });
   ov.appendChild(box);document.body.appendChild(ov);modals.push(api);
   onOpen&&onOpen(api);
-  setTimeout(()=>{const f=box.querySelector('[autofocus]')||box.querySelector('.mb input:not([type=hidden]),.mb select,.mb textarea')||mf.querySelector('.pri');f&&f.focus()},0);
+  setTimeout(()=>{ // el primer campo que se pueda usar (los plegados no toman el foco); si no hay, el botón principal
+    for(const f of [box.querySelector('[autofocus]'),...box.querySelectorAll('.mb input:not([type=hidden]),.mb select,.mb textarea'),mf.querySelector('.pri')]){if(!f)continue;f.focus();if(document.activeElement===f)break}},0);
   return api;
 }
 function confirmar(title,html,okL='confirmar',danger){
@@ -2922,27 +2937,50 @@ function quitarAjuste(ym){
 /* ---------- agenda ---------- */
 const dueStr=d=>`${ymd(d)}T${z(d.getHours())}:${z(d.getMinutes())}`;
 const byDue=(a,b)=>a.due<b.due?-1:a.due>b.due?1:0;
-function suggestTime(date){ // hora por defecto; si ya pasó hoy, la próxima media hora
-  if(date!==todayS())return cfg.hora;
-  const d=new Date();if(nowHM()<cfg.hora)return cfg.hora;
-  d.setMinutes(d.getMinutes()+30-(d.getMinutes()%30)+30,0,0);return `${z(d.getHours())}:${z(d.getMinutes())}`;
+// Agendar en dos toques: elegís cuándo (botones grandes) y Agendar. Otro día u hora y la palabra clave quedan plegados.
+const AG_END='17:30',AG_DIA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const hTxt=h=>h.replace(/^0(\d)/,'$1');
+function workAhead(n){let d=todayS();for(let i=0,k=0;i<n&&k<40;k++){d=addDays(d,1);const w=noTrabajo(d);if(!w||w==='falta')i++}return d} // n días que se trabajan desde hoy
+function agDay(d){return d===addDays(todayS(),1)?'Mañana':AG_DIA[parseYMD(d).getDay()]}
+function agDefault(){return `${workAhead(1)}T${cfg.hora}`}
+function agSlots(){ // los horarios de un toque (los de hoy, solo si todavía estás en horario)
+  const te=todayS(),L=[],inM=n=>{const d=new Date(Date.now()+n*6e4);d.setSeconds(0,0);const r=d.getMinutes()%5;if(r)d.setMinutes(d.getMinutes()+5-r);return dueStr(d)};
+  for(const [l,n] of [['En 1 hora',60],['En 2 horas',120]]){const v=inM(n);if(v.slice(0,10)===te&&v.slice(11)<=AG_END)L.push({k:'m'+n,l,v})}
+  if(nowHM()<'14:00')L.push({k:'h16',l:'Hoy 16:00',v:`${te}T16:00`});
+  const d1=workAhead(1),d3=workAhead(3),h=cfg.hora;
+  L.push({k:'d1',l:`${agDay(d1)} ${hTxt(h)}`,v:`${d1}T${h}`});
+  if(h<'15:00')L.push({k:'d1t',l:`${agDay(d1)} 15:00`,v:`${d1}T15:00`});
+  L.push({k:'d3',l:`${agDay(d3)} ${hTxt(h)}`,v:`${d3}T${h}`,s:'en 3 días'});
+  return L;
 }
-function agFields(p){
-  const d=p?p.due.slice(0,10):addDays(todayS(),1),t=p?p.due.slice(11,16):cfg.hora;
-  return `<div class="frow">
-    <label class="fld" style="flex:1 1 120px"><span>ID</span><input name="pid" value="${esc(p?p.id:'')}"></label>
-    <label class="fld" style="flex:3 1 200px"><span>Palabra clave <small class="dim">(del cliente)</small></span><input name="kw" value="${esc(p?p.kw:'')}" placeholder="la que acordaste con el cliente"></label>
-    <label class="fld" style="flex:0 1 150px"><span>Fecha</span><input type="date" name="pdate" value="${d}"></label>
-    <label class="fld" style="flex:0 1 104px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label>
-    ${p?'':'<button type="submit" class="btn pri">Agendar</button>'}</div>
-    <div class="chips" style="margin-top:8px">${[['Hoy',0],['Mañana',1],['Pasado',2],['En una semana',7]].map(([l,n])=>`<button type="button" class="chip" data-dd="${n}">${l}</button>`).join('')}</div>`;
+const agSlotsHTML=()=>agSlots().map(x=>`<button type="button" class="ag-s" data-qk="${x.k}" data-qt="${x.v}">${esc(x.l)}${x.s?`<small>${esc(x.s)}</small>`:''}</button>`).join('');
+function agFields(p,o={}){ // o.fixed: el ID ya se sabe (viene de un cliente): no se escribe
+  const due=p&&p.due||agDefault(),d=due.slice(0,10),t=due.slice(11,16),kw=p&&p.kw||'',edit=!!(p&&p._id);
+  return (o.fixed?`<input type="hidden" name="pid" value="${esc(p.id)}">`
+    :`<label class="fld ag-id"><span>ID del cliente</span><input name="pid" inputmode="numeric" value="${esc(p?p.id:'')}" placeholder="68636"></label>`)+
+    `<div class="ag-q"><span class="ag-l">¿Cuándo lo llamás?</span><div class="ag-slots">${agSlotsHTML()}</div><p class="ag-when"></p></div>
+    <details class="ag-more"${edit?' open':''}><summary>Otro día u hora</summary><div class="frow">
+      <label class="fld" style="flex:0 1 160px"><span>Día</span><input type="date" name="pdate" value="${d}" min="${todayS()}"></label>
+      <label class="fld" style="flex:0 1 120px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label></div></details>
+    <details class="ag-kw"><summary>Palabra clave <span class="dim">(opcional)</span><b class="ag-kwv">${kw?' · '+esc(kw):''}</b></summary>
+      <input name="kw" value="${esc(kw)}" placeholder="la que acordaste con el cliente" aria-label="Palabra clave"></details>
+    ${o.submit?'<button type="submit" class="btn pri ag-go">Agendar</button>':''}`;
 }
 function bindAgFields(root){
-  const date=root.querySelector('[name=pdate]'),time=root.querySelector('[name=ptime]');
-  const mark=()=>$$('[data-dd]',root).forEach(c=>c.classList.toggle('on',date.value===addDays(todayS(),+c.dataset.dd)));
-  root.addEventListener('click',e=>{const c=e.target.closest('[data-dd]');if(!c)return;date.value=addDays(todayS(),+c.dataset.dd);if(+c.dataset.dd===0&&(!time.value||time.value<=nowHM()))time.value=suggestTime(date.value);mark()});
-  date.addEventListener('input',mark);mark();
-  return {mark};
+  const date=root.querySelector('[name=pdate]'),time=root.querySelector('[name=ptime]'),kw=root.querySelector('[name=kw]');
+  const mark=()=>{
+    const v=`${date.value}T${time.value}`,ks=root.dataset.qk&&root.dataset.qv===v?root.dataset.qk:'';
+    $$('[data-qt]',root).forEach(c=>c.classList.toggle('on',ks?c.dataset.qk===ks:c.dataset.qt===v));
+    const w=root.querySelector('.ag-when'),dd=/^\d{4}-\d{2}-\d{2}$/.test(date.value)&&time.value?parseDue(v):null;
+    if(w)w.innerHTML=dd?`Lo llamás <b>${esc(whenTxt(dd))}</b> <span class="dim">(${esc(rel(dd))})</span>`:'';
+  };
+  root.addEventListener('click',e=>{const c=e.target.closest('[data-qt]');if(!c)return;const v=c.dataset.qt;date.value=v.slice(0,10);time.value=v.slice(11,16);root.dataset.qk=c.dataset.qk;root.dataset.qv=v;mark()});
+  date.addEventListener('input',mark);time.addEventListener('input',mark);
+  if(kw)kw.addEventListener('input',()=>{const b=root.querySelector('.ag-kwv');if(b)b.textContent=kw.value.trim()?' · '+kw.value.trim():''});
+  let last=agSlotsHTML();
+  const slots=()=>{const s=root.querySelector('.ag-slots'),h=agSlotsHTML();if(s&&h!==last){last=s.innerHTML=h;mark()}}; // "En 1 hora" cambia con la hora
+  mark();
+  return {mark,slots};
 }
 function readAg(root){
   const g=n=>root.querySelector(`[name=${n}]`).value.trim();
@@ -2952,9 +2990,10 @@ function readAg(root){
   const due=`${d}T${t}`;
   return {id,kw,due};
 }
+let agF=null;
 function bindAgForm(form){
-  form.innerHTML=agFields(null);
-  const F=bindAgFields(form);
+  form.innerHTML=agFields(null,{submit:true});
+  const F=agF=bindAgFields(form);
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(!noRO())return;
     $$('input.bad',form).forEach(x=>x.classList.remove('bad'));
@@ -2967,8 +3006,8 @@ function bindAgForm(form){
     syncAgKw(R.id,R.kw);
     const dd=parseDue(R.due);
     toast(`✔ Agendado #${n} · <b>${esc(R.id)}</b>${R.kw?' · '+esc(R.kw):''} · ${esc(whenTxt(dd))} <span class="dim">(${esc(rel(dd))})</span>`);
-    form.querySelector('[name=pid]').value='';form.querySelector('[name=kw]').value='';
-    form.querySelector('[name=pdate]').value=addDays(todayS(),1);form.querySelector('[name=ptime]').value=cfg.hora;F.mark();
+    form.querySelector('[name=pid]').value='';form.querySelector('[name=kw]').value='';form.querySelector('.ag-kwv').textContent='';form.querySelector('.ag-kw').open=false;
+    const df=agDefault();form.querySelector('[name=pdate]').value=df.slice(0,10);form.querySelector('[name=ptime]').value=df.slice(11);delete form.dataset.qk;F.slots();
     form.querySelector('[name=pid]').focus();primeAudio();check();
   });
 }
@@ -2996,7 +3035,7 @@ async function posponer(p,minutes,toDate){
 }
 function pendEdit(p){
   if(!p||!noRO())return;
-  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div>${(h=>h?`<p class="p-sub ag-hint">${esc(h)}</p>`:'')(cobroHint((crmStatusOf(id)||{}).country))}<div class="ebox" id="pErr"></div>`,wide:1,
+  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div>${(h=>h?`<p class="p-sub ag-hint">${esc(h)}</p>`:'')(cobroHint((crmStatusOf(p.id)||{}).country))}<div class="ebox" id="pErr"></div>`,wide:1,
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
@@ -3278,11 +3317,11 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return} // la extensión de esta compu es la estación: cómo le fue con cada vista
-  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);newPoll();if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -3313,8 +3352,9 @@ async function addLeadsFromExt(rows){
 async function syncAgKw(id,kw){kw=(kw||'').trim();if(kw&&kw!==clientKw(id)){try{await setClientKw(id,clientBrand(id),kw)}catch(e){}}}
 function agendarModal(id,kw){
   if(!noRO())return;
-  const p={id,kw:kw!=null?kw:clientKw(id),due:`${addDays(todayS(),1)}T${cfg.hora}`}; // arranca con la palabra clave del cliente
-  modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
+  const p={id,kw:kw!=null?kw:clientKw(id),due:agDefault()}; // arranca con la palabra clave del cliente
+  const h=cobroHint((crmStatusOf(id)||{}).country);
+  modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p,{fixed:true})}</div>${h?`<p class="p-sub ag-hint">${esc(h)}</p>`:''}<div class="ebox" id="pErr"></div>`,
     actions:[{l:'Cancelar'},{l:'Agendar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       if(parseDue(R.due)<new Date(Date.now()-6e4)){api.q('#pErr').textContent='Esa fecha y hora ya pasó.';return false}
@@ -3767,6 +3807,7 @@ function agMesaHTML(now,te){
 V.agenda={
   build(){bindAgForm($('#agForm'))},
   render(){
+    if(agF)agF.slots();
     const now=new Date(),te=todayS();
     const open=pend.filter(p=>!p.done).sort(byDue),done=pend.filter(p=>p.done).sort((a,b)=>(b.doneAt||'').localeCompare(a.doneAt||''));
     const venc=open.filter(p=>parseDue(p.due)<=now),hoy=open.filter(p=>parseDue(p.due)>now&&p.due.slice(0,10)===te),prox=open.filter(p=>p.due.slice(0,10)>te);
@@ -4771,11 +4812,14 @@ function msgIn(m){
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
+// mientras el chat pide el PIN (o Vitalis está tapado), los avisos dicen quién escribió pero no lo que escribió
+const chatShut=()=>locked||chatLocked();
+const SHUT_TXT='Abrí el chat para verlo.';
 // Vitalis escribe en "Toda la mesa" (felicita una venta o anuncia algo): avisa a todos aunque el chat esté silenciado.
 let botAsk=0;
 function cheerEvent(m,c){
   if(Date.now()-m.t>10*6e4)return;
-  const txt=clip(msgTxt(m.body),160);
+  const txt=clip(msgTxt(m.body),160); // lo de Vitalis (felicitar una venta, anunciar algo a la mesa) no es privado: se ve aunque el chat pida el PIN
   toast(`<b>${esc(memberName(m.uid))}</b>: ${esc(txt)}`,'win',{ms:9000,key:'venta'+m._id,actions:chatViewing(c.id)?[]:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();pop()}
   if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:'info',title:'Vitalis en el chat',id:'Toda la mesa',kw:txt,meta:'',btns:[['open','Abrir chat',1],['close','Ok']]});
@@ -4795,18 +4839,19 @@ function chatEvent(m){
   const force=isLeadUid(m.uid)&&(nm_||td),men=nm_||rp||force;
   if(muted(c.id)&&!men)return;
   const n=unread(c.id),who=first(m.uid),where=c.kind==='dm'?'':` en ${esc(chatName(c))}`,how=nm_?' te nombró':td&&force?' (a todos)':rp?' te respondió':'';
-  toast(`<b>${esc(who)}</b>${where}${how}: ${esc(clip(msgTxt(m.body),140))}${n>1?` <span class="dim">· ${n} sin leer</span>`:''}`,force?'imp':'info',{ms:force?15000:9000,key:'ch'+c.id,actions:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
+  const sh=chatShut(),txt=sh?SHUT_TXT:clip(msgTxt(m.body),140);
+  toast(`<b>${esc(who)}</b>${where}${how}: ${sh?`<span class="dim">${SHUT_TXT}</span>`:esc(txt)}${n>1?` <span class="dim">· ${n} sin leer</span>`:''}`,force?'imp':'info',{ms:force?15000:9000,key:'ch'+c.id,actions:[{l:'Abrir',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();if(force)beep(1);else pop()}
-  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:force?'imp':'info',title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+how,kw:clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
+  if(pageAway())extSocial({k:'so:c:'+c.id,v:m._id,lvl:force?'imp':'info',title:c.kind==='dm'?'Mensaje privado':chatName(c),id:who+how,kw:sh?SHUT_TXT+' (te pide el PIN)':clip(msgTxt(m.body),200),meta:n>1?`${n} sin leer`:'',btns:[['open','Abrir chat',1],['close','Ok']]});
 }
 // el aviso queda hasta que lo cierres (en Vitalis y en la tarjeta de la extensión); al entrar, los de hoy que no leíste
 function avisoEvent(m,c){
   if(m.uid===me||Date.now()-m.t>12*36e5||m.t<=readT(c.id))return;
   const seen=local.get('avisos',[]);if(seen.includes(m._id))return;local.set('avisos',[...seen.slice(-60),m._id]);
-  const who=first(m.uid),k=msgCard(m.body),txt=k?(k.title||'Datos')+(k.rest?': '+k.rest:''):msgTxt(m.body),where=c.kind==='team'?'':` en ${c.kind==='dm'?'tu privado':esc(chatName(c))}`;
+  const sh=chatShut(),who=first(m.uid),k=sh?null:msgCard(m.body),txt=sh?SHUT_TXT:k?(k.title||'Datos')+(k.rest?': '+k.rest:''):msgTxt(m.body),where=c.kind==='team'?'':` en ${c.kind==='dm'?'tu privado':esc(chatName(c))}`;
   toast(`<b><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Aviso de ${esc(who)}</b>${where}: ${esc(clip(txt,180))}${k?' <span class="dim">(con datos)</span>':''}`,'imp',{sticky:true,key:'av'+m._id,actions:[{l:'Ver',fn:()=>go('chat',{chat:c.id})}]});
   if(Date.now()-chatSound>2500){chatSound=Date.now();beep(1)}
-  if(pageAway())extSocial({k:'so:c:'+c.id+':a'+m._id,v:m._id,lvl:'imp',title:'Aviso de '+who,id:clip(k?(k.title||'Datos'):msgTxt(m.body),90),kw:clip(k?k.rest:'',200),meta:(c.kind==='team'?'Toda la mesa':chatName(c))+' · '+hhmm(m.t),btns:[['open','Ver',1],['close','Ok']]});
+  if(pageAway())extSocial({k:'so:c:'+c.id+':a'+m._id,v:m._id,lvl:'imp',title:'Aviso de '+who,id:sh?SHUT_TXT:clip(k?(k.title||'Datos'):msgTxt(m.body),90),kw:sh?'Te pide el PIN.':clip(k?k.rest:'',200),meta:(c.kind==='team'?'Toda la mesa':chatName(c))+' · '+hhmm(m.t),btns:[['open','Ver',1],['close','Ok']]});
 }
 function avisoCheck(){if(!ready)return;for(const c of chats)for(const m of (msgs[c.id]||[]).filter(x=>x.aviso&&!chatViewing(c.id)).slice(-3))avisoEvent(m,c)}
 function markRead(cid){
@@ -5736,9 +5781,48 @@ function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
   const by=new Map();for(const x of m.values())if(!isArch(x.brand)&&!by.has(norm(x.id)))by.set(norm(x.id),x);
   const was=crm.ok;crm.rows=m;crm.byId=by;crm.rot=rot||[];crm.ok=true;crm.at=Date.now();
+  newCheck();
   if(ready&&(!was||['ahora','inicio','clientes','campanas','equipo','agenda','cliente'].includes(cur)))refresh();
 }
 let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
+/* ---------- los new que entran por la estación ----------
+   El CRM del team leader (la estación) lee los new cada 10 s y los guarda en crm_clients: a cada agente le avisa de los
+   suyos (Sales Rep), aunque no tenga una pestaña propia vigilando. Uno solo por cliente: lo que ya avisó la pestaña
+   vigilada de la extensión (cmd "nuevo") no se repite. El team leader no recibe (no gestiona clientes). */
+const NEW_FRESH=15*6e4;
+let newAl=null,newAt=0,newBusy=false;
+const newSeen=()=>newAl||(newAl=new Map(local.get('newAl',[])));
+function newMark(id){
+  const m=newSeen(),k=norm(id);if(!k||m.has(k))return false;
+  m.set(k,Date.now());const cut=Date.now()-2*864e5;for(const [a,t] of m)if(t<cut)m.delete(a);
+  local.set('newAl',[...m].slice(-400));return true;
+}
+function newFresh(x,now,te){
+  return x.grp==='new'&&!isArch(x.brand)&&!/talk|habland/i.test(x.status)&&!paidCrm(x)&&x.first&&now-new Date(x.first)<NEW_FRESH&&(!x.reg||regDay(x)===te);
+}
+function newCheck(){
+  if(!ready||!profile||isLeadUid(me)||readOnly)return;
+  const now=Date.now(),te=todayS(),out=[];
+  for(const x of crm.rows.values())if(newFresh(x,now,te)&&x.firstBy!==me&&crmOwner(x)===me&&!newSeen().has(norm(x.id))&&!soldOf(x.id))out.push(x); // los que viste vos en tu CRM ya los tenés
+  if(!out.length)return;
+  out.sort((a,b)=>new Date(b.first)-new Date(a.first));
+  for(const x of out)newMark(x.id);
+  const away=pageAway();
+  fichaNew(out[0].id); // pasa adelante en Cliente (o aviso con "Ver" si estás escribiendo)
+  if(out.length>1)toast(`Entraron ${out.length} news: ${out.slice(0,4).map(x=>`<b>${esc(x.id)}</b>`).join(', ')}${out.length>4?'…':''}`,'imp',{key:'news',actions:[{l:'Ver la cola',fn:()=>go('ahora')}]});
+  if(away)for(const x of out.slice(0,3))extSocial({k:'crm:id:'+x.id,v:x.id,lvl:'imp',title:'Cliente nuevo en el CRM',id:x.id,kw:x.name||'',meta:[paisOf(x.country),'entró '+hhmm(+new Date(x.first))].filter(Boolean).join(' · '),btns:[['crm','Ver en el CRM',1],['close','Ok']]});
+  else beep(1);
+}
+// consulta liviana (solo los new de los últimos minutos): con la pestaña escondida, la extensión la despierta cada 30 s
+async function newPoll(){
+  if(!ready||!sb||!profile||isLeadUid(me)||newBusy||crm.ok===false||Date.now()-newAt<25e3)return;
+  newBusy=true;newAt=Date.now();
+  try{
+    const rows=await Q(sb.from('crm_clients').select('*').neq('brand',ARCH).eq('status_group','new').gte('first_seen',new Date(Date.now()-NEW_FRESH).toISOString()).limit(200));
+    let n=0;for(const r of rows){const x=C2X(r),k=ckey(x.brand,x.id);if(!crm.rows.has(k))n++;crm.rows.set(k,x);if(!crm.byId.has(norm(x.id)))crm.byId.set(norm(x.id),x)}
+    newCheck();if(n&&['ahora','inicio','cliente'].includes(cur))refresh();
+  }catch(e){}finally{newBusy=false}
+}
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}
 async function crmLog(id){ // status y rotaciones, en orden
   const [a,b]=await Promise.all([QO(sb.from('crm_status_log').select('*').eq('client_id',String(id)).order('seen_at',{ascending:true}).limit(60)),

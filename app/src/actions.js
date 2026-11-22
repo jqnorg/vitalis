@@ -172,27 +172,50 @@ function quitarAjuste(ym){
 /* ---------- agenda ---------- */
 const dueStr=d=>`${ymd(d)}T${z(d.getHours())}:${z(d.getMinutes())}`;
 const byDue=(a,b)=>a.due<b.due?-1:a.due>b.due?1:0;
-function suggestTime(date){ // hora por defecto; si ya pasó hoy, la próxima media hora
-  if(date!==todayS())return cfg.hora;
-  const d=new Date();if(nowHM()<cfg.hora)return cfg.hora;
-  d.setMinutes(d.getMinutes()+30-(d.getMinutes()%30)+30,0,0);return `${z(d.getHours())}:${z(d.getMinutes())}`;
+// Agendar en dos toques: elegís cuándo (botones grandes) y Agendar. Otro día u hora y la palabra clave quedan plegados.
+const AG_END='17:30',AG_DIA=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+const hTxt=h=>h.replace(/^0(\d)/,'$1');
+function workAhead(n){let d=todayS();for(let i=0,k=0;i<n&&k<40;k++){d=addDays(d,1);const w=noTrabajo(d);if(!w||w==='falta')i++}return d} // n días que se trabajan desde hoy
+function agDay(d){return d===addDays(todayS(),1)?'Mañana':AG_DIA[parseYMD(d).getDay()]}
+function agDefault(){return `${workAhead(1)}T${cfg.hora}`}
+function agSlots(){ // los horarios de un toque (los de hoy, solo si todavía estás en horario)
+  const te=todayS(),L=[],inM=n=>{const d=new Date(Date.now()+n*6e4);d.setSeconds(0,0);const r=d.getMinutes()%5;if(r)d.setMinutes(d.getMinutes()+5-r);return dueStr(d)};
+  for(const [l,n] of [['En 1 hora',60],['En 2 horas',120]]){const v=inM(n);if(v.slice(0,10)===te&&v.slice(11)<=AG_END)L.push({k:'m'+n,l,v})}
+  if(nowHM()<'14:00')L.push({k:'h16',l:'Hoy 16:00',v:`${te}T16:00`});
+  const d1=workAhead(1),d3=workAhead(3),h=cfg.hora;
+  L.push({k:'d1',l:`${agDay(d1)} ${hTxt(h)}`,v:`${d1}T${h}`});
+  if(h<'15:00')L.push({k:'d1t',l:`${agDay(d1)} 15:00`,v:`${d1}T15:00`});
+  L.push({k:'d3',l:`${agDay(d3)} ${hTxt(h)}`,v:`${d3}T${h}`,s:'en 3 días'});
+  return L;
 }
-function agFields(p){
-  const d=p?p.due.slice(0,10):addDays(todayS(),1),t=p?p.due.slice(11,16):cfg.hora;
-  return `<div class="frow">
-    <label class="fld" style="flex:1 1 120px"><span>ID</span><input name="pid" value="${esc(p?p.id:'')}"></label>
-    <label class="fld" style="flex:3 1 200px"><span>Palabra clave <small class="dim">(del cliente)</small></span><input name="kw" value="${esc(p?p.kw:'')}" placeholder="la que acordaste con el cliente"></label>
-    <label class="fld" style="flex:0 1 150px"><span>Fecha</span><input type="date" name="pdate" value="${d}"></label>
-    <label class="fld" style="flex:0 1 104px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label>
-    ${p?'':'<button type="submit" class="btn pri">Agendar</button>'}</div>
-    <div class="chips" style="margin-top:8px">${[['Hoy',0],['Mañana',1],['Pasado',2],['En una semana',7]].map(([l,n])=>`<button type="button" class="chip" data-dd="${n}">${l}</button>`).join('')}</div>`;
+const agSlotsHTML=()=>agSlots().map(x=>`<button type="button" class="ag-s" data-qk="${x.k}" data-qt="${x.v}">${esc(x.l)}${x.s?`<small>${esc(x.s)}</small>`:''}</button>`).join('');
+function agFields(p,o={}){ // o.fixed: el ID ya se sabe (viene de un cliente): no se escribe
+  const due=p&&p.due||agDefault(),d=due.slice(0,10),t=due.slice(11,16),kw=p&&p.kw||'',edit=!!(p&&p._id);
+  return (o.fixed?`<input type="hidden" name="pid" value="${esc(p.id)}">`
+    :`<label class="fld ag-id"><span>ID del cliente</span><input name="pid" inputmode="numeric" value="${esc(p?p.id:'')}" placeholder="68636"></label>`)+
+    `<div class="ag-q"><span class="ag-l">¿Cuándo lo llamás?</span><div class="ag-slots">${agSlotsHTML()}</div><p class="ag-when"></p></div>
+    <details class="ag-more"${edit?' open':''}><summary>Otro día u hora</summary><div class="frow">
+      <label class="fld" style="flex:0 1 160px"><span>Día</span><input type="date" name="pdate" value="${d}" min="${todayS()}"></label>
+      <label class="fld" style="flex:0 1 120px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label></div></details>
+    <details class="ag-kw"><summary>Palabra clave <span class="dim">(opcional)</span><b class="ag-kwv">${kw?' · '+esc(kw):''}</b></summary>
+      <input name="kw" value="${esc(kw)}" placeholder="la que acordaste con el cliente" aria-label="Palabra clave"></details>
+    ${o.submit?'<button type="submit" class="btn pri ag-go">Agendar</button>':''}`;
 }
 function bindAgFields(root){
-  const date=root.querySelector('[name=pdate]'),time=root.querySelector('[name=ptime]');
-  const mark=()=>$$('[data-dd]',root).forEach(c=>c.classList.toggle('on',date.value===addDays(todayS(),+c.dataset.dd)));
-  root.addEventListener('click',e=>{const c=e.target.closest('[data-dd]');if(!c)return;date.value=addDays(todayS(),+c.dataset.dd);if(+c.dataset.dd===0&&(!time.value||time.value<=nowHM()))time.value=suggestTime(date.value);mark()});
-  date.addEventListener('input',mark);mark();
-  return {mark};
+  const date=root.querySelector('[name=pdate]'),time=root.querySelector('[name=ptime]'),kw=root.querySelector('[name=kw]');
+  const mark=()=>{
+    const v=`${date.value}T${time.value}`,ks=root.dataset.qk&&root.dataset.qv===v?root.dataset.qk:'';
+    $$('[data-qt]',root).forEach(c=>c.classList.toggle('on',ks?c.dataset.qk===ks:c.dataset.qt===v));
+    const w=root.querySelector('.ag-when'),dd=/^\d{4}-\d{2}-\d{2}$/.test(date.value)&&time.value?parseDue(v):null;
+    if(w)w.innerHTML=dd?`Lo llamás <b>${esc(whenTxt(dd))}</b> <span class="dim">(${esc(rel(dd))})</span>`:'';
+  };
+  root.addEventListener('click',e=>{const c=e.target.closest('[data-qt]');if(!c)return;const v=c.dataset.qt;date.value=v.slice(0,10);time.value=v.slice(11,16);root.dataset.qk=c.dataset.qk;root.dataset.qv=v;mark()});
+  date.addEventListener('input',mark);time.addEventListener('input',mark);
+  if(kw)kw.addEventListener('input',()=>{const b=root.querySelector('.ag-kwv');if(b)b.textContent=kw.value.trim()?' · '+kw.value.trim():''});
+  let last=agSlotsHTML();
+  const slots=()=>{const s=root.querySelector('.ag-slots'),h=agSlotsHTML();if(s&&h!==last){last=s.innerHTML=h;mark()}}; // "En 1 hora" cambia con la hora
+  mark();
+  return {mark,slots};
 }
 function readAg(root){
   const g=n=>root.querySelector(`[name=${n}]`).value.trim();
@@ -202,9 +225,10 @@ function readAg(root){
   const due=`${d}T${t}`;
   return {id,kw,due};
 }
+let agF=null;
 function bindAgForm(form){
-  form.innerHTML=agFields(null);
-  const F=bindAgFields(form);
+  form.innerHTML=agFields(null,{submit:true});
+  const F=agF=bindAgFields(form);
   form.addEventListener('submit',async e=>{
     e.preventDefault();if(!noRO())return;
     $$('input.bad',form).forEach(x=>x.classList.remove('bad'));
@@ -217,8 +241,8 @@ function bindAgForm(form){
     syncAgKw(R.id,R.kw);
     const dd=parseDue(R.due);
     toast(`✔ Agendado #${n} · <b>${esc(R.id)}</b>${R.kw?' · '+esc(R.kw):''} · ${esc(whenTxt(dd))} <span class="dim">(${esc(rel(dd))})</span>`);
-    form.querySelector('[name=pid]').value='';form.querySelector('[name=kw]').value='';
-    form.querySelector('[name=pdate]').value=addDays(todayS(),1);form.querySelector('[name=ptime]').value=cfg.hora;F.mark();
+    form.querySelector('[name=pid]').value='';form.querySelector('[name=kw]').value='';form.querySelector('.ag-kwv').textContent='';form.querySelector('.ag-kw').open=false;
+    const df=agDefault();form.querySelector('[name=pdate]').value=df.slice(0,10);form.querySelector('[name=ptime]').value=df.slice(11);delete form.dataset.qk;F.slots();
     form.querySelector('[name=pid]').focus();primeAudio();check();
   });
 }
@@ -246,7 +270,7 @@ async function posponer(p,minutes,toDate){
 }
 function pendEdit(p){
   if(!p||!noRO())return;
-  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div>${(h=>h?`<p class="p-sub ag-hint">${esc(h)}</p>`:'')(cobroHint((crmStatusOf(id)||{}).country))}<div class="ebox" id="pErr"></div>`,wide:1,
+  modal({title:`Editar contacto #${p.n}`,body:`<div class="agform">${agFields(p)}</div>${(h=>h?`<p class="p-sub ag-hint">${esc(h)}</p>`:'')(cobroHint((crmStatusOf(p.id)||{}).country))}<div class="ebox" id="pErr"></div>`,wide:1,
     actions:[{l:'Cancelar'},{l:'Guardar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       const ch={id:R.id,kw:R.kw};if(R.due!==p.due){ch.due=R.due;ch.notified=false}
@@ -528,11 +552,11 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return} // la extensión de esta compu es la estación: cómo le fue con cada vista
-  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){fichaNew(String(d.k||'').slice(0,60));return} // entró un new: la ficha se abre cuando entres
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);newPoll();if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -563,8 +587,9 @@ async function addLeadsFromExt(rows){
 async function syncAgKw(id,kw){kw=(kw||'').trim();if(kw&&kw!==clientKw(id)){try{await setClientKw(id,clientBrand(id),kw)}catch(e){}}}
 function agendarModal(id,kw){
   if(!noRO())return;
-  const p={id,kw:kw!=null?kw:clientKw(id),due:`${addDays(todayS(),1)}T${cfg.hora}`}; // arranca con la palabra clave del cliente
-  modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p)}</div><div class="ebox" id="pErr"></div>`,wide:1,
+  const p={id,kw:kw!=null?kw:clientKw(id),due:agDefault()}; // arranca con la palabra clave del cliente
+  const h=cobroHint((crmStatusOf(id)||{}).country);
+  modal({title:`Agendar a ${esc(id)}`,body:`<div class="agform">${agFields(p,{fixed:true})}</div>${h?`<p class="p-sub ag-hint">${esc(h)}</p>`:''}<div class="ebox" id="pErr"></div>`,
     actions:[{l:'Cancelar'},{l:'Agendar',cls:'pri',fn:async api=>{
       const R=readAg(api.box);if(R.err){api.q('#pErr').textContent=R.err;return false}
       if(parseDue(R.due)<new Date(Date.now()-6e4)){api.q('#pErr').textContent='Esa fecha y hora ya pasó.';return false}

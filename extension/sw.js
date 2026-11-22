@@ -463,7 +463,8 @@ async function crmClients(tabId, m) {
   if (!got) return { watched: false };
   if ((await deskRole()) === 'leader') return { watched: true, fresh: 0 }; // el team leader no recibe avisos de new: los gestionan los agentes
   for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
-  for (const c of fresh.slice(0, 5)) {
+  const shown = new Set((await liveNow()).map((x) => x.k)); // Vitalis ya avisó por la estación: no repito tarjeta ni sonido
+  for (const c of fresh.filter((c) => !shown.has('crm:' + c.key)).slice(0, 5)) {
     await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
       btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
   }
@@ -653,6 +654,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'social' && msg.card) {
     const card = msg.card;
     if (/^so:c:/.test(card.k) && card.lvl !== 'imp') card.exp = Date.now() + CHAT_MS; // mensaje común del chat: se va solo (si te nombran o es el team leader, queda)
+    if (/^crm:id:/.test(card.k)) { alertCard({ ...card, kind: 'crm' }, 'crm', `Cliente nuevo: ${card.id}`, [card.kw, card.meta].filter(Boolean).join(' · ')); return false; } // un new que Vitalis vio por la estación
     alertCard(card, 'social'); return false;
   }
   if (msg.type === 'social-close' && msg.k) { dismiss(msg.k); return false; }
