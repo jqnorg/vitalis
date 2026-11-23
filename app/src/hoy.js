@@ -76,7 +76,7 @@ const meNeedsDay=()=>!!profile&&!isLeadUid(me)&&crm.ok;
 /* ---------- la franja: los news del día que piden repaso (sin sonido; se ve estando en Vitalis) ---------- */
 function hoyBand(){
   const el=$('#hoyBand');if(!el)return;
-  const due=meNeedsDay()?dayPool(me).due:[];
+  const due=meNeedsDay()&&cur!=='ahora'&&cur!=='agenda'?dayPool(me).due:[]; // en el Panel ya está la cola: ahí no se repite
   if(!due.length){el.hidden=true;el.innerHTML='';return}
   el.hidden=false;
   el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'Falta 1 new por repasar':`Faltan ${due.length} news por repasar`}</b>

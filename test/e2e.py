@@ -1069,6 +1069,7 @@ async def main():
             ok(await A.locator('#toasts .toast:has-text("pidió un cambio")').count() == 1, 'al admin le avisa el pedido de cambio')
             await A.evaluate("fichaCache.clear();cuRender(true)"); await A.wait_for_timeout(1800)
             ok(await A.locator('#v-cliente [data-fa=campReqs]').count() == 1, 'y en la ficha ve el pedido para resolverlo')
+            await A.click('#cuTop .cu-more summary'); await A.wait_for_timeout(200)  # "Abrir por ID" y los recientes van plegados en "Otro cliente"
             await A.fill('#cuTop [data-cu=find] input', '500002'); await A.press('#cuTop [data-cu=find] input', 'Enter'); await A.wait_for_timeout(1500)
             ok('Nueva Dos' in await A.inner_text('#cuBody') and '500001' in await A.inner_text('#cuTop .cu-rec'), 'se abre otro por ID y el anterior queda en Recientes')
             await A.click('#cuTop [data-cu=rec][data-id="500001"]'); await A.wait_for_timeout(1500)
@@ -1167,7 +1168,7 @@ async def main():
 
             # privacidad: Vitalis no se tapa solo; el candado de la barra lo cierra y pide el PIN (y recargar no lo destapa)
             await A.evaluate("modals.slice().forEach(m=>m.close());go('config')"); await A.wait_for_timeout(500)
-            ok(await A.is_visible('#cfLocks') and 'Nada se cierra solo' in await A.inner_text('#cfLocks'), 'Ajustes dice que nada se cierra solo')
+            ok(await A.is_visible('#cfLocks') and 'Nada se bloquea solo' in await A.inner_text('#cfLocks'), 'Ajustes dice que nada se bloquea solo')
             await A.evaluate("lockCheck()"); await A.wait_for_timeout(300)
             ok(not await A.is_visible('#lock'), 'Vitalis no se tapa solo')
             await A.click('#sLock'); await A.wait_for_timeout(400)

@@ -88,4 +88,4 @@ const padUp=()=>locked||chatPadOn; // con un teclado de PIN a la vista, las tecl
 function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return 'inicio'}return tlView()?'callman':'ahora'} // el team leader, a su call manager
 
 // Ajustes: ya no hay tiempos (los candados son a mano); queda la línea para que se sepa
-function locksTxt(){return 'Nada se cierra solo: el candado de la barra cierra Vitalis y el del chat cierra el chat. Los dos piden tu PIN.'}
+function locksTxt(){return 'Nada se bloquea solo: el candado de la barra bloquea Vitalis y el del chat bloquea el chat. Los dos piden tu PIN.'}

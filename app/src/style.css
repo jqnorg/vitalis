@@ -1397,3 +1397,13 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 /* candado de la barra: cierra Vitalis a mano */
 #bar .pill.lk{gap:6px}#bar .pill.lk .ic{width:16px;height:16px}
 @media (max-width:640px){#bar .pill.lk .lk-t{display:none}}
+
+/* ficha: "Otro cliente" plegado; el anuncio adentro de la tarjeta Campaña; las marcas del turno en el Inicio */
+.cu-more{margin-top:6px}.cu-more summary{cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;list-style:none}.cu-more summary::before{content:'▸ ';}.cu-more[open] summary::before{content:'▾ '}
+.cu-more .cu-rec{margin-top:8px}
+.fi-combo .fi-camps{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}.fi-combo .fi-camps>.p-sub{display:block;margin:0 0 4px;font-weight:700}
+.turno-mini .marks{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--dim);font-size:13px}.turno-mini .marks b{color:var(--fg)}
+/* menú: "Call manager" en una sola línea */
+#nav button .nm{white-space:nowrap}#nav button#navCm kbd{display:none}#nav button#navCm{gap:9px}
+/* celular: la barra en una fila que se desliza (el candado no queda solo en una línea) */
+@media (max-width:820px){#bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar .pill{flex:none}#bar .grow{display:none}#bar .pill.lk .lk-t{display:none}}

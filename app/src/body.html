@@ -70,7 +70,7 @@
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
   <button type="button" class="pill" id="sTask" data-go="tareas" title="Tareas pendientes" hidden></button>
   <span class="pill bad" id="sDb" hidden>Sin conexión</span>
-  <button type="button" class="pill lk wr" id="sLock" data-act="lockNow" title="Cerrar Vitalis (pide tu PIN para volver)" aria-label="Cerrar Vitalis"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg><span class="lk-t">Cerrar</span></button>
+  <button type="button" class="pill lk wr" id="sLock" data-act="lockNow" title="Bloquear Vitalis (pide tu PIN para volver)" aria-label="Bloquear Vitalis"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg><span class="lk-t">Bloquear</span></button>
   <span class="grow"></span>
   <span id="sClock"></span>
 </header>
@@ -157,7 +157,7 @@
 
 <section class="view" id="v-turnos" hidden>
   <div class="vh"><div><h1>Turnos</h1><p class="sub" id="tuSub"></p></div><span class="grow"></span>
-    <div class="tools"><span class="seg" id="tuPer"></span><select id="tuMes" aria-label="Mes"></select><button type="button" class="btn wr" data-act="cargarJornada">Cargar jornada</button></div></div>
+    <div class="tools"><span class="seg" id="tuPer"></span><select id="tuMes" aria-label="Mes"></select><button type="button" class="btn wr" data-act="deshacer" title="Deshacer la última marca de hoy">Deshacer</button><button type="button" class="btn wr" data-act="editHoy" title="Corregir las horas de hoy">Corregir hoy</button><button type="button" class="btn wr" data-act="cargarJornada">Cargar jornada</button></div></div>
   <div class="kpis" id="tuKpis"></div>
   <section class="card"><div class="card-h"><h3>Horas por día</h3><div class="legend"><span><i class="sw s1"></i>Horas</span><span><i class="sw ref"></i>Jornada</span></div></div><div class="chart" id="tuChart"></div></section>
   <section class="card"><div class="card-h"><h3>Jornadas</h3><span class="p-sub" id="tuCount"></span></div><div class="p-tablewrap" id="tuTable"></div></section>

@@ -157,7 +157,7 @@ function go(v,opts){
   sn.innerHTML=G.views.length<2?'':G.views.filter(x=>(x!=='equipo'&&x!=='clientes')||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
-  if(ready)V[v].render(opts||{});
+  if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
 }
 let rT=null;
 // con la pestaña escondida no se dibuja la sección (nadie la ve): se dibuja al volver. La barra y la extensión sí se actualizan.

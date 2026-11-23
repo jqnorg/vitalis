@@ -38,11 +38,11 @@ V.inicio={
     $('#iFecha').textContent=`${cap(DIAL[now.getDay()])} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
     const hoy=ftds.filter(f=>f.date===te),t=openTurno()||turnos[te],m=t?metr(t):null;
     const mes=MES[+ym.slice(5,7)-1];
-    const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
+    const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`tus clientes depositaron ${money(s.monto)} USD`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
     if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}</div><span class="grow"></span>
-      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
+      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${cfg.porftd} USD por FTD${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
@@ -50,7 +50,7 @@ V.inicio={
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
       (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
     {const bc=bkCard();$('#iBank').hidden=!bc;$('#iBank').innerHTML=bc} // si un procesador falla, primero eso
-    crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
+    crmLoad();const ah=TL?ahoraCard():'';$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // la cola de la mesa (team leader); al agente la franja y el Panel ya se lo dicen
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
     {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
@@ -61,10 +61,11 @@ V.inicio={
     const {t,b,h,key}=turnoState(),now=Date.now(),day=t||h;
     if(force||key!==this.k){
       this.k=key;let bt='';
+      // los botones del turno están en la barra de arriba (una sola vez); acá, el tiempo y las marcas del día
       if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">Reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">Marcar entrada</button>';
       else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">Volví ${isBano(b)?'del baño':'del descanso'}</button>`;
-      else bt=`<button type="button" class="btn big" data-act="bano">Baño</button><button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
-      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-act="deshacer" title="Deshacer la última marca">Deshacer</button><button type="button" class="ib" data-act="editHoy" title="Editar las horas de hoy">Editar</button>';
+      else bt=day?`<span class="marks">${marksHTML(day)}</span>`:'';
+      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">Corregir</button>';
       $('#itBtns').innerHTML=bt;
     }
     let st='<span class="dim">Todavía no marcaste entrada hoy.</span>';

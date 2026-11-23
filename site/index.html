@@ -1410,6 +1410,16 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 /* candado de la barra: cierra Vitalis a mano */
 #bar .pill.lk{gap:6px}#bar .pill.lk .ic{width:16px;height:16px}
 @media (max-width:640px){#bar .pill.lk .lk-t{display:none}}
+
+/* ficha: "Otro cliente" plegado; el anuncio adentro de la tarjeta Campaña; las marcas del turno en el Inicio */
+.cu-more{margin-top:6px}.cu-more summary{cursor:pointer;color:var(--dim);font-size:13px;font-weight:600;list-style:none}.cu-more summary::before{content:'▸ ';}.cu-more[open] summary::before{content:'▾ '}
+.cu-more .cu-rec{margin-top:8px}
+.fi-combo .fi-camps{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}.fi-combo .fi-camps>.p-sub{display:block;margin:0 0 4px;font-weight:700}
+.turno-mini .marks{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--dim);font-size:13px}.turno-mini .marks b{color:var(--fg)}
+/* menú: "Call manager" en una sola línea */
+#nav button .nm{white-space:nowrap}#nav button#navCm kbd{display:none}#nav button#navCm{gap:9px}
+/* celular: la barra en una fila que se desliza (el candado no queda solo en una línea) */
+@media (max-width:820px){#bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar .pill{flex:none}#bar .grow{display:none}#bar .pill.lk .lk-t{display:none}}
 </style>
 </head>
 <body class="auth">
@@ -1487,7 +1497,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
   <button type="button" class="pill" id="sTask" data-go="tareas" title="Tareas pendientes" hidden></button>
   <span class="pill bad" id="sDb" hidden>Sin conexión</span>
-  <button type="button" class="pill lk wr" id="sLock" data-act="lockNow" title="Cerrar Vitalis (pide tu PIN para volver)" aria-label="Cerrar Vitalis"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg><span class="lk-t">Cerrar</span></button>
+  <button type="button" class="pill lk wr" id="sLock" data-act="lockNow" title="Bloquear Vitalis (pide tu PIN para volver)" aria-label="Bloquear Vitalis"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg><span class="lk-t">Bloquear</span></button>
   <span class="grow"></span>
   <span id="sClock"></span>
 </header>
@@ -1574,7 +1584,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 
 <section class="view" id="v-turnos" hidden>
   <div class="vh"><div><h1>Turnos</h1><p class="sub" id="tuSub"></p></div><span class="grow"></span>
-    <div class="tools"><span class="seg" id="tuPer"></span><select id="tuMes" aria-label="Mes"></select><button type="button" class="btn wr" data-act="cargarJornada">Cargar jornada</button></div></div>
+    <div class="tools"><span class="seg" id="tuPer"></span><select id="tuMes" aria-label="Mes"></select><button type="button" class="btn wr" data-act="deshacer" title="Deshacer la última marca de hoy">Deshacer</button><button type="button" class="btn wr" data-act="editHoy" title="Corregir las horas de hoy">Corregir hoy</button><button type="button" class="btn wr" data-act="cargarJornada">Cargar jornada</button></div></div>
   <div class="kpis" id="tuKpis"></div>
   <section class="card"><div class="card-h"><h3>Horas por día</h3><div class="legend"><span><i class="sw s1"></i>Horas</span><span><i class="sw ref"></i>Jornada</span></div></div><div class="chart" id="tuChart"></div></section>
   <section class="card"><div class="card-h"><h3>Jornadas</h3><span class="p-sub" id="tuCount"></span></div><div class="p-tablewrap" id="tuTable"></div></section>
@@ -1756,7 +1766,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.33.0';
+const VERSION='1.34.0';
 const EXT_VER='1.15.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -2725,7 +2735,7 @@ function go(v,opts){
   sn.innerHTML=G.views.length<2?'':G.views.filter(x=>(x!=='equipo'&&x!=='clientes')||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
-  if(ready)V[v].render(opts||{});
+  if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
 }
 let rT=null;
 // con la pestaña escondida no se dibuja la sección (nadie la ve): se dibuja al volver. La barra y la extensión sí se actualizan.
@@ -3688,11 +3698,11 @@ V.inicio={
     $('#iFecha').textContent=`${cap(DIAL[now.getDay()])} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
     const hoy=ftds.filter(f=>f.date===te),t=openTurno()||turnos[te],m=t?metr(t):null;
     const mes=MES[+ym.slice(5,7)-1];
-    const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`${money(s.monto)} USD depositados`;
+    const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`tus clientes depositaron ${money(s.monto)} USD`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
     if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}</div><span class="grow"></span>
-      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${s.n} × ${cfg.porftd}${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
+      <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${cfg.porftd} USD por FTD${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
@@ -3700,7 +3710,7 @@ V.inicio={
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
       (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
     {const bc=bkCard();$('#iBank').hidden=!bc;$('#iBank').innerHTML=bc} // si un procesador falla, primero eso
-    crmLoad();const ah=ahoraCard();$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // lo que toca ahora, arriba de todo
+    crmLoad();const ah=TL?ahoraCard():'';$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // la cola de la mesa (team leader); al agente la franja y el Panel ya se lo dicen
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
     {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
@@ -3711,10 +3721,11 @@ V.inicio={
     const {t,b,h,key}=turnoState(),now=Date.now(),day=t||h;
     if(force||key!==this.k){
       this.k=key;let bt='';
+      // los botones del turno están en la barra de arriba (una sola vez); acá, el tiempo y las marcas del día
       if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">Reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">Marcar entrada</button>';
       else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">Volví ${isBano(b)?'del baño':'del descanso'}</button>`;
-      else bt=`<button type="button" class="btn big" data-act="bano">Baño</button><button type="button" class="btn big" data-act="d10">Descanso 10'</button><button type="button" class="btn big" data-act="d30">Descanso 30'</button><button type="button" class="btn pri big" data-act="salida">Marcar salida</button>`;
-      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-act="deshacer" title="Deshacer la última marca">Deshacer</button><button type="button" class="ib" data-act="editHoy" title="Editar las horas de hoy">Editar</button>';
+      else bt=day?`<span class="marks">${marksHTML(day)}</span>`:'';
+      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">Corregir</button>';
       $('#itBtns').innerHTML=bt;
     }
     let st='<span class="dim">Todavía no marcaste entrada hoy.</span>';
@@ -5244,7 +5255,7 @@ V.chat={
       (c.kind==='dm'?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+
       (c.kind==='group'?`<button type="button" class="btn sm" data-ch="people">Gente</button>`:'')+
       `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`+
-      `<button type="button" class="btn sm" data-ch="lock" title="Cerrar el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Cerrar chat</button>`;
+      `<button type="button" class="btn sm" data-ch="lock" title="Bloquear el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Bloquear</button>`;
     if($('#chHead').dataset.h!==hd){$('#chHead').innerHTML=hd;$('#chHead').dataset.h=hd}
     if(i.dataset.c!==c.id){i.dataset.c=c.id;i.value=chatDrafts[c.id]||'';growIn(i);i.placeholder=c.kind==='dm'?`Escribile a ${first(dmOther(c))}`:`Escribí en ${chatName(c)}`}
     // mensajes
@@ -6618,8 +6629,8 @@ function fichaHTML(d){
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
-      ${fiPayHTML(d)}${fiCampsHTML(d)}</div>
-      <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}${comboHTML(d)}</div>
+      ${fiPayHTML(d)}${comboHTML(d)}</div>
+      <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}</div>
     </div></div>`;
 }
 // Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
@@ -6652,17 +6663,17 @@ function fiBankFlow(b){
   return `${(b.use_pm||[]).length||(b.avoid_pm||[]).length?`<div class="bk-chips" style="margin:6px 0">${bankChips(b)}</div>`:''}${(b.steps||[]).length?`<ol class="bk-steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}${b.notes?`<p class="bk-notes">${esc(b.notes)}</p>`:''}${(bkFilesOf('bank',b.id)||[]).length?`<button type="button" class="lnk" data-fa="bankview" data-id="${esc(b.id)}">Ver fotos</button>`:''}`;
 }
 // las campañas del afiliador en el país: monto mínimo y qué ve la persona en el anuncio
-function fiCampsHTML(d){
+function fiCampsHTML(d){ // el anuncio de la campaña del cliente (y las otras del afiliador en una línea): va adentro de la tarjeta Campaña
   if(!d.aff)return '';
   const ed=bkEd(),nReq=c=>d.reqs.filter(q=>norm(q.camp)===norm(c)).length;
   const row=c=>{const i=c.info,n=nReq(c.camp);
     return `<div class="fi-camp${c.mine?' mine':''}"><div class="fi-ch"><b>${esc(c.camp)}</b>${c.mine?'<span class="badge paid">la del cliente</span>':''}<span class="grow"></span>
       ${i?(ed?`<button type="button" class="lnk" data-fa="campEdit" data-c="${esc(c.camp)}">Editar</button>`:`<button type="button" class="lnk" data-fa="campReq" data-c="${esc(c.camp)}">Pedir un cambio</button>`):`<button type="button" class="btn sm" data-fa="campAdd" data-c="${esc(c.camp)}">Agregar</button>`}</div>
-      ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Sin datos: agregá el monto mínimo y qué ve en el anuncio.</p>'}
+      ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Todavía no sabemos el monto mínimo ni qué ve en el anuncio. Si lo sabés, agregalo.</p>'}
       ${ed&&n?`<button type="button" class="lnk hot" data-fa="campReqs" data-c="${esc(c.camp)}">${plural(n,'pedido de cambio','pedidos de cambio')}</button>`:''}</div>`};
   // para cargar datos solo aparece la campaña del cliente; las otras sin datos van en una línea
   const show=d.camps.filter(c=>c.info||c.mine),rest=d.camps.filter(c=>!c.info&&!c.mine);
-  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">${show.length?'Sin datos':'Campañas'}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}${d.camps.length?'':'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliador.</p>'}</div>`;
+  return `<div class="fi-camps"><span class="p-sub">El anuncio</span>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">Otras de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}</div>`;
 }
 // el perfil que exige la gerencia: edad, ocupación y objetivo siempre; más si tiene el dinero y por qué no depositó
 function profFalta(p){const f=[];if(!p||p.edad==null)f.push('edad');if(!p||(!p.ocupacion&&!p.desocupado))f.push('ocupación');if(!p||!p.objetivo)f.push('objetivo');return f}
@@ -6907,13 +6918,12 @@ function cuTopHTML(){
   const h=cuHist.filter(x=>!curCl||x.id!==curCl.id);
   return `<div class="cu-bar">${curCl?`<span class="cu-src"><span class="cu-dot ${esc(curCl.src||'')}"></span>Cliente actual · ${cuSrc(curCl)} · ${esc(rel(new Date(curCl.at)))}</span>`:'<span class="cu-src">Cliente actual</span>'}
     <span class="grow"></span>
-    <form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>
-    ${curCl?`<button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="btn sm" data-cu="ag">Agendar</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
-    ${h.length?`<div class="cu-rec"><span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b>${x.name?' '+esc(clip(x.name,22)):''}</button>`).join('')}</div>`:''}`;
+    ${curCl?`<button type="button" class="btn sm pri" data-cu="ag">Agendar</button><button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
+    <details class="cu-more" data-k="cu-more"${curCl?'':' open'}><summary>Otro cliente</summary><div class="cu-rec"><form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>${h.length?`<span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b>${x.name?' '+esc(clip(x.name,22)):''}</button>`).join('')}`:''}</div></details>`;
 }
 async function cuRender(force){
   const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
-  if(!top.contains(document.activeElement)||force)top.innerHTML=cuTopHTML(); // sin pisar el ID que estás escribiendo
+  if(!top.contains(document.activeElement)||force){const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)} // sin pisar el ID que estás escribiendo ni plegar "Otro cliente"
   if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con el perfil, el depósito, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
   const id=curCl.id;
   // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
@@ -6926,7 +6936,7 @@ async function cuRender(force){
   body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);reopen(body,opened);bkHydrate(body);
   const t2=body.querySelector('[data-fcom]');if(t2&&txt){t2.value=txt;if(foc)t2.focus()}
   const b2=body.querySelector('[data-fbank]');if(b2&&bv){b2.value=bv;b2.dispatchEvent(new Event('change',{bubbles:true}))}
-  if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);top.innerHTML=cuTopHTML()}
+  if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)}
 }
 V.cliente={
   build(){
@@ -7028,7 +7038,7 @@ const meNeedsDay=()=>!!profile&&!isLeadUid(me)&&crm.ok;
 /* ---------- la franja: los news del día que piden repaso (sin sonido; se ve estando en Vitalis) ---------- */
 function hoyBand(){
   const el=$('#hoyBand');if(!el)return;
-  const due=meNeedsDay()?dayPool(me).due:[];
+  const due=meNeedsDay()&&cur!=='ahora'&&cur!=='agenda'?dayPool(me).due:[]; // en el Panel ya está la cola: ahí no se repite
   if(!due.length){el.hidden=true;el.innerHTML='';return}
   el.hidden=false;
   el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'Falta 1 new por repasar':`Faltan ${due.length} news por repasar`}</b>
@@ -7135,7 +7145,7 @@ function comboHTML(d){
   return `<div class="fi-c fi-combo"><h4>Campaña <span class="fi-v" title="${esc(campTxt(d.aff,d.camp,d.pais))}">${esc(campTxt(d.aff,d.camp,d.pais))}</span></h4>
     ${g&&g.reg?`<p class="fi-cline">${campLine(g)}</p>${stBar(g)}`:''}${(h=>h?`<p class="fi-late">${esc(h)}</p>`:'')(affLateHint(d.aff))}
     ${g&&g.reg?rw2('Registrados vistos',g.reg)+rw2('Atienden',`${g.at} · ${pctTxt(g.at,g.at+g.no)}`)+rw2('Depositaron',`${g.dep} · ${pctTxt(g.dep,g.reg)}${g.dep?` <span class="d">(${g.nw} new · ${g.lt} late)</span>`:''}`):''}
-    ${g&&g.ftd?rw2('FTDs en 30 días',g.f30)+rw2('FTDs en total',`${g.ftd} · ${pctTxt(g.flt,g.ftd)} late`)+(g.last?rw2('Último FTD',`${esc(g.last.date===todayS()?'hoy':dm(g.last.date))} ${esc(g.last.time||'')}`):''):(g&&g.reg?'':'<p class="p-sub" style="margin:0">Sin datos de esta campaña todavía.</p>')}</div>`;
+    ${g&&g.ftd?rw2('FTDs en 30 días',g.f30)+rw2('FTDs en total',`${g.ftd} · ${pctTxt(g.flt,g.ftd)} late`)+(g.last?rw2('Último FTD',`${esc(g.last.date===todayS()?'hoy':dm(g.last.date))} ${esc(g.last.time||'')}`):''):(g&&g.reg?'':'<p class="p-sub" style="margin:0">Sin datos de esta campaña todavía.</p>')}${fiCampsHTML(d)}</div>`;
 }
 
 /* ---------- la parte de Campañas en Clientes ---------- */
@@ -8041,7 +8051,7 @@ const padUp=()=>locked||chatPadOn; // con un teclado de PIN a la vista, las tecl
 function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return 'inicio'}return tlView()?'callman':'ahora'} // el team leader, a su call manager
 
 // Ajustes: ya no hay tiempos (los candados son a mano); queda la línea para que se sepa
-function locksTxt(){return 'Nada se cierra solo: el candado de la barra cierra Vitalis y el del chat cierra el chat. Los dos piden tu PIN.'}
+function locksTxt(){return 'Nada se bloquea solo: el candado de la barra bloquea Vitalis y el del chat bloquea el chat. Los dos piden tu PIN.'}
 
 /* ============================================================
    Entrada: elegís tu nombre → tu PIN. Vitalis es para una sola mesa.

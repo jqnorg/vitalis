@@ -453,7 +453,7 @@ V.chat={
       (c.kind==='dm'?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+
       (c.kind==='group'?`<button type="button" class="btn sm" data-ch="people">Gente</button>`:'')+
       `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`+
-      `<button type="button" class="btn sm" data-ch="lock" title="Cerrar el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Cerrar chat</button>`;
+      `<button type="button" class="btn sm" data-ch="lock" title="Bloquear el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Bloquear</button>`;
     if($('#chHead').dataset.h!==hd){$('#chHead').innerHTML=hd;$('#chHead').dataset.h=hd}
     if(i.dataset.c!==c.id){i.dataset.c=c.id;i.value=chatDrafts[c.id]||'';growIn(i);i.placeholder=c.kind==='dm'?`Escribile a ${first(dmOther(c))}`:`Escribí en ${chatName(c)}`}
     // mensajes

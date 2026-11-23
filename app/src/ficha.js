@@ -52,8 +52,8 @@ function fichaHTML(d){
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
-      ${fiPayHTML(d)}${fiCampsHTML(d)}</div>
-      <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}${comboHTML(d)}</div>
+      ${fiPayHTML(d)}${comboHTML(d)}</div>
+      <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}</div>
     </div></div>`;
 }
 // Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
@@ -86,17 +86,17 @@ function fiBankFlow(b){
   return `${(b.use_pm||[]).length||(b.avoid_pm||[]).length?`<div class="bk-chips" style="margin:6px 0">${bankChips(b)}</div>`:''}${(b.steps||[]).length?`<ol class="bk-steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}${b.notes?`<p class="bk-notes">${esc(b.notes)}</p>`:''}${(bkFilesOf('bank',b.id)||[]).length?`<button type="button" class="lnk" data-fa="bankview" data-id="${esc(b.id)}">Ver fotos</button>`:''}`;
 }
 // las campañas del afiliador en el país: monto mínimo y qué ve la persona en el anuncio
-function fiCampsHTML(d){
+function fiCampsHTML(d){ // el anuncio de la campaña del cliente (y las otras del afiliador en una línea): va adentro de la tarjeta Campaña
   if(!d.aff)return '';
   const ed=bkEd(),nReq=c=>d.reqs.filter(q=>norm(q.camp)===norm(c)).length;
   const row=c=>{const i=c.info,n=nReq(c.camp);
     return `<div class="fi-camp${c.mine?' mine':''}"><div class="fi-ch"><b>${esc(c.camp)}</b>${c.mine?'<span class="badge paid">la del cliente</span>':''}<span class="grow"></span>
       ${i?(ed?`<button type="button" class="lnk" data-fa="campEdit" data-c="${esc(c.camp)}">Editar</button>`:`<button type="button" class="lnk" data-fa="campReq" data-c="${esc(c.camp)}">Pedir un cambio</button>`):`<button type="button" class="btn sm" data-fa="campAdd" data-c="${esc(c.camp)}">Agregar</button>`}</div>
-      ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Sin datos: agregá el monto mínimo y qué ve en el anuncio.</p>'}
+      ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Todavía no sabemos el monto mínimo ni qué ve en el anuncio. Si lo sabés, agregalo.</p>'}
       ${ed&&n?`<button type="button" class="lnk hot" data-fa="campReqs" data-c="${esc(c.camp)}">${plural(n,'pedido de cambio','pedidos de cambio')}</button>`:''}</div>`};
   // para cargar datos solo aparece la campaña del cliente; las otras sin datos van en una línea
   const show=d.camps.filter(c=>c.info||c.mine),rest=d.camps.filter(c=>!c.info&&!c.mine);
-  return `<div class="fi-c fi-camps"><h4>Campañas de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}</h4>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">${show.length?'Sin datos':'Campañas'}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}${d.camps.length?'':'<p class="p-sub" style="margin:0">Todavía no vi campañas de este afiliador.</p>'}</div>`;
+  return `<div class="fi-camps"><span class="p-sub">El anuncio</span>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">Otras de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}</div>`;
 }
 // el perfil que exige la gerencia: edad, ocupación y objetivo siempre; más si tiene el dinero y por qué no depositó
 function profFalta(p){const f=[];if(!p||p.edad==null)f.push('edad');if(!p||(!p.ocupacion&&!p.desocupado))f.push('ocupación');if(!p||!p.objetivo)f.push('objetivo');return f}
@@ -341,13 +341,12 @@ function cuTopHTML(){
   const h=cuHist.filter(x=>!curCl||x.id!==curCl.id);
   return `<div class="cu-bar">${curCl?`<span class="cu-src"><span class="cu-dot ${esc(curCl.src||'')}"></span>Cliente actual · ${cuSrc(curCl)} · ${esc(rel(new Date(curCl.at)))}</span>`:'<span class="cu-src">Cliente actual</span>'}
     <span class="grow"></span>
-    <form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>
-    ${curCl?`<button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="btn sm" data-cu="ag">Agendar</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
-    ${h.length?`<div class="cu-rec"><span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b>${x.name?' '+esc(clip(x.name,22)):''}</button>`).join('')}</div>`:''}`;
+    ${curCl?`<button type="button" class="btn sm pri" data-cu="ag">Agendar</button><button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
+    <details class="cu-more" data-k="cu-more"${curCl?'':' open'}><summary>Otro cliente</summary><div class="cu-rec"><form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>${h.length?`<span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b>${x.name?' '+esc(clip(x.name,22)):''}</button>`).join('')}`:''}</div></details>`;
 }
 async function cuRender(force){
   const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
-  if(!top.contains(document.activeElement)||force)top.innerHTML=cuTopHTML(); // sin pisar el ID que estás escribiendo
+  if(!top.contains(document.activeElement)||force){const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)} // sin pisar el ID que estás escribiendo ni plegar "Otro cliente"
   if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con el perfil, el depósito, las campañas de su afiliador y los comentarios. Cuando entra un new, también.</p></div>`;return}
   const id=curCl.id;
   // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
@@ -360,7 +359,7 @@ async function cuRender(force){
   body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);reopen(body,opened);bkHydrate(body);
   const t2=body.querySelector('[data-fcom]');if(t2&&txt){t2.value=txt;if(foc)t2.focus()}
   const b2=body.querySelector('[data-fbank]');if(b2&&bv){b2.value=bv;b2.dispatchEvent(new Event('change',{bubbles:true}))}
-  if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);top.innerHTML=cuTopHTML()}
+  if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)}
 }
 V.cliente={
   build(){
