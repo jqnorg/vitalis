@@ -4,7 +4,8 @@
    su turno, sus news (ahora y los que recibió hoy), FTDs de hoy, llamadas contra el mínimo, la última llamada,
    y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
 const CM_NEW=5*6e4,CM_QUIET=20*6e4; // un New sin llamar a los 5 min · en turno y sin llamar hace 20 min
-const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
+const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:m<48*60?`${Math.floor(m/60)} h ${z(m%60)}`:`${Math.round(m/1440)} días`};
+const CM_STUCK=2*36e5; // un cliente en Talking hace más de 2 h quedó colgado: al cortar tiene que salir de Talking (lo dijo el dueño)
 const cmHace=ms=>ms<6e4?'recién':`hace ${cmAgo(ms)}`; // "recién", nunca "hace recién"
 const cmInCall=(R,now)=>!!(R&&R.segs&&R.segs.some(s=>s.k==='talk'&&now-s.b<9e4)); // el sistema ya sabe que está en llamada (conversación abierta)
 function cmTurno(uid){ // el turno de hoy de alguien, con el descanso que tiene abierto
@@ -39,7 +40,15 @@ function cmData(){
   // lo que hay que atender ya, lo más urgente primero
   const al=[];
   for(const p of pings)if(p.kind==='ayuda'&&!p.reply&&now-Date.parse(p.at)<30*6e4)al.push({w:0,html:`<b>${esc(first(p.from))}</b> pidió ayuda ${cmHace(now-Date.parse(p.at))} y nadie fue todavía`});
-  for(const x of cur)if(x.wait)al.push({w:1,id:x.r.id,html:`New sin llamar <b>${cmHace(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''} · ${x.u?esc(memberName(x.u)):'<span class="hot">sin agente</span>'}`});
+  // New sin llamar y Talking colgados, agrupados por agente (una fila por agente, desplegable), lo más viejo primero
+  const grp=(list,k,one,many)=>{const by=new Map();for(const x of list)(by.get(x.u||'')||by.set(x.u||'',[]).get(x.u||'')).push(x);
+    for(const [u,xs] of by){xs.sort((a,b)=>a.a-b.a);const nm=u?esc(memberName(u)):'<span class="hot">Sin agente</span>';
+      const li=x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.r.id)}"><b>${esc(x.r.id)}</b></button> ${esc(clip(x.r.name,26))}${x.r.country?` <span class="d">(${esc(x.r.country)})</span>`:''} · ${cmHace(now-x.a)}</li>`;
+      if(xs.length===1)al.push({w:k,id:xs[0].r.id,html:`${nm}: ${one(xs[0])}`});
+      else al.push({w:k,html:`<details class="cm-g"><summary><b>${nm}</b>: ${many(xs)}</summary><ul>${xs.map(li).join('')}</ul></details>`});}};
+  grp(cur.filter(x=>x.wait),1,x=>`New sin llamar <b>${cmHace(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''}`,xs=>`<b>${xs.length}</b> new sin llamar, el más viejo <b>${cmHace(now-xs[0].a)}</b>`);
+  const stuck=cur.filter(x=>x.talk&&x.r.since&&now-Date.parse(x.r.since)>CM_STUCK).map(x=>({...x,a:Date.parse(x.r.since)}));
+  grp(stuck,2,x=>`<b>${esc(x.r.id)}</b> ${esc(x.r.name)} quedó en <b>Talking</b> ${cmHace(now-x.a)}: al cortar tiene que salir de Talking`,xs=>`<b>${xs.length}</b> clientes quedaron en <b>Talking</b> (el más viejo ${cmHace(now-xs[0].a)}): al cortar tienen que salir de Talking`);
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
@@ -60,14 +69,14 @@ V.callman={
     const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin llamar hace +5 min</span>`:'todos llamados','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+
       kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`);
     const alerts=D.al.length?`<section class="card cm-al"><div class="card-h"><h3>Para atender ya</h3><span class="p-sub">${plural(D.al.length,'cosa','cosas')}</span></div>
-      <ul class="cm-list">${D.al.slice(0,12).map(a=>`<li class="w${a.w}"><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg><span>${a.html}</span>${a.id?`<button type="button" class="btn sm" data-hy="ficha" data-id="${esc(a.id)}">Ficha</button>`:''}</li>`).join('')}</ul></section>`:'';
+      <ul class="cm-list">${D.al.slice(0,20).map(a=>`<li class="w${a.w}"><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg><span>${a.html}</span>${a.id?`<button type="button" class="btn sm" data-hy="ficha" data-id="${esc(a.id)}">Ficha</button>`:''}</li>`).join('')}</ul></section>`:'';
     const cRow=x=>{const r=x.r,c=x.k;
       return `<tr class="${x.wait?'cm-wait':''}"><td><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> ${esc(clip(r.name,26))}<div class="d">${esc(r.country||'')}${r.camp?' · '+esc(clip(r.camp,22)):''}</div></td>
         <td>${x.u?`<span class="eq-who">${avatar(memberName(x.u))}${esc(first(x.u))}</span>`:'<span class="hot">sin agente</span>'}</td>
         <td>${x.talk?sp('ok b','Talking'):sp(x.wait?'hot b':'b','New')}</td>
         <td>${x.a?cmHace(D.now-x.a):'—'}</td>
         <td>${c.last?`${c.lines.size?`${c.lines.size} línea${c.lines.size===1?'':'s'} · `:''}${cmHace(D.now-c.last)}`:sp(x.wait?'hot':'d','sin llamar')}</td></tr>`};
-    const cur=`<section class="card"><div class="card-h"><h3>News en curso</h3><span class="p-sub">New y Talking, sin depositar · primero los que nadie llamó</span></div>
+    const cur=`${D.al.length>20?`<p class="p-sub" style="margin:-8px 2px 12px">Y ${D.al.length-20} avisos más.</p>`:''}<section class="card"><div class="card-h"><h3>News en curso</h3><span class="p-sub">New y Talking, sin depositar · primero los que nadie llamó</span></div>
       ${D.cur.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Cliente</th><th>Agente</th><th>Estado</th><th>Registro</th><th>Llamadas</th></tr></thead><tbody>${D.cur.slice(0,40).map(cRow).join('')}</tbody></table></div>${D.cur.length>40?`<p class="p-sub" style="margin:8px 2px 0">Y ${D.cur.length-40} más.</p>`:''}`:'<div class="p-empty">Nadie en New ni en Talking ahora.</div>'}</section>`;
     const aRow=p=>`<tr><td><button type="button" class="eq-who lnkp" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}<b>${esc(p.m.name)}</b></button></td>
       <td><span class="${p.tu.cls}">${esc(p.tu.txt)}</span></td>

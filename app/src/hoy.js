@@ -75,14 +75,14 @@ function dayPace(uid){
 const meNeedsDay=()=>!!profile&&!isLeadUid(me)&&crm.ok;
 
 /* ---------- la franja: los news del día que piden repaso (sin sonido; se ve estando en Vitalis) ---------- */
-function hoyBand(){
-  const el=$('#hoyBand');if(!el)return;
-  const due=meNeedsDay()&&cur!=='ahora'&&cur!=='agenda'?dayPool(me).due:[]; // en el Panel ya está la cola: ahí no se repite
-  if(!due.length){el.hidden=true;el.innerHTML='';return}
-  el.hidden=false;
-  el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'1 cliente en New: llamalo ya':`${due.length} clientes en New: llamalos ya`}</b>
-    <span class="hb-list">${due.slice(0,5).map(x=>`<button type="button" class="chip" data-hb="ficha" data-id="${esc(x.r.id)}" title="${esc(x.k.last?'Último contacto '+rel(new Date(x.k.last)):'Sin llamar todavía')}"><b>${esc(x.r.id)}</b> ${esc(clip(x.r.name||'',18))}<small>${x.k.last?esc(rel(new Date(x.k.last))):'sin llamar'}</small></button>`).join('')}${due.length>5?`<span class="d">y ${due.length-5} más</span>`:''}</span>
-    <span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button>`;
+function hoyBand(){ // los clientes en New, como pastilla en la barra (lo pidió el dueño): se ve en todas las secciones y lleva a la Cola
+  const el=$('#hoyBand');if(el){el.hidden=true;el.innerHTML=''}
+  const p=$('#sNew');if(!p)return;
+  const due=meNeedsDay()?dayPool(me).due:[];
+  p.hidden=!due.length;if(!due.length)return;
+  const sin=due.filter(x=>!x.k.last).length;
+  p.innerHTML=`<span class="hb-dot" aria-hidden="true"></span>${due.length===1?'<b>1</b> en New':`<b>${due.length}</b> en New`}${sin&&sin!==due.length?` <span class="d">· ${sin} sin llamar</span>`:''}`;
+  p.title=`${plural(due.length,'cliente')} en New: ${due.length===1?'llamalo':'llamalos'} ya. ${due.slice(0,6).map(x=>x.r.id+(x.k.last?'':' (sin llamar)')).join(', ')}${due.length>6?'…':''}`;
 }
 
 /* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
@@ -108,7 +108,7 @@ function ritmo(uid){
     const isTalk=l=>/talk|habl/.test(l.st); // Talking: tiempo de llamada justificado
     const talked=(id,from,until)=>{ // pasó a Talking (o ya lo estaba) o quedó con un resultado antes del siguiente intento
       const k=norm(id),cur=crmStatusOf(id);
-      if(cur&&/talk|habl/.test(norm(cur.status))&&cur.since&&Date.parse(cur.since)<=until+10*6e4)return true;
+      if(cur&&/talk|habl/.test(norm(cur.status))&&cur.since){const t=Date.parse(cur.since);if(t>=from-10*6e4&&t<=until+10*6e4)return true} // pasó a Talking alrededor del intento (uno colgado de días es un error del CRM, no charla)
       return stLog.some(l=>l.id===k&&l.at>=from&&l.at<=until+10*6e4&&(isTalk(l)||TALK_G.includes(l.grp)));
     };
     let dead=0,talk=0,cur=t.in;const segs=[]; // segs: qué pasó en cada tramo del día (para el detalle)

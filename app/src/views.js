@@ -722,8 +722,9 @@ V.clientes={
       $('#clSeen').hidden=false;$('#clSeen').innerHTML=`Hoy entraron al registro ${plural(nuevos,'cliente')} del CRM, con su status.`+(isLeader()&&fh.length?` De los ${plural(fh.length,'FTD')} de hoy, ${en} ${en===1?'estaba':'estaban'} en el registro.`:'')}
     else $('#clSeen').hidden=true;
     // gráfico: últimos 30 días
-    const start=addDays(te,-29),own=l=>uid==null||leadOwner(l)===uid,data=[];
-    for(let i=0;i<30;i++){const d=addDays(start,i),L=leads.filter(l=>l.date===d&&own(l)),paid=L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
+    const start=addDays(te,-29),own=l=>uid==null||leadOwner(l)===uid,data=[],useCrm=typeof cohortCovers==='function'&&cohortCovers(start,te); // con el registro del CRM, los registrados por día (del primero que los llamó); si no, el registro viejo
+    const crmByDay=new Map();if(useCrm)for(const r of crmAll()){if(isArch(r.brand)||(uid!=null&&convOwner(r)!==uid))continue;const d=regDay(r);if(d>=start&&d<=te)(crmByDay.get(d)||crmByDay.set(d,[]).get(d)).push(r)}
+    for(let i=0;i<30;i++){const d=addDays(start,i),L=useCrm?(crmByDay.get(d)||[]):leads.filter(l=>l.date===d&&own(l)),paid=useCrm?L.filter(r=>sold.has(norm(r.id))||paidCrm(r)).length:L.filter(l=>sold.has(norm(l.id))).length,dw=parseYMD(d).getDay();
       data.push({lab:String(+d.slice(8)),a:paid,b:L.length-paid,d,dw,ftd:team.filter(f=>f.date===d&&own(f)).length,labC:dw===0||dw===6?'color-mix(in srgb,var(--dim) 55%,transparent)':''})}
     $('#clChartSub').textContent='Últimos 30 días';
     colChart($('#clChart'),data,{h:190,capMin:18,cb:'var(--sx)',label:'Clientes new por día',empty:'Todavía no hay clientes registrados. Abrí el CRM con la extensión instalada o cargalos con + Cliente.',
