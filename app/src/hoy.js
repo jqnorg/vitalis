@@ -4,17 +4,18 @@
    Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader), cada NA (NA a NA-4: días de llamadas, sin llamarlo no avanza), CA, HU, CallBack y Pending
    llamado al menos una vez en el día, y los news del día repasados cada menos de 2 h. Un intento completo es por las tres líneas.
    ============================================================ */
-let calls=[],callsOk=null,callsDay='';
+let calls=[],callsOk=null,callsDay='',stLog=[]; // stLog: los cambios de status de hoy (para saber qué llamadas fueron conversación)
 const LINES={omega:'Omega',gizat:'Gizat',voiso:'Voiso'};
 const C2C=r=>({uid:r.user_id,id:String(r.client_id),brand:r.brand,line:r.line,at:+new Date(r.at)});
 const minCalls=()=>+(teamInfo&&teamInfo.min_calls)||250;
 async function callsFetch(){ // las de hoy de toda la mesa
   const day=todayS(),from=parseYMD(day).toISOString();
   const page=i=>Q(sb.from('calls').select('user_id,client_id,brand,line,at').gte('at',from).order('at').order('id').range(i*1000,i*1000+999));
-  try{const pages=await Promise.all([page(0),page(1)]);while(pages[pages.length-1].length===1000)pages.push(await page(pages.length));return {day,rows:pages.flat()}}
+  try{const [pages,log]=await Promise.all([Promise.all([page(0),page(1)]),QO(sb.from('crm_status_log').select('client_id,new_status,new_group,seen_at').gte('seen_at',from).order('seen_at').limit(5000))]);
+    while(pages[pages.length-1].length===1000)pages.push(await page(pages.length));return {day,rows:pages.flat(),log}}
   catch(e){return null}
 }
-function callsApply(x){if(!x){callsOk=false;return}callsOk=true;callsDay=x.day;calls=x.day===todayS()?x.rows.map(C2C):[]}
+function callsApply(x){if(!x){callsOk=false;return}callsOk=true;callsDay=x.day;calls=x.day===todayS()?x.rows.map(C2C):[];stLog=(x.log||[]).map(l=>({id:norm(l.client_id),grp:l.new_group||'',st:norm(l.new_status),at:+new Date(l.seen_at)}))}
 const sameCall=(a,b)=>a.uid===b.uid&&norm(a.id)===norm(b.id)&&a.line===b.line&&Math.abs(a.at-b.at)<30e3;
 function callAdd(c){if(calls.some(x=>sameCall(x,c)))return false;calls.push(c);return true}
 function callLive(p){if(p.eventType!=='INSERT'||!p.new||p.new.team_id!==profile.team_id)return;if(callAdd(C2C(p.new)))refresh()}
@@ -84,16 +85,58 @@ function hoyBand(){
     <span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button>`;
 }
 
+/* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
+   Hablar no suma ni resta: no depende del agente que el cliente atienda. Lo que se mide es si, cuando no está hablando, marca al ritmo.
+   Una llamada cubre CALL_S (50 s de espera + 3 s para cambiar de línea). Una llamada es conversación si después de ella el cliente cambió
+   de status (o pasó a Talking) antes de la siguiente llamada: ese hueco es hablado. Lo demás, sin descanso marcado, es tiempo muerto.
+   Requeridas = el mínimo menos lo que no se pudo marcar por hablar (una hora hablada = 68 llamadas). La franja sale del tiempo muerto
+   proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
+const CALL_S=53e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['new','call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
+const ritmoMemo={p:-1,m:new Map()};
+function ritmo(uid){
+  if(ritmoMemo.p!==pass){ritmoMemo.p=pass;ritmoMemo.m.clear()}
+  if(ritmoMemo.m.has(uid))return ritmoMemo.m.get(uid);
+  const te=todayS(),now=Date.now(),t=uid===me?(openTurno()||turnos[te]):(teamSh[uid]||{})[te];
+  let R=null;
+  if(t&&t.in){
+    const end=t.out||now,brs=(t.breaks||[]).map(b=>[b.s,b.e||now]);
+    const brIn=(a,b)=>{let x=0;for(const [s,e] of brs){const lo=Math.max(a,s),hi=Math.min(b,e);if(hi>lo)x+=hi-lo}return x}; // descanso dentro de un tramo
+    const L=calls.filter(c=>c.uid===uid&&c.at>=t.in&&c.at<=end).sort((a,b)=>a.at-b.at);
+    const talked=(c,until)=>stLog.some(l=>l.id===norm(c.id)&&l.at>=c.at&&l.at<=until+10*6e4&&(TALK_G.includes(l.grp)||/talk|habl/.test(l.st))&&!(l.grp==='new'&&!/talk|habl/.test(l.st)));
+    let dead=0,talk=0,cur=t.in;
+    for(let i=0;i<L.length;i++){
+      const c=L[i],nx=L[i+1];
+      dead+=Math.max(0,c.at-cur-brIn(cur,c.at)); // antes de esta llamada: nada cubría
+      const until=nx?nx.at:end,gap=Math.max(0,until-c.at-CALL_S),sameCl=nx&&norm(nx.id)===norm(c.id)&&until-c.at<2*6e4; // cambio de línea al mismo cliente: no es hueco
+      if(gap>0&&!sameCl){if(talked(c,until))talk+=Math.min(gap,TALK_MAX);else dead+=Math.max(0,gap-brIn(c.at+CALL_S,until))}
+      cur=until;
+    }
+    if(!L.length)dead=Math.max(0,end-t.in-brIn(t.in,end));
+    const brTot=brIn(t.in,end),useful=Math.max(1,end-t.in-brTot),full=t.out?useful:Math.max(useful,jorMs()-brTot);
+    const proj=t.out?dead:Math.round(dead/useful*full);
+    const req=Math.max(0,Math.round(minCalls()-talk/CALL_S));
+    R={n:L.length,dead,talk,proj,req,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4};
+  }
+  ritmoMemo.m.set(uid,R);return R;
+}
+const qCls=q=>q===1?'ok':q===2?'warn':'hot';
+const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
+const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;
+function ritmoLine(uid){ // en palabras: "180 llamadas · 25 min muertos · Q1"
+  const R=ritmo(uid);if(!R)return '';
+  return `<span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}${R.req!==minCalls()?` <span class="d">(hoy se piden ${R.req}: hablaste ${esc(minsTxt(R.talk))})</span>`:` <span class="d">de ${R.req}</span>`}</span> · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)}`;
+}
+
 /* ---------- en Equipo: las llamadas de hoy de cada agente (texto; el team leader fija el mínimo) ---------- */
 function paceTxt(pc){if(pc.exp==null)return 'sin Entrada marcada';if(pc.n>=pc.min)return 'mínimo cumplido';if(pc.exp<10)return 'recién empieza su jornada';return pc.ok?`va bien · a esta altura, ${pc.exp}`:`va atrasado · a esta altura, ${pc.exp}`}
 function callsMesaCard(){
   if(callsOk===false)return '';
   const all=sellers(team).filter(m=>!isLeadUid(m.id)).map(m=>({m,pc:dayPace(m.id),P:crm.ok?dayPool(m.id):null})).sort((a,b)=>b.pc.n-a.pc.n||a.m.name.localeCompare(b.m.name));
   const on=all.filter(x=>x.pc.n||(x.P&&x.P.total)),off=all.filter(x=>!(x.pc.n||(x.P&&x.P.total)));
-  const row=({m,pc,P})=>`<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td title="${esc(paceTxt(pc))}"><b class="${pc.n>=pc.min?'ok':pc.ok===false?'hot':''}">${pc.n}</b><span class="d">/${pc.min}</span></td>
-    <td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`;
-  return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">toques en Omega, Gizat o Voiso (estimado)</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+  const row=({m,pc,P})=>{const R=ritmo(m.id);return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span></td>
+    <td>${R?esc(minsTxt(R.dead)):'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`};
+  return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">llamadas, tiempo muerto y franja: Q1 menos de 30 min muertos en el día · Q2 hasta 1 h · Q3 más</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Tiempo muerto</th><th>Franja</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){

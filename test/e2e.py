@@ -855,6 +855,18 @@ async def main():
             await A.wait_for_timeout(500)
             ok(await A.evaluate("(()=>{const P=dayPool(me);return P.done===2&&callsOf(me)===4&&P.items.find(x=>x.r.id==='500003').k.full&&P.items.find(x=>x.r.id==='500002').k.lines.size===1})()"), 'llamado por las 3 líneas: intento completo; por una: a medias')
             ok(await A.locator('#iCielo').count() == 0 and await A.locator('.sky').count() == 0, 'sin el pool con estrellas')
+            # el ritmo del día: tiempo muerto y franja Q (hablar no suma ni resta)
+            rt = await A.evaluate("(()=>{const t=openTurno()||turnos[todayS()];return t&&t.in?ritmo(me):null})()")
+            ok(rt is None or (rt['n'] == 4 and rt['q'] in (1, 2, 3) and rt['dead'] >= 0), f'el ritmo cuenta las llamadas y el tiempo muerto ({rt})')
+            await A.evaluate("""(()=>{const now=Date.now();turnos[todayS()]={date:todayS(),in:now-3*36e5,breaks:[{k:10,s:now-2*36e5,e:now-2*36e5+10*6e4}]};
+              calls=[['A','omega',175],['A','gizat',174],['A','voiso',173],['B','omega',150],['C','omega',60],['C','gizat',59],['C','voiso',58]].map(([id,l,m])=>({uid:me,id,brand:'Novara Markets',line:l,at:now-m*6e4}));
+              stLog=[{id:'b',grp:'call_again',st:'call again',at:now-120*6e4}];pass++})()""")
+            rt = await A.evaluate("(({n,dead,talk,req,q})=>({n,dead:Math.round(dead/6e4),talk:Math.round(talk/6e4),req,q}))(ritmo(me))")
+            ok(rt['n'] == 7 and 85 <= rt['talk'] <= 91 and rt['req'] < 250, f'la llamada a B fue conversación (cambió de status): ese hueco es hablado y descuenta llamadas requeridas ({rt})')
+            ok(80 <= rt['dead'] <= 88 and rt['q'] == 3, f'lo demás (sin el descanso marcado ni los cambios de línea) es tiempo muerto, proyectado al día: Q3 ({rt})')
+            await A.evaluate("go('inicio')"); await A.wait_for_timeout(600)
+            ok('muertos' in await A.inner_text('#itRitmo') and 'Q3' in await A.inner_text('#itRitmo'), 'el Inicio dice llamadas, tiempo muerto y franja')
+            await A.evaluate("calls=[];callsFetch().then(x=>{callsApply(x);refresh()})"); await A.wait_for_timeout(1000)
             ok(await A.is_visible('#hoyBand') and '1 cliente en New' in await A.inner_text('#hoyBand'), 'llamado y todavía en New: sigue siendo urgente, la franja queda')
             await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
             gs = await A.evaluate("Object.fromEntries([...document.querySelectorAll('#ahBody details[data-k^=sg-]')].map(d=>[d.dataset.k,{t:d.textContent,open:d.open}]))")

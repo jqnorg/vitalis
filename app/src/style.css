@@ -1407,3 +1407,10 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 #nav button .nm{white-space:nowrap}#nav button#navCm kbd{display:none}#nav button#navCm{gap:9px}
 /* celular: la barra en una fila que se desliza (el candado no queda solo en una línea) */
 @media (max-width:820px){#bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar .pill{flex:none}#bar .grow{display:none}#bar .pill.lk .lk-t{display:none}}
+
+/* el ritmo del día: tiempo muerto y franja Q */
+.qb{display:inline-block;font-weight:800;font-size:12.5px;border-radius:999px;padding:1px 9px;border:1.5px solid}
+.qb.q1{color:#047857;border-color:var(--v-ok);background:color-mix(in srgb,var(--v-ok) 12%,transparent)}
+.qb.q2{color:#92400e;border-color:var(--v-warn);background:color-mix(in srgb,var(--v-warn) 14%,transparent)}
+.qb.q3{color:#be123c;border-color:var(--v-err);background:color-mix(in srgb,var(--v-err) 10%,transparent)}
+.ritmo{margin:-4px 0 10px;font-size:13.5px;color:var(--dim)}.ritmo b{color:var(--fg)}.ritmo b.hot{color:#be123c}.ritmo b.warn{color:#b45309}

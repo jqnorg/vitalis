@@ -77,6 +77,7 @@ V.inicio={
       else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
     $('#itState').innerHTML=st;
+    {const el=$('#itRitmo');if(el){const h=tlView()?'':ritmoLine(me);el.hidden=!h;el.innerHTML=h}} // tu ritmo de hoy: llamadas, tiempo muerto y franja
     $('#itTl').innerHTML=day?timeline(day,now):'';
   },
 };
