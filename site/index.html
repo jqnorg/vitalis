@@ -5810,7 +5810,9 @@ const utCell=(uid,ym,n)=>{const t=utOf(uid,ym);return `<button type="button" cla
 const ARCH='Trade24Seven',isArch=b=>norm(b)===norm(ARCH); // la marca que quedó como archivo
 const GRPS={new:'New (y Talking)',na:'No Answer y NA',callback:'CallBack (con cita)',call_again:'Call Again',hang_up:'Hang Up',low_potential:'Low potential',not_interested:'Not interested',
   pending:'Pending Payment (boleto)',failed:'Depósito trabado (Failed, Bank Block, Declined)',ftd:'FTD',dnc:'Do Not Call',invalid:'Inválido (número, idioma)',crm:'Del CRM (Reassign, Test, FAKE…)',otro:'Otro'};
-const G3=['call_again','hang_up','na'],G2=['callback','pending'],DAYS5=['callback','call_again','hang_up','low_potential']; // con cita · los de 5 días seguidos y al 5º pasan a Not interested
+const G3=['call_again','hang_up','na'],G2=['callback','pending']; // con cita
+// CallBack, Call Again, Hang Up y Low Potential pasan a Not interested al 5º día de contacto (no de calendario). Vitalis no lo cuenta:
+// no hay forma de saber si los llamó otra mesa (lo pidió el dueño).
 let crm={ok:null,rows:new Map(),byId:new Map(),at:0,busy:null,rot:[],fullAt:0,seenMs:0,rotMs:0,dBusy:false};
 const CRM_FULL=10*6e4,CRM_ACT=['new','na','callback','call_again','hang_up','low_potential','pending','failed']; // la carga entera, cada 10 min; en el medio, solo lo que cambió
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
@@ -6020,8 +6022,6 @@ const staleSet=perPass(()=>{
 });
 const stale=r=>staleSet().has(ckey(r.brand,r.id));
 // día del status para los de "5 días seguidos" (cuenta desde que Vitalis lo vio cambiar)
-const statusDay=r=>{if(!DAYS5.includes(r.grp)||!r.since)return 0;return Math.max(1,Math.round((parseYMD(todayS())-parseYMD(ymd(new Date(r.since))))/864e5)+1)};
-const dayTag=r=>{const n=statusDay(r);return n?` <span class="d${n>=5?' hot b':''}" title="Al 5º día seguido pasa a Not interested">día ${Math.min(n,5)}/5</span>`:''};
 const g3rank=r=>r.grp==='call_again'?0:r.grp==='hang_up'?10:20+naNum(r.status);
 const byRegDesc=(a,b)=>(regAt(b)||0)-(regAt(a)||0);
 const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
@@ -6046,7 +6046,7 @@ function queueOf(uid){ // uid: me | null (toda la mesa) | otro
 }
 function ahRow(r,i,who){
   const ra=regAt(r),ca=callAt(r),tz=cliTime(r.country);
-  return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}${dayTag(r)}</td>
+  return `<tr><td class="d">${i}</td><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}" title="Ver la ficha"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td>
     <td class="d" title="${ca?esc(whenTxt(ca)):''}">${ca?esc(rel(ca)):'—'}${r.note?`<div class="ah-nt trunc" title="${esc(r.note)}">${esc(r.note)}</div>`:''}</td>
     <td class="d" title="${ra?esc(whenTxt(ra)):''}">${ra?esc(rel(ra)):''}${newClock(r)}</td><td>${esc(r.country)}${tz?` <span class="d" title="Hora del cliente">${tz}</span>`:''}</td><td class="trunc d" title="${esc(r.camp)}">${esc(r.camp)}</td>
     ${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}<td class="act wr"><button type="button" class="ib" data-ah="ficha" data-id="${esc(r.id)}">Ficha</button><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
@@ -6603,7 +6603,7 @@ function fichaHTML(d){
       <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}</div></div>
     <div class="fi-cols"><div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
-        ${rw2('Status',r?`${esc(r.status||'—')}${dayTag(r)}`:'<span class="d">todavía no se vio en el CRM</span>')}
+        ${rw2('Status',r?esc(r.status||'—'):'<span class="d">todavía no se vio en el CRM</span>')}
         <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
         ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}
@@ -7508,7 +7508,6 @@ const sgPlain=r=>{ // el status en palabras simples
 const sgPlace=r=>{if(!r||!r.country)return '';const t=cliTime(r.country);return esc(r.country)+(t?` · allá son las ${t}`:'')};
 const sgFlame='<svg class="ic sg-fl" aria-hidden="true"><use href="#i-racha"/></svg>';
 const sgCalled=k=>k.today&&k.last?`<span class="sg-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Llamado hoy ${hhmm(k.last)}</span>`:'<span class="sg-no">Sin llamar hoy</span>';
-const sgDay=r=>{const d=statusDay(r);return d?Math.min(d,5):0};
 // en qué días del mes deposita más su país (Radar: días de cobro); '' si hoy no es uno de esos días
 function sgPayDay(country){
   const o=payDaysBy().find(x=>norm(x.p)===norm(paisOf(country)));if(!o)return '';
@@ -7545,7 +7544,6 @@ function sgRowWhy(r,k){
   if(!k.last)bits.push('sin ningún contacto registrado');
   else if(k.today)bits.push(`lo llamaron a las ${hhmm(k.last)} (${esc(rel(new Date(k.last)))})`);
   else bits.push(`sin tocar ${esc(rel(new Date(k.last)))}`);
-  const d=sgDay(r);if(d>=4&&r.grp!=='na')bits.push(`<b>día ${d} de 5</b>: ${d>=5?'hoy':'mañana'} pasa a Not interested`);
   if(r.grp==='na'&&naNum(r.status)>=3)bits.push('probá con las tres líneas');
   return bits.join(' · ');
 }
@@ -7627,9 +7625,9 @@ function colaSug(q){
       `<div class="sg-list">${two.map(({p,r})=>{
         if(p){const d=parseDue(p.due),late=now-d>5*6e4;
           return sgCard({p,r:r||null,c:'ag',tag:'Agenda',k:r?K(r):null,why:`Quedaste en llamarlo a las <b>${esc(p.due.slice(11,16))}</b>${late?` (${esc(rel(d))})`:''}.${p.kw?` Palabra clave: <b>${esc(p.kw)}</b>.`:''}`})}
-        const k=K(r),d=sgDay(r),called=k.today?` Ya lo llamaste hoy a las ${hhmm(k.last)}.`:'';
+        const k=K(r),called=k.today?` Ya lo llamaste hoy a las ${hhmm(k.last)}.`:'';
         if(r.grp==='pending')return sgCard({r,c:'pend',tag:'Boleto',k,why:`Tiene un boleto sin pagar: preguntale si ya pudo pagar y ayudalo a terminar.${called}`});
-        return sgCard({r,c:'cb',tag:'Pidió que lo llamen',k,why:`Tiene cita en el CRM${d?` (día ${d} de 5)`:''}. Si te da una hora, agendalo para que Vitalis te avise.${called}`});
+        return sgCard({r,c:'cb',tag:'Pidió que lo llamen',k,why:`Tiene cita en el CRM. Si te da una hora, agendalo para que Vitalis te avise.${called}`});
       }).join('')}</div>`;
   }
   if(agLater.length)html+=`<p class="sg-later"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Más tarde: ${agLater.map(p=>`<b>${esc(p.due.slice(11,16))}</b> ${esc(p.id)}`).join(' · ')}. <span class="d">Te avisa a la hora.</span></p>`;

@@ -22,7 +22,6 @@ const sgPlain=r=>{ // el status en palabras simples
 const sgPlace=r=>{if(!r||!r.country)return '';const t=cliTime(r.country);return esc(r.country)+(t?` · allá son las ${t}`:'')};
 const sgFlame='<svg class="ic sg-fl" aria-hidden="true"><use href="#i-racha"/></svg>';
 const sgCalled=k=>k.today&&k.last?`<span class="sg-ok"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Llamado hoy ${hhmm(k.last)}</span>`:'<span class="sg-no">Sin llamar hoy</span>';
-const sgDay=r=>{const d=statusDay(r);return d?Math.min(d,5):0};
 // en qué días del mes deposita más su país (Radar: días de cobro); '' si hoy no es uno de esos días
 function sgPayDay(country){
   const o=payDaysBy().find(x=>norm(x.p)===norm(paisOf(country)));if(!o)return '';
@@ -59,7 +58,6 @@ function sgRowWhy(r,k){
   if(!k.last)bits.push('sin ningún contacto registrado');
   else if(k.today)bits.push(`lo llamaron a las ${hhmm(k.last)} (${esc(rel(new Date(k.last)))})`);
   else bits.push(`sin tocar ${esc(rel(new Date(k.last)))}`);
-  const d=sgDay(r);if(d>=4&&r.grp!=='na')bits.push(`<b>día ${d} de 5</b>: ${d>=5?'hoy':'mañana'} pasa a Not interested`);
   if(r.grp==='na'&&naNum(r.status)>=3)bits.push('probá con las tres líneas');
   return bits.join(' · ');
 }
@@ -141,9 +139,9 @@ function colaSug(q){
       `<div class="sg-list">${two.map(({p,r})=>{
         if(p){const d=parseDue(p.due),late=now-d>5*6e4;
           return sgCard({p,r:r||null,c:'ag',tag:'Agenda',k:r?K(r):null,why:`Quedaste en llamarlo a las <b>${esc(p.due.slice(11,16))}</b>${late?` (${esc(rel(d))})`:''}.${p.kw?` Palabra clave: <b>${esc(p.kw)}</b>.`:''}`})}
-        const k=K(r),d=sgDay(r),called=k.today?` Ya lo llamaste hoy a las ${hhmm(k.last)}.`:'';
+        const k=K(r),called=k.today?` Ya lo llamaste hoy a las ${hhmm(k.last)}.`:'';
         if(r.grp==='pending')return sgCard({r,c:'pend',tag:'Boleto',k,why:`Tiene un boleto sin pagar: preguntale si ya pudo pagar y ayudalo a terminar.${called}`});
-        return sgCard({r,c:'cb',tag:'Pidió que lo llamen',k,why:`Tiene cita en el CRM${d?` (día ${d} de 5)`:''}. Si te da una hora, agendalo para que Vitalis te avise.${called}`});
+        return sgCard({r,c:'cb',tag:'Pidió que lo llamen',k,why:`Tiene cita en el CRM. Si te da una hora, agendalo para que Vitalis te avise.${called}`});
       }).join('')}</div>`;
   }
   if(agLater.length)html+=`<p class="sg-later"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Más tarde: ${agLater.map(p=>`<b>${esc(p.due.slice(11,16))}</b> ${esc(p.id)}`).join(' · ')}. <span class="d">Te avisa a la hora.</span></p>`;
