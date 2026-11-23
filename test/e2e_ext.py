@@ -307,17 +307,23 @@ async def main():
             ok('Montevideo' in await Nv.evaluate(DKT), 'y vuelve al destaparlo')
             await A2.evaluate("crmLoad(true)"); await A2.evaluate("go('inicio')")
             await Nv.locator('#vitalis-dock #dmin').click(); await Nv.wait_for_timeout(200)
-            # una ficha que entra de costado y termina de llegar sin cambiar nada en la página (como el cajón del CRM real): igual la toma en unos segundos
-            await Nv.evaluate('''()=>{const d=document.createElement('div');d.id='drw2';d.style.cssText='position:fixed;top:0;left:120%;width:460px;height:100%;background:#fff;z-index:5';
-              const ind='\\n'+' '.repeat(44);  // como el CRM real (Angular): renglones con mucha sangría
-              d.innerHTML=`<div class=hd>${ind}<div class=nm>${ind}María Del Carmen Soto Ramos${ind}</div>${ind}<small>${ind}ID 70759${ind}</small>${ind}</div><p>Server: Stock</p><button>${ind}<i></i>${ind}Omega - 9944418${ind}</button> <button>${ind}Gizat - 1371${ind}</button> <button>${ind}Voiso LATAM - 3262${ind}</button>`;
-              document.body.appendChild(d);setTimeout(()=>{d.style.left='auto';d.style.right='0'},1500)}''')
+            # la ficha como en el CRM real: un componente <client-card> con shadow DOM, en un cajón que entra de costado (sin cambios en la página
+            # al terminar de llegar), con el texto con sangría y el ícono de Material escrito como texto ("radio_button_checked")
+            await Nv.evaluate('''()=>{const ov=document.createElement('div');ov.className='cdk-overlay-container';ov.id='drw2';ov.style.cssText='position:fixed;top:0;left:120%;width:460px;height:100%;background:#fff;z-index:5';
+              const cc=document.createElement('client-card');ov.appendChild(cc);const sr=cc.attachShadow({mode:'open'});const ind='\\n'+' '.repeat(30);
+              sr.innerHTML=`<mat-card-header><div class=inner-container><app-title><h1><span class=app-title-content-wrap><app-title-content><app-online-indicator><i class=material-icons>radio_button_checked</i></app-online-indicator><span class=user-name-group><span class=user-name>${ind}María Del Carmen Soto Ramos${ind}</span></span></app-title-content></span></h1><app-title-sub-content class=app-title-sub-content><span class=user-id> ID 70759 </span></app-title-sub-content></app-title></div></mat-card-header>
+                <p>Server: Stock</p><div><app-button class=voip-button><button class=mdc-button><span class=mdc-button__label><span><span>Omega - 9944418</span></span></span></button></app-button> <app-button class=voip-button><button class=mdc-button><span class=mdc-button__label><span><span>Gizat - 1371</span></span></span></button></app-button> <app-button class=voip-button><button class=mdc-button><span class=mdc-button__label><span><span>Voiso LATAM - 3262</span></span></span></button></app-button></div>`;
+              document.body.appendChild(ov);setTimeout(()=>{ov.style.left='auto';ov.style.right='0'},1500)}''')
             await Nv.wait_for_timeout(5000)
-            ok(await A2.evaluate("curCl&&curCl.id") == '70759', f'una ficha que entra de costado: la toma igual, revisando cada 1,5 s ({await A2.evaluate("curCl&&curCl.id")})')
+            ok(await A2.evaluate("curCl&&curCl.id") == '70759', f'la ficha del CRM real (adentro de un componente con shadow DOM, en un cajón que entra de costado): la toma ({await A2.evaluate("curCl&&curCl.id")})')
             ok('70759' in await Nv.evaluate(DKT), 'y la mini ficha muestra a ese cliente')
-            ok(await A2.evaluate("curCl&&curCl.name") == 'María Del Carmen Soto Ramos', 'con el nombre, aunque el CRM deje los renglones con sangría')
-            await Nv.click('#drw2 button >> nth=0'); await Nv.wait_for_timeout(2500)
-            ok(sql("select count(*)::int n from public.calls where client_id='70759' and line='omega'")[0]['n'] == 1, 'y el toque en Omega cuenta la llamada')
+            ok(await A2.evaluate("curCl&&curCl.name") == 'María Del Carmen Soto Ramos', f'con el nombre, sin el ícono ni la sangría ({await A2.evaluate("curCl&&curCl.name")!r})')
+            await Nv.locator('#drw2 client-card button >> nth=0').click(); await Nv.wait_for_timeout(2500)
+            ok(sql("select count(*)::int n from public.calls where client_id='70759' and line='omega'")[0]['n'] == 1, 'el toque en Omega adentro de la ficha cuenta la llamada')
+            # pasar al cliente siguiente con las flechas del cajón: cambia solo lo de adentro del componente
+            await Nv.evaluate('''()=>{const sr=document.querySelector('#drw2 client-card').shadowRoot;sr.querySelector('.user-id').textContent=' ID 70760 ';sr.querySelector('.user-name').textContent='Pedro Siguiente'}''')
+            await A2.wait_for_function("curCl&&curCl.id==='70760'", timeout=4000)
+            ok(await A2.evaluate("curCl.name") == 'Pedro Siguiente', 'al pasar al cliente siguiente adentro del cajón, cambia enseguida')
             await Nv.evaluate("document.getElementById('drw2').remove()")
             # el ID en una tabla de datos ("ID" en una celda y el número en la de al lado) y el "ID" puesto por el estilo
             await Nv.evaluate("document.getElementById('fic').innerHTML='<table class=desc><tr><th>Name</th><td>Rosa Prueba</td></tr><tr><th>ID</th><td>68801</td><th>Server</th><td>Stock</td></tr></table><div class=calls><button>Omega - 9944418</button></div>'")

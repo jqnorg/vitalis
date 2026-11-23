@@ -325,16 +325,21 @@
   // cada toque en Omega, Gizat o Voiso (lo que va después del guión es el interno de cada agente: no se lee) = una llamada al cliente de esa ficha.
   // Se guarda solo cliente, línea y hora. La misma línea al mismo cliente en menos de 30 s cuenta una (lo resuelve la base).
   const LINE_RE = /^[^a-z0-9]*(omega|gizat|voiso)\b/i; // el ícono del teléfono adelante no importa
+  // subir y "contener" también cruzando el borde de un componente con shadow DOM (la ficha del CRM real)
+  const upC = (e) => e.parentElement || (e.parentNode && e.parentNode.host) || null;
+  const inC = (a, b) => { for (let e = b, k = 0; e && k < 60; e = upC(e), k++) if (e === a) return true; return false; };
   function idNear(el) { // el ID de la ficha donde está el botón (el de la ficha a la vista, si hay varias)
     const { ids } = scanCur(); for (const c of ids) c.v = onTop(c.el);
-    for (let e = el, k = 0; e && k < 14; e = e.parentElement, k++) {
-      const h = ids.filter((c) => c.v && e.contains(c.el)); if (h.length) return h.sort((a, b) => b.v - a.v)[0].id;
+    for (let e = el, k = 0; e && k < 14; e = upC(e), k++) {
+      const h = ids.filter((c) => c.v && inC(e, c.el)); if (h.length) return h.sort((a, b) => b.v - a.v)[0].id;
     }
     return '';
   }
   document.addEventListener('click', (ev) => {
     if (!live()) return;
-    const t0 = ev.target; if (!t0 || !t0.closest || (ui && ui.h.contains(t0))) return;
+    if (isMine(ev.target)) return;
+    let t0 = (ev.composedPath && ev.composedPath()[0]) || ev.target; if (t0 && t0.nodeType !== 1) t0 = t0.parentElement; // dentro de la ficha (shadow DOM), el botón de verdad
+    if (!t0 || !t0.closest || (ui && ui.h.contains(t0))) return;
     let b = t0.closest('button,a,[role=button]'), m = b && (b.textContent || '').replace(/\s+/g, ' ').match(LINE_RE);
     if (!m) { // el botón puede no ser un <button>: el elemento tocado o alguno de los que lo contienen, si el texto es corto y empieza con la línea
       for (let e = t0, k = 0; e && k < 4 && !m; e = e.parentElement, k++) { const tx = (e.textContent || '').replace(/\s+/g, ' ').trim(); if (tx.length <= 40 && (m = tx.match(LINE_RE))) b = e; }
@@ -764,15 +769,33 @@
     const W = innerWidth, H = innerHeight;
     if (r.bottom <= 0 || r.right <= 0 || r.top >= H || r.left >= W) return 1;
     const x = Math.min(W - 1, Math.max(0, r.left + Math.min(r.width / 2, 12))), y = Math.min(H - 1, Math.max(0, r.top + r.height / 2));
-    const e = document.elementFromPoint(x, y);
+    const rt = el.getRootNode(), e = (rt && rt !== document && rt.elementFromPoint ? rt : document).elementFromPoint(x, y); // dentro de un shadow root, el de adentro
     return !e || e === el || el.contains(e) || e.contains(el) || isMine(e) ? 3 : 2;
+  }
+  // La ficha del CRM real vive dentro de un componente con shadow DOM (<client-card>, en el cajón de la derecha): el texto de adentro
+  // no aparece recorriendo la página común, y los cambios de adentro no los ve el observador. Se recorre también por dentro.
+  const shadowOf = (el) => { if (el.shadowRoot) return el.shadowRoot; try { return chrome.dom && chrome.dom.openOrClosedShadowRoot ? chrome.dom.openOrClosedShadowRoot(el) : null; } catch (e) { return null; } };
+  const watchedRoots = new WeakSet();
+  function* textNodes(root) {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode())) {
+      if (n.nodeType === 1) {
+        const sr = n.shadowRoot || (n.tagName.includes('-') ? shadowOf(n) : null); // los componentes tienen guion en el nombre
+        if (sr && !isMine(n)) {
+          if (!watchedRoots.has(sr)) { watchedRoots.add(sr); try { obs.observe(sr, { childList: true, subtree: true, characterData: true }); } catch (e) {} } // así se entera cuando cambia la ficha
+          yield* textNodes(sr);
+        }
+        continue;
+      }
+      yield n;
+    }
   }
   // una sola pasada por el texto de la página: los "ID 12345", los botones para llamar y los números sueltos
   function scanCur() {
     const ids = [], lines = [], nums = [], root = document.body; if (!root) return { ids, lines, nums };
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n, lbl = null;
+    let lbl = null;
     const pair = (a, n) => { for (let e = a, k = 0; e && k < 3; e = e.parentElement, k++) { if (/^(TABLE|TBODY|THEAD|TFOOT)$/.test(e.tagName) || /^(table|grid|rowgroup)$/.test(e.getAttribute('role') || '')) return false; if (e.contains(n)) return true; } return false; };
-    while ((n = w.nextNode())) {
+    for (const n of textNodes(root)) {
       const t = (n.nodeValue || '').trim(); if (!t) continue; // sin la sangría: el CRM real deja "\n            ID 70759\n          "
       if (t.length > 60) { lbl = null; continue; }
       const p0 = n.parentElement; if (!p0 || NO_TXT.test(p0.tagName) || isMine(p0)) { lbl = null; continue; }
@@ -814,7 +837,7 @@
     const fs = (c) => firstSeen.get(c.id) || 0;
     // la ficha de cada botón es lo más cerca que tenga un ID, y la de cada ID lo más cerca que tenga un botón: van juntos si se eligen los dos
     // (así un botón de la ficha abierta no se queda con el ID de una ficha vieja que está en otra parte de la página)
-    const nearest = (el, list) => { for (let e = el.parentElement, k = 0; e && k < 14; e = e.parentElement, k++) { const h = list.filter((x) => e.contains(x.el)); if (h.length) return h; } return []; };
+    const nearest = (el, list) => { for (let e = upC(el), k = 0; e && k < 14; e = upC(e), k++) { const h = list.filter((x) => inC(e, x.el)); if (h.length) return h; } return []; };
     const nb = new Map();
     for (const c of C) c.near = 0;
     for (const b of B) for (const c of nearest(b.el, C)) { if (!nb.has(c)) nb.set(c, nearest(c.el, B)); if (nb.get(c).includes(b)) c.near = Math.max(c.near, b.v); }
@@ -843,10 +866,12 @@
   }
   const NOT_NAME = /^(server|status|estado|id|phone|tel[eé]fono|email|e-mail|country|pa[ií]s|language|idioma|source|apx|time|balance|desk|campaign|affiliate|individual|corporate)\b/i;
   const nameOk = (t) => !!t && t.length >= 3 && t.length <= 60 && /\p{L}{2}/u.test(t) && !/\d{3,}|[:@/]/.test(t) && !NOT_NAME.test(t) && !LINE_RE.test(t);
+  const noIcon = (t) => t.split(' ').filter((w) => !/^[a-z]+(?:_[a-z]+)+$/.test(w)).join(' ').trim(); // los íconos de Material vienen como texto ("radio_button_checked")
   function nameNear(el) { // el nombre que está arriba del ID en la ficha
+    for (let e = el, k = 0; e && k < 5; k++, e = e.parentElement) { const u = e.querySelector && e.querySelector('.user-name'); if (u) { const t = noIcon(cellText(u)); if (nameOk(t)) return t; } } // la ficha del CRM real lo marca así
     for (let e = el, k = 0; e && k < 4; k++, e = e.parentElement) {
       for (let p = e.previousElementSibling, j = 0; p && j < 2; p = p.previousElementSibling, j++) {
-        const t = cellText(p); if (nameOk(t)) return t; if (t) break;
+        const t = noIcon(cellText(p)); if (nameOk(t)) return t; if (t) break;
       }
     }
     return '';
@@ -877,7 +902,7 @@
       || (() => { const e = [...document.querySelectorAll('button,a,[role=button]')].find((x) => LINE_RE.test((x.textContent || '').replace(/\s+/g, ' ').trim())); return e ? { el: e } : null; })();
     let box = b ? b.el : document.body; if (!box) return '';
     if (b) for (let i = 0; i < 7 && box.parentElement && box.parentElement !== document.body; i++) box = box.parentElement;
-    const P = panelClient(), info = { ids: S.ids.map((x) => onTop(x.el)), lines: S.lines.map((x) => x.v), pick: !!P.pick, same: !!P.pick && P.pick.id === curSent, frames: document.querySelectorAll('iframe').length, shadow: [...document.querySelectorAll('body *')].slice(0, 4000).filter((e) => e.shadowRoot).length, watched, stView: !!stView };
+    const P = panelClient(), info = { ids: S.ids.map((x) => onTop(x.el)), lines: S.lines.map((x) => x.v), pick: !!P.pick, same: !!P.pick && P.pick.id === curSent, frames: document.querySelectorAll('iframe').length, shadow: [...document.querySelectorAll('body *')].slice(0, 4000).filter((e) => shadowOf(e) && !isMine(e)).map((e) => e.tagName.toLowerCase()).slice(0, 10), watched, stView: !!stView };
     const cl = box.cloneNode(true), O = [box, ...box.querySelectorAll('*')].slice(0, 800), K = [cl, ...cl.querySelectorAll('*')].slice(0, 800);
     O.forEach((o, i) => { try { const c = getComputedStyle(o, '::before').content; if (c && !/^(none|normal|""|'')$/.test(c)) K[i].setAttribute('data-before', c.slice(0, 30)); } catch (e) {} });
     for (const s of cl.querySelectorAll('script,style,svg,img')) s.replaceWith(document.createElement(s.tagName.toLowerCase()));
