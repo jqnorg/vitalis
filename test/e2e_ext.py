@@ -324,6 +324,10 @@ async def main():
             await Nv.evaluate('''()=>{const sr=document.querySelector('#drw2 client-card').shadowRoot;sr.querySelector('.user-id').textContent=' ID 70760 ';sr.querySelector('.user-name').textContent='Pedro Siguiente'}''')
             await A2.wait_for_function("curCl&&curCl.id==='70760'", timeout=4000)
             ok(await A2.evaluate("curCl.name") == 'Pedro Siguiente', 'al pasar al cliente siguiente adentro del cajón, cambia enseguida')
+            # el historial de llamadas de la ficha: una tabla con "Omega" en una celda no es un botón para llamar
+            await Nv.evaluate('''()=>{const g=document.createElement('div');g.id='hist';g.setAttribute('role','grid');g.innerHTML='<div role=row><div role=gridcell class=ag-cell><span class=ag-cell-value>Omega</span></div><div role=gridcell class=ag-cell><span class=ag-cell-value>00:01:10</span></div></div>';document.getElementById('drw2').appendChild(g)}''')
+            await Nv.click('#hist .ag-cell-value >> text=Omega'); await Nv.wait_for_timeout(2500)
+            ok(sql("select count(*)::int n from public.calls where line='omega' and client_id in ('70759','70760')")[0]['n'] == 1, 'tocar una fila del historial de llamadas no cuenta como llamada')
             await Nv.evaluate("document.getElementById('drw2').remove()")
             # el ID en una tabla de datos ("ID" en una celda y el número en la de al lado) y el "ID" puesto por el estilo
             await Nv.evaluate("document.getElementById('fic').innerHTML='<table class=desc><tr><th>Name</th><td>Rosa Prueba</td></tr><tr><th>ID</th><td>68801</td><th>Server</th><td>Stock</td></tr></table><div class=calls><button>Omega - 9944418</button></div>'")

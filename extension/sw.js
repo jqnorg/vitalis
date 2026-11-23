@@ -287,11 +287,14 @@ async function leadsDone(keys) {
 // cola por marca y cliente con la última foto de cada uno; cada fila lleva k = clave@hora, y Vitalis devuelve las que guardó
 const seenKey = (r) => nrm(r.brand) + '|' + nrm(r.id);
 const REG_RE = /^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/;
+// la cola de clientes del CRM se lee y se escribe sola (no todo el estado de la extensión): la estación manda tandas muy seguido
+const crmQGet = async () => (await chrome.storage.local.get('crmQ')).crmQ || [];
+const crmQMut = (fn) => lock('st', async () => { const n = fn(await crmQGet()); if (n) await chrome.storage.local.set({ crmQ: n }); });
 async function crmSeen(rows) {
   const now = Date.now();
   const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
-  await mut((st) => {
-  const q = new Map(st.crmQ.map((r) => [r.ln ? r.k : seenKey(r), r])); // las llamadas tienen su propia clave
+  await crmQMut((crmQ) => {
+  const q = new Map(crmQ.map((r) => [r.ln ? r.k : seenKey(r), r])); // las llamadas tienen su propia clave
   for (const r of rows.slice(0, 1000)) {
     const id = cl(r.id, 60); if (!id) continue;
     if (/^(omega|gizat|voiso)$/.test(r.ln || '')) { // una llamada: va aparte, cada una con su clave
@@ -304,7 +307,7 @@ async function crmSeen(rows) {
     row.k = seenKey(row) + '@' + now;
     q.set(seenKey(row), row);
   }
-  return { crmQ: [...q.values()].slice(-5000) };
+  return [...q.values()].slice(-5000);
   });
   await deliverSeen();
   return { ok: true };
@@ -314,11 +317,11 @@ async function deliverSeen() {
   if (delivering) return false; delivering = true;
   try {
     for (let round = 0; round < 10; round++) {
-      const st = await state(); if (!st.crmQ.length) return true;
+      const crmQ = await crmQGet(); if (!crmQ.length) return true;
       let done = false;
       for (const t of await vitalisTabs()) {
         try {
-          const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'seen', rows: st.crmQ.slice(0, 500) }), 20000);
+          const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'seen', rows: crmQ.slice(0, 500) }), 20000);
           if (r && !r.noPanel && !r.err) { await seenDone(r.keys || []); done = true; break; }
         } catch (e) {}
       }
@@ -327,7 +330,7 @@ async function deliverSeen() {
     return true;
   } finally { delivering = false; }
 }
-async function seenDone(keys) { const ks = new Set(keys.map(String)); await mut((st) => ({ crmQ: st.crmQ.filter((r) => !ks.has(r.k)) })); }
+async function seenDone(keys) { const ks = new Set(keys.map(String)); await crmQMut((q) => q.filter((r) => !ks.has(r.k))); }
 
 /* ---------- ventas desde el CRM ---------- */
 const CRM_URLS = ['https://crmnovaramarkets.com/*', 'https://*.crmnovaramarkets.com/*', 'https://crmtrade24seven.com/*', 'https://*.crmtrade24seven.com/*'];

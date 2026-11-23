@@ -271,6 +271,7 @@
       const btn = multiWatch()
         ? (btns.find(isRe) || (rb && !isSearch(rb) ? rb : null))
         : (rb || btns.find(isSearch) || btns.find(isRe));
+      refAt = Date.now();
       if (btn) { btn.click(); reply({ clicked: txt(btn).trim() || 'refresh-btn' }); setTimeout(() => refresh(true), 2500); }
       else { reply({ reload: true }); setTimeout(() => location.reload(), 50); }
       return false;
@@ -325,6 +326,7 @@
   // cada toque en Omega, Gizat o Voiso (lo que va después del guión es el interno de cada agente: no se lee) = una llamada al cliente de esa ficha.
   // Se guarda solo cliente, línea y hora. La misma línea al mismo cliente en menos de 30 s cuenta una (lo resuelve la base).
   const LINE_RE = /^[^a-z0-9]*(omega|gizat|voiso)\b/i; // el ícono del teléfono adelante no importa
+  const GRID_CELL = '[role=gridcell],[role=row],[role=columnheader],td,th,.ag-cell'; // una celda de una tabla (el historial de llamadas de la ficha)
   // subir y "contener" también cruzando el borde de un componente con shadow DOM (la ficha del CRM real)
   const upC = (e) => e.parentElement || (e.parentNode && e.parentNode.host) || null;
   const inC = (a, b) => { for (let e = b, k = 0; e && k < 60; e = upC(e), k++) if (e === a) return true; return false; };
@@ -341,6 +343,7 @@
     let t0 = (ev.composedPath && ev.composedPath()[0]) || ev.target; if (t0 && t0.nodeType !== 1) t0 = t0.parentElement; // dentro de la ficha (shadow DOM), el botón de verdad
     if (!t0 || !t0.closest || (ui && ui.h.contains(t0))) return;
     let b = t0.closest('button,a,[role=button]'), m = b && (b.textContent || '').replace(/\s+/g, ' ').match(LINE_RE);
+    if (!m && t0.closest(GRID_CELL)) return; // tocar una fila del historial de llamadas ("Omega" en una celda) no es llamar
     if (!m) { // el botón puede no ser un <button>: el elemento tocado o alguno de los que lo contienen, si el texto es corto y empieza con la línea
       for (let e = t0, k = 0; e && k < 4 && !m; e = e.parentElement, k++) { const tx = (e.textContent || '').replace(/\s+/g, ' ').trim(); if (tx.length <= 40 && (m = tx.match(LINE_RE))) b = e; }
     }
@@ -813,7 +816,9 @@
         continue;
       }
       if (/omega|gizat|voiso/i.test(t)) {
-        const b = p0.closest('button,a,[role=button]') || p0;
+        const bb = p0.closest('button,a,[role=button]');
+        if (!bb && p0.closest(GRID_CELL)) continue; // el historial de llamadas (una tabla con "Omega" en una celda) no es un botón para llamar
+        const b = bb || p0;
         if (lines.some((x) => x.el === b)) continue;
         const tx = (b.textContent || '').replace(/\s+/g, ' ').trim();
         if (tx.length <= 60 && LINE_RE.test(tx)) lines.push({ el: b, v: onTop(b) });
@@ -933,11 +938,11 @@
   for (const ev of ['transitionend', 'animationend']) addEventListener(ev, () => { if (live()) schedCur(); }, { capture: true, passive: true }); // la ficha terminó de entrar
   const poll = () => setTimeout(() => { if (!live()) return; if (!watched && !stView && document.visibilityState === 'visible') reportCurrent(); poll(); }, Math.max(1500, curMs * 30)); // y cada 1,5 s, por las dudas
   poll();
-  let lastMs = 0, againT = null;
+  let lastMs = 0, againT = null, refAt = Date.now(), lastRead = 0; // refAt: el último ⟳ de la estación (al cargar la página cuenta como uno)
   const again = () => { clearTimeout(againT); againT = setTimeout(() => { if (live()) refresh(); }, 3000); }; // algo no llegó a la extensión: vuelvo a leer y lo mando
   function refresh(force) {
     if (!live()) return retire();
-    const t0 = performance.now();
+    const t0 = performance.now(); lastRead = Date.now();
     try { refresh0(force); } finally { lastMs = performance.now() - t0; }
   }
   function refresh0(force) {
@@ -1042,6 +1047,7 @@
   const obs = new MutationObserver((muts) => {
     if (muts.every((m) => mine(m.target) || (m.type === 'childList' && [...m.addedNodes, ...m.removedNodes].length > 0 && [...m.addedNodes, ...m.removedNodes].every(mine)))) return; // lo que cambió es de Vitalis
     const now = Date.now(), quiet = Math.min(3000, Math.max(600, lastMs * 4)), cap = Math.max(2000, quiet * 2);
+    if (stView && now - refAt > 12000 && now - lastRead < 30000) return; // la estación lee después de su ⟳ (y cada 30 s por las dudas), no con cada cambio de la página
     schedCur();
     if (!firstMut) firstMut = now;
     clearTimeout(t);

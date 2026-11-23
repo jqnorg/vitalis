@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.30.0';
+const VERSION='1.31.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -365,7 +365,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
   // canal de la mesa, solo para avisarse "cambió algo del CRM" (sin datos): así un new cuenta para todos apenas alguien lo ve, sin esperar los 45 s
-  try{if(mesaCh)sb.removeChannel(mesaCh);mesaCh=sb.channel('vitalis-mesa-'+profile.team_id,{config:{broadcast:{self:false}}}).on('broadcast',{event:'crm'},()=>{if(Date.now()-crmPingAt>4000){crmPingAt=Date.now();clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),600)}}).subscribe()}catch(e){mesaCh=null}
+  try{if(mesaCh)sb.removeChannel(mesaCh);mesaCh=sb.channel('vitalis-mesa-'+profile.team_id,{config:{broadcast:{self:false}}}).on('broadcast',{event:'crm'},()=>{if(Date.now()-crmPingAt>4000){crmPingAt=Date.now();crmSoon(600)}}).subscribe()}catch(e){mesaCh=null}
   const gen=++rtGen;rtOk=false;
   const up=(arr,item,key='_id')=>{const i=arr.findIndex(x=>x[key]===item[key]);if(i>=0)arr[i]=item;else arr.push(item)};
   chan=sb.channel('vitalis-'+me)

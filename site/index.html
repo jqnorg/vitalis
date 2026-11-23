@@ -1732,8 +1732,8 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.30.0';
-const EXT_VER='1.13.3'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.31.0';
+const EXT_VER='1.14.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2094,7 +2094,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
   // canal de la mesa, solo para avisarse "cambió algo del CRM" (sin datos): así un new cuenta para todos apenas alguien lo ve, sin esperar los 45 s
-  try{if(mesaCh)sb.removeChannel(mesaCh);mesaCh=sb.channel('vitalis-mesa-'+profile.team_id,{config:{broadcast:{self:false}}}).on('broadcast',{event:'crm'},()=>{if(Date.now()-crmPingAt>4000){crmPingAt=Date.now();clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),600)}}).subscribe()}catch(e){mesaCh=null}
+  try{if(mesaCh)sb.removeChannel(mesaCh);mesaCh=sb.channel('vitalis-mesa-'+profile.team_id,{config:{broadcast:{self:false}}}).on('broadcast',{event:'crm'},()=>{if(Date.now()-crmPingAt>4000){crmPingAt=Date.now();crmSoon(600)}}).subscribe()}catch(e){mesaCh=null}
   const gen=++rtGen;rtOk=false;
   const up=(arr,item,key='_id')=>{const i=arr.findIndex(x=>x[key]===item[key]);if(i>=0)arr[i]=item;else arr.push(item)};
   chan=sb.channel('vitalis-'+me)
@@ -5767,7 +5767,8 @@ const ARCH='Trade24Seven',isArch=b=>norm(b)===norm(ARCH); // la marca que quedó
 const GRPS={new:'New (y Talking)',na:'No Answer y NA',callback:'CallBack (con cita)',call_again:'Call Again',hang_up:'Hang Up',low_potential:'Low potential',not_interested:'Not interested',
   pending:'Pending Payment (boleto)',failed:'Depósito trabado (Failed, Bank Block, Declined)',ftd:'FTD',dnc:'Do Not Call',invalid:'Inválido (número, idioma)',crm:'Del CRM (Reassign, Test, FAKE…)',otro:'Otro'};
 const G3=['call_again','hang_up','na'],G2=['callback','pending'],DAYS5=['callback','call_again','hang_up','low_potential']; // con cita · los de 5 días seguidos y al 5º pasan a Not interested
-let crm={ok:null,rows:new Map(),byId:new Map(),at:0,busy:null,rot:[]};
+let crm={ok:null,rows:new Map(),byId:new Map(),at:0,busy:null,rot:[],fullAt:0,seenMs:0,rotMs:0,dBusy:false};
+const CRM_FULL=10*6e4,CRM_ACT=['new','na','callback','call_again','hang_up','low_potential','pending','failed']; // la carga entera, cada 10 min; en el medio, solo lo que cambió
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
 // un Talking que desapareció de la lista que se actualiza ya no es new (su status nuevo llega cuando se lo vea)
 const gone=r=>!!r.left_new_at&&r.status_group==='new';
@@ -5816,6 +5817,7 @@ async function crmLoad(force){
   if(!ready||!sb)return;
   if(crm.busy)return crm.busy;
   if(!force&&Date.now()-crm.at<20e3)return;
+  if(!force&&crm.ok&&crm.seenMs&&Date.now()-crm.fullAt<CRM_FULL)return crmDelta(); // en el medio, solo lo que cambió (liviano)
   kwLoad(force);
   crm.busy=(async()=>{
     try{
@@ -5824,26 +5826,59 @@ async function crmLoad(force){
       const ids=[...new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>String(p.id)))].slice(0,300);
       // todo junto: la cola, los registrados del mes y la semana, los de la agenda y (team leader) las rotaciones de hoy
       const [act,coh,cohS,ag,rot]=await Promise.all([
-        crmPage(()=>base().in('status_group',['new','na','callback','call_again','hang_up','low_potential','pending','failed']).order('client_id')),
+        crmPage(()=>base().in('status_group',CRM_ACT).order('client_id')),
         crmPage(()=>base().gte('reg',from).order('client_id')),
         crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
         ids.length?Q(base().in('client_id',ids)):Promise.resolve([]),
         QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)), // las rotaciones de hoy (el team leader las ve en Equipo; el pool del día saca de tu meta a los que te rotaron ya llamados)
       ]);
-      const rows=[...act,...coh,...cohS,...ag];crmApply(rows,rot);snapCrm(rows,rot);
+      const rows=[...act,...coh,...cohS,...ag];crmApply(rows,rot);crm.fullAt=Date.now();
+      if(Date.now()-crmSnapAt>12e4){crmSnapAt=Date.now();snapCrm(rows,rot)} // lo guardado para arrancar rápido: como mucho cada 2 min
     }catch(e){if(/crm_clients|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))crm.ok=false}
     finally{crm.busy=null}
   })();
   return crm.busy;
 }
+let crmSnapAt=0;
+const tsMax=(L,k)=>{let m=0;for(const r of L){const t=Date.parse(r[k]);if(t>m)m=t}return m};
 function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
+  crm.seenMs=tsMax(rows,'last_seen');crm.rotMs=Math.max(tsMax(rot||[],'seen_at'),parseYMD(todayS()).getTime());
   const by=new Map();for(const x of m.values())if(!isArch(x.brand)&&!by.has(norm(x.id)))by.set(norm(x.id),x);
   const was=crm.ok;crm.rows=m;crm.byId=by;crm.rot=rot||[];crm.ok=true;crm.at=Date.now();
   newCheck();
   if(ready&&(!was||['ahora','inicio','clientes','campanas','equipo','agenda','cliente'].includes(cur)))refresh();
 }
-let crmT=null;const crmSoon=()=>{clearTimeout(crmT);crmT=setTimeout(()=>crmLoad(true),2500)};
+let crmT=null;const crmSoon=(ms=1500)=>{clearTimeout(crmT);crmT=setTimeout(()=>crmDelta(),ms)};
+/* Solo lo que cambió desde la última vez (last_seen): la estación lee el CRM cada pocos segundos y antes cada lectura recargaba
+   todos los clientes en cada Vitalis abierto (mucha memoria, sobre todo en la compu del team leader). Cada 10 min, la carga entera. */
+async function crmDelta(){
+  if(!ready||!sb)return;
+  if(!crm.ok||!crm.seenMs||Date.now()-crm.fullAt>=CRM_FULL)return crmLoad(true);
+  if(crm.busy||crm.dBusy)return;
+  crm.dBusy=true;let full=false;
+  try{
+    const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromMs=parseYMD(from).getTime();
+    const [rows,rot]=await Promise.all([
+      Q(sb.from('crm_clients').select('*').neq('brand',ARCH).gt('last_seen',new Date(crm.seenMs-3000).toISOString()).order('last_seen').limit(1000)),
+      QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gt('seen_at',new Date(Math.max(crm.rotMs,parseYMD(te).getTime())).toISOString()).order('seen_at').limit(500)),
+    ]);
+    if(rows.length>=1000){full=true;return}
+    const ag=new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>norm(p.id)));
+    let n=0;
+    for(const r of rows){ // los mismos que trae la carga entera (activos, registrados o vistos este mes, los de la agenda) o los que ya estaban
+      const x=C2X(r),k=ckey(x.brand,x.id),inSet=CRM_ACT.includes(r.status_group)||(r.reg||'')>=from||Date.parse(r.first_seen)>=fromMs||ag.has(norm(x.id));
+      if(!inSet&&!crm.rows.has(k))continue;
+      crm.rows.set(k,x);if(!isArch(x.brand))crm.byId.set(norm(x.id),x);n++;
+    }
+    crm.seenMs=Math.max(crm.seenMs,tsMax(rows,'last_seen'));
+    const seenRot=new Set(crm.rot.map(r=>r.client_id+'|'+r.seen_at)),nr=(rot||[]).filter(r=>!seenRot.has(r.client_id+'|'+r.seen_at));
+    if(nr.length){crm.rot=[...crm.rot,...nr];crm.rotMs=Math.max(crm.rotMs,tsMax(nr,'seen_at'))}
+    crm.at=Date.now();
+    if(n||nr.length){newCheck();if(ready&&['ahora','inicio','clientes','campanas','equipo','agenda','cliente'].includes(cur))refresh()}
+  }catch(e){}
+  finally{crm.dBusy=false;if(full)crmLoad(true)}
+}
 /* ---------- los new que entran por la estación ----------
    El CRM del team leader (la estación) lee los new cada 10 s y los guarda en crm_clients: a cada agente le avisa de los
    suyos (Sales Rep), aunque no tenga una pestaña propia vigilando. Uno solo por cliente: lo que ya avisó la pestaña
@@ -5904,7 +5939,7 @@ async function crmSeenFromExt(rows){
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
   const keys=batch.map(r=>String(r&&r.k||''));
   if(!list.length)return {keys};
-  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;crmSoon();if(res&&(res.new||res.changed))mesaPing('crm');return {keys,added:res&&res.new||0}}
+  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;if(res&&(res.new||res.changed)){crmSoon();mesaPing('crm')}return {keys,added:res&&res.new||0}}
   catch(e){const m=String(e&&(e.message||e.code));if(/crm_seen|PGRST202|42883|crm_clients|does not exist/.test(m)){crm.ok=false;crm.at=Date.now();return {err:'falta actualizar la base'}}return {err:errMsg(e)}}
 }
 
