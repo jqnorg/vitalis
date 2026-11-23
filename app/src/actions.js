@@ -555,6 +555,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir')){dockCmd(d);return} // desde la mini ficha del CRM
+  if(d&&d.type==='ftd-agenda-prof'&&d.v===1){const src=e.source;dockProf(d).catch(()=>({err:'No pude guardarlo.'})).then(r=>{try{src.postMessage({type:'ftd-agenda-prof-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // el perfil completado en la mini ficha
   if(d&&d.type==='ftd-agenda-tr'&&d.v===1){const src=e.source;dockTr(d.txt).catch(()=>({why:'no'})).then(r=>{try{src.postMessage({type:'ftd-agenda-tr-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // traducir el comentario de la mini ficha
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId

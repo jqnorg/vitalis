@@ -67,13 +67,15 @@ async function crmLoad(force){
       const base=()=>sb.from('crm_clients').select('*').neq('brand',ARCH);
       const ids=[...new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>String(p.id)))].slice(0,300);
       // todo junto: la cola, los registrados del mes y la semana, los de la agenda y (team leader) las rotaciones de hoy
-      const [act,coh,cohS,ag,rot]=await Promise.all([
+      const [act,coh,cohS,ag,rot,stt]=await Promise.all([
         crmPage(()=>base().in('status_group',CRM_ACT).order('client_id')),
         crmPage(()=>base().gte('reg',from).order('client_id')),
         crmPage(()=>base().gte('first_seen',fromTs).order('client_id')),
         ids.length?Q(base().in('client_id',ids)):Promise.resolve([]),
         QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gte('seen_at',parseYMD(te).toISOString()).order('seen_at').limit(2000)), // las rotaciones de hoy (el team leader las ve en Equipo; el pool del día saca de tu meta a los que te rotaron ya llamados)
+        QO(sb.from('station_state').select('last_ok').eq('vista','todo')), // ¿la estación lee la lista de Clientes entera? (ahí no ver a alguien es que no cambió)
       ]);
+      stTodoAt=Math.max(0,...stt.map(r=>Date.parse(r.last_ok)||0));
       const rows=[...act,...coh,...cohS,...ag];crmApply(rows,rot);crm.fullAt=Date.now();
       if(Date.now()-crmSnapAt>12e4){crmSnapAt=Date.now();snapCrm(rows,rot)} // lo guardado para arrancar rápido: como mucho cada 2 min
     }catch(e){if(/crm_clients|PGRST205|42P01|does not exist/.test(String(e&&(e.message||e.code))))crm.ok=false}
@@ -192,7 +194,10 @@ const paidCrm=r=>r.grp==='ftd'||!!r.ftd; // el CRM ya lo marca con FTD
 // dato viejo: desde que la extensión lo vio por última vez, la mesa siguió leyendo el CRM una jornada entera y no apareció
 // (seguro ya rotó o cambió en el CRM): fuera de la cola. Solo cuentan las horas de trabajo (lunes a viernes, 9 a 17) y hasta
 // la última lectura de la mesa: la noche, el fin de semana o un día en que nadie leyó el CRM no esconden a nadie.
-const WORK_H=[9,17],STALE_WH=8;
+// Con la estación leyendo la lista de Clientes entera (ordenada por Modified Time) todo lo que cambia se ve al toque: no verlo es que
+// no cambió, y no se esconde a nadie (mientras esa vista haya leído bien en las últimas 24 h).
+const WORK_H=[9,17],STALE_WH=8;let stTodoAt=0;
+const stTodo=()=>Date.now()-stTodoAt<864e5;
 function workHours(a,b){
   let h=0;if(!(b>a))return h;
   const d=new Date(a);d.setHours(0,0,0,0);
@@ -204,6 +209,7 @@ function workHours(a,b){
   return h;
 }
 const staleSet=perPass(()=>{
+  if(stTodo())return new Set();
   const rows=crmAll();let feed=0;const at=new Map();
   for(const r of rows){const t=r.last?Date.parse(r.last):0;if(t>0){at.set(r,t);if(t>feed)feed=t}}
   const out=new Set();for(const [r,t] of at)if(workHours(t,feed)>=STALE_WH)out.add(ckey(r.brand,r.id));

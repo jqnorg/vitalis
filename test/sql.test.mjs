@@ -914,6 +914,17 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!R.error && q.rows.length === 1 && q.rows[0].vista === 'news' && q.rows[0].ok, 'las vistas que ya no vienen salen; una hora rara no borra la última lectura buena');
   q = await as(X, 'select * from public.station_state');
   ok(q.rows.length === 0, 'otra mesa no ve la estación');
+  R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([
+    { vista: 'todo', ok: ts, try: ts, n: 100, total: 904, statuses: { New: 2, 'Call Again': 40, 'Not Interested': 30, 'Do Not Call': 28 } },
+    { vista: 'trx', ok: ts, try: ts, n: 26, problem: 'orden' },
+  ])]);
+  q = await as(B, 'select vista, n, total, off_pct, problem from public.station_state order by vista');
+  const T = Object.fromEntries(q.rows.map((x) => [x.vista, x]));
+  ok(!R.error && T.todo && T.todo.n === 100 && T.todo.total === 904 && T.todo.problem === '' && T.todo.off_pct == null, 'la vista Clientes (todos los status) no tiene filtro que perder');
+  ok(T.trx.problem === '', '"sin orden" solo vale para la de Clientes');
+  await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([{ vista: 'todo', try: ts, n: 100, problem: 'orden' }])]);
+  q = await as(B, 'select problem from public.station_state where vista = $1', ['todo']);
+  ok(q.rows[0] && q.rows[0].problem === 'orden', 'la de Clientes sin el último que cambió arriba queda marcada');
   await rpc(M, "select public.station_beat('[]'::jsonb) j");
   ok((await db.query('select count(*)::int c from public.station_state')).rows[0].c === 0, 'sin vistas, la estación queda vacía');
 }

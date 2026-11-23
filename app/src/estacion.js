@@ -1,8 +1,11 @@
 /* ---------- estación: las pestañas propias del CRM en el Chrome del team leader ---------- */
-// Cada vista (News, Transactions, Cola, Agendables, Cerrados) es una pestaña que la extensión fija, actualiza a su ritmo y
+// Con dos alcanza: Clientes (todos los status, ordenada por Modified Time: lo que cambia sube arriba) y Transactions. Las de antes
+// (News, Cola, Agendables, Cerrados, por grupo de status) siguen andando. Cada vista es una pestaña que la extensión fija, actualiza a su ritmo y
 // vuelve a abrir si se cierra, solo en horario. La extensión late cada 30 s por la pestaña de Vitalis de esa compu
 // (station_beat); acá se ve hace cuánto se leyó cada vista y se avisa a team leader y admin si algo anda mal.
-const ST_VIEWS=[['news','News',10],['trx','Transactions',15],['cola','Cola',30],['agen','Agendables',60],['cerr','Cerrados',600]];
+const ST_VIEWS=[['todo','Clientes',10],['trx','Transactions',15],['news','News',10],['cola','Cola',30],['agen','Agendables',60],['cerr','Cerrados',600]];
+const ST_OLD=['news','cola','agen','cerr'];
+const stName=v=>(ST_VIEWS.find(x=>x[0]===v)||[0,v])[1];
 const ST_HOURS={days:[1,2,3,4,5],from:9*60,to:17*60+30}; // lunes a viernes, 9:00 a 17:30 (igual que la extensión)
 const ST_QUIET=3*6e4; // sin latido en horario: la estación se calló
 let stRows=[],stAt=0,stSent=0,stOkErr=0,stLoaded=false;
@@ -33,24 +36,26 @@ function stState(r){
   if(r.problem==='cerrada')return ['err','Pestaña cerrada'];
   if(r.problem==='sin-tabla')return ['hot','No ve la lista'];
   if(r.problem==='filtro')return ['hot',`Perdió el filtro (${r.off_pct}% no son de acá)`];
+  if(r.problem==='orden')return ['hot','Sin orden: ordená por Modified Time'];
   if(stInHours()&&stLate(r))return ['hot','Atrasada'];
   return ['ok','Al día'];
 }
 function stationCard(){
   if(!isLeader())return '';
   const head=`<div class="card-h"><h3>Estación</h3><span class="p-sub">las pestañas del CRM que lee el Chrome del team leader</span></div>`;
-  if(!stRows.length)return head+`<p class="p-sub" style="margin:4px 2px 0">Sin estación. En el Chrome del team leader, abrí cada vista del CRM con su filtro (News, Transactions, Cola, Agendables, Cerrados) y elegila en el botón de Vitalis del CRM. Desde ahí se actualiza sola, solo en horario.</p>`;
-  const by=Object.fromEntries(stRows.map(r=>[r.vista,r]));
+  const how='dos pestañas del CRM: <b>Clientes</b> con todos los status, ordenada por Modified Time (la más nueva arriba) y 100 por página, y <b>Transactions</b>. Elegí cada una en el botón de Vitalis del CRM';
+  if(!stRows.length)return head+`<p class="p-sub" style="margin:4px 2px 0">Sin estación. En el Chrome del team leader, abrí ${how}. Desde ahí se actualizan solas, solo en horario.</p>`;
+  const by=Object.fromEntries(stRows.map(r=>[r.vista,r])),old=!by.todo&&stRows.some(r=>ST_OLD.includes(r.vista));
   const line=!stInHours()?'<span class="d">Fuera de horario: quieta hasta el próximo día hábil a las 9.</span>'
     :stQuiet()?`<b class="err">Callada ${esc(stAgo(stBeatAt()))}</b>: fijate que el Chrome del team leader esté prendido y con Vitalis abierto.`
     :`<span class="ok">Leyendo</span> <span class="d">· último aviso ${esc(stAgo(stBeatAt()))}</span>`;
-  const rows=ST_VIEWS.map(([v,name,every])=>{
+  const rows=ST_VIEWS.filter(([v])=>by[v]||v==='todo'||v==='trx').map(([v,name,every])=>{
     const r=by[v];
     if(!r)return `<tr class="st-off"><td><b>${esc(name)}</b></td><td class="d">Sin pestaña</td><td></td><td></td><td></td></tr>`;
     const [cls,txt]=stState(r);
     return `<tr><td><b>${esc(name)}</b><span class="d"> · cada ${every<60?every+' s':every/60+' min'}</span></td><td><span class="${cls}">${esc(txt)}</span></td><td>${nf(r.n||0)}</td><td>${r.total==null?'<span class="d">—</span>':nf(r.total)}</td><td>${r.last_ok?esc(stAgo(Date.parse(r.last_ok))):'<span class="d">nunca</span>'}</td></tr>`;
   }).join('');
-  return head+`<p class="st-line">${line}</p><div class="p-tablewrap"><table class="pt st-t"><thead><tr><th>Vista</th><th>Estado</th><th>Vio</th><th>Total en el CRM</th><th>Última lectura buena</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return head+`<p class="st-line">${line}</p>${old?`<p class="p-sub" style="margin:0 2px 8px">Más simple: una sola pestaña de <b>Clientes</b> con todos los status, ordenada por Modified Time (la más nueva arriba) y 100 por página, reemplaza a News, Cola, Agendables y Cerrados. Elegila en el botón de Vitalis del CRM.</p>`:''}<div class="p-tablewrap"><table class="pt st-t"><thead><tr><th>Vista</th><th>Estado</th><th>Vio</th><th>Total en el CRM</th><th>Última lectura buena</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function stDraw(){const el=$('#eqStation');if(!el)return;const h=stLoaded?stationCard():'';el.hidden=!h;el.innerHTML=h}
 // cada minuto, para team leader y admin: avisos si la estación se calla, queda sin sesión, se cierra una pestaña o pierde el filtro
@@ -61,9 +66,9 @@ async function stationCheck(){
   if(cur==='equipo')stDraw();
   if(!stRows.length||!stInHours()){stWarn={};return}
   const once=(k,html,kind,card)=>{if(stWarn[k])return;stWarn[k]=Date.now();toast(html,kind,{key:'st-'+k,sticky:kind==='alert',actions:[{l:'Ver Equipo',fn:()=>go('equipo')}]});if(card)extSocial({k:'so:st:'+k,lvl:kind==='alert'?'urg':'imp',title:'Estación del CRM',id:card,kw:'Abrí Equipo en Vitalis para ver qué vista.',meta:'',btns:[['close','Ok',1]]})};
-  const quiet=stQuiet(),dead=stRows.filter(r=>r.problem==='login'||r.problem==='cerrada'),soft=stRows.filter(r=>r.problem==='filtro'||r.problem==='sin-tabla');
+  const quiet=stQuiet(),dead=stRows.filter(r=>r.problem==='login'||r.problem==='cerrada'),soft=stRows.filter(r=>r.problem==='filtro'||r.problem==='sin-tabla'||r.problem==='orden');
   if(quiet)once('quiet','<b>La estación dejó de leer el CRM.</b> Fijate que el Chrome del team leader esté prendido y con Vitalis abierto.','alert','Dejó de leer el CRM');else delete stWarn.quiet;
-  if(!quiet&&dead.length)once('dead:'+dead.map(r=>r.vista+r.problem).join(),`<b>La estación tiene un problema:</b> ${dead.map(r=>esc((ST_VIEWS.find(x=>x[0]===r.vista)||[0,r.vista])[1])+': '+esc(lc1(stState(r)[1]))).join(' · ')}.`,'alert',dead.some(r=>r.problem==='login')?'Quedó sin sesión del CRM':'Se cerró una pestaña');
+  if(!quiet&&dead.length)once('dead:'+dead.map(r=>r.vista+r.problem).join(),`<b>La estación tiene un problema:</b> ${dead.map(r=>esc(stName(r.vista))+': '+esc(lc1(stState(r)[1]))).join(' · ')}.`,'alert',dead.some(r=>r.problem==='login')?'Quedó sin sesión del CRM':'Se cerró una pestaña');
   if(!dead.length)for(const k of Object.keys(stWarn))if(k.startsWith('dead:'))delete stWarn[k];
-  if(!quiet&&soft.length)once('soft:'+soft.map(r=>r.vista+r.problem).join(),`La estación: ${soft.map(r=>esc((ST_VIEWS.find(x=>x[0]===r.vista)||[0,r.vista])[1])+' '+esc(lc1(stState(r)[1]))).join(' · ')}. Revisá esa pestaña en el Chrome del team leader.`,'warn');
+  if(!quiet&&soft.length)once('soft:'+soft.map(r=>r.vista+r.problem).join(),`La estación: ${soft.map(r=>esc(stName(r.vista))+' '+esc(lc1(stState(r)[1]))).join(' · ')}. Revisá esa pestaña en el Chrome del team leader.`,'warn');
 }

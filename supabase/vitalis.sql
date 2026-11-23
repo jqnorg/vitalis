@@ -1705,21 +1705,24 @@ revoke all on function public.calls_add(jsonb), public.set_min_calls(integer) fr
 grant execute on function public.calls_add(jsonb), public.set_min_calls(integer) to authenticated;
 
 -- ---------- estación: el Chrome del team leader con una pestaña propia por vista del CRM ----------
--- news (New y Talking) · trx (depósitos) · cola (NA, Call Again, Hang Up) · agen (CallBack, Pending, Low Potential, Failed) · cerr (cerrados).
+-- todo (Clientes: todos los status, ordenada por Modified Time, el último que cambió arriba: con esta y trx alcanza) · trx (depósitos).
+-- Las de antes, por grupo de status: news (New y Talking) · cola (NA, Call Again, Hang Up) · agen (CallBack, Pending, Low Potential, Failed) · cerr (cerrados).
 -- La extensión de la estación avisa cada 30 s (en horario) cómo le fue con cada vista; Vitalis muestra hace cuánto se leyó cada una
 -- y avisa si la estación se calla, queda sin sesión del CRM o una vista perdió su filtro (aparecen status que no son de esa vista).
 create table if not exists public.station_state (
   team_id    uuid not null references public.teams(id) on delete cascade,
-  vista      text not null check (vista in ('news', 'trx', 'cola', 'agen', 'cerr')),
+  vista      text not null,
   last_ok    timestamptz,                    -- última lectura buena de esa vista
   last_try   timestamptz,                    -- último intento
   n          integer not null default 0,     -- filas que vio (clientes, o depósitos en trx)
   total      integer,                        -- el total que dice el CRM, si lo muestra
   off_pct    integer,                        -- % de clientes que no son de esa vista
-  problem    text not null default '',       -- '' · login · sin-tabla · cerrada · filtro
+  problem    text not null default '',       -- '' · login · sin-tabla · cerrada · filtro · orden (la de Clientes sin el último que cambió arriba)
   by_user    uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (team_id, vista));
+alter table public.station_state drop constraint if exists station_state_vista_check;
+alter table public.station_state add constraint station_state_vista_check check (vista in ('todo', 'news', 'trx', 'cola', 'agen', 'cerr'));
 alter table public.station_state enable row level security;
 drop policy if exists station_read on public.station_state;
 create policy station_read on public.station_state for select to authenticated using (team_id = public.my_team());
@@ -1733,11 +1736,11 @@ begin
   if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
   for r in select x from jsonb_array_elements(case when jsonb_typeof(p) = 'array' then p else '[]'::jsonb end) x limit 10 loop
     v := r->>'vista';
-    if v is null or v not in ('news', 'trx', 'cola', 'agen', 'cerr') or v = any(got) then continue; end if;
+    if v is null or v not in ('todo', 'news', 'trx', 'cola', 'agen', 'cerr') or v = any(got) then continue; end if;
     got := got || v;
     want := case v when 'news' then array['new'] when 'cola' then array['na', 'call_again', 'hang_up']
       when 'agen' then array['callback', 'pending', 'low_potential', 'failed'] when 'cerr' then array['not_interested', 'dnc', 'invalid', 'ftd', 'crm', 'otro'] end;
-    prob := case when r->>'problem' in ('login', 'sin-tabla', 'cerrada') then r->>'problem' else '' end;
+    prob := case when r->>'problem' in ('login', 'sin-tabla', 'cerrada') or (v = 'todo' and r->>'problem' = 'orden') then r->>'problem' else '' end;
     ts_ok := case when r->>'ok' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((r->>'ok')::timestamptz, now()) end;
     ts_try := case when r->>'try' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((r->>'try')::timestamptz, now()) end;
     off := null;

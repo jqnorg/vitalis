@@ -495,7 +495,8 @@ async function focusCrm() { // la pestaña de clientes (la que tiene clientes en
 // El team leader arma cada vista una vez (filtro, orden, filas por página) y en el botón de Vitalis del CRM dice cuál es.
 // Desde ahí la extensión la fija, la actualiza a su ritmo (con un poco de variación) y, si se cierra, la vuelve a abrir.
 // Solo en horario: fuera de hora no toca el CRM. Cada 30 s le cuenta a Vitalis cómo le fue con cada vista (latido).
-const SVIEWS = { news: { n: 'News', every: 10 }, trx: { n: 'Transactions', every: 15 }, cola: { n: 'Cola', every: 30 }, agen: { n: 'Agendables', every: 60 }, cerr: { n: 'Cerrados', every: 600 } };
+const SVIEWS = { todo: { n: 'Clientes', every: 10 }, trx: { n: 'Transactions', every: 15 }, news: { n: 'News', every: 10 }, cola: { n: 'Cola', every: 30 }, agen: { n: 'Agendables', every: 60 }, cerr: { n: 'Cerrados', every: 600 } };
+const SV_OLD = ['news', 'cola', 'agen', 'cerr']; // las de antes: "Clientes" (todos los status, el último que cambió arriba) las reemplaza
 const ST_HOURS = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 17 * 60 + 30 }; // lunes a viernes, 9:00 a 17:30
 async function stGet() { return (await chrome.storage.local.get('station')).station || { views: {} }; }
 const stUpd = (fn) => lock('station', async () => { const s = await stGet(), n = fn(s); if (n && n !== s) await chrome.storage.local.set({ station: n }); return n || s; }); // fn devuelve la nueva (o null si no cambia)
@@ -509,21 +510,23 @@ const stationOf = (tabId) => (Object.entries(stCache.views || {}).find(([, c]) =
 async function stationSet(tab, view) { // "Esta pestaña es la de…" desde el botón del CRM ('' = ya no es parte de la estación)
   if (!['leader', 'admin'].includes(await deskRole())) return { err: 'Solo el team leader o el administrador' };
   if (view && !SVIEWS[view]) return { err: 'vista desconocida' };
-  let freed = null;
+  if (SV_OLD.includes(view) && Object.entries((await stGet()).views).some(([k, c]) => k === 'todo' && c.tabId !== tab.id)) return { err: 'Con la pestaña de Clientes esta ya no hace falta.' };
+  const freed = [];
   await stUpd((s) => {
     const views = { ...s.views };
     for (const [k, c] of Object.entries(views)) if (c.tabId === tab.id) delete views[k];
-    if (view) { if (views[view]) freed = views[view].tabId; views[view] = { tabId: tab.id, url: tab.url, title: tab.title || '', at: Date.now() }; }
+    if (view) { if (views[view]) freed.push(views[view].tabId); views[view] = { tabId: tab.id, url: tab.url, title: tab.title || '', at: Date.now() }; }
+    if (view === 'todo') for (const k of SV_OLD) if (views[k]) { freed.push(views[k].tabId); delete views[k]; } // las de antes quedan como pestañas comunes
     return { ...s, views };
   });
-  if (freed != null && freed !== tab.id) { try { await chrome.tabs.update(freed, { pinned: false }); } catch (e) {} } // la que tenía esa vista antes queda como una pestaña común
+  for (const id of freed) if (id !== tab.id) { try { await chrome.tabs.update(id, { pinned: false }); } catch (e) {} } // la que tenía esa vista antes queda como una pestaña común
   try { await chrome.tabs.update(tab.id, view ? { pinned: true, autoDiscardable: false } : { pinned: false }); } catch (e) {}
   if (view) {
     if (await getW(tab.id)) await watchStop(tab.id); // si se actualizaba para los news, ahora la maneja la estación
     await stRun(view, { nextAt: 0, problem: '', noTable: 0 });
   }
   await stLoop(); stFlushSoon();
-  return { ok: true };
+  return { ok: true, freed: view === 'todo' ? freed.filter((id) => id !== tab.id).length : 0 };
 }
 async function stationOff() { // apagar la estación entera (desde el ícono): las pestañas quedan como pestañas comunes
   const s = await stGet();
@@ -583,6 +586,7 @@ async function stScan(tabId, m, url) {
   const [view] = v, now = Date.now(), prev = (await sess.get('stRuns', {}))[view] || {};
   const patch = { n: Math.max(0, +m.n || 0), total: m.total == null ? null : +m.total, statuses: m.statuses || {}, seenAt: now };
   if (m.login) { patch.problem = 'login'; patch.noTable = 0; }
+  else if (m.table && view === 'todo' && (m.ord === 'mal' || m.ord === 'sin')) { patch.problem = 'orden'; patch.noTable = 0; } // sin el último que cambió arriba, no sirve
   else if (m.table) { patch.problem = ''; patch.lastOk = now; patch.noTable = 0; }
   else if (!prev.noTable) patch.noTable = now; // la lista desaparece un momento al actualizar: recién a los 20 s es un problema
   else if (now - prev.noTable > 2e4) patch.problem = 'sin-tabla';
@@ -595,7 +599,7 @@ async function stScan(tabId, m, url) {
       await alertCard({ k: 'crm:stlogin', kind: 'crm', title: 'La estación quedó sin sesión', id: 'Volvé a entrar al CRM', kw: `La pestaña de ${SVIEWS[view].n} pide entrar de nuevo. Mientras tanto no se leen clientes.`, meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', 'La estación quedó sin sesión del CRM', 'Volvé a entrar para que siga leyendo.');
     }
   }
-  return { station: view };
+  return { station: view, problem: patch.problem ?? prev.problem ?? '' };
 }
 // cada 30 s (y cuando algo cambia) le cuento a Vitalis cómo está cada vista; al apagarla, una vez más vacía
 async function stFlush() {
@@ -642,6 +646,11 @@ async function toVitalis(cmd) { // solo si Vitalis está abierto (marcar el bañ
 async function dockTr(txt) { // el comentario, al inglés con el traductor de la pestaña de Vitalis
   for (const t of await vitalisTabs()) { try { const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'tr', txt }), 15000); if (r && !r.noPanel) return r; } catch (e) {} }
   return { why: 'cerrado' };
+}
+
+async function dockProf(id, p) { // el perfil que se completó en la mini ficha: lo guarda Vitalis (si está abierto)
+  for (const t of await vitalisTabs()) { try { const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'prof', id, p }), 16000); if (r && !r.noPanel) return r; } catch (e) {} }
+  return { err: 'cerrado' };
 }
 
 async function sendCmd(cmd) { // "hecho" desde el aviso: se lo paso a Vitalis si está abierto; si no, queda en cola
@@ -697,6 +706,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (a === 'abrir') { openPanel().then(() => reply({ ok: true }), () => reply({ ok: false })); return true; }
     return false;
   }
+  if (msg.type === 'dock-prof' && msg.id && msg.p && typeof msg.p === 'object') { dockProf(String(msg.id).slice(0, 60), msg.p).then(reply, () => reply({ err: 'cerrado' })); return true; }
   if (msg.type === 'dock-tr' && typeof msg.txt === 'string') { dockTr(msg.txt.slice(0, 4000)).then(reply, () => reply({ why: 'no' })); return true; }
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }

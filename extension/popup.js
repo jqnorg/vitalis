@@ -65,7 +65,7 @@ async function renderStation() { // la estación (el Chrome del team leader): cu
   const h = stationHours || { days: [1, 2, 3, 4, 5], from: 540, to: 1050 }, d = new Date(), m = d.getHours() * 60 + d.getMinutes(), on = h.days.includes(d.getDay()) && m >= h.from && m < h.to;
   const bad = vs.filter((v) => runs[v] && runs[v].problem), last = Math.max(0, ...vs.map((v) => (runs[v] && runs[v].lastOk) || 0));
   el.hidden = false;
-  dotLine(document.getElementById('stTxt'), !on ? 'off' : bad.length ? 'bad' : '', `Estación: ${vs.length} de 5 vistas · ${!on ? 'fuera de horario' : bad.length ? plural(bad.length, 'con problema', 'con problemas') : last ? 'leyendo, ' + ago(last) : 'arrancando'}`);
+  dotLine(document.getElementById('stTxt'), !on ? 'off' : bad.length ? 'bad' : '', `Estación: ${plural(vs.length, 'vista', 'vistas')} · ${!on ? 'fuera de horario' : bad.length ? plural(bad.length, 'con problema', 'con problemas') : last ? 'leyendo, ' + ago(last) : 'arrancando'}`);
   document.getElementById('stOff').onclick = () => chrome.runtime.sendMessage({ type: 'station-off' }, () => renderStation());
 }
 const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);

@@ -34,6 +34,16 @@
       setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ why: 'no' }); delete waiting[reqId]; } }, 14000);
       return true;
     }
+    if (msg && msg.type === 'prof' && msg.p && typeof msg.p === 'object') { // la mini ficha del CRM: el perfil del cliente → Vitalis lo guarda
+      if (!alive) { reply({ noPanel: true }); return false; }
+      const reqId = 'P' + Date.now() + Math.random().toString(36).slice(2), q = msg.p, s = (v, n) => (v == null ? '' : String(v).slice(0, n));
+      const p = { edad: q.edad == null || q.edad === '' ? null : Number(q.edad), ocupacion: s(q.ocupacion, 120), desocupado: q.desocupado === true, desocupado_desde: s(q.desocupado_desde, 60),
+        objetivo: s(q.objetivo, 200), anuncio: s(q.anuncio, 300), vio_min: q.vio_min === true ? true : q.vio_min === false ? false : null, outcome: s(q.outcome, 30) || null, motivo: s(q.motivo, 400) };
+      waiting[reqId] = reply;
+      post({ type: 'ftd-agenda-prof', v: 1, reqId, id: s(msg.id, 60), p });
+      setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ err: 'cerrado' }); delete waiting[reqId]; } }, 14000);
+      return true;
+    }
     if (msg && msg.type === 'station' && Array.isArray(msg.views)) { // la estación (pestañas propias del CRM): cómo le fue con cada vista → Vitalis lo guarda
       if (!alive) { reply({ noPanel: true }); return false; }
       const t = (v, n) => (v == null ? null : String(v).slice(0, n));
@@ -88,6 +98,12 @@
       const card = { k: t(c.k, 80), v: t(c.v, 60), kind: 'social', lvl: ['urg', 'imp', 'info'].includes(c.lvl) ? c.lvl : '', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
         btns: (Array.isArray(c.btns) ? c.btns : []).slice(0, 4).map((b) => [t(b[0], 20), t(b[1], 30), b[2] ? 1 : 0]) };
       try { chrome.runtime.sendMessage({ type: 'social', card }); } catch (x) {}
+      return;
+    }
+    if (d.type === 'ftd-agenda-prof-ack' && d.v === 1) {
+      const res = d.ok ? { ok: true, parts: Array.isArray(d.parts) ? d.parts.slice(0, 12).map((x) => ({ es: String((x && x.es) || '').slice(0, 1500), en: String((x && x.en) || '').slice(0, 1500), free: !!(x && x.free) })) : [] }
+        : { err: String(d.err || 'no').slice(0, 200) };
+      if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }
       return;
     }
     if (d.type === 'ftd-agenda-tr-ack' && d.v === 1) {
