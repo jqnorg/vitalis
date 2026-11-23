@@ -625,6 +625,22 @@ async function tellCrm(res) {
   for (const t of await chrome.tabs.query({ url: await crmUrls() })) { try { await chrome.tabs.sendMessage(t.id, { type: 'import-result', res }); } catch (e) {} }
 }
 
+/* ---------- la mini ficha del CRM: lo que manda Vitalis (cliente actual, el siguiente de la Cola, el turno) ----------
+   Solo en memoria (storage.session): se borra al cerrar Chrome. Va a todas las pestañas del CRM menos las de la estación. */
+async function dockSet(d) {
+  const dk = { ...(d && typeof d === 'object' ? d : { off: 1 }), at: Date.now() };
+  await sess.set('dock', dk);
+  for (const t of await chrome.tabs.query({ url: await crmUrls() })) { if (stationOf(t.id)) continue; try { chrome.tabs.sendMessage(t.id, { type: 'dock', d: dk }).catch(() => {}); } catch (e) {} }
+}
+async function toVitalis(cmd) { // solo si Vitalis está abierto (marcar el baño con Vitalis cerrado no puede quedar para después)
+  for (const t of await vitalisTabs()) { try { const r = await chrome.tabs.sendMessage(t.id, { type: 'cmds', cmds: [cmd] }); if (r && r.ok) return true; } catch (e) {} }
+  return false;
+}
+async function dockTr(txt) { // el comentario, al inglés con el traductor de la pestaña de Vitalis
+  for (const t of await vitalisTabs()) { try { const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'tr', txt }), 15000); if (r && !r.noPanel) return r; } catch (e) {} }
+  return { why: 'cerrado' };
+}
+
 async function sendCmd(cmd) { // "hecho" desde el aviso: se lo paso a Vitalis si está abierto; si no, queda en cola
   const tabs = await vitalisTabs();
   for (const t of tabs) {
@@ -662,6 +678,23 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     chrome.tabs.get(msg.tabId).then((tab) => crmSiteAdd(tab, String(msg.brand || 'Novara Markets'))).then(() => reply({ ok: true })).catch((e) => reply({ ok: false, err: String(e && e.message || e) }));
     return true;
   }
+  if (msg.type === 'dock' && msg.d) { dockSet(msg.d).then(() => reply({ ok: true }), () => reply(null)); return true; }
+  if (msg.type === 'dock-get') { Promise.all([sess.get('dock', null), sess.get('dockDrafts', {})]).then(([d, drafts]) => reply({ d, drafts, station: !!(sender.tab && stationOf(sender.tab.id)) }), () => reply(null)); return true; }
+  if (msg.type === 'dock-draft' && msg.id) { // lo que escribió en el comentario: no se pierde al minimizar o cambiar de página
+    lock('dd', async () => { const all = await sess.get('dockDrafts', {}); const id = String(msg.id).slice(0, 60), t = String(msg.txt || '').slice(0, 4000);
+      if (t) all[id] = t; else delete all[id];
+      const ks = Object.keys(all); for (const k of ks.slice(0, Math.max(0, ks.length - 30))) delete all[k];
+      await sess.set('dockDrafts', all); }).then(() => reply({ ok: true }), () => reply(null));
+    return true;
+  }
+  if (msg.type === 'dock-act' && msg.a) {
+    const a = String(msg.a);
+    if (['bano', 'd10', 'd30', 'vuelta'].includes(a)) { toVitalis({ cmd: 'turno', k: a, at: Date.now() }).then((ok) => reply({ ok }), () => reply({ ok: false })); return true; }
+    if (a === 'ver') { openPanel().then(() => toVitalis({ cmd: 'ir', k: 'cliente', at: Date.now() })).then((ok) => reply({ ok }), () => reply({ ok: false })); return true; }
+    if (a === 'abrir') { openPanel().then(() => reply({ ok: true }), () => reply({ ok: false })); return true; }
+    return false;
+  }
+  if (msg.type === 'dock-tr' && typeof msg.txt === 'string') { dockTr(msg.txt.slice(0, 4000)).then(reply, () => reply({ why: 'no' })); return true; }
   if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }

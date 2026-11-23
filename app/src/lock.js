@@ -27,7 +27,7 @@ function lockNow(){
   if(locked||!ready||!profile)return;
   locked=true;chatOkAt=0;lkName=profile.name;local.set(LK,{uid:me,name:profile.name});
   try{document.activeElement&&document.activeElement.blur()}catch(e){}
-  lockDraw();
+  lockDraw();dockSync();
 }
 function lockBoot(uid){const v=local.get(LK,null);if(!v||!uid||v.uid!==uid)return;locked=true;lkName=v.name||'';lockDraw()} // al abrir: si quedó tapado, sigue tapado
 function lockClear(){locked=false;local.set(LK,null);document.body.classList.remove('locked');const L=$('#lock');if(L)L.remove()}
@@ -45,12 +45,13 @@ function lockDraw(){
 function unlock(){
   lockClear();lastAct=Date.now();chatOkAt=Date.now();chatPadOff(); // acaba de poner el PIN: el chat también queda abierto
   if(ready){go(landing());status()}
+  dockSoon();
 }
-async function lockOut(){lockClear();try{await sb.auth.signOut()}catch(e){}location.reload()} // otra persona: sale del todo
+async function lockOut(){lockClear();postTop({type:'ftd-agenda-dock',v:1,d:{off:1}});try{await sb.auth.signOut()}catch(e){}location.reload()} // otra persona: sale del todo
 // otra pestaña de Vitalis en esta compu se tapó o se destapó
 addEventListener('storage',e=>{
   if(e.key!=='vitalis.'+LK)return;let v=null;try{v=JSON.parse(e.newValue)}catch(x){}
-  if(v&&v.uid===me&&!locked){locked=true;chatOkAt=0;lkName=v.name||'';lockDraw()}
+  if(v&&v.uid===me&&!locked){locked=true;chatOkAt=0;lkName=v.name||'';lockDraw();dockSync()}
   else if(!v&&locked){locked=false;document.body.classList.remove('locked');const L=$('#lock');if(L)L.remove();lastAct=Date.now();chatOkAt=Date.now();if(ready){go(landing());status()}}
 });
 // el PIN se revisa en la base (con el mismo freno de intentos que la entrada)

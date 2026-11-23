@@ -26,6 +26,14 @@
       setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ noPanel: true }); delete waiting[reqId]; } }, 18000);
       return true;
     }
+    if (msg && msg.type === 'tr' && typeof msg.txt === 'string') { // la mini ficha del CRM: traducir el comentario con el traductor de esta pestaña
+      if (!alive) { reply({ noPanel: true }); return false; }
+      const reqId = 'T' + Date.now() + Math.random().toString(36).slice(2);
+      waiting[reqId] = reply;
+      post({ type: 'ftd-agenda-tr', v: 1, reqId, txt: msg.txt.slice(0, 4000) });
+      setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ why: 'no' }); delete waiting[reqId]; } }, 14000);
+      return true;
+    }
     if (msg && msg.type === 'station' && Array.isArray(msg.views)) { // la estación (pestañas propias del CRM): cómo le fue con cada vista → Vitalis lo guarda
       if (!alive) { reply({ noPanel: true }); return false; }
       const t = (v, n) => (v == null ? null : String(v).slice(0, n));
@@ -80,6 +88,17 @@
       const card = { k: t(c.k, 80), v: t(c.v, 60), kind: 'social', lvl: ['urg', 'imp', 'info'].includes(c.lvl) ? c.lvl : '', title: t(c.title, 60), id: t(c.id, 120), kw: t(c.kw, 200), meta: t(c.meta, 80),
         btns: (Array.isArray(c.btns) ? c.btns : []).slice(0, 4).map((b) => [t(b[0], 20), t(b[1], 30), b[2] ? 1 : 0]) };
       try { chrome.runtime.sendMessage({ type: 'social', card }); } catch (x) {}
+      return;
+    }
+    if (d.type === 'ftd-agenda-tr-ack' && d.v === 1) {
+      const res = { en: String(d.en || '').slice(0, 8000), why: String(d.why || '').slice(0, 12) };
+      if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }
+      return;
+    }
+    if (d.type === 'ftd-agenda-dock' && d.v === 1 && d.d && typeof d.d === 'object') { // la mini ficha del CRM (lo justo, y nunca más de 60 KB)
+      let j = ''; try { j = JSON.stringify(d.d); } catch (x) { return; }
+      if (j.length > 60000) return;
+      try { chrome.runtime.sendMessage({ type: 'dock', d: JSON.parse(j) }); } catch (x) {}
       return;
     }
     if (d.type === 'ftd-agenda-social-close' && d.v === 1) { try { chrome.runtime.sendMessage({ type: 'social-close', k: String(d.k || '').slice(0, 80) }); } catch (x) {} return; }

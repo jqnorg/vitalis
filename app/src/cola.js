@@ -84,34 +84,63 @@ function sgLowWhy(r,te){
   return out.length?{why:out.slice(0,2).join(' · '),w}:null;
 }
 
-function colaSug(q){
-  const S=new Set(),now=Date.now(),te=todayS(),H=hotMine(q),hot=new Map();
+// qué va en cada paso (lo usan la Cola y el "Siguiente" de la extensión en el CRM)
+function colaPlan(q){
+  const now=Date.now(),te=todayS(),H=hotMine(q),hot=new Map();
   for(const h of H)for(const r of h.cl)hot.set(norm(r.id),h);
   const mark=r=>{r.hot=hot.get(norm(r.id))||null;return r};
   const kOf=new Map(),K=r=>{let k=kOf.get(r);if(!k)kOf.set(r,k=contactOf(r));return k};
+  // 1) los new (en la Cola, solo si hay más de uno)
+  const news=q.g1.map(mark),due=r=>{const k=K(r);return !k.last||now-k.last>=REPASO};
+  const newsL=[...news].sort((a,b)=>(due(b)?1:0)-(due(a)?1:0)||(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
+  // 2) agendas que ya llegaron, Pending Payment y CallBack
+  const agNow=q.ag.filter(p=>parseDue(p.due)<=new Date()),agLater=q.ag.filter(p=>parseDue(p.due)>new Date());
+  const cb=q.cb.map(mark),cbRank=r=>(K(r).today?2:0)+(r.grp==='pending'?0:1);
+  const two=[...agNow.map(p=>{const r=crmStatusOf(p.id);return {p,r:r?mark(r):null}}),...[...cb].sort((a,b)=>cbRank(a)-cbRank(b)||byRegDesc(a,b)).map(r=>({r}))];
+  // 3) NA, Call Again y Hang Up, por el motivo. Un cliente va en un solo lugar: los que tienen agenda abierta los avisa la agenda
+  const agIds=new Set(pend.filter(p=>!p.done).map(p=>norm(p.id)));
+  const g3=q.g3.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r)})),by=(a,b)=>(a.k.last||0)-(b.k.last||0); // primero el que hace más que nadie toca (a la par, queda el orden de la mesa: Call Again, Hang Up, NA)
+  const recent=x=>x.k.today&&x.k.last&&now-x.k.last<=SG_STALE;
+  const hotL=g3.filter(x=>x.r.hot&&!recent(x)).sort(by),rest=g3.filter(x=>!(x.r.hot&&!recent(x)));
+  const nunca=rest.filter(x=>!x.k.today).sort(by),viejos=rest.filter(x=>x.k.today&&!recent(x)).sort(by),poco=rest.filter(recent).sort(by);
+  // 4) Low potential con chance
+  const low=q.low.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r),x:sgLowWhy(r,te)})).filter(o=>o.x)
+    .sort((a,b)=>(recent(a)?1:0)-(recent(b)?1:0)||a.x.w-b.x.w||byRegDesc(a.r,b.r));
+  return {now,te,H,K,news,newsL,due,agNow,agLater,cb,two,g3,hotL,nunca,viejos,poco,low,recent};
+}
+// el próximo a llamar, en el orden de la Cola, con su porqué en una línea (para la extensión en el CRM)
+function colaNext(q,n=6){
+  const P=colaPlan(q),out=[],seen=new Set(),add=(id,name,why)=>{const k=norm(id);if(!id||seen.has(k))return;seen.add(k);out.push({id:String(id),name:name||'',why})};
+  for(const r of P.newsL.filter(P.due)){const k=P.K(r);add(r.id,r.name,k.last?`Nuevo: lo llamaste ${rel(new Date(k.last))}, toca repasarlo`:'Nuevo: todavía no lo llamaste')}
+  for(const {p,r} of P.two){
+    if(p)add(p.id,r&&r.name,`Agenda de las ${p.due.slice(11,16)}`);
+    else add(r.id,r.name,r.grp==='pending'?'Tiene un boleto sin pagar':'Pidió que lo llamen');
+  }
+  for(const x of P.hotL)add(x.r.id,x.r.name,'Su campaña está depositando hoy');
+  for(const x of P.nunca)add(x.r.id,x.r.name,`${sgPlain(x.r)} · sin llamar hoy`);
+  for(const x of P.viejos)add(x.r.id,x.r.name,`${sgPlain(x.r)} · sin tocar hace más de 2 h`);
+  for(const o of P.low)add(o.r.id,o.r.name,'Low potential: '+o.x.why.replace(/<[^>]+>/g,''));
+  return out.slice(0,n);
+}
+function colaSug(q){
+  const P=colaPlan(q),{now,H,K,news,newsL,due,agNow,agLater,cb,two,g3,hotL,nunca,viejos,poco,low,recent}=P;
   let html='',step=0;
   const stepH=(t,sub)=>`<div class="sg-step"><span class="sg-sn">${++step}</span><div><h3>${t}</h3><p>${sub}</p></div></div>`;
 
   // 1) los new: solo si hay más de uno
-  const news=q.g1.map(mark);
   if(news.length>1){
-    const due=r=>{const k=K(r);return !k.last||now-k.last>=REPASO};
-    const L=[...news].sort((a,b)=>(due(b)?1:0)-(due(a)?1:0)||(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
-    const n=L.filter(due).length;
+    const L=newsL,n=L.filter(due).length;
     html+=stepH('Primero, los nuevos',`Tenés ${plural(news.length,'nuevo','nuevos')} sin depositar${n?`; ${n===news.length?'a todos':`a ${n}`} toca llamarlos ahora`:''}. Depositan más en las primeras horas, y se repasan cada menos de 2 horas.`)+
       `<div class="sg-list">${L.map(r=>sgCard({r,c:'new',tag:'Nuevo',k:K(r),why:sgNewWhy(r,K(r))})).join('')}</div>`;
   }
   document.body.classList.toggle('sg-news',news.length>1);
 
   // 2) agendas que ya llegaron, Pending Payment y CallBack
-  const agNow=q.ag.filter(p=>parseDue(p.due)<=new Date()),agLater=q.ag.filter(p=>parseDue(p.due)>new Date());
-  const cb=q.cb.map(mark),cbRank=r=>(K(r).today?2:0)+(r.grp==='pending'?0:1);
-  const two=[...agNow.map(p=>({p,r:crmStatusOf(p.id)})),...[...cb].sort((a,b)=>cbRank(a)-cbRank(b)||byRegDesc(a,b)).map(r=>({r}))];
   if(two.length){
     html+=stepH('Después, los que esperan tu llamada',`${[agNow.length&&plural(agNow.length,'agenda que ya llegó','agendas que ya llegaron'),cb.filter(r=>r.grp==='pending').length&&plural(cb.filter(r=>r.grp==='pending').length,'boleto sin pagar','boletos sin pagar'),cb.filter(r=>r.grp==='callback').length&&plural(cb.filter(r=>r.grp==='callback').length,'cliente que pidió que lo llamen','clientes que pidieron que los llamen')].filter(Boolean).join(', ')}. Ya tienen un compromiso: no los dejes esperando.`)+
       `<div class="sg-list">${two.map(({p,r})=>{
         if(p){const d=parseDue(p.due),late=now-d>5*6e4;
-          return sgCard({p,r:r?mark(r):null,c:'ag',tag:'Agenda',k:r?K(r):null,why:`Quedaste en llamarlo a las <b>${esc(p.due.slice(11,16))}</b>${late?` (${esc(rel(d))})`:''}.${p.kw?` Palabra clave: <b>${esc(p.kw)}</b>.`:''}`})}
+          return sgCard({p,r:r||null,c:'ag',tag:'Agenda',k:r?K(r):null,why:`Quedaste en llamarlo a las <b>${esc(p.due.slice(11,16))}</b>${late?` (${esc(rel(d))})`:''}.${p.kw?` Palabra clave: <b>${esc(p.kw)}</b>.`:''}`})}
         const k=K(r),d=sgDay(r),called=k.today?` Ya lo llamaste hoy a las ${hhmm(k.last)}.`:'';
         if(r.grp==='pending')return sgCard({r,c:'pend',tag:'Boleto',k,why:`Tiene un boleto sin pagar: preguntale si ya pudo pagar y ayudalo a terminar.${called}`});
         return sgCard({r,c:'cb',tag:'Pidió que lo llamen',k,why:`Tiene cita en el CRM${d?` (día ${d} de 5)`:''}. Si te da una hora, agendalo para que Vitalis te avise.${called}`});
@@ -119,12 +148,7 @@ function colaSug(q){
   }
   if(agLater.length)html+=`<p class="sg-later"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Más tarde: ${agLater.map(p=>`<b>${esc(p.due.slice(11,16))}</b> ${esc(p.id)}`).join(' · ')}. <span class="d">Te avisa a la hora.</span></p>`;
 
-  // 3) NA, Call Again y Hang Up, por el motivo. Un cliente va en un solo lugar: los que tienen agenda abierta los avisa la agenda
-  const agIds=new Set(pend.filter(p=>!p.done).map(p=>norm(p.id)));
-  const g3=q.g3.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r)})),by=(a,b)=>(a.k.last||0)-(b.k.last||0); // primero el que hace más que nadie toca (a la par, queda el orden de la mesa: Call Again, Hang Up, NA)
-  const recent=x=>x.k.today&&x.k.last&&now-x.k.last<=SG_STALE;
-  const hotL=g3.filter(x=>x.r.hot&&!recent(x)).sort(by),rest=g3.filter(x=>!(x.r.hot&&!recent(x)));
-  const nunca=rest.filter(x=>!x.k.today).sort(by),viejos=rest.filter(x=>x.k.today&&!recent(x)).sort(by),poco=rest.filter(recent).sort(by);
+  // 3) NA, Call Again y Hang Up, por el motivo
   if(g3.length){
     const pend3=hotL.length+nunca.length+viejos.length;
     html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para repasar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
@@ -137,8 +161,6 @@ function colaSug(q){
   }
 
   // 4) Low potential con chance
-  const low=q.low.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r),x:sgLowWhy(r,te)})).filter(o=>o.x)
-    .sort((a,b)=>(recent(a)?1:0)-(recent(b)?1:0)||a.x.w-b.x.w||byRegDesc(a.r,b.r));
   if(low.length){
     html+=stepH('Low potential con chance hoy','No tenían el dinero, pero según el Radar hoy pueden entrar. Los que tienen agenda no van acá: te avisa la agenda.')+
       `<section class="card sg-g3">${low.slice(0,ahMore.low4?low.length:12).map(o=>sgRow(o.r,o.k,o.x.why+(o.k.today?` · lo llamaron a las ${hhmm(o.k.last)}`:''))).join('')}${low.length>12&&!ahMore.low4?`<button type="button" class="btn sm rk-more" data-ah="more" data-g="low4">Ver los ${low.length}</button>`:''}</section>`;

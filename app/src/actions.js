@@ -554,9 +554,11 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return} // la extensión de esta compu es la estación: cómo le fue con cada vista
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir')){dockCmd(d);return} // desde la mini ficha del CRM
+  if(d&&d.type==='ftd-agenda-tr'&&d.v===1){const src=e.source;dockTr(d.txt).catch(()=>({why:'no'})).then(r=>{try{src.postMessage({type:'ftd-agenda-tr-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // traducir el comentario de la mini ficha
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);newPoll();if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);newPoll();dockSync(true);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
@@ -565,7 +567,7 @@ window.addEventListener('message',e=>{
   if(!d||d.type!=='ftd-agenda-ack'||d.v!==1)return;
   const was=extOn();extOk=Date.now();extN=+d.scheduled||0;extVer=String(d.ver||'').slice(0,12);
   if(extOld()&&!extWarned){extWarned=1;toast(`Tu extensión de Chrome es vieja${extVer?' ('+esc(extVer)+')':''}: bajá la ${esc(EXT_VER)} en Ajustes, cargala de nuevo y recargá el CRM.`,'warn')}
-  if(!was){status();if(cur==='config'||cur==='agenda')V[cur].render({})}
+  if(!was){status();dockSoon();if(cur==='config'||cur==='agenda')V[cur].render({})}
 });
 
 async function addLeadsFromExt(rows){
@@ -735,7 +737,7 @@ const ACT={
   cargarJornada:()=>editTurno(null),editTurno:el=>editTurno(el.dataset.d),
   editFtd:el=>{const f=team.find(x=>x._id===el.dataset.id);if(f&&canEdit(f))ftdForm(f)},
   delFtd:el=>{const f=team.find(x=>x._id===el.dataset.id);if(f&&canEdit(f))borrarFtd(f)},
-  salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))await sb.auth.signOut().catch(()=>{}),location.reload()},
+  salir:async()=>{if(await confirmar('Salir','¿Cerrar la sesión en esta computadora? Para volver elegís tu nombre y ponés tu PIN.','Salir'))postTop({type:'ftd-agenda-dock',v:1,d:{off:1}}),await sb.auth.signOut().catch(()=>{}),location.reload()},
   nuevoCliente:()=>clienteModal(),nuevoSnip:()=>snipModal(),
   importarRespaldo:()=>importarRespaldo(),
   target:el=>targetModal(el.dataset.ym||ymNow()),foto:()=>avPick(),formers:()=>formersModal(null),hoyMas:()=>{hoyAll=!hoyAll;refresh()},utargets:el=>utModal(el.dataset.ym||ymNow(),el.dataset.uid),hoyVentas:()=>go('ventas',{who:'all',f:{desde:todayS(),hasta:todayS()}}),fotoX:async()=>{if(await confirmar('Sacar la foto','¿Saco tu foto de perfil? Vuelven a aparecer tus iniciales.','Sacar',true)&&await B.delAvatar())toast('Foto sacada.')},ficha:el=>fichaModal(el.dataset.uid),focusTc:()=>{const i=$('#suTc');i.focus();i.select()},

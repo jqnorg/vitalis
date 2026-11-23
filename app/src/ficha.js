@@ -322,7 +322,7 @@ function setCurrent(id,name,src){
   id=String(id||'').trim();if(!id)return;
   const same=curCl&&curCl.id===id;
   curCl={id,name:name||(same&&curCl.name)||'',src,at:Date.now()};local.set('curCl',curCl);
-  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);cliBadge();
+  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);cliBadge();dockSoon();
   if(src!=='lista'&&!same)cuShow(src);
   else if(cur==='cliente')cuRender(!same);
 }
@@ -377,7 +377,7 @@ V.cliente={
   render(o){cuRender(!!o.force)}
 };
 // en vivo: comentarios y campañas del cliente que tenés abierto
-function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);if(cur==='cliente')cuRender(true)}
+function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);if(cur==='cliente')cuRender(true);dockSoon()}
 const ficFetch=()=>QN(sb.from('client_comments').select('id').limit(1)).then(r=>!!r);
 async function ficInit(){ficOk=await ficFetch()}
 

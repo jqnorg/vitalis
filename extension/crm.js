@@ -217,6 +217,7 @@
     if (ch.station) setStation(ch.station.newValue);
     if (ch.stationHours) stHoursCfg = ch.stationHours.newValue || null;
     if (ch.known || ch.importQ || ch.watches || ch.station || ch.stationHours) refresh();
+    if (ch.dockMin && TOP) { dMin = !!ch.dockMin.newValue; dockDraw(); } // minimizada en una pestaña, minimizada en todas
   });
   const isKnown = (s) => { if (!known) return false; prep(); const b = norm(s.brand); return (s.tx && known.txSet.has(b + '|' + s.tx)) || known.idSet.has(b + '|' + norm(s.id)); };
   const isQueued = (s) => queued.has(norm(s.brand) + '|' + norm(s.id));
@@ -255,6 +256,7 @@
   chrome.runtime.onMessage.addListener((m, sender, reply) => {
     if (!live()) return false;
     if (m && m.type === 'import-result') { result(m.res); return false; }
+    if (m && m.type === 'dock') { if (TOP) { dock = m.d || null; dockDraw(); } return false; } // la mini ficha: lo nuevo de Vitalis
     if (m && m.type === 'crm-refresh') { // pedido de la extensión: refrescar la lista
       if (document.hasFocus() && Date.now() - lastInput < 15000) { reply({ skipped: true }); return false; } // la estás usando: no te la muevo
       // un agente: el botón ⟳ de su CRM, si no "Search" (recarga la lista sin recargar la página), si no "Refresh".
@@ -525,7 +527,219 @@
     }
     $('t').textContent = head.join(' · ');
   }
-  function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } }
+  function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } if (dk) { dk.h.remove(); dk = null; } clearInterval(dTimer); }
+  /* ================= la mini ficha de Vitalis (abajo a la izquierda) ================= */
+  // El cliente actual en corto, el siguiente de la Cola y el turno: lo manda Vitalis y acá no se escribe nada en el CRM.
+  // Se minimiza (queda una pastilla, en todas las pestañas). El comentario se escribe acá y se copia solo en inglés.
+  const TOP = (() => { try { return window.top === window; } catch (e) { return false; } })();
+  let dock = null, dk = null, dMin = false, dPayOpen = false, dPay = { id: '', t: '', all: false }, dSkip = 0, dDrafts = {}, dTimer = null, dTicks = 0, dDraftT = null, trObj = null;
+  const dEn = new Map(), DK_OLD = 3 * 6e4;
+  const mmss = (ms) => { const x = Math.max(0, Math.floor(ms / 1000)); return z(Math.floor(x / 60)) + ':' + z(x % 60); };
+  const brLab = (t) => (t.k ? `Descanso ${t.k}'` : 'Baño');
+  const DK_CSS = `.dk{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;color:#0f1720}
+    .box{background:#fff;border:1.5px solid #dde2e7;border-top:5px solid #00b36b;border-radius:18px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);width:320px;max-height:min(62vh,600px);display:flex;flex-direction:column;overflow:hidden}
+    .h{display:flex;align-items:center;gap:8px;padding:10px 10px 8px 14px}.mk{width:20px;height:20px;flex:none}
+    .tag{font-weight:700;font-size:15px;letter-spacing:-.035em}.t{flex:1;color:#6b7684;font-size:12px;text-align:right}
+    .x{all:unset;cursor:pointer;color:#6b7684;width:28px;height:28px;display:grid;place-items:center;border-radius:8px;font-size:18px;font-weight:700}.x:hover{background:#eef0f3;color:#0f1720}
+    .bd{overflow:auto;padding:0 14px 12px;min-height:0}.ft{flex:none;border-top:1.5px solid #eef0f3;padding:2px 14px 12px}.ft:has(#nx:empty):has(#tu:empty){display:none}#nx:empty,#tu:empty{display:none}#nx+#tu:not(:empty){margin-top:2px}[hidden]{display:none!important}
+    .sec{border-top:1.5px solid #eef0f3;padding-top:4px;margin-top:12px}.sec:empty{display:none}
+    .stop{font-weight:700;border-radius:10px;padding:7px 10px;margin-bottom:8px;font-size:13.5px}
+    .stop.err{background:#fff1f3;color:#be123c;border:1.5px solid #f43f5e}.stop.ok{background:#ecfdf5;color:#047857;border:1.5px solid #00b36b}
+    .cid{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.cid b{font-size:18px;letter-spacing:-.02em}.nm{font-weight:600}
+    .meta{color:#6b7684;font-size:12px;margin:1px 0 6px}
+    .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #f1f3f5;font-size:12.5px}
+    .kv span{color:#6b7684;flex:none}.kv b{font-weight:600;text-align:right}.kv i{color:#6b7684;font-weight:400;font-style:normal}
+    .falta{margin-top:8px;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:600}
+    .lb{display:block;color:#6b7684;font-size:11.5px;font-weight:700;margin:10px 0 5px}.lb i{font-style:normal;font-weight:500}
+    .coms p{margin:0 0 6px;font-size:12.5px;background:#f6f7f9;border-radius:10px;padding:6px 9px;word-break:break-word}.coms i{color:#6b7684;font-style:normal;font-size:11.5px}
+    details{margin-top:12px;border:1.5px solid #dde2e7;border-radius:12px;padding:0 10px}
+    summary{cursor:pointer;font-weight:700;padding:9px 0;list-style:none;display:flex;gap:7px;align-items:center}summary::-webkit-details-marker{display:none}
+    summary::before{content:'';width:0;height:0;border-left:5px solid #6b7684;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
+    details[open] summary::before{transform:rotate(90deg)}details[open]{padding-bottom:10px}#payp{color:#6b7684;font-weight:500}
+    .seg{display:flex;gap:6px}.seg button{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 6px;font-weight:600;font-size:13px}
+    .seg button:hover{border-color:#6b7684}.seg button.on{border-color:#00875a;background:#e8f6ef;color:#00875a}.seg button.no{color:#9aa3ad}
+    .op{border:1.5px solid #d5efe1;background:#f3fbf6;border-radius:10px;padding:6px 9px;margin-bottom:6px;font-size:12.5px}.opn{color:#4b5563;font-size:12px;margin-top:2px}
+    .bad{color:#be123c;font-size:12px;margin:6px 0 0}
+    textarea{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 9px;resize:vertical;min-height:64px;color:#0f1720;background:#fff}
+    textarea:focus{outline:none;border-color:#00875a;box-shadow:0 0 0 2px #00875a33}
+    .row{display:flex;gap:8px;margin-top:6px;align-items:center}.row .go{flex:1}
+    .go{all:unset;box-sizing:border-box;display:block;text-align:center;cursor:pointer;background:#00875a;color:#fff;font-weight:700;border-radius:12px;padding:9px 12px;box-shadow:0 2px 0 #00573a}
+    .go:hover{background:#006e49}.go[disabled]{opacity:.6;cursor:default}.go.alt{background:#fff;color:#0f1720;border:1.5px solid #dde2e7;box-shadow:none}.go.alt:hover{border-color:#6b7684}
+    .go.sm{padding:6px 10px;font-size:12.5px;flex:none}
+    .lnk{all:unset;cursor:pointer;color:#00875a;font-weight:600;font-size:12.5px;text-decoration:underline;margin-top:8px;display:inline-block}
+    .msg{font-size:12.5px;margin-top:6px;font-weight:600}.msg:empty{display:none}
+    .en{margin-top:4px;background:#f6f7f9;border-radius:10px;padding:6px 9px;color:#0f1720;font-weight:400;max-height:96px;overflow:auto;white-space:pre-wrap}
+    .ok{color:#047857}.warn{color:#b45309}.err{color:#be123c}
+    .note{color:#6b7684;font-size:12.5px;margin:6px 0}.note.warn{color:#b45309}
+    .nr{display:flex;align-items:center;gap:8px}.nx-o{all:unset;cursor:pointer;color:#00875a;font-weight:600;font-size:12px;margin-left:4px;text-decoration:underline}.nt{flex:1;min-width:0}.nt b{font-size:15px}.why{color:#4b5563;font-size:12px}
+    .tb3{display:flex;gap:6px;margin-top:8px}.tb{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;border:1.5px solid #dde2e7;border-radius:12px;padding:9px 4px;font-weight:700;font-size:13px}
+    .tb:hover{border-color:#00875a;color:#00875a}.tb[disabled]{opacity:.5}
+    .trow{display:flex;align-items:center;gap:8px;margin-top:8px}.brk{flex:1;font-weight:600}.brk b{font-variant-numeric:tabular-nums;margin-left:4px}.brk b.hot{color:#be123c}
+    .pill{display:none;align-items:center;gap:8px;background:#fff;border:1.5px solid #00b36b;border-radius:999px;padding:7px 13px 7px 9px;box-shadow:0 8px 24px rgba(16,24,40,.16);cursor:pointer;font-weight:600;font-size:12.5px;color:#0f1720}
+    .pill .mk{width:18px;height:18px}.pill .plus{color:#6b7684;font-weight:700;font-size:15px;line-height:1}.pill.stp{border-color:#f43f5e}
+    .min .pill{display:inline-flex}.min .box{display:none}
+    :focus-visible{outline:2px solid #00875a;outline-offset:2px}`;
+  if (TOP) {
+    chrome.storage.local.get('dockMin').then((x) => { dMin = !!x.dockMin; dockDraw(); }).catch(() => {});
+    send({ type: 'dock-get' }).then((r) => { if (r) { dock = r.d || null; dDrafts = r.drafts || {}; dockDraw(); } });
+  }
+  const dockShow = () => !!(TOP && dock && !dock.off && !stView && document.body && !loginPage());
+  function dockVis() { if (dockShow() !== !!dk) dockDraw(); } // la pestaña pasó a ser de la estación, o el CRM pidió login
+  function dockBuild() {
+    for (const e of document.querySelectorAll('#vitalis-dock')) e.remove(); // la de una copia vieja
+    const h = document.createElement('div');
+    h.id = 'vitalis-dock';
+    h.style.cssText = 'all:initial;position:fixed;left:16px;bottom:16px;z-index:2147483645;';
+    const root = h.attachShadow({ mode: 'open' });
+    root.innerHTML = `<style>${DK_CSS}</style><div class="dk" id="dk">
+      <div class="pill" id="pill" role="button" tabindex="0" aria-label="Abrir la ficha de Vitalis">${SEAL}<b class="tag">vitalis</b><span id="pt"></span><span class="plus" aria-hidden="true">+</span></div>
+      <div class="box" id="box"><div class="h">${SEAL}<span class="tag">vitalis</span><span class="t" id="ht"></span><button class="x" id="dmin" title="Minimizar" aria-label="Minimizar">–</button></div>
+        <div class="bd"><div id="info"></div>
+          <div id="cl"><div id="clh"></div>
+            <span class="lb">Comentario para el CRM</span><textarea id="cmt" rows="3" maxlength="2000" placeholder="Escribilo en español: se copia en inglés" aria-label="Comentario para el CRM"></textarea>
+            <div class="row"><button class="go" id="cpen">Copiar en inglés</button><button class="lnk" id="cclr" style="margin:0">Borrar</button></div><div class="msg" id="cmsg"></div>
+            <details id="pay"><summary>Depósito <span id="payp"></span></summary><div id="payb"></div></details>
+            <div id="clc"></div></div></div>
+        <div class="ft" id="ft"><div id="nx"></div><div id="tu"></div></div></div></div>`;
+    const $ = (id) => root.getElementById(id);
+    // las teclas que se escriben acá no le llegan al CRM (sus atajos); espacio, Tab y Enter sí, para los snippets
+    root.addEventListener('keydown', (e) => { if (!/^( |Tab|Enter)$/.test(e.key)) e.stopPropagation(); });
+    for (const ev of ['keyup', 'keypress']) root.addEventListener(ev, (e) => e.stopPropagation());
+    $('pay').addEventListener('toggle', () => { dPayOpen = $('pay').open; });
+    $('pill').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dockMin(false); } });
+    $('cmt').addEventListener('input', () => {
+      const c = dock && dock.cl; if (!c) return;
+      dDrafts[c.id] = $('cmt').value; $('cmsg').textContent = '';
+      clearTimeout(dDraftT); dDraftT = setTimeout(() => send({ type: 'dock-draft', id: c.id, txt: $('cmt').value }), 600);
+    });
+    root.addEventListener('click', (e) => dockClick(e));
+    document.documentElement.appendChild(h);
+    return { h, root, $, clId: '' };
+  }
+  function dockMin(v) { dMin = v; try { chrome.storage.local.set({ dockMin: v }); } catch (e) {} dockDraw(); }
+  function dockDraw() {
+    if (!TOP || !live()) return;
+    if (!dockShow()) { if (dk) { dk.h.remove(); dk = null; } clearInterval(dTimer); dTimer = null; return; }
+    if (!dk || !dk.h.isConnected) dk = dockBuild();
+    const $ = dk.$, now = Date.now(), old = now - (dock.at || 0) > DK_OLD, lk = !!dock.locked, cl = lk ? null : dock.cl || null, tu = dock.tu || {};
+    $('dk').classList.toggle('min', dMin);
+    $('pill').classList.toggle('stp', !!(cl && cl.stop === 'dnc'));
+    $('pt').textContent = lk ? '· tapado' : cl ? `· ${cl.id}${cl.stop === 'dnc' ? ' · No llamar' : ''}` : '';
+    $('ht').textContent = lk ? 'tapado' : old ? 'Vitalis no contesta' : '';
+    $('info').innerHTML = lk ? '<p class="note">Vitalis está tapado: poné tu PIN para ver al cliente.</p><button class="go alt" data-a="abrir">Abrir Vitalis</button>'
+      : old ? `<p class="note warn">Vitalis no contesta desde hace ${Math.round((now - dock.at) / 6e4)} min: esto puede estar viejo.</p><button class="go alt" data-a="abrir">Abrir Vitalis</button>` : '';
+    $('cl').hidden = !cl;
+    if (!cl && dk.clId) { dk.clId = ''; $('clh').innerHTML = ''; $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('cmt').value = ''; $('cmsg').textContent = ''; } // tapado o sin cliente: nada del cliente queda en la página
+    if (cl) {
+      $('clh').innerHTML = dockClHTML(cl); $('clc').innerHTML = dockComsHTML(cl);
+      if (dk.clId !== cl.id) { dk.clId = cl.id; $('cmt').value = dDrafts[cl.id] || ''; $('cmsg').textContent = ''; dPayOpen = false; }
+      $('pay').open = dPayOpen;
+      dockPay(cl);
+    }
+    dockNext(cl, lk);
+    dockTurno(tu, lk || old);
+    if (!dTimer) dTimer = setInterval(() => { if (!live()) return; dockTick(); if (++dTicks % 20 === 0) dockDraw(); }, 1000);
+    dockTick();
+  }
+  function dockClHTML(c) {
+    return `${c.stop === 'dnc' ? '<div class="stop err">No llamar: es Do Not Call</div>' : c.stop === 'paid' ? `<div class="stop ok">Ya depositó${c.paid ? ' · ' + escH(c.paid) : ''}</div>` : ''}
+      <div class="cid"><b>${escH(c.id)}</b>${c.name ? `<span class="nm">${escH(c.name)}</span>` : ''}</div>
+      <div class="meta">${[c.pais ? escH(c.pais) : '', c.hora ? `allá son las ${escH(c.hora)}` : ''].filter(Boolean).join(' · ') || '&nbsp;'}</div>
+      <div class="kv"><span>Status</span><b>${c.st ? escH(c.st) : '<i>todavía no se vio en el CRM</i>'}</b></div>
+      <div class="kv"><span>Palabra clave</span><b>${c.kw ? escH(c.kw) : '<i>sin asignar</i>'}</b></div>
+      ${c.ag && c.ag.length ? `<div class="kv"><span>Agenda</span><b>${escH(c.ag.join(', '))}</b></div>` : ''}
+      ${c.falta && c.falta.length ? `<div class="falta">Falta en el perfil: ${escH(c.falta.join(', '))}</div>` : ''}
+`;
+  }
+  const dockComsHTML = (c) => `${c.coms && c.coms.length ? `<span class="lb">Comentarios de la mesa</span><div class="coms">${c.coms.map((x) => `<p><b>${escH(x.w)}</b> <i>${escH(x.t)}</i><br>${escH(x.x)}</p>`).join('')}</div>` : ''}
+      <button class="lnk" data-a="ver">Ver la ficha en Vitalis</button>`;
+  // el camino del depósito, como en la ficha de Vitalis: ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle
+  function dockPay(c) {
+    const P = c.pay, $ = dk.$;
+    $('payp').textContent = P ? P.pais : c.pais || '';
+    if (dPay.id !== c.id) dPay = { id: c.id, t: '', all: false };
+    if (!P) { $('payb').innerHTML = `<p class="note">${c.pais ? `No hay métodos cargados para ${escH(c.pais)}.` : 'No sé de qué país es.'}</p>`; return; }
+    const has = (k) => !!(P.k[k] && P.k[k].ok.length), t = dPay.t, dig = ['digital', 'transferencia', 'tarjeta'].includes(t), fin = ['efectivo', 'transferencia', 'tarjeta'].includes(t);
+    const seg = (lab, items) => `<span class="lb">${lab}</span><div class="seg">${items.map(([k, l, on, ok]) => `<button data-pt="${k}" class="${on ? 'on' : ''}${ok ? '' : ' no'}"${ok ? '' : ' title="No hay nada que ande ahora"'}>${l}</button>`).join('')}</div>`;
+    let h = seg('¿Paga en efectivo o digital?', [['efectivo', 'Efectivo', t === 'efectivo', has('efectivo')], ['digital', 'Digital', dig, has('transferencia') || has('tarjeta')]]);
+    if (dig) h += seg('¿Con tarjeta o transferencia?', [['tarjeta', 'Tarjeta', t === 'tarjeta', has('tarjeta')], ['transferencia', 'Transferencia', t === 'transferencia', has('transferencia')]]);
+    if (fin) {
+      const o = P.k[t] || { ok: [], bad: [] }, L = dPay.all ? o.ok : o.ok.slice(0, 4);
+      h += '<span class="lb">Ofrecele:</span>' + (o.ok.length ? L.map((x) => `<div class="op"><b>${escH(x.m)}</b> con ${escH(x.p)}${x.n ? `<div class="opn">${escH(x.n)}</div>` : ''}</div>`).join('')
+        + (o.ok.length > L.length ? `<button class="lnk" data-pall style="margin-top:2px">Ver las ${o.ok.length} que andan</button>` : '') : '<p class="note">Ahora no anda ninguno: probá con otra forma de pago.</p>')
+        + (o.bad.length ? `<p class="bad"><b>No ofrecer ahora (fallan):</b> ${o.bad.map(escH).join(', ')}</p>` : '');
+    }
+    $('payb').innerHTML = h;
+  }
+  function dockNext(cl, lk) {
+    const L = lk ? [] : (dock.next || []).filter((x) => !cl || x.id !== cl.id), el = dk.$('nx');
+    if (!L.length) { el.innerHTML = ''; return; }
+    const i = dSkip % L.length, x = L[i];
+    el.innerHTML = `<span class="lb">Siguiente${L.length > 1 ? ` <i>· ${i + 1} de ${L.length}</i><button class="nx-o" data-skip>Ver otro</button>` : ''}</span><div class="nr"><div class="nt"><b>${escH(x.id)}</b>${x.name ? ` <span class="nm">${escH(x.name)}</span>` : ''}<div class="why">${escH(x.why || '')}</div></div><button class="go sm" data-cp="${escH(x.id)}">Copiar ID</button></div>`;
+  }
+  function dockTurno(tu, off) {
+    const el = dk.$('tu');
+    if (off) { el.innerHTML = ''; return; }
+    if (tu.st === 'br') el.innerHTML = `<div class="trow"><span class="brk">${brLab(tu)}<b id="tuT"></b></span><button class="go" data-t="vuelta">Volví</button></div>`;
+    else if (tu.st === 'in') el.innerHTML = '<div class="tb3"><button class="tb" data-t="bano">Baño</button><button class="tb" data-t="d10">10 min</button><button class="tb" data-t="d30">30 min</button></div>';
+    else el.innerHTML = `<p class="note">${tu.st === 'out' ? 'Ya marcaste la salida de hoy.' : 'Marcá la entrada en Vitalis para poder marcar el baño y los descansos.'}</p>`;
+  }
+  function dockTick() { // el reloj del baño o del descanso
+    const tu = dock && dock.tu; if (!dk || !tu || tu.st !== 'br' || dock.locked) return;
+    const now = Date.now(), left = tu.k ? tu.s + tu.k * 6e4 - now : 0, hot = !!tu.k && left < 0, txt = tu.k ? (hot ? '+' : '') + mmss(Math.abs(left)) : mmss(now - tu.s);
+    const el = dk.$('tuT'); if (el) { el.textContent = txt; el.classList.toggle('hot', hot); }
+    if (dMin) dk.$('pt').textContent = [dock.cl ? '· ' + dock.cl.id : '', `· ${brLab(tu)} ${txt}`].filter(Boolean).join(' ');
+  }
+  async function dockCopy(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch (e) {}
+    try { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;left:-9999px;top:0'; dk.root.appendChild(ta); ta.select(); const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (e) { return false; }
+  }
+  // al inglés: el traductor de Chrome acá mismo (el toque deja bajar el idioma la primera vez); si no anda, el de la pestaña de Vitalis
+  async function dockEn(txt) {
+    if (dEn.has(txt)) return { en: dEn.get(txt) };
+    const here = async () => {
+      if (!self.Translator) return '';
+      const o = { sourceLanguage: 'es', targetLanguage: 'en' };
+      if ((await Translator.availability(o)) === 'unavailable') return '';
+      if (!trObj) trObj = await Translator.create(o);
+      return String((await trObj.translate(txt)) || '').trim();
+    };
+    const r0 = await Promise.race([here().catch(() => { trObj = null; return ''; }), new Promise((ok) => setTimeout(() => ok(''), 6000))]); // si baja el idioma y tarda, pruebo con Vitalis
+    if (r0) { dEn.set(txt, r0); return { en: r0 }; }
+    const r = await send({ type: 'dock-tr', txt });
+    if (r && r.en) { dEn.set(txt, r.en); return { en: r.en }; }
+    return { why: (r && r.why) || 'no' };
+  }
+  const cmsg = (cls, html) => { if (!dk) return; const m = dk.$('cmsg'); m.className = 'msg ' + cls; m.innerHTML = html; };
+  async function dockClick(e) {
+    const b = e.target.closest('button,#pill'); if (!b || !dk) return;
+    const cl = dock && !dock.locked ? dock.cl : null;
+    if (b.id === 'pill') return dockMin(false);
+    if (b.id === 'dmin') return dockMin(true);
+    if (b.dataset.a) { const r = await send({ type: 'dock-act', a: b.dataset.a }); if (!r || !r.ok) cmsg('err', 'Abrí Vitalis.'); return; }
+    if (b.dataset.t) { // baño, 10 min, 30 min, Volví: lo marca Vitalis (si está abierto)
+      for (const x of dk.root.querySelectorAll('[data-t]')) x.disabled = true;
+      const r = await send({ type: 'dock-act', a: b.dataset.t });
+      if (!r || !r.ok) { dockDraw(); dk.$('tu').insertAdjacentHTML('beforeend', '<p class="note warn">Abrí Vitalis para marcarlo.</p>'); }
+      else setTimeout(() => { if (dk) for (const x of dk.root.querySelectorAll('[data-t]')) x.disabled = false; }, 2500);
+      return;
+    }
+    if (b.dataset.cp) { const ok = await dockCopy(b.dataset.cp); b.textContent = ok ? 'Copiado' : 'No pude'; setTimeout(() => { if (b.isConnected) b.textContent = 'Copiar ID'; }, 1800); return; }
+    if (b.hasAttribute('data-skip')) { dSkip++; dockNext(cl, !!(dock && dock.locked)); return; }
+    if (b.dataset.pt && cl) { dPay.t = b.dataset.pt; dPay.all = false; dockPay(cl); return; }
+    if (b.hasAttribute('data-pall') && cl) { dPay.all = true; dockPay(cl); return; }
+    if (b.id === 'cclr' && cl) { dk.$('cmt').value = ''; dDrafts[cl.id] = ''; send({ type: 'dock-draft', id: cl.id, txt: '' }); cmsg('', ''); dk.$('cmt').focus(); return; }
+    if (b.id === 'cpen' && cl) {
+      const txt = dk.$('cmt').value.trim();
+      if (!txt) { cmsg('warn', 'Escribí el comentario primero.'); dk.$('cmt').focus(); return; }
+      b.disabled = true; b.textContent = 'Traduciendo…';
+      const r = await dockEn(txt);
+      b.disabled = false; b.textContent = 'Copiar en inglés';
+      if (!r.en) return cmsg('err', r.why === 'bajando' ? 'Chrome está bajando el traductor: probá de nuevo en un minuto.' : r.why === 'cerrado' ? 'No pude traducirlo: abrí Vitalis y probá de nuevo.' : 'Este Chrome no tiene el traductor: hay que actualizar Chrome. No copié nada.');
+      const ok = await dockCopy(r.en);
+      cmsg(ok ? 'ok' : 'err', (ok ? 'Copiado en inglés. Pegalo en el CRM:' : 'No pude copiarlo: tocá de nuevo.') + `<div class="en">${escH(r.en)}</div>`);
+    }
+  }
   // ---- el cliente actual: la ficha abierta en el CRM ----
   // La ficha (panel arriba de la lista o página propia) tiene el nombre, "ID 68636" y los botones para llamar (Omega/Gizat/Voiso).
   // Gana el ID que está junto a esos botones y a la vista. Si hay varias fichas (una vieja escondida, un cajón abajo de otro), la que
@@ -540,7 +754,7 @@
       || (location.search + ' ' + location.hash).match(/[?&#](?:user_?id|client_?id|lead_?id)=(\d{3,})/i);
     return m ? m[1] : '';
   }
-  const isMine = (e) => !!(e && ((ui && (e === ui.h || ui.h.contains(e))) || e.id === 'vitalis-cur-pill' || e.id === 'ftd-agenda-overlay'));
+  const isMine = (e) => !!(e && ((ui && (e === ui.h || ui.h.contains(e))) || e.id === 'vitalis-cur-pill' || e.id === 'ftd-agenda-overlay' || e.id === 'vitalis-dock'));
   function onTop(el) { // 0 no se ve · 1 está pero fuera de la pantalla · 2 tapado por otra cosa · 3 a la vista
     if (!el || !el.isConnected) return 0;
     try { if (el.checkVisibility && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true, opacityProperty: true, visibilityProperty: true })) return 0; } catch (e) {}
@@ -667,11 +881,12 @@
   }
   let pillT = null;
   function curPill(id, r) {
+    if (dk && r && r.sent && !(r && r.diag)) return; // la mini ficha ya lo muestra
     let h = document.getElementById('vitalis-cur-pill');
     if (!h) { h = document.createElement('div'); h.id = 'vitalis-cur-pill'; h.attachShadow({ mode: 'open' }); document.documentElement.appendChild(h); }
     const diag = r && r.diag, ok = r && r.sent;
     const txt = diag ? 'no encuentro el ID de esta ficha' : !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
-    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1.5px solid ${ok ? '#00b36b' : '#f59e0b'};padding:7px 12px 7px 11px;border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.16);display:flex;gap:8px;align-items:center}i{width:9px;height:9px;border-radius:50%;background:${ok ? '#00b36b' : '#f59e0b'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:700;color:#0f1720;background:#fff;border:1.5px solid #dde2e7;border-radius:999px;padding:3px 10px;cursor:pointer}button:hover{border-color:#6b7684}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
+    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1.5px solid ${ok ? '#00b36b' : '#f59e0b'};padding:7px 12px 7px 11px;${dk ? `bottom:${Math.round(dk.h.getBoundingClientRect().height) + 26}px;` : ''}border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.16);display:flex;gap:8px;align-items:center}i{width:9px;height:9px;border-radius:50%;background:${ok ? '#00b36b' : '#f59e0b'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:700;color:#0f1720;background:#fff;border:1.5px solid #dde2e7;border-radius:999px;padding:3px 10px;cursor:pointer}button:hover{border-color:#6b7684}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
     const btn = h.shadowRoot.querySelector('button');
     if (btn) btn.onclick = () => navigator.clipboard.writeText(diagCur()).then(() => { btn.textContent = 'Copiado: mandáselo a quien mantiene Vitalis'; }, () => { btn.textContent = 'No pude copiar'; });
     clearTimeout(pillT); pillT = setTimeout(() => h.remove(), diag ? 20000 : 4500);
@@ -704,6 +919,7 @@
     reportSeen(seen);
     goneCheck(seen);
     if (stView) stReport();
+    dockVis();
     if (!sales && !seen && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
     render();
@@ -787,7 +1003,7 @@
   // la página cambió: leo de nuevo cuando se queda quieta 0,6 s, y como mucho a los 2 s aunque no pare de moverse (un reloj, una animación).
   // Si leer la lista tarda (tablas muy grandes), espero más entre lecturas para no trabar el CRM.
   let t = null, firstMut = 0;
-  const mine = (n) => { const h = n && n.nodeType === 1 ? n : n && n.parentElement; return !!(h && ((ui && (h === ui.h || ui.h.contains(h))) || h.id === 'vitalis-cur-pill' || h.id === 'ftd-agenda-overlay')); };
+  const mine = (n) => { const h = n && n.nodeType === 1 ? n : n && n.parentElement; return !!(h && ((ui && (h === ui.h || ui.h.contains(h))) || h.id === 'vitalis-cur-pill' || h.id === 'ftd-agenda-overlay' || h.id === 'vitalis-dock')); };
   const obs = new MutationObserver((muts) => {
     if (muts.every((m) => mine(m.target) || (m.type === 'childList' && [...m.addedNodes, ...m.removedNodes].length > 0 && [...m.addedNodes, ...m.removedNodes].every(mine)))) return; // lo que cambió es de Vitalis
     const now = Date.now(), quiet = Math.min(3000, Math.max(600, lastMs * 4)), cap = Math.max(2000, quiet * 2);

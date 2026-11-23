@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vitalis",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "Vitalis para Chrome: avisos de agenda y sociales con sonido en cualquier pestaña, botón en el CRM (Novara Markets; Trade24Seven como archivo) para pasar ventas, registro de todos los clientes con su status, la estación del team leader (una pestaña propia por vista del CRM) y snippets con /atajo.",
   "permissions": [
     "alarms",

@@ -162,7 +162,7 @@ let rDirty=false;
 // lo que estaba desplegado sigue desplegado después de volver a dibujar
 const openKeys=el=>new Set([...el.querySelectorAll('details[data-k][open]')].map(d=>d.dataset.k));
 function reopen(el,keys){if(keys.size)for(const d of el.querySelectorAll('details[data-k]'))if(keys.has(d.dataset.k))d.open=true}
-function refresh(){clearTimeout(rT);rT=setTimeout(()=>{pass++;if(!ready)return status();status();if(document.hidden)rDirty=true;else{rDirty=false;V[cur].render({})}syncExt()},60)}
+function refresh(){clearTimeout(rT);rT=setTimeout(()=>{pass++;if(!ready)return status();status();if(document.hidden)rDirty=true;else{rDirty=false;V[cur].render({})}syncExt();dockSoon()},60)}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&rDirty&&ready){rDirty=false;V[cur].render({})}});
 
 /* ---------- barra de estado ---------- */
@@ -208,7 +208,7 @@ function turnoBar(force){
   const {t,b,h,key}=turnoState(),now=Date.now();
   const btn=(act,label,title,cls='')=>`<button type="button" class="tb wr ${cls}" data-act="${act}" title="${title}">${label}</button>`;
   if(force||key!==turnoKey){
-    turnoKey=key;
+    turnoKey=key;dockSoon();
     if(!t)el.innerHTML=h&&h.out?`Turno de hoy <b>${durS(h.out-h.in)}</b>&nbsp;`:btn('entrada','Marcar entrada','Marcar la entrada de hoy','go');
     else if(b)el.innerHTML=`${isBano(b)?'En el baño':`Descanso ${b.k}'`} <span class="tLive"></span> ${btn('vuelta','Volví','Volver','go')}`;
     else el.innerHTML=`<span class="tLive"></span> ${btn('bano','Baño','Ir al baño')}${btn('d10','10 min','Descanso de 10 minutos')}${btn('d30','30 min','Descanso de media hora')}${btn('salida','Salida','Marcar salida')}`;
