@@ -551,7 +551,8 @@ window.addEventListener('message',e=>{
     crmSeenFromExt(d.rows).then(res=>{try{src.postMessage({type:'ftd-agenda-seen-ack',v:1,reqId:d.reqId,...res},'*')}catch(x){}});
     return;
   }
-  if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return} // la extensión de esta compu es la estación: cómo le fue con cada vista
+  if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return}
+  if(d&&d.type==='ftd-agenda-sweep'&&d.v===1&&d.sweep){const src=e.source;sweepFromExt(d.sweep).then(r=>{try{src.postMessage({type:'ftd-agenda-sweep-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // el pase completo de la pestaña de Clientes // la extensión de esta compu es la estación: cómo le fue con cada vista
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir')){dockCmd(d);return} // desde la mini ficha del CRM
@@ -664,6 +665,9 @@ function ayuda(){
     <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliador exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
+  <h4>Cola y clientes</h4><dl>
+    <dt>De quién es cada cliente</dt><dd>Del Sales Rep que se ve en el CRM. Si lo rotan dentro de la mesa, cambia solo.</dd>
+    <dt>Lo tiene otra mesa</dt><dd>Una vez por hora la estación recorre todas las páginas de Clientes del CRM. El que estaba y no aparece lo tiene otra mesa: sale de la Cola, del Siguiente y del pool, y la ficha lo dice. Si vuelve a aparecer, vuelve.</dd></dl>
   <h4>Tu ritmo del día</h4><dl>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking o quedó con un status de resultado. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>

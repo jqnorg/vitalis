@@ -44,6 +44,16 @@
       setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ err: 'cerrado' }); delete waiting[reqId]; } }, 14000);
       return true;
     }
+    if (msg && msg.type === 'station-sweep' && msg.sweep && typeof msg.sweep === 'object') { // el pase de la pestaña de Clientes: todos los clientes de la mesa → Vitalis marca a los que ya no están
+      if (!alive) { reply({ noPanel: true }); return false; }
+      const w = msg.sweep, t = (v, n) => (v == null ? null : String(v).slice(0, n)), reqId = 'w' + Date.now() + Math.random().toString(36).slice(2);
+      const sweep = { started: t(w.started, 30), ended: t(w.ended, 30), n: Number(w.n) || 0, total: w.total == null ? null : Number(w.total) || 0, pages: Number(w.pages) || 0, bounded: !!w.bounded, cutoff: t(w.cutoff, 10), brand: t(w.brand, 40) || '', ms: Number(w.ms) || 0,
+        ids: (Array.isArray(w.ids) ? w.ids : []).slice(0, 20000).map((x) => String(x).slice(0, 60)) };
+      waiting[reqId] = reply;
+      post({ type: 'ftd-agenda-sweep', v: 1, reqId, sweep });
+      setTimeout(() => { if (waiting[reqId]) { waiting[reqId]({ noPanel: true }); delete waiting[reqId]; } }, 14000);
+      return true;
+    }
     if (msg && msg.type === 'station' && Array.isArray(msg.views)) { // la estación (pestañas propias del CRM): cómo le fue con cada vista → Vitalis lo guarda
       if (!alive) { reply({ noPanel: true }); return false; }
       const t = (v, n) => (v == null ? null : String(v).slice(0, n));
@@ -75,6 +85,7 @@
       } catch (x) {}
       return;
     }
+    if (d.type === 'ftd-agenda-sweep-ack' && d.v === 1) { if (waiting[d.reqId]) { waiting[d.reqId]({ ok: !!d.ok, err: d.err || null }); delete waiting[d.reqId]; } return; }
     if (d.type === 'ftd-agenda-import-ack' && d.v === 1) {
       const res = { added: d.added || 0, dup: d.dup || 0, bad: d.bad || 0, unmatched: d.unmatched || 0, formers: d.formers || 0, ids: d.ids || [], mes: d.mes || null, err: d.err || null };
       if (waiting[d.reqId]) { waiting[d.reqId](res); delete waiting[d.reqId]; }

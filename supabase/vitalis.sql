@@ -1066,6 +1066,8 @@ alter table public.crm_clients add column if not exists first_agent text;
 alter table public.crm_clients add column if not exists first_call_at timestamptz;
 -- un Talking que desapareció de la lista que se actualiza: ya cambió de status en el CRM (cuál, se sabe cuando aparezca en otra pestaña)
 alter table public.crm_clients add column if not exists left_new_at timestamptz;
+-- lo tiene otra mesa: no apareció en el pase completo de la pestaña de Clientes de la estación (station_sweep); vuelve a null al verlo de nuevo
+alter table public.crm_clients add column if not exists gone_at timestamptz;
 create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
   id         bigserial primary key,
   team_id    uuid not null references public.teams(id),
@@ -1207,6 +1209,7 @@ begin
         status_group = case when st is null then status_group else g end,
         status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
         left_new_at = case when st is null then left_new_at end, -- se lo vio con su status: vale lo que se ve
+        gone_at = null, -- se lo ve: está en la mesa
         last_seen = now(), last_seen_by = auth.uid()
       where team_id = t and brand = br and client_id = cid;
       if ag is not null and cur.crm_agent is not null and lower(ag) <> lower(cur.crm_agent) then -- lo rotaron
@@ -1721,6 +1724,14 @@ create table if not exists public.station_state (
   by_user    uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (team_id, vista));
+-- el pase completo de la pestaña de Clientes (todas las páginas, una vez por hora): cuándo, cuántos vio, páginas, cuánto tardó, y si no encuentra el paginado
+alter table public.station_state add column if not exists sweep_at timestamptz;
+alter table public.station_state add column if not exists sweep_n integer;
+alter table public.station_state add column if not exists sweep_pages integer;
+alter table public.station_state add column if not exists sweep_ms integer;
+alter table public.station_state add column if not exists sweep_err text not null default '';
+alter table public.station_state add column if not exists sweep_gone integer;
+alter table public.station_state add column if not exists pager text not null default '';
 alter table public.station_state drop constraint if exists station_state_vista_check;
 alter table public.station_state add constraint station_state_vista_check check (vista in ('todo', 'news', 'trx', 'cola', 'agen', 'cerr'));
 alter table public.station_state enable row level security;
@@ -1759,6 +1770,11 @@ begin
         case when r->>'total' ~ '^\d{1,7}$' then (r->>'total')::int end, off, prob, auth.uid(), now())
       on conflict (team_id, vista) do update set last_ok = coalesce(excluded.last_ok, station_state.last_ok), last_try = coalesce(excluded.last_try, station_state.last_try),
         n = excluded.n, total = excluded.total, off_pct = excluded.off_pct, problem = excluded.problem, by_user = excluded.by_user, updated_at = now();
+    if v = 'todo' and jsonb_typeof(r->'sweep') = 'object' then
+      update public.station_state set pager = case when r->'sweep'->>'pager' = 'no' then 'no' else '' end,
+        sweep_err = case when r->'sweep'->>'busy' = 'true' then 'busy' else public._clip(r->'sweep'->>'err', 20) end
+        where team_id = t and vista = v;
+    end if;
     nv := nv + 1;
   end loop;
   delete from public.station_state where team_id = t and not (vista = any(got));
@@ -1766,6 +1782,42 @@ begin
 end $$;
 revoke all on function public.station_beat(jsonb) from public, anon;
 grant execute on function public.station_beat(jsonb) to authenticated;
+-- el pase completo: p = {started, ended, n, total, pages, bounded, cutoff, brand, ids}. Los clientes de la mesa que no están en ids
+-- los tiene otra mesa (gone_at); si el pase se cortó por fecha (bounded), solo los vistos desde cutoff (los más viejos no se recorrieron).
+-- Frenos: un pase con menos del 80% del total del CRM, o que dejaría fuera a más de la mitad de la mesa, no marca a nadie.
+create or replace function public.station_sweep(p jsonb) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); ids text[]; br text; nn int; tot int; bounded boolean; cutoff timestamptz; ng int := 0; nb int := 0; live int; ts_s timestamptz; ts_e timestamptz;
+begin
+  if t is null then raise exception 'sin mesa'; end if;
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
+  if jsonb_typeof(p->'ids') <> 'array' or jsonb_array_length(p->'ids') > 20000 then raise exception 'BAD: ids'; end if;
+  select array_agg(public._clip(x, 60)) into ids from jsonb_array_elements_text(p->'ids') x where x <> '';
+  nn := coalesce(array_length(ids, 1), 0);
+  br := coalesce(public._clip(p->>'brand', 40), 'Novara Markets');
+  tot := case when p->>'total' ~ '^\d{1,7}$' then (p->>'total')::int end;
+  bounded := coalesce(p->>'bounded', '') = 'true';
+  cutoff := case when bounded and p->>'cutoff' ~ '^\d{4}-\d\d-\d\d$' then (p->>'cutoff')::date::timestamptz end;
+  ts_s := case when p->>'started' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((p->>'started')::timestamptz, now()) end;
+  ts_e := case when p->>'ended' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((p->>'ended')::timestamptz, now()) else now() end;
+  if bounded and cutoff is null then raise exception 'BAD: cutoff'; end if;
+  select count(*) into live from public.crm_clients where team_id = t and brand = br and gone_at is null;
+  if nn < 1 or (tot is not null and not bounded and nn < tot * 0.8) or (live > 20 and nn < live * 0.5) then
+    update public.station_state set sweep_at = ts_e, sweep_n = nn, sweep_pages = case when p->>'pages' ~ '^\d{1,5}$' then (p->>'pages')::int end,
+      sweep_ms = case when p->>'ms' ~ '^\d{1,9}$' then (p->>'ms')::int end, sweep_err = 'incompleto', sweep_gone = 0, updated_at = now() where team_id = t and vista = 'todo';
+    return json_build_object('ok', false, 'err', 'incompleto', 'n', nn, 'total', tot, 'live', live);
+  end if;
+  update public.crm_clients set gone_at = null where team_id = t and brand = br and gone_at is not null and client_id = any(ids);
+  get diagnostics nb = row_count;
+  update public.crm_clients set gone_at = now()
+    where team_id = t and brand = br and gone_at is null and not (client_id = any(ids)) and (cutoff is null or last_seen >= cutoff);
+  get diagnostics ng = row_count;
+  update public.station_state set sweep_at = ts_e, sweep_n = nn, sweep_pages = case when p->>'pages' ~ '^\d{1,5}$' then (p->>'pages')::int end,
+    sweep_ms = case when p->>'ms' ~ '^\d{1,9}$' then (p->>'ms')::int end, sweep_err = '', sweep_gone = ng, updated_at = now() where team_id = t and vista = 'todo';
+  return json_build_object('ok', true, 'n', nn, 'gone', ng, 'back', nb, 'started', ts_s);
+end $$;
+revoke all on function public.station_sweep(jsonb) from public, anon;
+grant execute on function public.station_sweep(jsonb) to authenticated;
 
 -- ---------- cambios en vivo ----------
 do $$

@@ -706,6 +706,49 @@ async def main():
             r = sql("select vista, problem, last_ok is not null ok from public.station_state order by vista")
             ok([(x['vista'], x['problem'], x['ok']) for x in r] == [('todo', '', True)], f'la base la tiene al día ({r})')
             ok(await A2.evaluate("crmLoad(true).then(()=>{pass++;return [stTodo(),staleSet().has(ckey('Novara Markets','990001'))]})") == [True, False], 'con la pestaña de Clientes, no verlo es que no cambió: no se esconde a nadie de la cola')
+            # el pase completo: una vez por hora recorre todas las páginas (solo clics en el paginado); el que no aparece lo tiene otra mesa
+            cl = [x['client_id'] for x in sql("select client_id from public.crm_clients where brand='Novara Markets' and client_id<>'990001' order by client_id")]
+            half = max(1, (len(cl) + 1) // 2)
+            row = lambda i, cid, d: f'<tr><td>{cid}</td><td>Cli {i}</td><td>Peru</td><td>Call Again</td><td>20/11/2026 09:00</td><td>{d}</td></tr>'
+            pg1 = ''.join(row(i, c, '23/11/2026 10:%02d' % (59 - i)) for i, c in enumerate(cl[:half]))
+            pg2 = ''.join(row(i, c, '22/11/2026 10:%02d' % (59 - i)) for i, c in enumerate(cl[half:]))
+            SWP = f'''<!doctype html><meta charset="utf-8"><title>CRM · Clients</title><body><button class="refresh-btn" onclick="window.__clicks=(window.__clicks||0)+1;window.__pg=1;draw()">Refresh</button>
+<table><thead><tr><th>User ID</th><th>Full Name</th><th>Country</th><th>Sales Status</th><th>Registration Time</th><th>Modified Time</th></tr></thead><tbody id="tb"></tbody></table>
+<div class="mat-mdc-paginator"><button class="mat-mdc-paginator-navigation-first" aria-label="First page" onclick="window.__pg=1;draw()">«</button><button class="mat-mdc-paginator-navigation-previous" aria-label="Previous page" onclick="window.__pg=1;draw()">‹</button><span class="mat-mdc-paginator-range-label" id="rl"></span><button class="mat-mdc-paginator-navigation-next" aria-label="Next page" id="nx" onclick="window.__pg=2;window.__nexts=(window.__nexts||0)+1;draw()">›</button></div>
+<script>const P={{1:`{pg1}`,2:`{pg2}`}};window.__pg=1;function draw(){{document.getElementById('tb').innerHTML=P[window.__pg];document.getElementById('rl').textContent='Page '+window.__pg+' of 2 ({len(cl)} items)';document.getElementById('nx').disabled=window.__pg===2}}draw()</script></body>'''
+            await ctx.route('https://crmnovaramarkets.com/st/todo', lambda r: r.fulfill(status=200, content_type='text/html', body=SWP))
+            await Td.reload(); await Td.wait_for_timeout(2500)
+            await sw.evaluate("SWEEP.step=300;SWEEP.scanWait=12000;stRun('todo',{sw:null,swAt:1,nextAt:0,lastOk:Date.now(),problem:''}).then(()=>stTick())"); await Td.wait_for_timeout(1500)
+            run = await sw.evaluate("chrome.storage.session.get('stRuns').then(s=>s.stRuns.todo)")
+            ok(run.get('sw') and run['sw'].get('phase') == 'go', f'arranca el pase ({run.get("sw")})')
+            for _ in range(12):
+                await sw.evaluate('stTick()'); await Td.wait_for_timeout(2000)
+                run = await sw.evaluate("chrome.storage.session.get('stRuns').then(s=>s.stRuns.todo)")
+                if not run.get('sw') and run.get('swAt'): break
+            ok(not run.get('sw') and run.get('swN') == len(cl) and run.get('swPages') == 2 and not run.get('swErr'), f'recorre las 2 páginas y junta todos los clientes ({ {k: run.get(k) for k in ("swN", "swPages", "swErr", "sw")} })')
+            ok(await Td.evaluate('window.__nexts||0') == 1 and await Td.evaluate('window.__pg') == 1, 'un solo clic en "siguiente" y vuelve a la primera página')
+            await A2.wait_for_timeout(2500)
+            r = sql("select sweep_n, sweep_pages, sweep_gone, sweep_err from public.station_state where vista='todo'")
+            ok(r and r[0]['sweep_n'] == len(cl) and r[0]['sweep_pages'] == 2 and r[0]['sweep_gone'] == 1 and r[0]['sweep_err'] == '', f'el resultado llega a la base por la pestaña de Vitalis ({r})')
+            ok(sql("select gone_at is not null g from public.crm_clients where client_id='990001'")[0]['g'], 'el que no apareció en ninguna página lo tiene otra mesa')
+            await A2.evaluate('stSent=0'); await sw.evaluate('stFlush()'); await A2.wait_for_timeout(2000)
+            await A2.evaluate("go('equipo')"); await A2.evaluate('stAt=0;stLoad(true).then(()=>stDraw())'); await A2.wait_for_timeout(1200)
+            eq = await A2.inner_text('#eqStation')
+            ok('Pase completo' in eq and '2 páginas' in eq and '1 se fue' in eq, f'Equipo → Estación muestra el pase ({eq[:260]!r})')
+            await A2.locator('#eqStation').screenshot(path=OUT / 'x8c_estacion_pase.png')
+            # sin paginado: lo dice y ofrece el diagnóstico (solo la forma, sin datos)
+            await Td.evaluate("document.querySelector('.mat-mdc-paginator').remove()")
+            await sw.evaluate("stRun('todo',{sw:null,swAt:1,nextAt:0}).then(()=>stTick())"); await Td.wait_for_timeout(1500)
+            for _ in range(4):
+                await sw.evaluate('stTick()'); await Td.wait_for_timeout(1500)
+            run = await sw.evaluate("chrome.storage.session.get('stRuns').then(s=>s.stRuns.todo)")
+            ok(not run.get('sw') and run.get('swNoPager'), f'sin paginado, el pase se corta y queda anotado ({run.get("swNoPager")})')
+            await sw.evaluate("stRun('todo',{nextAt:0}).then(()=>stTick())"); await Td.wait_for_timeout(3500)
+            ok('No encuentro el paginado' in await Td.locator('#ftd-crm-button #stids').inner_text(), 'el panel del CRM lo dice y ofrece "Copiar diagnóstico"')
+            await sw.evaluate("stRun('todo',{swNoPager:0}).then(()=>null)")
+            await ctx.route('https://crmnovaramarkets.com/st/todo', lambda r: r.fulfill(status=200, content_type='text/html', body=TODO))
+            await Td.reload(); await Td.wait_for_timeout(2500)
+            await sw.evaluate("stRun('todo',{nextAt:0}).then(()=>stTick())"); await Td.wait_for_timeout(3500)
             # si pierde el orden (la más vieja arriba), no sirve: lo dice
             await Td.evaluate("(()=>{const b=document.getElementById('tb');[...b.rows].reverse().forEach(r=>b.appendChild(r))})()")
             await sw.evaluate("stRun('todo',{nextAt:0}).then(()=>stTick())"); await Td.wait_for_timeout(3500)

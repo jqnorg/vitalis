@@ -765,6 +765,27 @@ async def main():
             ok('500005' in body and 'datos viejos' not in body, f'con toda la mesa sin leer el CRM, la cola no se vacía ({body[-160:]!r})')
             sql("update public.crm_clients set last_seen = now()")
             sql("update public.crm_clients set last_seen = now() where client_id='500005'")
+            # el pase completo de la estación: el que no aparece en el CRM de la mesa lo tiene otra mesa y sale de la cola
+            ids = [x['client_id'] for x in sql("select client_id from public.crm_clients where brand='Novara Markets' and client_id<>'500005'")]
+            sql("insert into public.station_state (team_id, vista, last_ok, by_user) select team_id, 'todo', now(), id from public.profiles where name='Matias Me'")
+            await D.evaluate(f"window.postMessage({{type:'ftd-agenda-sweep',v:1,reqId:'w1',sweep:{{started:new Date(Date.now()-60000).toISOString(),ended:new Date().toISOString(),n:{len(ids)},total:{len(ids)},pages:2,ms:40000,brand:'Novara Markets',ids:{ids!r}}}}},location.origin)")
+            await D.wait_for_timeout(1500)
+            sw = sql("select sweep_n, sweep_pages, sweep_gone, sweep_err from public.station_state where vista='todo'")
+            ok(sw and sw[0]['sweep_gone'] == 1 and sw[0]['sweep_n'] == len(ids) and sw[0]['sweep_err'] == '', f'el team leader guarda el pase completo de Clientes ({sw})')
+            ok(sql("select gone_at is not null g from public.crm_clients where client_id='500005'")[0]['g'], 'el que no apareció queda como de otra mesa')
+            await A.evaluate('crmDelta()'); await A.wait_for_timeout(900); await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
+            body = await A.inner_text('#ahBody')
+            ok('500005' not in body and '1 cliente que tiene otra mesa' in body, f'sale de la cola y se avisa ({body[-200:]!r})')
+            ok(await A.evaluate("dayPool(me).items.every(x=>x.r.id!=='500005')"), 'ni cuenta en el pool del día')
+            await A.evaluate("openFicha('500005')"); await A.wait_for_timeout(600)
+            ok('Lo tiene otra mesa' in await A.inner_text('#v-cliente'), 'la ficha lo dice')
+            await D.evaluate("go('equipo')"); await D.evaluate('stAt=0;stLoad(true).then(()=>stDraw())'); await D.wait_for_timeout(900)
+            est = await D.inner_text('#eqStation')
+            ok('Pase completo' in est and '2 páginas' in est and '1 se fue' in est, f'Equipo → Estación muestra el pase ({est[:300]!r})')
+            await A.evaluate(f'''()=>crmSeenFromExt([{{id:'500005',name:'Cortó',country:'Peru',status:'Hang Up',reg:'{ym}-03 12:00',agent:'Joaquín Or',k:'e2'}}])''')
+            await A.wait_for_timeout(600); await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900); await A.evaluate("go('ahora')"); await A.wait_for_timeout(500)
+            ok('500005' in await A.inner_text('#ahBody'), 'al verlo de nuevo en el CRM vuelve a la cola')
+            sql("delete from public.station_state")
             ayer = (date.fromisoformat(te) - timedelta(days=1)).isoformat()
             await A.evaluate(f'''()=>crmSeenFromExt([
               {{id:'500020',name:'Con boleto',country:'Peru',status:'Pending Payment',reg:'{ym}-05 10:00',agent:'Joaquín Or',k:'p1'}},

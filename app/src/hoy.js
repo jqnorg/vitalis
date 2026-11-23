@@ -51,7 +51,7 @@ function dayPool(uid){
   const rotIn=new Set((crm.rot||[]).filter(x=>agentUid(x.new_agent)===uid).map(x=>norm(x.client_id)));
   const items=[];
   for(const r of crm.rows.values()){
-    if(isArch(r.brand)||crmOwner(r)!==uid||paidCrm(r)||S.has(ckey(r.brand,r.id)))continue;
+    if(isArch(r.brand)||offDesk(r)||crmOwner(r)!==uid||paidCrm(r)||S.has(ckey(r.brand,r.id)))continue;
     const inNew=r.grp==='new'&&!/talk|habl/.test(norm(r.status)),news=inNew||(regDay(r)===te&&!NEWS_OUT.includes(r.grp));
     const g=news?'news':['callback','pending'].includes(r.grp)?'cb':(['call_again','hang_up'].includes(r.grp)||(r.grp==='na'&&naNum(r.status)<=NA_MAX))?'g3':null;
     if(!g)continue;

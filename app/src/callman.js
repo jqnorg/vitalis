@@ -21,7 +21,7 @@ function cmData(){
   const ag=sellers(team).filter(m=>!isLeadUid(m.id)),per=new Map(ag.map(m=>[m.id,{m,newN:0,talk:0,hoy:0,ftd:0,last:0,list:[]}]));
   const cur=[];let hoyMesa=0;
   for(const r of crm.rows.values()){
-    if(isArch(r.brand))continue;
+    if(isArch(r.brand)||offDesk(r))continue;
     const paid=paidCrm(r)||S.has(ckey(r.brand,r.id)),reg=regDay(r)===te;
     if(reg&&!['crm','otro','invalid'].includes(r.grp)){hoyMesa++;const o=fa.get(norm(r.id)),u=notLead(o?agentUid(o):crmOwner(r));const p=u&&per.get(u);if(p)p.hoy++}
     if(r.grp!=='new'||paid)continue;

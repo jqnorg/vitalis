@@ -17,8 +17,10 @@ const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
 // un Talking que desapareció de la lista que se actualiza ya no es new (su status nuevo llega cuando se lo vea)
 const gone=r=>!!r.left_new_at&&r.status_group==='new';
 const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:gone(r)?'Salió de Talking':r.status||'',grp:gone(r)?'gone':r.status_group||'otro',agent:r.crm_agent||'',
-  camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',firstAgent:r.first_agent||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since});
+  camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',firstAgent:r.first_agent||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since,goneAt:r.gone_at||''});
 const crmAll=()=>[...crm.rows.values()];
+// lo tiene otra mesa: no apareció en el pase completo de la pestaña de Clientes de la estación (gone_at). No se llama, no se sugiere, no cuenta en el pool
+const offDesk=r=>!!r.goneAt;
 const regDay=r=>r.reg?r.reg.slice(0,10):(r.first?ymd(new Date(r.first)):'');
 const callAt=r=>r.call?parseDue(r.call.slice(0,10)+'T'+r.call.slice(11,16)):null; // "Last Communication Time" del CRM
 const regAt=r=>r.reg?(r.reg.length>10?parseDue(r.reg.slice(0,10)+'T'+r.reg.slice(11,16)):parseYMD(r.reg)):(r.first?new Date(r.first):null);
@@ -105,11 +107,14 @@ async function crmDelta(){
   crm.dBusy=true;let full=false;
   try{
     const te=todayS(),from=[te.slice(0,8)+'01',weekStart(te)].sort()[0],fromMs=parseYMD(from).getTime();
-    const [rows,rot]=await Promise.all([
+    const [rows0,rot,goneRows]=await Promise.all([
       Q(sb.from('crm_clients').select('*').neq('brand',ARCH).gt('last_seen',new Date(crm.seenMs-3000).toISOString()).order('last_seen').limit(1000)),
+      QO(sb.from('crm_clients').select('*').neq('brand',ARCH).gt('gone_at',new Date(Math.max(crm.goneMs||0,crm.fullAt)-3000).toISOString()).order('gone_at').limit(1000)).catch(()=>[]), // los que el pase marcó como de otra mesa (gone_at no toca last_seen)
       QO(sb.from('crm_agent_log').select('client_id,brand,old_agent,new_agent,status,seen_at').gt('seen_at',new Date(Math.max(crm.rotMs,parseYMD(te).getTime())).toISOString()).order('seen_at').limit(500)),
     ]);
-    if(rows.length>=1000){full=true;return}
+    const rows=rows0.concat((goneRows||[]).filter(g=>!rows0.some(r=>r.client_id===g.client_id&&r.brand===g.brand)));
+    if(rows0.length>=1000||(goneRows||[]).length>=1000){full=true;return}
+    if((goneRows||[]).length)crm.goneMs=Math.max(crm.goneMs||0,tsMax(goneRows,'gone_at'));
     const ag=new Set([...pend,...teamAg].filter(p=>!p.done).map(p=>norm(p.id)));
     let n=0;
     for(const r of rows){ // los mismos que trae la carga entera (activos, registrados o vistos este mes, los de la agenda) o los que ya estaban
@@ -117,7 +122,7 @@ async function crmDelta(){
       if(!inSet&&!crm.rows.has(k))continue;
       crm.rows.set(k,x);if(!isArch(x.brand))crm.byId.set(norm(x.id),x);n++;
     }
-    crm.seenMs=Math.max(crm.seenMs,tsMax(rows,'last_seen'));
+    crm.seenMs=Math.max(crm.seenMs,tsMax(rows0,'last_seen'));
     const seenRot=new Set(crm.rot.map(r=>r.client_id+'|'+r.seen_at)),nr=(rot||[]).filter(r=>!seenRot.has(r.client_id+'|'+r.seen_at));
     if(nr.length){crm.rot=[...crm.rot,...nr];crm.rotMs=Math.max(crm.rotMs,tsMax(nr,'seen_at'))}
     crm.at=Date.now();
@@ -143,7 +148,7 @@ function newFresh(x,now,te){
 function newCheck(){
   if(!ready||!profile||isLeadUid(me)||readOnly)return;
   const now=Date.now(),te=todayS(),out=[];
-  for(const x of crm.rows.values())if(newFresh(x,now,te)&&x.firstBy!==me&&crmOwner(x)===me&&!newSeen().has(norm(x.id))&&!soldOf(x.id))out.push(x); // los que viste vos en tu CRM ya los tenés
+  for(const x of crm.rows.values())if(newFresh(x,now,te)&&!offDesk(x)&&x.firstBy!==me&&crmOwner(x)===me&&!newSeen().has(norm(x.id))&&!soldOf(x.id))out.push(x); // los que viste vos en tu CRM ya los tenés
   if(!out.length)return;
   out.sort((a,b)=>new Date(b.first)-new Date(a.first));
   for(const x of out)newMark(x.id);
@@ -225,8 +230,9 @@ const byRegDesc=(a,b)=>(regAt(b)||0)-(regAt(a)||0);
 const qCap=()=>+(teamInfo&&teamInfo.queue_cap)||60;
 function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
-  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
+  const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)&&!offDesk(r)),live=mineAll.filter(r=>!stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
   const nStale=mineAll.filter(r=>stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r)).length; // viejos, ocultos de la cola
+  const nOff=crmAll().filter(r=>!isArch(r.brand)&&own(r)&&offDesk(r)&&!paidCrm(r)&&CRM_ACT.includes(r.grp)).length; // los tiene otra mesa
   // dentro de cada grupo, primero los que no se llamaron hoy; los new, del más nuevo (en New es urgente siempre)
   const hoyRank=r=>{const k=contactOf(r);return k.today?1:0};
   const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
@@ -239,7 +245,7 @@ function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const g3=(many?all3.filter(r=>regDay(r).slice(0,7)===ym):all3).sort((a,b)=>hoyRank(a)-hoyRank(b)||g3rank(a)-g3rank(b)||byRegDesc(a,b));
   const cnt=g=>mineAll.filter(r=>r.grp===g).length;
   const low=live.filter(r=>r.grp==='low_potential').sort(byRegDesc);
-  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,nStale,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
+  return {g1,ag,cb,g3,n3:all3.length,cap,many,rep,low,lowSin:low.filter(r=>!agIds.has(norm(r.id))).length,nStale,nOff,failed:live.filter(r=>r.grp==='failed').sort(byRegDesc),
     ni:cnt('not_interested'),dnc:cnt('dnc'),inv:cnt('invalid'),otro:cnt('otro')+cnt('crm')};
 }
 function ahRow(r,i,who){
@@ -311,7 +317,7 @@ function fueraHTML(q,who){
         ${q.rep.length?`<button type="button" class="btn sm" data-ah="rep">${ahRep?'Ocultar':'Ver'} NA-5</button>`:''}${q.low.length?`<button type="button" class="btn sm" data-ah="low">${ahLow?'Ocultar':'Ver'} los Low potential</button>`:''}${q.failed.length?`<button type="button" class="btn sm" data-ah="fail">${ahFail?'Ocultar':'Ver'} depósitos trabados</button>`:''}</div>
         ${ahRep&&q.rep.length?`<p class="p-sub" style="margin:0 0 8px">NA-5: se lo llamó 5 días y no atendió. Solo para repasos.</p>`+ahTable(q.rep,who):''}
         ${ahLow&&q.low.length?`<p class="p-sub" style="margin:0 0 8px">No tienen el dinero ahora: van agendados para el día que dijeron.${q.lowSin?` <span class="hot">${plural(q.lowSin,'está','están')} sin agenda: sin cita, CRM los puede mover.</span>`:''}</p>`+ahTable(q.low,who):''}
-        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p>${q.nStale?`<p class="note" style="margin-top:6px">${plural(q.nStale,'cliente oculto','clientes ocultos')} por datos viejos: la extensión no los ve hace rato (seguro ya rotaron o cambiaron en el CRM). Abrí el CRM con la extensión para refrescarlos.</p>`:''}</section>`;
+        ${ahFail&&q.failed.length?`<p class="p-sub" style="margin:0 0 8px">Failed Deposit, Bank Block y Declined: quisieron depositar y no se pudo.</p>`+ahTable(q.failed,who):''}<p class="note" style="margin-top:6px">Do Not Call no aparece nunca y no se puede agendar.</p>${q.nStale?`<p class="note" style="margin-top:6px">${plural(q.nStale,'cliente oculto','clientes ocultos')} por datos viejos: la extensión no los ve hace rato (seguro ya rotaron o cambiaron en el CRM). Abrí el CRM con la extensión para refrescarlos.</p>`:''}${q.nOff?`<p class="note" style="margin-top:6px">${plural(q.nOff,'cliente','clientes')} que ${q.nOff===1?'tiene':'tienen'} otra mesa (ya no ${q.nOff===1?'aparece':'aparecen'} en el CRM de la mesa): no se ${q.nOff===1?'sugiere':'sugieren'}.</p>`:''}</section>`;
 }
 function capModal(){
   if(!isLeader())return;
