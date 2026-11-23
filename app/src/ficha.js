@@ -42,7 +42,8 @@ function fichaHTML(d){
   return `<div class="fi" data-fid="${esc(id)}">
     <div class="fi-h"><div><div class="fi-nm">${esc(d.name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${d.pais?' · '+esc(d.pais):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
       <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}${r&&offDesk(r)?`<span class="badge bad" title="No apareció en el CRM de la mesa en el último pase de la estación">Lo tiene otra mesa${r.goneAt?' · desde '+esc(dm(r.goneAt.slice(0,10))):''}</span>`:''}</div></div>
-    <div class="fi-cols"><div class="fi-col">
+    <div class="fi-cols"><div class="fi-col fi-main">${fiProfHTML(d)}${fiComsHTML(d)}</div>
+      <div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
         ${rw2('Status',r?esc(r.status||'—'):'<span class="d">todavía no se vio en el CRM</span>')}
         <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
@@ -52,8 +53,7 @@ function fichaHTML(d){
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
-      ${fiPayHTML(d)}${comboHTML(d)}</div>
-      <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}</div>
+      ${comboHTML(d)}${fiPayHTML(d)}</div>
     </div></div>`;
 }
 // Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
@@ -186,10 +186,10 @@ async function profCopyCrm(p){ // copia lo que va al CRM; true si copió
 function fiProfHTML(d){
   const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p,'es'),st=profStatus(p);
   return `<div class="fi-c fi-prof${done?'':' fp-falta'}"><h4>Perfil del cliente ${done?'<span class="badge paid">completo</span>':'<span class="badge warn">faltan datos</span>'}</h4>
-    ${p&&txt?`<div class="fi-ptext">${esc(txt)}</div>`:'<p class="p-sub" style="margin:0 0 6px">La gerencia pide siempre edad, ocupación y objetivo. Cargalos para que la mesa y el CRM los tengan.</p>'}
+    ${p&&txt?`<div class="fi-ptext">${esc(txt)}</div>`:'<p class="fi-pinv">Contá quién es este cliente: edad, ocupación y qué busca. Con eso la mesa y el CRM lo tienen, y el cierre queda justificado.</p>'}
     ${st?`<p class="fi-pst">Status sugerido en el CRM: <b>${esc(st)}</b></p>`:''}
     ${!done?`<p class="fi-pfalta">Faltan: ${esc(falta.join(', '))}</p>`:''}
-    <div class="fi-prow"><button type="button" class="btn sm pri" data-fa="profEdit">${p?'Editar perfil':'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
+    <div class="fi-prow"><button type="button" class="btn ${done?'sm':'lg'} pri" data-fa="profEdit">${p?(done?'Editar perfil':'Completar lo que falta'):'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>

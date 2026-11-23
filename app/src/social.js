@@ -193,7 +193,7 @@ function openProfile(uid){
   const body=`<div class="pf">
     <div class="pf-h">${own?`<button type="button" class="av-edit" data-own data-act="foto" title="Cambiar mi foto">${avatar(m.name,'xl')}<span>Cambiar</span></button>`:avatar(m.name,'xl')}<div><h2>${esc(m.name)}</h2><p>${esc(roleTxt(m.role))}${own?' · vos':''}${quiet(m)?' · <span class="hot">🔕 avisos silenciados</span>':''}${m.active?'':' · de baja'}</p></div></div>
     <div class="pf-k">${k('Hoy',S.hoy,'FTDs')}${k('Esta semana',S.sem,'FTDs')}${k(MES[new Date().getMonth()][0].toUpperCase()+MES[new Date().getMonth()].slice(1),S.mes,`FTDs · ${esc(money(S.usd))} USD`)}
-      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('Conversión del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
+      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('%Cr del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
     <div class="pf-ch"><div class="lb">FTDs de los últimos 14 días <span class="pf-lg"><span class="sw"></span>new <span class="sw s2"></span>late</span></div><div id="pfChart"></div></div>
     ${own?'':`<div class="pf-acts" id="pfActs"></div>`}
   </div>`;

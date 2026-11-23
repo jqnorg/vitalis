@@ -1156,7 +1156,7 @@ h3 svg.ic{color:var(--acc)}
 .tg-fill{background:var(--pri)}.tg-ideal{background:var(--fg)}
 
 /* barra de arriba sin pastillas: solo la hora, el aviso de sin conexión y Venta (lo demás ya está en el menú y en el Inicio) */
-#bar #sMes,#bar #sLiq,#bar #sPend,#bar #sTask{display:none} /* el turno y Pedir ayuda sí (los pidió el dueño) */
+#bar #sMes,#bar #sPend,#bar #sTask{display:none} /* el turno, Pedir ayuda y el Líquido sí (los pidió el dueño; el líquido antes era una tarjeta del Inicio) */
 .people{margin-top:22px}
 
 /* ---------- Radar y lo que predice ventas (radar.js) ---------- */
@@ -1436,6 +1436,13 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .rt-h{margin:14px 0 6px;font-size:14px}.rt-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
 /* RMO: el nombre de la medida del ritmo del día */
 .rmo-t{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--v-ok,#00875a);border:1.5px solid var(--v-ok,#00875a);border-radius:6px;padding:0 5px;line-height:17px;vertical-align:1px}
+
+/* %Cr en la tarjeta del mes (el segundo dato del rendimiento, lo pidió el dueño) */
+.hero .cr{margin-top:8px;font-size:14px}.hero .cr .cr-t{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--v-ok,#00875a);border:1.5px solid var(--v-ok,#00875a);border-radius:6px;padding:0 5px;line-height:17px;vertical-align:1px;margin-right:2px}.hero .cr .cr-v{font-size:16px}
+/* Manager del agente: la solapa Cliente lleva el ID del cliente actual; "(agente)" solo en la compu */
+#subnav .tab-id{font-weight:800;color:var(--v-ok,#00875a)}#navPanel small.ag{font-weight:500;opacity:.85}@media (max-width:760px){#navPanel small.ag{display:none}}
+/* ficha: el perfil, a la izquierda y más grande, invita a completarlo */
+.fi-main .fi-prof h4{font-size:17px}.fi-pinv{margin:0 0 10px;font-size:14.5px;line-height:1.45}.fi-prof .btn.lg{font-size:15px;padding:10px 18px}
 </style>
 </head>
 <body class="auth">
@@ -1482,9 +1489,8 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
   <div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
-    <button type="button" data-g="cliente" data-v="cliente" class="nv-cli" title="Cliente actual (L)"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><span class="nb cli" id="nbCli"></span><kbd>L</kbd></button>
     <button type="button" data-g="callman" data-v="callman" id="navCm" class="nv-cli" hidden title="Manager (M)"><svg><use href="#i-cm"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbCm"></span><kbd>M</kbd></button>
-    <button type="button" data-g="panel" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Panel</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
+    <button type="button" data-g="panel" data-v="ahora" id="navPanel" class="nv-cli" title="Manager: tu cliente, tu cola y tu agenda (2)"><svg><use href="#i-cliente"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
     <button type="button" data-g="banking" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>5</kbd></button>
@@ -1492,7 +1498,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
     <button type="button" data-g="ajustes" data-v="config" class="mob-only"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span></button>
     <button type="button" data-g="equipo" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
   </nav>
-  <span hidden aria-hidden="true"><span id="nbAh"></span><span id="nbCl"></span><span id="nbAg"></span><span id="nbCh"></span><span id="nbSo"></span></span>
+  <span hidden aria-hidden="true"><span id="nbCli"></span><span id="nbAh"></span><span id="nbCl"></span><span id="nbAg"></span><span id="nbCh"></span><span id="nbSo"></span></span>
   <div class="side-foot">
     <button type="button" class="me" id="sMe" data-go="config" title="Mi cuenta"></button>
     <div class="side-acts">
@@ -1782,7 +1788,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.41.0';
+const VERSION='1.42.0';
 const EXT_VER='1.16.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -2721,9 +2727,8 @@ const V={}; // vistas: {build(), render()}
 function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.title=curCl?'Cliente actual: '+(curCl.name||curCl.id):''}} // el cliente actual, en el botón del menú
 const GROUPS=[
   {g:'inicio',views:['inicio','sueldo','turnos'],tabs:['Hoy','Sueldo','Turnos']},
-  {g:'cliente',views:['cliente']}, // el cliente con el que estás hablando: botón propio en el menú, que brilla
-  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante en vez de Cliente
-  {g:'panel',views:['ahora','agenda'],tabs:['Cola','Agenda']},
+  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
+  {g:'panel',views:['cliente','ahora','agenda'],tabs:['Cliente','Cola','Agenda'],def:'ahora'}, // el Manager del agente (lo pidió el dueño): el cliente actual, la cola y la agenda. El team leader no tiene Cliente
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
@@ -2732,15 +2737,17 @@ const GROUPS=[
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
 // lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
-function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());$('#nav [data-g=cliente]').hidden=tlView()}
+function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());
+  const p=$('#navPanel');p.classList.toggle('nv-cli',!tlView());p.querySelector('.nm').innerHTML=tlView()?'Panel':isLeader()?'Manager<small class="ag"> (agente)</small>':'Manager';p.title=tlView()?'Panel: la cola y la agenda (2)':'Manager: tu cliente, tu cola y tu agenda (2)'}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
-function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.views[0])} // Inicio siempre vuelve a Hoy
+function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Hoy
 const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader()))v='inicio';
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
+  if(v==='cliente'&&tlView())v='ahora'; // el team leader no tiene clientes
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
@@ -2748,7 +2755,7 @@ function go(v,opts){
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
   const sn=$('#subnav');sn.hidden=G.views.length<2;
-  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>(x!=='equipo'&&x!=='clientes')||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
+  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader())&&(x!=='cliente'||!tlView())).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}${x==='cliente'&&curCl?` <b class="tab-id">${esc(curCl.id)}</b>`:''}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
@@ -3575,7 +3582,7 @@ function ayuda(){
     <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliador y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
     <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
-    <dt>Conversión</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
+    <dt>%Cr (conversión)</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
   <h4>Banking</h4><dl>
     <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
     <dt>Bancos</dt><dd>Cómo conviene pagar según el banco del cliente: pasos, qué usar y qué evitar (por ejemplo, Falabella Chile: no transferencia). Lo cargan el administrador y el team leader, con fotos.</dd></dl>
@@ -3727,15 +3734,15 @@ V.inicio={
     const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`tus clientes depositaron ${money(s.monto)} USD`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
-    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}</div><span class="grow"></span>
+    const cr=convPeriod(ym+'-01',te,me); // %Cr del mes: de tus news del mes, cuántos depositaron (el segundo dato del rendimiento)
+    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}<div class="cr" title="%Cr: conversión del mes. De tus clientes new del mes, cuántos depositaron."><b class="cr-t">%Cr</b> <b class="cr-v">${cr.rate==null?'—':esc(pct(cr.rate))}</b> <span class="d">${cr.leads?`${plural(cr.ftd,'FTD')} de ${plural(cr.leads,'new')} este mes`:'sin news este mes todavía'}</span></div></div><span class="grow"></span>
       <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${cfg.porftd} USD por FTD${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
-      kpi('Líquido del mes ≈',P&&P.total!=null?esc(pesos(P.total)):'—',P&&P.total!=null?(tcViejo()?sp('hot','Dólar viejo: '+tcTxt()):esc(cap(tcTxt()))):sp('hot','Cargá el dólar'),'click',' data-go="sueldo" title="Ver sueldo"')+
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
       (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
-    {const bc=bkCard();$('#iBank').hidden=!bc;$('#iBank').innerHTML=bc} // si un procesador falla, primero eso
+    $('#iBank').hidden=true; // las fallas de pago ya no van en el Inicio (lo pidió el dueño): quedan en Banking y en la marca del menú
     crmLoad();const ah=TL?ahoraCard():'';$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // la cola de la mesa (team leader); al agente la franja y el Panel ya se lo dicen
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
@@ -4286,7 +4293,7 @@ V.equipo={
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+
-      (()=>{const c=convPeriod(mFrom,mTo,null);return k('Conversión de la mesa',c.rate==null?'—':pct(c.rate),`${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente new','clientes new')}`)})()+
+      (()=>{const c=convPeriod(mFrom,mTo,null);return k('%Cr de la mesa',c.rate==null?'—':pct(c.rate),`${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente new','clientes new')}`)})()+
       (per[0]&&per[0].n?k('Primero',per[0].m.name,plural(per[0].n,'FTD')):'');
     const max=Math.max(1,...per.map(p=>p.n));
     $('#eqRank').innerHTML=`<div class="rk" style="--vw:${Math.max(6,...per.map(p=>(`${p.n} · ${money(p.monto)}${p.late?' · '+p.late+' late':''}`).length))}ch">`+
@@ -4297,7 +4304,7 @@ V.equipo={
     colChart($('#eqChart'),data,{h:210,capMin:18,int:true,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     $('#eqCount').textContent=`${plural(conV,'agente')} con ventas · ${nf(days?R.n/days:0,2)} FTDs por día`;
-    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th>${utOk?'<th>Target</th>':''}<th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r">Conversión</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
+    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th>${utOk?'<th>Target</th>':''}<th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r" title="%Cr: conversión">%Cr</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
       per.map(p=>{const act_=p.m.role!=null,th=act_?turnoHoy(p.m.id):{txt:'',cls:'d'},ag=act_?agStats(p.m.id):null;
         return `<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="eq-hoy ${th.cls}">${esc(th.txt)}</td><td class="r">${p.n}</td>${utOk?`<td>${act_?utCell(p.m.id,eqYm,p.n):''}</td>`:''}<td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="r">${ag?(ag.open?`${ag.open}${ag.venc?` · <span class="hot b">${ag.venc} venc.</span>`:''}`:'<span class="d">0</span>'):''}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td><td class="act">${act_?`<button type="button" class="btn sm" data-act="ficha" data-uid="${esc(p.m.id)}">Ficha</button>`:''}</td></tr>`}).join('')+'</tbody></table>';
   },
@@ -4757,7 +4764,7 @@ function openProfile(uid){
   const body=`<div class="pf">
     <div class="pf-h">${own?`<button type="button" class="av-edit" data-own data-act="foto" title="Cambiar mi foto">${avatar(m.name,'xl')}<span>Cambiar</span></button>`:avatar(m.name,'xl')}<div><h2>${esc(m.name)}</h2><p>${esc(roleTxt(m.role))}${own?' · vos':''}${quiet(m)?' · <span class="hot">🔕 avisos silenciados</span>':''}${m.active?'':' · de baja'}</p></div></div>
     <div class="pf-k">${k('Hoy',S.hoy,'FTDs')}${k('Esta semana',S.sem,'FTDs')}${k(MES[new Date().getMonth()][0].toUpperCase()+MES[new Date().getMonth()].slice(1),S.mes,`FTDs · ${esc(money(S.usd))} USD`)}
-      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('Conversión del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
+      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('%Cr del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
     <div class="pf-ch"><div class="lb">FTDs de los últimos 14 días <span class="pf-lg"><span class="sw"></span>new <span class="sw s2"></span>late</span></div><div id="pfChart"></div></div>
     ${own?'':`<div class="pf-acts" id="pfActs"></div>`}
   </div>`;
@@ -6652,7 +6659,8 @@ function fichaHTML(d){
   return `<div class="fi" data-fid="${esc(id)}">
     <div class="fi-h"><div><div class="fi-nm">${esc(d.name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${d.pais?' · '+esc(d.pais):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
       <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}${r&&offDesk(r)?`<span class="badge bad" title="No apareció en el CRM de la mesa en el último pase de la estación">Lo tiene otra mesa${r.goneAt?' · desde '+esc(dm(r.goneAt.slice(0,10))):''}</span>`:''}</div></div>
-    <div class="fi-cols"><div class="fi-col">
+    <div class="fi-cols"><div class="fi-col fi-main">${fiProfHTML(d)}${fiComsHTML(d)}</div>
+      <div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
         ${rw2('Status',r?esc(r.status||'—'):'<span class="d">todavía no se vio en el CRM</span>')}
         <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
@@ -6662,8 +6670,7 @@ function fichaHTML(d){
         ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
         ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
       </div>
-      ${fiPayHTML(d)}${comboHTML(d)}</div>
-      <div class="fi-col">${fiProfHTML(d)}${fiComsHTML(d)}</div>
+      ${comboHTML(d)}${fiPayHTML(d)}</div>
     </div></div>`;
 }
 // Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
@@ -6796,10 +6803,10 @@ async function profCopyCrm(p){ // copia lo que va al CRM; true si copió
 function fiProfHTML(d){
   const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p,'es'),st=profStatus(p);
   return `<div class="fi-c fi-prof${done?'':' fp-falta'}"><h4>Perfil del cliente ${done?'<span class="badge paid">completo</span>':'<span class="badge warn">faltan datos</span>'}</h4>
-    ${p&&txt?`<div class="fi-ptext">${esc(txt)}</div>`:'<p class="p-sub" style="margin:0 0 6px">La gerencia pide siempre edad, ocupación y objetivo. Cargalos para que la mesa y el CRM los tengan.</p>'}
+    ${p&&txt?`<div class="fi-ptext">${esc(txt)}</div>`:'<p class="fi-pinv">Contá quién es este cliente: edad, ocupación y qué busca. Con eso la mesa y el CRM lo tienen, y el cierre queda justificado.</p>'}
     ${st?`<p class="fi-pst">Status sugerido en el CRM: <b>${esc(st)}</b></p>`:''}
     ${!done?`<p class="fi-pfalta">Faltan: ${esc(falta.join(', '))}</p>`:''}
-    <div class="fi-prow"><button type="button" class="btn sm pri" data-fa="profEdit">${p?'Editar perfil':'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
+    <div class="fi-prow"><button type="button" class="btn ${done?'sm':'lg'} pri" data-fa="profEdit">${p?(done?'Editar perfil':'Completar lo que falta'):'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>
@@ -7885,6 +7892,8 @@ async function stationCheck(){
    y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
 const CM_NEW=5*6e4,CM_QUIET=20*6e4; // un New sin llamar a los 5 min · en turno y sin llamar hace 20 min
 const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
+const cmHace=ms=>ms<6e4?'recién':`hace ${cmAgo(ms)}`; // "recién", nunca "hace recién"
+const cmInCall=(R,now)=>!!(R&&R.segs&&R.segs.some(s=>s.k==='talk'&&now-s.b<9e4)); // el sistema ya sabe que está en llamada (conversación abierta)
 function cmTurno(uid){ // el turno de hoy de alguien, con el descanso que tiene abierto
   const t=(teamSh[uid]||{})[todayS()]||(uid===me?openTurno():null),now=Date.now();
   if(!t||!t.in)return {k:'none',txt:'Sin entrada',cls:'d'};
@@ -7916,13 +7925,13 @@ function cmData(){
   rows.sort((a,b)=>ord[a.tu.k]-ord[b.tu.k]||(b.newN+b.talk)-(a.newN+a.talk)||a.m.name.localeCompare(b.m.name));
   // lo que hay que atender ya, lo más urgente primero
   const al=[];
-  for(const p of pings)if(p.kind==='ayuda'&&!p.reply&&now-Date.parse(p.at)<30*6e4)al.push({w:0,html:`<b>${esc(first(p.from))}</b> pidió ayuda hace ${cmAgo(now-Date.parse(p.at))} y nadie fue todavía`});
-  for(const x of cur)if(x.wait)al.push({w:1,id:x.r.id,html:`New sin llamar hace <b>${cmAgo(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''} · ${x.u?esc(memberName(x.u)):'<span class="hot">sin agente</span>'}`});
+  for(const p of pings)if(p.kind==='ayuda'&&!p.reply&&now-Date.parse(p.at)<30*6e4)al.push({w:0,html:`<b>${esc(first(p.from))}</b> pidió ayuda ${cmHace(now-Date.parse(p.at))} y nadie fue todavía`});
+  for(const x of cur)if(x.wait)al.push({w:1,id:x.r.id,html:`New sin llamar <b>${cmHace(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''} · ${x.u?esc(memberName(x.u)):'<span class="hot">sin agente</span>'}`});
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
     if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
-    if(p.tu.k==='in'&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`});
+    if(p.tu.k==='in'&&!cmInCall(p.R,now)&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`}); // en llamada no se avisa: el tiempo está justificado
   }
   al.sort((a,b)=>a.w-b.w);
   return {now,cur,rows,al,hoyMesa,newN:cur.filter(x=>!x.talk).length,talk:cur.filter(x=>x.talk).length,wait:cur.filter(x=>x.wait).length,callsN:calls.length};
@@ -7943,8 +7952,8 @@ V.callman={
       return `<tr class="${x.wait?'cm-wait':''}"><td><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> ${esc(clip(r.name,26))}<div class="d">${esc(r.country||'')}${r.camp?' · '+esc(clip(r.camp,22)):''}</div></td>
         <td>${x.u?`<span class="eq-who">${avatar(memberName(x.u))}${esc(first(x.u))}</span>`:'<span class="hot">sin agente</span>'}</td>
         <td>${x.talk?sp('ok b','Talking'):sp(x.wait?'hot b':'b','New')}</td>
-        <td>${x.a?`hace ${cmAgo(D.now-x.a)}`:'—'}</td>
-        <td>${c.last?`${c.lines.size?`${c.lines.size} línea${c.lines.size===1?'':'s'} · `:''}hace ${cmAgo(D.now-c.last)}`:sp(x.wait?'hot':'d','sin llamar')}</td></tr>`};
+        <td>${x.a?cmHace(D.now-x.a):'—'}</td>
+        <td>${c.last?`${c.lines.size?`${c.lines.size} línea${c.lines.size===1?'':'s'} · `:''}${cmHace(D.now-c.last)}`:sp(x.wait?'hot':'d','sin llamar')}</td></tr>`};
     const cur=`<section class="card"><div class="card-h"><h3>News en curso</h3><span class="p-sub">New y Talking, sin depositar · primero los que nadie llamó</span></div>
       ${D.cur.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Cliente</th><th>Agente</th><th>Estado</th><th>Registro</th><th>Llamadas</th></tr></thead><tbody>${D.cur.slice(0,40).map(cRow).join('')}</tbody></table></div>${D.cur.length>40?`<p class="p-sub" style="margin:8px 2px 0">Y ${D.cur.length-40} más.</p>`:''}`:'<div class="p-empty">Nadie en New ni en Talking ahora.</div>'}</section>`;
     const aRow=p=>`<tr><td><button type="button" class="eq-who lnkp" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}<b>${esc(p.m.name)}</b></button></td>
@@ -7952,11 +7961,11 @@ V.callman={
       <td>${p.newN?sp(p.list.some(x=>x.wait)?'hot b':'b',String(p.newN)):'<span class="d">0</span>'}</td><td>${p.talk?sp('ok b',String(p.talk)):'<span class="d">0</span>'}</td>
       <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td><td>${p.hoy?`<b>${p.ftdNew||0}</b><span class="d">/${p.hoy} · ${Math.round(100*(p.ftdNew||0)/p.hoy)}%</span>`:'<span class="d">—</span>'}</td>
       <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span></td><td>${p.R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(p.m.id)}" title="Ver qué pasó">${esc(minsTxt(p.R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
-      <td>${p.last?`hace ${cmAgo(D.now-p.last)}`:'<span class="d">—</span>'}</td>
+      <td>${p.last?cmHace(D.now-p.last):'<span class="d">—</span>'}</td>
       <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
     const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
-      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="De los news que le llegaron hoy, cuántos depositaron hoy">Conversión hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
+      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="%Cr de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">%Cr hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
     body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
   }

@@ -82,11 +82,12 @@ async def main():
             await A.evaluate("go('inicio')"); await A.wait_for_function("document.querySelector('#iHero .n')&&document.querySelector('#iHero .n').textContent.trim()==='13'", timeout=5000)
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
-            order = ['inicio', 'cliente', 'callman', 'panel', 'tareas', 'chat', 'banking', 'analisis', 'ajustes', 'equipo']
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, Cliente, (Manager), Panel, Tareas, Chat, Banking, Análisis (y Equipo); Ajustes abajo')
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 9, 'el admin ve 9 botones en la compu: con Manager y Equipo (Ajustes va abajo, junto a tu nombre)')
-            ok(await A.evaluate("getComputedStyle(document.querySelector('#nav .nv-cli')).animationName.includes('cliGlow')"), 'Cliente está en el menú, en verde vivo y brillando')
-            tabs = {'inicio': ['inicio', 'sueldo', 'turnos'], 'cliente': ['cliente'], 'panel': ['ahora', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'campanas', 'filtros']}
+            order = ['inicio', 'callman', 'panel', 'tareas', 'chat', 'banking', 'analisis', 'ajustes', 'equipo']
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, (Manager de la mesa), Manager (agente), Tareas, Chat, Banking, Análisis (y Equipo); Ajustes abajo')
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 8, 'el admin ve 8 botones en la compu: con los dos Manager y Equipo (Ajustes va abajo, junto a tu nombre)')
+            ok(await A.evaluate("getComputedStyle(document.querySelector('#navPanel')).animationName.includes('cliGlow')") and (await A.inner_text('#navPanel .nm')).startswith('Manager'), 'el Manager del agente está en el menú, en verde vivo y brillando')
+            ok('(agente)' in await A.inner_text('#navPanel .nm'), 'el admin, que tiene los dos, lo ve como "Manager (agente)"')
+            tabs = {'inicio': ['inicio', 'sueldo', 'turnos'], 'panel': ['ahora', 'cliente', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'campanas', 'filtros']}
             i = 0
             for g, vs in tabs.items():
                 await A.click(f'#nav [data-g={g}]'); await A.wait_for_timeout(400)
@@ -441,7 +442,7 @@ async def main():
             await A.click('#soPeople [data-prof]:has-text("Matias Me")'); await A.wait_for_timeout(700)
             ok(await A.is_visible('.mbox .pf') and 'Matias Me' in await A.inner_text('.mbox .pf-h'), 'tocar a alguien abre su perfil')
             k = await A.inner_text('.mbox .pf-k')
-            ok('Puesto del mes' in k and 'Conversión' in k, 'con sus estadísticas')
+            ok('Puesto del mes' in k and '%Cr' in k, 'con sus estadísticas')
             ok(await A.locator('.mbox #pfChart svg').count() == 1, 'y el gráfico de los últimos 14 días')
             await A.click('.mbox [data-pa=toque]'); await A.wait_for_timeout(800)
             ok(sql("select count(*)::int c from public.pings where kind='toque' and from_id=(select id from public.profiles where name='Joaquín Or')")[0]['c'] == 1, 'Joaquín le da un toque')
@@ -908,8 +909,10 @@ async def main():
             sql('update public.teams set min_calls = 250')
             # el Manager del team leader: su botón brillante (no tiene clientes, así que no tiene Cliente)
             await D.evaluate("navRoles()"); await A.evaluate("navRoles()")
-            ok(await D.is_visible('#navCm') and 'nv-cli' in (await D.get_attribute('#navCm', 'class') or '') and await D.locator('#nav [data-g=cliente]').is_hidden(), 'el team leader tiene el Manager como botón brillante, sin Cliente')
-            ok(await A.is_visible('#navCm') and 'nv-cli' not in (await A.get_attribute('#navCm', 'class') or '') and await A.locator('#nav [data-g=cliente]').is_visible(), 'el admin lo tiene también, sin brillo, y sigue con Cliente')
+            ok(await D.is_visible('#navCm') and 'nv-cli' in (await D.get_attribute('#navCm', 'class') or '') and 'nv-cli' not in (await D.get_attribute('#navPanel', 'class') or '') and (await D.inner_text('#navPanel .nm')).strip() == 'Panel', 'el team leader tiene el Manager de la mesa como botón brillante y un Panel sin Cliente')
+            await D.evaluate("go('ahora')"); await D.wait_for_timeout(300)
+            ok(await D.locator('#subnav [data-tab=cliente]').count() == 0 and await D.locator('#subnav [data-tab=ahora]').count() == 1, 'su Panel: Cola y Agenda, sin la solapa Cliente')
+            ok(await A.is_visible('#navCm') and 'nv-cli' not in (await A.get_attribute('#navCm', 'class') or '') and 'nv-cli' in (await A.get_attribute('#navPanel', 'class') or ''), 'el admin lo tiene también, sin brillo, y su Manager (agente) es el que brilla')
             import datetime as _dt
             r10 = (_dt.datetime.now() - _dt.timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M')
             sql(f"""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent) select team_id,'Novara Markets','500040','Nadie Lollama','Peru','{r10}','New','new','Joaquín Or' from public.profiles where name='Matias Me'""")
@@ -1021,7 +1024,7 @@ async def main():
             await E.evaluate('bkLoad(true)'); await E.wait_for_timeout(900)
             t = E.locator('#toasts .toast.alert:has-text("está fallando")')
             ok(await t.count() == 1 and 'Kushki · Tarjeta en Chile' in await t.inner_text(), 'al agente le llega el aviso urgente de la falla, con el país')
-            ok(await E.is_visible('#iBank') and 'Kushki' in await E.inner_text('#iBank'), 'y la falla queda arriba del inicio')
+            ok(await E.is_hidden('#iBank') and (await E.inner_text('#nbBk')).strip() != '', 'el inicio ya no muestra la falla: queda en Banking y en la marca del menú')
             await E.evaluate("go('banking')"); await E.wait_for_timeout(500)
             ok(await E.locator('#bkTools button').count() == 0 and 'Falabella' in await E.inner_text('#bkBody'), 'el agente ve Banking sin poder editar')
             ok('⚠ CL' in await E.inner_text('#bkBody .bk-proc .bk-m:has-text("Tarjeta")') and await E.locator('#bkBody .bk-proc .bk-m.falla').count() == 0, 'sin país elegido, el método marca dónde falla (no se tacha)')

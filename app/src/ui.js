@@ -127,9 +127,8 @@ const V={}; // vistas: {build(), render()}
 function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.title=curCl?'Cliente actual: '+(curCl.name||curCl.id):''}} // el cliente actual, en el botón del menú
 const GROUPS=[
   {g:'inicio',views:['inicio','sueldo','turnos'],tabs:['Hoy','Sueldo','Turnos']},
-  {g:'cliente',views:['cliente']}, // el cliente con el que estás hablando: botón propio en el menú, que brilla
-  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante en vez de Cliente
-  {g:'panel',views:['ahora','agenda'],tabs:['Cola','Agenda']},
+  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
+  {g:'panel',views:['cliente','ahora','agenda'],tabs:['Cliente','Cola','Agenda'],def:'ahora'}, // el Manager del agente (lo pidió el dueño): el cliente actual, la cola y la agenda. El team leader no tiene Cliente
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
@@ -138,15 +137,17 @@ const GROUPS=[
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
 // lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
-function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());$('#nav [data-g=cliente]').hidden=tlView()}
+function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());
+  const p=$('#navPanel');p.classList.toggle('nv-cli',!tlView());p.querySelector('.nm').innerHTML=tlView()?'Panel':isLeader()?'Manager<small class="ag"> (agente)</small>':'Manager';p.title=tlView()?'Panel: la cola y la agenda (2)':'Manager: tu cliente, tu cola y tu agenda (2)'}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
-function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.views[0])} // Inicio siempre vuelve a Hoy
+function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Hoy
 const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader()))v='inicio';
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
+  if(v==='cliente'&&tlView())v='ahora'; // el team leader no tiene clientes
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
@@ -154,7 +155,7 @@ function go(v,opts){
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
   const sn=$('#subnav');sn.hidden=G.views.length<2;
-  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>(x!=='equipo'&&x!=='clientes')||isLeader()).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
+  sn.innerHTML=G.views.length<2?'':G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader())&&(x!=='cliente'||!tlView())).map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}${x==='cliente'&&curCl?` <b class="tab-id">${esc(curCl.id)}</b>`:''}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
