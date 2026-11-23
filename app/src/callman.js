@@ -2,7 +2,7 @@
    Su botón brillante del menú (el team leader no tiene clientes: en vez de "Cliente" tiene esto).
    Arriba lo que hay que atender ya; después los news en curso (New y Talking) con su agente; abajo, cada agente:
    su turno, sus news (ahora y los que recibió hoy), FTDs de hoy, llamadas contra el mínimo, la última llamada,
-   los news por repasar y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
+   y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
 const CM_NEW=5*6e4,CM_QUIET=20*6e4; // un New sin llamar a los 5 min · en turno y sin llamar hace 20 min
 const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
 function cmTurno(uid){ // el turno de hoy de alguien, con el descanso que tiene abierto
@@ -31,7 +31,7 @@ function cmData(){
   for(const f of team)if(f.date===te){const p=per.get(f.uid);if(p)p.ftd++}
   for(const c of calls){const p=per.get(c.uid);if(p&&c.at>p.last)p.last=c.at}
   cur.sort((a,b)=>(b.wait?1:0)-(a.wait?1:0)||(a.talk?1:0)-(b.talk?1:0)||(a.k.last?1:0)-(b.k.last?1:0)||(a.a||now)-(b.a||now));
-  const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),rep:crm.ok?dayPool(p.m.id).due.length:0,venc:agStats(p.m.id).venc}));
+  const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),venc:agStats(p.m.id).venc}));
   const ord={br:0,in:0,none:2,out:3};
   rows.sort((a,b)=>ord[a.tu.k]-ord[b.tu.k]||(b.newN+b.talk)-(a.newN+a.talk)||a.m.name.localeCompare(b.m.name));
   // lo que hay que atender ya, lo más urgente primero
@@ -42,7 +42,6 @@ function cmData(){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
     if(p.tu.k==='in'&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`});
-    if(p.rep)al.push({w:4,html:`${nm} tiene ${plural(p.rep,'new por repasar','news por repasar')}`});
   }
   al.sort((a,b)=>a.w-b.w);
   return {now,cur,rows,al,hoyMesa,newN:cur.filter(x=>!x.talk).length,talk:cur.filter(x=>x.talk).length,wait:cur.filter(x=>x.wait).length,callsN:calls.length};
@@ -73,10 +72,10 @@ V.callman={
       <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td>
       <td title="${esc(paceTxt(p.pc))}"><b class="${p.pc.n>=p.pc.min?'ok':p.pc.ok===false?'hot':''}">${p.pc.n}</b><span class="d">/${p.pc.min}</span></td>
       <td>${p.last?`hace ${cmAgo(D.now-p.last)}`:'<span class="d">—</span>'}</td>
-      <td>${p.rep?sp('hot b',String(p.rep)):'<span class="d">—</span>'}</td><td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
-    const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.rep||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
+      <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
+    const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
-      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th>Llamadas</th><th>Última llamada</th><th>Por repasar</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
+      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th>Llamadas</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
     body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
   }

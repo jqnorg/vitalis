@@ -1766,7 +1766,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.34.0';
+const VERSION='1.35.0';
 const EXT_VER='1.15.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -6047,9 +6047,9 @@ function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
   const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
   const nStale=mineAll.filter(r=>stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r)).length; // viejos, ocultos de la cola
-  // dentro de cada grupo, primero los que no se llamaron hoy (los news: los que piden repaso)
-  const hoyRank=r=>{const k=contactOf(r);return k.today?1:0},repRank=r=>{const k=contactOf(r);return !k.last||Date.now()-k.last>REPASO?0:1};
-  const g1=live.filter(r=>r.grp==='new').sort((a,b)=>repRank(a)-repRank(b)||byRegDesc(a,b));
+  // dentro de cada grupo, primero los que no se llamaron hoy; los new, del más nuevo (en New es urgente siempre)
+  const hoyRank=r=>{const k=contactOf(r);return k.today?1:0};
+  const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
   const ags=uid===me?pend:uid==null?[...pend,...(isLeader()?teamAg:[])]:agOf(uid);
   const ag=ags.filter(p=>!p.done&&p.due.slice(0,10)<=te&&!soldOf(p.id)&&!isDnc(p.id)).sort(byDue);
   const agIds=new Set(ags.filter(p=>!p.done).map(p=>norm(p.id)));
@@ -6961,14 +6961,14 @@ async function ficInit(){ficOk=await ficFetch()}
 function fichaNew(id){if(id)setCurrent(id,'','new')}
 
 /* ============================================================
-   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y la franja de news por repasar.
+   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y la franja de los que están en New.
+   Un cliente en New es lo más urgente, pase lo que pase y haya pasado el tiempo que haya pasado (lo dijo el dueño): no hay "repaso" ni reloj.
    Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader), cada NA (NA a NA-4: días de llamadas, sin llamarlo no avanza), CA, HU, CallBack y Pending
    llamado al menos una vez en el día, y los news del día repasados cada menos de 2 h. Un intento completo es por las tres líneas.
    ============================================================ */
 let calls=[],callsOk=null,callsDay='';
 const LINES={omega:'Omega',gizat:'Gizat',voiso:'Voiso'};
 const C2C=r=>({uid:r.user_id,id:String(r.client_id),brand:r.brand,line:r.line,at:+new Date(r.at)});
-const REPASO=105*6e4; // un new del día pide repaso a la 1 h 45 sin llamada
 const minCalls=()=>+(teamInfo&&teamInfo.min_calls)||250;
 async function callsFetch(){ // las de hoy de toda la mesa
   const day=todayS(),from=parseYMD(day).toISOString();
@@ -7013,15 +7013,15 @@ function dayPool(uid){
   const items=[];
   for(const r of crm.rows.values()){
     if(isArch(r.brand)||crmOwner(r)!==uid||paidCrm(r)||S.has(ckey(r.brand,r.id)))continue;
-    const news=regDay(r)===te&&!NEWS_OUT.includes(r.grp);
+    const inNew=r.grp==='new'&&!/talk|habl/.test(norm(r.status)),news=inNew||(regDay(r)===te&&!NEWS_OUT.includes(r.grp));
     const g=news?'news':['callback','pending'].includes(r.grp)?'cb':(['call_again','hang_up'].includes(r.grp)||(r.grp==='na'&&naNum(r.status)<=NA_MAX))?'g3':null;
     if(!g)continue;
     const k=contactOf(r);
     if(!news&&rotIn.has(norm(r.id))&&k.today)continue; // te lo rotaron hoy y ya lo llamó alguien: no entra en tu meta
-    items.push({r,k,g,due:news&&(!k.last||now-k.last>REPASO)});
+    items.push({r,k,g,due:inNew}); // en New: urgente siempre
   }
   const done=items.filter(x=>x.k.today).length,half=items.filter(x=>x.k.today&&!x.k.full&&x.k.lines.size&&now-x.k.last>3*6e4);
-  const P={items,done,total:items.length,due:items.filter(x=>x.due).sort((a,b)=>(a.k.last||0)-(b.k.last||0)),half,n:callsOf(uid)};
+  const P={items,done,total:items.length,due:items.filter(x=>x.due).sort((a,b)=>byRegDesc(a.r,b.r)),half,n:callsOf(uid)};
   poolMemo.m.set(uid,P);return P;
 }
 // el ritmo: desde tu entrada (o tu primera llamada) hasta el fin de tu jornada
@@ -7041,7 +7041,7 @@ function hoyBand(){
   const due=meNeedsDay()&&cur!=='ahora'&&cur!=='agenda'?dayPool(me).due:[]; // en el Panel ya está la cola: ahí no se repite
   if(!due.length){el.hidden=true;el.innerHTML='';return}
   el.hidden=false;
-  el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'Falta 1 new por repasar':`Faltan ${due.length} news por repasar`}</b>
+  el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'1 cliente en New: llamalo ya':`${due.length} clientes en New: llamalos ya`}</b>
     <span class="hb-list">${due.slice(0,5).map(x=>`<button type="button" class="chip" data-hb="ficha" data-id="${esc(x.r.id)}" title="${esc(x.k.last?'Último contacto '+rel(new Date(x.k.last)):'Sin llamar todavía')}"><b>${esc(x.r.id)}</b> ${esc(clip(x.r.name||'',18))}<small>${x.k.last?esc(rel(new Date(x.k.last))):'sin llamar'}</small></button>`).join('')}${due.length>5?`<span class="d">y ${due.length-5} más</span>`:''}</span>
     <span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button>`;
 }
@@ -7055,7 +7055,7 @@ function callsMesaCard(){
   const row=({m,pc,P})=>`<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td title="${esc(paceTxt(pc))}"><b class="${pc.n>=pc.min?'ok':pc.ok===false?'hot':''}">${pc.n}</b><span class="d">/${pc.min}</span></td>
     <td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`;
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">toques en Omega, Gizat o Voiso (estimado)</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Pool llamado hoy</th><th>News por repasar</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){
@@ -7541,13 +7541,9 @@ function sgCard({r,p,c,tag,why,k}){ // compacta: arriba el cliente, abajo el por
     <div class="sg-side">${k?sgCalled(k):''}<div class="sg-b">${p?`<button type="button" class="btn pri" data-act="pHecho">Ya lo llamé</button>`:''}<button type="button" class="btn${p?'':' pri'}" data-ah="ficha" data-id="${esc(id)}">Ficha</button>${p?'':`<button type="button" class="btn" data-ah="ag" data-id="${esc(id)}">Agendar</button>`}</div></div>
   </div>`;
 }
-function sgNewWhy(r,k){
-  const now=Date.now(),a=regAt(r),m=a?Math.round((now-a)/6e4):null;
-  if(k.last&&now-k.last<REPASO)return `Ya lo llamaste ${esc(rel(new Date(k.last)))}. Volvé a probar antes de las <b>${hhmm(k.last+REPASO)}</b>.`;
-  if(k.last)return `Lo llamaste ${esc(rel(new Date(k.last)))} y no depositó: toca repasarlo.`;
-  if(m==null)return 'Todavía no lo llamaste.';
-  const {w,cold}=newWin(r.country);
-  return `Se registró ${esc(rel(a))} y todavía no lo llamaste${m<=w?': <b>es su mejor momento</b>.':m<=cold?': todavía está a tiempo.':'.'}`;
+function sgNewWhy(r,k){ // en New: lo más urgente, pase lo que pase
+  const a=regAt(r);
+  return `<b>Está en New: llamalo ya.</b>${a?` Se registró ${esc(rel(a))}.`:''}${k.last?` Lo llamaste ${esc(rel(new Date(k.last)))} y sigue en New.`:''}`;
 }
 
 /* ---------- 3): NA, Call Again y Hang Up, agrupados por el motivo ---------- */
@@ -7592,8 +7588,8 @@ function colaPlan(q){
   const mark=r=>{r.hot=hot.get(norm(r.id))||null;return r};
   const kOf=new Map(),K=r=>{let k=kOf.get(r);if(!k)kOf.set(r,k=contactOf(r));return k};
   // 1) los new (en la Cola, solo si hay más de uno)
-  const news=q.g1.map(mark),due=r=>{const k=K(r);return !k.last||now-k.last>=REPASO};
-  const newsL=[...news].sort((a,b)=>(due(b)?1:0)-(due(a)?1:0)||(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
+  const news=q.g1.map(mark),due=()=>true; // todos: en New es urgente siempre
+  const newsL=[...news].sort((a,b)=>(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
   // 2) agendas que ya llegaron, Pending Payment y CallBack
   const agNow=q.ag.filter(p=>parseDue(p.due)<=new Date()),agLater=q.ag.filter(p=>parseDue(p.due)>new Date());
   const cb=q.cb.map(mark),cbRank=r=>(K(r).today?2:0)+(r.grp==='pending'?0:1);
@@ -7612,7 +7608,7 @@ function colaPlan(q){
 // el próximo a llamar, en el orden de la Cola, con su porqué en una línea (para la extensión en el CRM)
 function colaNext(q,n=6){
   const P=colaPlan(q),out=[],seen=new Set(),add=(id,name,why)=>{const k=norm(id);if(!id||seen.has(k))return;seen.add(k);out.push({id:String(id),name:name||'',why})};
-  for(const r of P.newsL.filter(P.due)){const k=P.K(r);add(r.id,r.name,k.last?`Nuevo: lo llamaste ${rel(new Date(k.last))}, toca repasarlo`:'Nuevo: todavía no lo llamaste')}
+  for(const r of P.newsL.filter(P.due)){const k=P.K(r);add(r.id,r.name,k.last?`En New: lo llamaste ${rel(new Date(k.last))} y sigue en New`:'En New: todavía no lo llamaste')}
   for(const {p,r} of P.two){
     if(p)add(p.id,r&&r.name,`Agenda de las ${p.due.slice(11,16)}`);
     else add(r.id,r.name,r.grp==='pending'?'Tiene un boleto sin pagar':'Pidió que lo llamen');
@@ -7630,8 +7626,8 @@ function colaSug(q){
 
   // 1) los new: solo si hay más de uno
   if(news.length>1){
-    const L=newsL,n=L.filter(due).length;
-    html+=stepH('Primero, los nuevos',`Tenés ${plural(news.length,'nuevo','nuevos')} sin depositar${n?`; ${n===news.length?'a todos':`a ${n}`} toca llamarlos ahora`:''}. Depositan más en las primeras horas, y se repasan cada menos de 2 horas.`)+
+    const L=newsL;
+    html+=stepH('Primero, los nuevos',`Tenés ${plural(news.length,'cliente','clientes')} en New. Son lo más urgente, pase lo que pase: llamalos antes que a nadie.`)+
       `<div class="sg-list">${L.map(r=>sgCard({r,c:'new',tag:'Nuevo',k:K(r),why:sgNewWhy(r,K(r))})).join('')}</div>`;
   }
   document.body.classList.toggle('sg-news',news.length>1);
@@ -7652,7 +7648,7 @@ function colaSug(q){
   // 3) NA, Call Again y Hang Up, por el motivo
   if(g3.length){
     const pend3=hotL.length+nunca.length+viejos.length;
-    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para repasar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
+    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para volver a llamar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
       `<section class="card sg-g3">`+
       sgGroup('hot',hotL,`${sgFlame}Su campaña está depositando hoy`,`${H.map(h=>esc(h.txt)+` lleva ${h.n} FTDs hoy`).join(' · ')}: es el mejor momento para esos clientes.`)+
       sgGroup('nunca',nunca,'Sin llamar hoy','Nadie los llamó todavía hoy.')+
@@ -7749,7 +7745,7 @@ async function stationCheck(){
    Su botón brillante del menú (el team leader no tiene clientes: en vez de "Cliente" tiene esto).
    Arriba lo que hay que atender ya; después los news en curso (New y Talking) con su agente; abajo, cada agente:
    su turno, sus news (ahora y los que recibió hoy), FTDs de hoy, llamadas contra el mínimo, la última llamada,
-   los news por repasar y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
+   y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
 const CM_NEW=5*6e4,CM_QUIET=20*6e4; // un New sin llamar a los 5 min · en turno y sin llamar hace 20 min
 const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
 function cmTurno(uid){ // el turno de hoy de alguien, con el descanso que tiene abierto
@@ -7778,7 +7774,7 @@ function cmData(){
   for(const f of team)if(f.date===te){const p=per.get(f.uid);if(p)p.ftd++}
   for(const c of calls){const p=per.get(c.uid);if(p&&c.at>p.last)p.last=c.at}
   cur.sort((a,b)=>(b.wait?1:0)-(a.wait?1:0)||(a.talk?1:0)-(b.talk?1:0)||(a.k.last?1:0)-(b.k.last?1:0)||(a.a||now)-(b.a||now));
-  const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),rep:crm.ok?dayPool(p.m.id).due.length:0,venc:agStats(p.m.id).venc}));
+  const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),venc:agStats(p.m.id).venc}));
   const ord={br:0,in:0,none:2,out:3};
   rows.sort((a,b)=>ord[a.tu.k]-ord[b.tu.k]||(b.newN+b.talk)-(a.newN+a.talk)||a.m.name.localeCompare(b.m.name));
   // lo que hay que atender ya, lo más urgente primero
@@ -7789,7 +7785,6 @@ function cmData(){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
     if(p.tu.k==='in'&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`});
-    if(p.rep)al.push({w:4,html:`${nm} tiene ${plural(p.rep,'new por repasar','news por repasar')}`});
   }
   al.sort((a,b)=>a.w-b.w);
   return {now,cur,rows,al,hoyMesa,newN:cur.filter(x=>!x.talk).length,talk:cur.filter(x=>x.talk).length,wait:cur.filter(x=>x.wait).length,callsN:calls.length};
@@ -7820,10 +7815,10 @@ V.callman={
       <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td>
       <td title="${esc(paceTxt(p.pc))}"><b class="${p.pc.n>=p.pc.min?'ok':p.pc.ok===false?'hot':''}">${p.pc.n}</b><span class="d">/${p.pc.min}</span></td>
       <td>${p.last?`hace ${cmAgo(D.now-p.last)}`:'<span class="d">—</span>'}</td>
-      <td>${p.rep?sp('hot b',String(p.rep)):'<span class="d">—</span>'}</td><td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
-    const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.rep||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
+      <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
+    const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
-      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th>Llamadas</th><th>Última llamada</th><th>Por repasar</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
+      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th>Llamadas</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
     body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
   }

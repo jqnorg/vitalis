@@ -1,12 +1,12 @@
 /* ============================================================
-   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y la franja de news por repasar.
+   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y la franja de los que están en New.
+   Un cliente en New es lo más urgente, pase lo que pase y haya pasado el tiempo que haya pasado (lo dijo el dueño): no hay "repaso" ni reloj.
    Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader), cada NA (NA a NA-4: días de llamadas, sin llamarlo no avanza), CA, HU, CallBack y Pending
    llamado al menos una vez en el día, y los news del día repasados cada menos de 2 h. Un intento completo es por las tres líneas.
    ============================================================ */
 let calls=[],callsOk=null,callsDay='';
 const LINES={omega:'Omega',gizat:'Gizat',voiso:'Voiso'};
 const C2C=r=>({uid:r.user_id,id:String(r.client_id),brand:r.brand,line:r.line,at:+new Date(r.at)});
-const REPASO=105*6e4; // un new del día pide repaso a la 1 h 45 sin llamada
 const minCalls=()=>+(teamInfo&&teamInfo.min_calls)||250;
 async function callsFetch(){ // las de hoy de toda la mesa
   const day=todayS(),from=parseYMD(day).toISOString();
@@ -51,15 +51,15 @@ function dayPool(uid){
   const items=[];
   for(const r of crm.rows.values()){
     if(isArch(r.brand)||crmOwner(r)!==uid||paidCrm(r)||S.has(ckey(r.brand,r.id)))continue;
-    const news=regDay(r)===te&&!NEWS_OUT.includes(r.grp);
+    const inNew=r.grp==='new'&&!/talk|habl/.test(norm(r.status)),news=inNew||(regDay(r)===te&&!NEWS_OUT.includes(r.grp));
     const g=news?'news':['callback','pending'].includes(r.grp)?'cb':(['call_again','hang_up'].includes(r.grp)||(r.grp==='na'&&naNum(r.status)<=NA_MAX))?'g3':null;
     if(!g)continue;
     const k=contactOf(r);
     if(!news&&rotIn.has(norm(r.id))&&k.today)continue; // te lo rotaron hoy y ya lo llamó alguien: no entra en tu meta
-    items.push({r,k,g,due:news&&(!k.last||now-k.last>REPASO)});
+    items.push({r,k,g,due:inNew}); // en New: urgente siempre
   }
   const done=items.filter(x=>x.k.today).length,half=items.filter(x=>x.k.today&&!x.k.full&&x.k.lines.size&&now-x.k.last>3*6e4);
-  const P={items,done,total:items.length,due:items.filter(x=>x.due).sort((a,b)=>(a.k.last||0)-(b.k.last||0)),half,n:callsOf(uid)};
+  const P={items,done,total:items.length,due:items.filter(x=>x.due).sort((a,b)=>byRegDesc(a.r,b.r)),half,n:callsOf(uid)};
   poolMemo.m.set(uid,P);return P;
 }
 // el ritmo: desde tu entrada (o tu primera llamada) hasta el fin de tu jornada
@@ -79,7 +79,7 @@ function hoyBand(){
   const due=meNeedsDay()&&cur!=='ahora'&&cur!=='agenda'?dayPool(me).due:[]; // en el Panel ya está la cola: ahí no se repite
   if(!due.length){el.hidden=true;el.innerHTML='';return}
   el.hidden=false;
-  el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'Falta 1 new por repasar':`Faltan ${due.length} news por repasar`}</b>
+  el.innerHTML=`<span class="hb-dot" aria-hidden="true"></span><b>${due.length===1?'1 cliente en New: llamalo ya':`${due.length} clientes en New: llamalos ya`}</b>
     <span class="hb-list">${due.slice(0,5).map(x=>`<button type="button" class="chip" data-hb="ficha" data-id="${esc(x.r.id)}" title="${esc(x.k.last?'Último contacto '+rel(new Date(x.k.last)):'Sin llamar todavía')}"><b>${esc(x.r.id)}</b> ${esc(clip(x.r.name||'',18))}<small>${x.k.last?esc(rel(new Date(x.k.last))):'sin llamar'}</small></button>`).join('')}${due.length>5?`<span class="d">y ${due.length-5} más</span>`:''}</span>
     <span class="grow"></span><button type="button" class="btn sm" data-go="ahora">Ver la cola</button>`;
 }
@@ -93,7 +93,7 @@ function callsMesaCard(){
   const row=({m,pc,P})=>`<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td title="${esc(paceTxt(pc))}"><b class="${pc.n>=pc.min?'ok':pc.ok===false?'hot':''}">${pc.n}</b><span class="d">/${pc.min}</span></td>
     <td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`;
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">toques en Omega, Gizat o Voiso (estimado)</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Pool llamado hoy</th><th>News por repasar</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){

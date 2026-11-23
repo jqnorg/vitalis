@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.34.0';
+const VERSION='1.35.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];

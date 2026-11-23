@@ -265,7 +265,7 @@ async def main():
             ok('OXXO con PagoMX' in await Nv.locator('#vitalis-dock #payb').inner_text() and 'cualquier OXXO' in await Nv.locator('#vitalis-dock #payb').inner_text(), 'se despliega y lleva el camino del depósito con el país del cliente')
             await Nv.screenshot(path=OUT / 'x3d_mini_ficha_deposito.png')
             nx = await Nv.locator('#vitalis-dock #nx').inner_text()
-            ok('Siguiente' in nx and '555004' in nx and 'Nuevo: todavía no lo llamaste' in nx and 'Copiar ID' in nx, f'abajo, el siguiente de la Cola con su porqué: primero el new ({nx!r})')
+            ok('Siguiente' in nx and '555004' in nx and 'En New: todavía no lo llamaste' in nx and 'Copiar ID' in nx, f'abajo, el siguiente de la Cola con su porqué: primero el new ({nx!r})')
             ok('Marcá la entrada en Vitalis' in await Nv.locator('#vitalis-dock #tu').inner_text(), 'sin entrada marcada, no ofrece descansos')
             await A2.evaluate("marcar('entrada')"); await Nv.wait_for_timeout(1500)
             ok(await Nv.locator('#vitalis-dock [data-t]').count() == 3, 'con la entrada marcada: Baño, 10 min y 30 min')

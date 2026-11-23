@@ -38,13 +38,9 @@ function sgCard({r,p,c,tag,why,k}){ // compacta: arriba el cliente, abajo el por
     <div class="sg-side">${k?sgCalled(k):''}<div class="sg-b">${p?`<button type="button" class="btn pri" data-act="pHecho">Ya lo llamé</button>`:''}<button type="button" class="btn${p?'':' pri'}" data-ah="ficha" data-id="${esc(id)}">Ficha</button>${p?'':`<button type="button" class="btn" data-ah="ag" data-id="${esc(id)}">Agendar</button>`}</div></div>
   </div>`;
 }
-function sgNewWhy(r,k){
-  const now=Date.now(),a=regAt(r),m=a?Math.round((now-a)/6e4):null;
-  if(k.last&&now-k.last<REPASO)return `Ya lo llamaste ${esc(rel(new Date(k.last)))}. Volvé a probar antes de las <b>${hhmm(k.last+REPASO)}</b>.`;
-  if(k.last)return `Lo llamaste ${esc(rel(new Date(k.last)))} y no depositó: toca repasarlo.`;
-  if(m==null)return 'Todavía no lo llamaste.';
-  const {w,cold}=newWin(r.country);
-  return `Se registró ${esc(rel(a))} y todavía no lo llamaste${m<=w?': <b>es su mejor momento</b>.':m<=cold?': todavía está a tiempo.':'.'}`;
+function sgNewWhy(r,k){ // en New: lo más urgente, pase lo que pase
+  const a=regAt(r);
+  return `<b>Está en New: llamalo ya.</b>${a?` Se registró ${esc(rel(a))}.`:''}${k.last?` Lo llamaste ${esc(rel(new Date(k.last)))} y sigue en New.`:''}`;
 }
 
 /* ---------- 3): NA, Call Again y Hang Up, agrupados por el motivo ---------- */
@@ -89,8 +85,8 @@ function colaPlan(q){
   const mark=r=>{r.hot=hot.get(norm(r.id))||null;return r};
   const kOf=new Map(),K=r=>{let k=kOf.get(r);if(!k)kOf.set(r,k=contactOf(r));return k};
   // 1) los new (en la Cola, solo si hay más de uno)
-  const news=q.g1.map(mark),due=r=>{const k=K(r);return !k.last||now-k.last>=REPASO};
-  const newsL=[...news].sort((a,b)=>(due(b)?1:0)-(due(a)?1:0)||(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
+  const news=q.g1.map(mark),due=()=>true; // todos: en New es urgente siempre
+  const newsL=[...news].sort((a,b)=>(b.hot?1:0)-(a.hot?1:0)||byRegDesc(a,b));
   // 2) agendas que ya llegaron, Pending Payment y CallBack
   const agNow=q.ag.filter(p=>parseDue(p.due)<=new Date()),agLater=q.ag.filter(p=>parseDue(p.due)>new Date());
   const cb=q.cb.map(mark),cbRank=r=>(K(r).today?2:0)+(r.grp==='pending'?0:1);
@@ -109,7 +105,7 @@ function colaPlan(q){
 // el próximo a llamar, en el orden de la Cola, con su porqué en una línea (para la extensión en el CRM)
 function colaNext(q,n=6){
   const P=colaPlan(q),out=[],seen=new Set(),add=(id,name,why)=>{const k=norm(id);if(!id||seen.has(k))return;seen.add(k);out.push({id:String(id),name:name||'',why})};
-  for(const r of P.newsL.filter(P.due)){const k=P.K(r);add(r.id,r.name,k.last?`Nuevo: lo llamaste ${rel(new Date(k.last))}, toca repasarlo`:'Nuevo: todavía no lo llamaste')}
+  for(const r of P.newsL.filter(P.due)){const k=P.K(r);add(r.id,r.name,k.last?`En New: lo llamaste ${rel(new Date(k.last))} y sigue en New`:'En New: todavía no lo llamaste')}
   for(const {p,r} of P.two){
     if(p)add(p.id,r&&r.name,`Agenda de las ${p.due.slice(11,16)}`);
     else add(r.id,r.name,r.grp==='pending'?'Tiene un boleto sin pagar':'Pidió que lo llamen');
@@ -127,8 +123,8 @@ function colaSug(q){
 
   // 1) los new: solo si hay más de uno
   if(news.length>1){
-    const L=newsL,n=L.filter(due).length;
-    html+=stepH('Primero, los nuevos',`Tenés ${plural(news.length,'nuevo','nuevos')} sin depositar${n?`; ${n===news.length?'a todos':`a ${n}`} toca llamarlos ahora`:''}. Depositan más en las primeras horas, y se repasan cada menos de 2 horas.`)+
+    const L=newsL;
+    html+=stepH('Primero, los nuevos',`Tenés ${plural(news.length,'cliente','clientes')} en New. Son lo más urgente, pase lo que pase: llamalos antes que a nadie.`)+
       `<div class="sg-list">${L.map(r=>sgCard({r,c:'new',tag:'Nuevo',k:K(r),why:sgNewWhy(r,K(r))})).join('')}</div>`;
   }
   document.body.classList.toggle('sg-news',news.length>1);
@@ -149,7 +145,7 @@ function colaSug(q){
   // 3) NA, Call Again y Hang Up, por el motivo
   if(g3.length){
     const pend3=hotL.length+nunca.length+viejos.length;
-    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para repasar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
+    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para volver a llamar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
       `<section class="card sg-g3">`+
       sgGroup('hot',hotL,`${sgFlame}Su campaña está depositando hoy`,`${H.map(h=>esc(h.txt)+` lleva ${h.n} FTDs hoy`).join(' · ')}: es el mejor momento para esos clientes.`)+
       sgGroup('nunca',nunca,'Sin llamar hoy','Nadie los llamó todavía hoy.')+

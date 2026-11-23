@@ -227,9 +227,9 @@ function queueOf(uid){ // uid: me | null (toda la mesa) | otro
   const S=soldIdx(),te=todayS(),ym=te.slice(0,7),own=r=>uid==null||crmOwner(r)===uid;
   const mineAll=crmAll().filter(r=>!isArch(r.brand)&&own(r)),live=mineAll.filter(r=>!stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r));
   const nStale=mineAll.filter(r=>stale(r)&&!S.has(ckey(r.brand,r.id))&&!paidCrm(r)).length; // viejos, ocultos de la cola
-  // dentro de cada grupo, primero los que no se llamaron hoy (los news: los que piden repaso)
-  const hoyRank=r=>{const k=contactOf(r);return k.today?1:0},repRank=r=>{const k=contactOf(r);return !k.last||Date.now()-k.last>REPASO?0:1};
-  const g1=live.filter(r=>r.grp==='new').sort((a,b)=>repRank(a)-repRank(b)||byRegDesc(a,b));
+  // dentro de cada grupo, primero los que no se llamaron hoy; los new, del más nuevo (en New es urgente siempre)
+  const hoyRank=r=>{const k=contactOf(r);return k.today?1:0};
+  const g1=live.filter(r=>r.grp==='new').sort(byRegDesc);
   const ags=uid===me?pend:uid==null?[...pend,...(isLeader()?teamAg:[])]:agOf(uid);
   const ag=ags.filter(p=>!p.done&&p.due.slice(0,10)<=te&&!soldOf(p.id)&&!isDnc(p.id)).sort(byDue);
   const agIds=new Set(ags.filter(p=>!p.done).map(p=>norm(p.id)));
