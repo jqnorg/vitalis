@@ -10,7 +10,7 @@
 const SG_STALE=2*36e5; // "sin tocar hace más de 2 h"
 const sgPlain=r=>{ // el status en palabras simples
   if(!r)return '';const g=r.grp,s=norm(r.status);
-  if(g==='new')return /talk|habl/.test(s)?'Nuevo, ya habló':'Nuevo';
+  if(g==='new')return /talk|habl/.test(s)?'Nuevo, ya asignado (Talking)':'Nuevo';
   if(g==='na'){const n=naNum(r.status);return `No atendió · ${n} ${n===1?'día':'días'} de llamadas`} // NA-N: N días en que se lo llamó (sin llamarlo, no cambia)
   if(g==='call_again')return 'Volver a llamar';
   if(g==='hang_up')return 'Cortó';

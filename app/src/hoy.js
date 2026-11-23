@@ -88,10 +88,10 @@ function hoyBand(){
 /* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
    Hablar no suma ni resta: no depende del agente que el cliente atienda. Lo que se mide es si, cuando no está hablando, marca al ritmo.
    Una llamada cubre CALL_S (50 s de espera + 3 s para cambiar de línea). Los toques seguidos al mismo cliente (Omega, Gizat, Voiso) son un
-   intento. Un intento es conversación si después el cliente quedó con un resultado real (Call Again, Hang Up, CallBack, Pending, Low
-   Potential, Not Interested, Do Not Call, Failed, FTD) antes del siguiente intento; Talking NO cuenta (se pone apenas se lo pasan, no cuando
-   atiende). Lo hablado es ese hueco menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s). Lo demás, sin descanso
-   marcado, es tiempo muerto.
+   intento. Un intento es conversación si después el cliente pasó a Talking o quedó con un resultado (Call Again, Hang Up, CallBack, Pending,
+   Low Potential, Not Interested, Do Not Call, Failed, FTD) antes del siguiente intento. Lo hablado es el tiempo en Talking (o hasta ese
+   resultado) menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s): el tiempo que costó llamarlo no es charla.
+   Lo demás, sin descanso marcado, es tiempo muerto.
    Requeridas = el mínimo menos lo que no se pudo marcar por hablar (una hora hablada = 68 llamadas). La franja sale del tiempo muerto
    proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
 const CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
@@ -105,7 +105,12 @@ function ritmo(uid){
     const end=t.out||now,brs=(t.breaks||[]).map(b=>[b.s,b.e||now]);
     const brIn=(a,b)=>{let x=0;for(const [s,e] of brs){const lo=Math.max(a,s),hi=Math.min(b,e);if(hi>lo)x+=hi-lo}return x}; // descanso dentro de un tramo
     const L=calls.filter(c=>c.uid===uid&&c.at>=t.in&&c.at<=end).sort((a,b)=>a.at-b.at);
-    const talked=(id,from,until)=>stLog.some(l=>l.id===norm(id)&&l.at>=from&&l.at<=until+10*6e4&&TALK_G.includes(l.grp)); // quedó con un resultado real (Talking no cuenta)
+    const isTalk=l=>/talk|habl/.test(l.st); // Talking: tiempo de llamada justificado
+    const talked=(id,from,until)=>{ // pasó a Talking (o ya lo estaba) o quedó con un resultado antes del siguiente intento
+      const k=norm(id),cur=crmStatusOf(id);
+      if(cur&&/talk|habl/.test(norm(cur.status))&&cur.since&&Date.parse(cur.since)<=until+10*6e4)return true;
+      return stLog.some(l=>l.id===k&&l.at>=from&&l.at<=until+10*6e4&&(isTalk(l)||TALK_G.includes(l.grp)));
+    };
     let dead=0,talk=0,cur=t.in;const segs=[]; // segs: qué pasó en cada tramo del día (para el detalle)
     const seg=(k,a,b,x)=>{if(b-a>=1000)segs.push({k,a,b,...x})}; // k: call · talk · dead · br
     const deadSeg=(a,b)=>{const d=Math.max(0,b-a-brIn(a,b));dead+=d;if(d>0)seg('dead',a,b,{d})};
@@ -153,7 +158,7 @@ function ritmoModal(uid){
     <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
     <h4 class="rt-h">Huecos sin marcar</h4>${holes.length?`<ul class="rt-list">${holes.map(s=>`<li><b>${esc(minsTxt(s.d))}</b> de ${hhmm(s.a)} a ${hhmm(s.b)}, ${before(s)}</li>`).join('')}</ul>`:'<p class="p-sub" style="margin:0">Ninguno de más de 3 minutos.</p>'}
     ${talks.length?`<h4 class="rt-h">Conversaciones</h4><ul class="rt-list">${talks.map(s=>`<li><b>${esc(minsTxt(s.b-s.a))}</b> desde las ${hhmm(s.a)} con <b>${esc(s.id)}</b> ${esc(name(s.id))}${s.n>1?` <span class="d">(atendió a la ${s.n}ª línea)</span>`:''}</li>`).join('')}</ul>`:''}
-    <p class="p-sub" style="margin:10px 0 0">Cada línea marcada cubre 50 s. Es conversación si después el cliente quedó con un status de resultado (Talking no cuenta) antes del siguiente intento; se le restan 50 s por línea marcada. Los descansos marcados no cuentan.</p>`,
+    <p class="p-sub" style="margin:10px 0 0">Cada línea marcada cubre 50 s. Es conversación si después el cliente pasó a Talking o quedó con un status de resultado antes del siguiente intento; se le restan 50 s por línea marcada. Los descansos marcados no cuentan.</p>`,
     actions:[{l:'Listo',cls:'pri'}]});
 }
 
