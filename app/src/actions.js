@@ -666,7 +666,7 @@ function ayuda(){
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
   <h4>Tu ritmo del día</h4><dl>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
-    <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada llamada cubre 53 s: 50 de espera y 3 para cambiar de línea).</dd>
+    <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente quedó con un status de resultado (Talking no cuenta: se pone apenas lo pasan). A lo hablado se le restan 50 s por cada línea que hubo que marcar.</dd>
     <dt>Llamadas de hoy</dt><dd>Se piden 250 (lo fija el team leader). Cada hora hablada descuenta 68: con 2 h 30 habladas se piden 80.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Ahora</h4><dl>

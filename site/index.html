@@ -1780,7 +1780,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.37.0';
+const VERSION='1.38.0';
 const EXT_VER='1.15.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -3559,7 +3559,7 @@ function ayuda(){
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
   <h4>Tu ritmo del día</h4><dl>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
-    <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada llamada cubre 53 s: 50 de espera y 3 para cambiar de línea).</dd>
+    <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente quedó con un status de resultado (Talking no cuenta: se pone apenas lo pasan). A lo hablado se le restan 50 s por cada línea que hubo que marcar.</dd>
     <dt>Llamadas de hoy</dt><dd>Se piden 250 (lo fija el team leader). Cada hora hablada descuenta 68: con 2 h 30 habladas se piden 80.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Ahora</h4><dl>
@@ -7069,11 +7069,14 @@ function hoyBand(){
 
 /* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
    Hablar no suma ni resta: no depende del agente que el cliente atienda. Lo que se mide es si, cuando no está hablando, marca al ritmo.
-   Una llamada cubre CALL_S (50 s de espera + 3 s para cambiar de línea). Una llamada es conversación si después de ella el cliente cambió
-   de status (o pasó a Talking) antes de la siguiente llamada: ese hueco es hablado. Lo demás, sin descanso marcado, es tiempo muerto.
+   Una llamada cubre CALL_S (50 s de espera + 3 s para cambiar de línea). Los toques seguidos al mismo cliente (Omega, Gizat, Voiso) son un
+   intento. Un intento es conversación si después el cliente quedó con un resultado real (Call Again, Hang Up, CallBack, Pending, Low
+   Potential, Not Interested, Do Not Call, Failed, FTD) antes del siguiente intento; Talking NO cuenta (se pone apenas se lo pasan, no cuando
+   atiende). Lo hablado es ese hueco menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s). Lo demás, sin descanso
+   marcado, es tiempo muerto.
    Requeridas = el mínimo menos lo que no se pudo marcar por hablar (una hora hablada = 68 llamadas). La franja sale del tiempo muerto
    proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
-const CALL_S=53e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['new','call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
+const CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
 const ritmoMemo={p:-1,m:new Map()};
 function ritmo(uid){
   if(ritmoMemo.p!==pass){ritmoMemo.p=pass;ritmoMemo.m.clear()}
@@ -7084,16 +7087,21 @@ function ritmo(uid){
     const end=t.out||now,brs=(t.breaks||[]).map(b=>[b.s,b.e||now]);
     const brIn=(a,b)=>{let x=0;for(const [s,e] of brs){const lo=Math.max(a,s),hi=Math.min(b,e);if(hi>lo)x+=hi-lo}return x}; // descanso dentro de un tramo
     const L=calls.filter(c=>c.uid===uid&&c.at>=t.in&&c.at<=end).sort((a,b)=>a.at-b.at);
-    const talked=(c,until)=>stLog.some(l=>l.id===norm(c.id)&&l.at>=c.at&&l.at<=until+10*6e4&&(TALK_G.includes(l.grp)||/talk|habl/.test(l.st))&&!(l.grp==='new'&&!/talk|habl/.test(l.st)));
+    const talked=(id,from,until)=>stLog.some(l=>l.id===norm(id)&&l.at>=from&&l.at<=until+10*6e4&&TALK_G.includes(l.grp)); // quedó con un resultado real (Talking no cuenta)
     let dead=0,talk=0,cur=t.in;const segs=[]; // segs: qué pasó en cada tramo del día (para el detalle)
     const seg=(k,a,b,x)=>{if(b-a>=1000)segs.push({k,a,b,...x})}; // k: call · talk · dead · br
     const deadSeg=(a,b)=>{const d=Math.max(0,b-a-brIn(a,b));dead+=d;if(d>0)seg('dead',a,b,{d})};
-    for(let i=0;i<L.length;i++){
-      const c=L[i],nx=L[i+1];
-      deadSeg(cur,c.at); // antes de esta llamada: nada cubría
-      const until=nx?nx.at:end,gap=Math.max(0,until-c.at-CALL_S),sameCl=nx&&norm(nx.id)===norm(c.id)&&until-c.at<2*6e4; // cambio de línea al mismo cliente: no es hueco
-      seg('call',c.at,Math.min(until,c.at+CALL_S),{id:c.id,line:c.line});
-      if(gap>0&&!sameCl){if(talked(c,until)){const x=Math.min(gap,TALK_MAX);talk+=x;seg('talk',c.at+CALL_S,c.at+CALL_S+x,{id:c.id})}else deadSeg(c.at+CALL_S,until)}
+    // los toques seguidos al mismo cliente son un intento (1, 2 o 3 líneas)
+    const G=[];for(const c of L){const g=G[G.length-1];if(g&&norm(g.id)===norm(c.id)&&c.at-g.last<2*6e4){g.n++;g.last=c.at;g.lines.push(c.line)}else G.push({id:c.id,at:c.at,last:c.at,n:1,lines:[c.line]})}
+    for(let i=0;i<G.length;i++){
+      const g=G[i],nx=G[i+1],until=nx?nx.at:end;
+      deadSeg(cur,g.at); // antes de este intento: nada cubría
+      const ring=Math.min(until-g.at,g.last-g.at+CALL_S),gap=Math.max(0,until-g.at-ring); // lo que cubren las líneas marcadas; después, el hueco
+      seg('call',g.at,g.at+ring,{id:g.id,line:g.lines.join('+'),n:g.n});
+      if(gap>0){
+        if(talked(g.id,g.at,until)){const x=Math.min(Math.max(0,until-g.at-RING_S*g.n),TALK_MAX);talk+=x;seg('talk',g.at+ring,g.at+ring+Math.max(0,x-(ring-RING_S*g.n)),{id:g.id,n:g.n})} // hablado: el hueco menos 50 s por línea marcada
+        else deadSeg(g.at+ring,until);
+      }
       cur=until;
     }
     if(!L.length)deadSeg(t.in,end);
@@ -7120,14 +7128,14 @@ function ritmoModal(uid){
   const tl=R.segs.map(s=>`<div class="rs ${s.k}" style="left:${P(s.a)}%;width:${Math.max(.3,P(s.b)-P(s.a))}%" title="${esc(s.k==='call'?`Llamada ${hhmm(s.a)} · ${s.id}`:s.k==='talk'?`Conversación ${hhmm(s.a)}–${hhmm(s.b)} · ${s.id} ${name(s.id)}`:s.k==='br'?`Descanso ${hhmm(s.a)}–${hhmm(s.b)}`:`Sin marcar ${hhmm(s.a)}–${hhmm(s.b)}`)}"></div>`).join('');
   const holes=R.segs.filter(s=>s.k==='dead'&&s.d>=3*6e4).sort((a,b)=>b.d-a.d).slice(0,8);
   const talks=R.segs.filter(s=>s.k==='talk').sort((a,b)=>(b.b-b.a)-(a.b-a.a)).slice(0,6);
-  const before=(s)=>{const prev=[...R.segs].filter(x=>x.k==='call'&&x.b<=s.a+1000).sort((x,y)=>y.a-x.a)[0];return prev?`después de llamar a <b>${esc(prev.id)}</b> ${esc(name(prev.id))}`:'antes de la primera llamada'};
+  const before=(s)=>{const prev=[...R.segs].filter(x=>x.k==='call'&&x.b<=s.a+1000).sort((x,y)=>y.a-x.a)[0];return prev?`después de llamar a <b>${esc(prev.id)}</b> ${esc(name(prev.id))}${prev.n>1?` (${prev.n} líneas)`:''}`:'antes de la primera llamada'};
   modal({wide:true,title:`${esc(nm)} · ${qBadge(R,true)}`,body:`
     <div class="rt-sum"><span><b>${R.n}</b> llamadas <span class="d">de ${R.req}</span></span><span><b>${esc(minsTxt(R.talk))}</b> hablando</span><span><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos${R.open?` <span class="d">(a fin de día serían ${esc(minsTxt(R.proj))})</span>`:''}</span></div>
     <div class="rt-tl" role="img" aria-label="Línea de tiempo del día">${tl}</div><div class="tll"><span>${hhmm(R.in)}</span><span>${R.open?'ahora':'salida'} ${hhmm(R.end)}</span></div>
     <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
     <h4 class="rt-h">Huecos sin marcar</h4>${holes.length?`<ul class="rt-list">${holes.map(s=>`<li><b>${esc(minsTxt(s.d))}</b> de ${hhmm(s.a)} a ${hhmm(s.b)}, ${before(s)}</li>`).join('')}</ul>`:'<p class="p-sub" style="margin:0">Ninguno de más de 3 minutos.</p>'}
-    ${talks.length?`<h4 class="rt-h">Conversaciones</h4><ul class="rt-list">${talks.map(s=>`<li><b>${esc(minsTxt(s.b-s.a))}</b> desde las ${hhmm(s.a)} con <b>${esc(s.id)}</b> ${esc(name(s.id))}</li>`).join('')}</ul>`:''}
-    <p class="p-sub" style="margin:10px 0 0">Una llamada cubre 53 s. Es conversación si después el cliente cambió de status antes de la siguiente llamada. Los descansos marcados no cuentan.</p>`,
+    ${talks.length?`<h4 class="rt-h">Conversaciones</h4><ul class="rt-list">${talks.map(s=>`<li><b>${esc(minsTxt(s.b-s.a))}</b> desde las ${hhmm(s.a)} con <b>${esc(s.id)}</b> ${esc(name(s.id))}${s.n>1?` <span class="d">(atendió a la ${s.n}ª línea)</span>`:''}</li>`).join('')}</ul>`:''}
+    <p class="p-sub" style="margin:10px 0 0">Cada línea marcada cubre 50 s. Es conversación si después el cliente quedó con un status de resultado (Talking no cuenta) antes del siguiente intento; se le restan 50 s por línea marcada. Los descansos marcados no cuentan.</p>`,
     actions:[{l:'Listo',cls:'pri'}]});
 }
 
@@ -7884,7 +7892,7 @@ V.callman={
     $('#cmSub').textContent=`La mesa en vivo · ${hhmm(Date.now())}`;
     if(crm.ok===false){body.innerHTML='<div class="card"><div class="p-empty">Sin clientes del CRM todavía: hace falta la estación o la extensión.</div></div>';return}
     const D=cmData(),op=openKeys(body);
-    const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin llamar hace +5 min</span>`:'todos llamados','')+kpi('Talking',`${D.talk}`,'hablando con un agente')+
+    const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin llamar hace +5 min</span>`:'todos llamados','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+
       kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`);
     const alerts=D.al.length?`<section class="card cm-al"><div class="card-h"><h3>Para atender ya</h3><span class="p-sub">${plural(D.al.length,'cosa','cosas')}</span></div>
       <ul class="cm-list">${D.al.slice(0,12).map(a=>`<li class="w${a.w}"><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg><span>${a.html}</span>${a.id?`<button type="button" class="btn sm" data-hy="ficha" data-id="${esc(a.id)}">Ficha</button>`:''}</li>`).join('')}</ul></section>`:'';
