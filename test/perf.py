@@ -49,11 +49,11 @@ async def main():
             await A.route('**/rest/v1/**', lag); await A.route('**/auth/v1/**', lag)
             for i in range(2):
                 await A.evaluate("new Promise(r=>{const q=indexedDB.deleteDatabase('vitalis');q.onsuccess=q.onerror=q.onblocked=()=>r()})")
-                t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&document.querySelector('#iHero .n')&&document.querySelector('#iHero .n').textContent.trim()", timeout=30000)
+                t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&(()=>{const v=document.querySelector('#main .view:not([hidden])');return !!v&&v.innerText.trim().length>80})()", timeout=30000)
                 print(f'recarga SIN guardado (220 ms por consulta) → inicio con datos: {time.time()-t0:.2f}s')
             await A.wait_for_timeout(3000)
             for i in range(2):
-                t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&document.querySelector('#iHero .n')&&document.querySelector('#iHero .n').textContent.trim()", timeout=30000)
+                t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&(()=>{const v=document.querySelector('#main .view:not([hidden])');return !!v&&v.innerText.trim().length>80})()", timeout=30000)
                 print(f'recarga CON guardado (220 ms por consulta) → inicio con datos: {time.time()-t0:.2f}s')
                 await A.wait_for_timeout(2500)
             await A.unroute('**/rest/v1/**'); await A.unroute('**/auth/v1/**')
