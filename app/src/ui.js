@@ -137,7 +137,7 @@ const GROUPS=[
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
-// lo del menú que depende del rol: Equipo y el call manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
+// lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
 function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());$('#nav [data-g=cliente]').hidden=tlView()}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
@@ -192,7 +192,7 @@ function status(){
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const q=queueOf(tlView()||isLeadUid(me)?null:me);$('#nbAh').textContent=q.g1.length||''}
-  if(isLeader())cmBadge(); // call manager: lo que hay que atender ya
+  if(isLeader())cmBadge(); // Manager: lo que hay que atender ya
   // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
   cliBadge();
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');

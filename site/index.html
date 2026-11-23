@@ -1416,7 +1416,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .cu-more .cu-rec{margin-top:8px}
 .fi-combo .fi-camps{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}.fi-combo .fi-camps>.p-sub{display:block;margin:0 0 4px;font-weight:700}
 .turno-mini .marks{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--dim);font-size:13px}.turno-mini .marks b{color:var(--fg)}
-/* menú: "Call manager" en una sola línea */
+/* menú: "Manager" en una sola línea */
 #nav button .nm{white-space:nowrap}#nav button#navCm kbd{display:none}#nav button#navCm{gap:9px}
 /* celular: la barra en una fila que se desliza (el candado no queda solo en una línea) */
 @media (max-width:820px){#bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar .pill{flex:none}#bar .grow{display:none}#bar .pill.lk .lk-t{display:none}}
@@ -1434,6 +1434,8 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .rt-tl .rs{position:absolute;top:0;height:100%}.rt-tl .rs.call{background:#00875a}.rt-tl .rs.talk{background:#3b82f6}.rt-tl .rs.br{background:#9aa3ad}.rt-tl .rs.dead{background:#f43f5e;opacity:.85}
 .rt-lg{margin:8px 0 4px}.rt-lg .sw.call{background:#00875a}.rt-lg .sw.talk{background:#3b82f6}.rt-lg .sw.br{background:#9aa3ad}.rt-lg .sw.dead{background:#f43f5e}
 .rt-h{margin:14px 0 6px;font-size:14px}.rt-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
+/* RMO: el nombre de la medida del ritmo del día */
+.rmo-t{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--v-ok,#00875a);border:1.5px solid var(--v-ok,#00875a);border-radius:6px;padding:0 5px;line-height:17px;vertical-align:1px}
 </style>
 </head>
 <body class="auth">
@@ -1481,7 +1483,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-g="cliente" data-v="cliente" class="nv-cli" title="Cliente actual (L)"><svg><use href="#i-cliente"/></svg><span class="nm">Cliente</span><span class="nb cli" id="nbCli"></span><kbd>L</kbd></button>
-    <button type="button" data-g="callman" data-v="callman" id="navCm" class="nv-cli" hidden title="Call manager (M)"><svg><use href="#i-cm"/></svg><span class="nm">Call manager</span><span class="nb hot" id="nbCm"></span><kbd>M</kbd></button>
+    <button type="button" data-g="callman" data-v="callman" id="navCm" class="nv-cli" hidden title="Manager (M)"><svg><use href="#i-cm"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbCm"></span><kbd>M</kbd></button>
     <button type="button" data-g="panel" data-v="ahora"><svg><use href="#i-ahora"/></svg><span class="nm">Panel</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
@@ -1631,7 +1633,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 </section>
 
 <section class="view" id="v-callman" hidden>
-  <div class="vh"><div><h1>Call manager</h1><p class="sub" id="cmSub"></p></div></div>
+  <div class="vh"><div><h1>Manager</h1><p class="sub" id="cmSub"></p></div></div>
   <div id="cmBody"></div>
 </section>
 
@@ -1780,7 +1782,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.40.0';
+const VERSION='1.41.0';
 const EXT_VER='1.16.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -2729,7 +2731,7 @@ const GROUPS=[
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
-// lo del menú que depende del rol: Equipo y el call manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
+// lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
 function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());$('#nav [data-g=cliente]').hidden=tlView()}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
@@ -2784,7 +2786,7 @@ function status(){
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const q=queueOf(tlView()||isLeadUid(me)?null:me);$('#nbAh').textContent=q.g1.length||''}
-  if(isLeader())cmBadge(); // call manager: lo que hay que atender ya
+  if(isLeader())cmBadge(); // Manager: lo que hay que atender ya
   // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
   cliBadge();
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
@@ -3561,7 +3563,8 @@ function ayuda(){
   <h4>Cola y clientes</h4><dl>
     <dt>De quién es cada cliente</dt><dd>Del Sales Rep que se ve en el CRM. Si lo rotan dentro de la mesa, cambia solo.</dd>
     <dt>Lo tiene otra mesa</dt><dd>Una vez por hora la estación recorre todas las páginas de Clientes del CRM. El que estaba y no aparece lo tiene otra mesa: sale de la Cola, del Siguiente y del pool, y la ficha lo dice. Si vuelve a aparecer, vuelve.</dd></dl>
-  <h4>Tu ritmo del día</h4><dl>
+  <h4>RMO (tu ritmo del día)</h4><dl>
+    <dt>Qué es</dt><dd>RMO es la medida del ritmo del día: cuántas llamadas, cuánto tiempo muerto y en qué franja vas. Se ve en el Inicio, en el Manager y en Equipo; "Ver qué pasó" lo abre con el detalle.</dd>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking o quedó con un status de resultado. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
     <dt>Llamadas de hoy</dt><dd>Se piden 250 (lo fija el team leader). Cada hora hablada descuenta 68: con 2 h 30 habladas se piden 80.</dd>
@@ -3671,7 +3674,7 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
-  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el call manager
+  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
@@ -7133,7 +7136,7 @@ const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.flo
 const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;
 function ritmoLine(uid){ // en palabras: "180 llamadas · 25 min muertos · Q1"
   const R=ritmo(uid);if(!R)return '';
-  return `<span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}${R.req!==minCalls()?` <span class="d">(hoy se piden ${R.req}: hablaste ${esc(minsTxt(R.talk))})</span>`:` <span class="d">de ${R.req}</span>`}</span> · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;
+  return `<b class="rmo-t" title="RMO: tu ritmo del día">RMO</b> · <span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}${R.req!==minCalls()?` <span class="d">(hoy se piden ${R.req}: hablaste ${esc(minsTxt(R.talk))})</span>`:` <span class="d">de ${R.req}</span>`}</span> · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;
 }
 // el detalle del día: la línea de tiempo (llamadas, conversaciones, descansos y huecos) y los huecos más largos, para entender qué pasó
 function ritmoModal(uid){
@@ -7144,7 +7147,7 @@ function ritmoModal(uid){
   const holes=R.segs.filter(s=>s.k==='dead'&&s.d>=3*6e4).sort((a,b)=>b.d-a.d).slice(0,8);
   const talks=R.segs.filter(s=>s.k==='talk').sort((a,b)=>(b.b-b.a)-(a.b-a.a)).slice(0,6);
   const before=(s)=>{const prev=[...R.segs].filter(x=>x.k==='call'&&x.b<=s.a+1000).sort((x,y)=>y.a-x.a)[0];return prev?`después de llamar a <b>${esc(prev.id)}</b> ${esc(name(prev.id))}${prev.n>1?` (${prev.n} líneas)`:''}`:'antes de la primera llamada'};
-  modal({wide:true,title:`${esc(nm)} · ${qBadge(R,true)}`,body:`
+  modal({wide:true,title:`RMO · ${esc(nm)} · ${qBadge(R,true)}`,body:`
     <div class="rt-sum"><span><b>${R.n}</b> llamadas <span class="d">de ${R.req}</span></span><span><b>${esc(minsTxt(R.talk))}</b> hablando</span><span><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos${R.open?` <span class="d">(a fin de día serían ${esc(minsTxt(R.proj))})</span>`:''}</span></div>
     <div class="rt-tl" role="img" aria-label="Línea de tiempo del día">${tl}</div><div class="tll"><span>${hhmm(R.in)}</span><span>${R.open?'ahora':'salida'} ${hhmm(R.end)}</span></div>
     <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
@@ -7163,7 +7166,7 @@ function callsMesaCard(){
   const row=({m,pc,P})=>{const R=ritmo(m.id);return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span></td>
     <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`};
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">llamadas, tiempo muerto y franja: Q1 menos de 30 min muertos en el día · Q2 hasta 1 h · Q3 más</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Tiempo muerto</th><th>Franja</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){
@@ -7875,7 +7878,7 @@ async function stationCheck(){
   if(!quiet&&soft.length)once('soft:'+soft.map(r=>r.vista+r.problem).join(),`La estación: ${soft.map(r=>esc(stName(r.vista))+' '+esc(lc1(stState(r)[1]))).join(' · ')}. Revisá esa pestaña en el Chrome del team leader.`,'warn');
 }
 
-/* ---------- Call manager: la mesa en vivo, para el team leader (y el admin) ----------
+/* ---------- Manager: la mesa en vivo, para el team leader (y el admin) ----------
    Su botón brillante del menú (el team leader no tiene clientes: en vez de "Cliente" tiene esto).
    Arriba lo que hay que atender ya; después los news en curso (New y Talking) con su agente; abajo, cada agente:
    su turno, sus news (ahora y los que recibió hoy), FTDs de hoy, llamadas contra el mínimo, la última llamada,
@@ -7905,7 +7908,7 @@ function cmData(){
     const u=crmOwner(r),k=contactOf(r),a=regAt(r),talk=cmIsTalk(r),x={r,u,k,a:a?+a:0,talk,wait:!!(!talk&&!k.last&&a&&now-a>=CM_NEW)};
     cur.push(x);const p=u&&per.get(u);if(p){if(talk)p.talk++;else p.newN++;p.list.push(x)}
   }
-  for(const f of team)if(f.date===te){const p=per.get(f.uid);if(p)p.ftd++}
+  for(const f of team)if(f.date===te){const p=per.get(f.uid);if(p){p.ftd++;if(!isLate(f))p.ftdNew=(p.ftdNew||0)+1}} // ftdNew: depositó el mismo día que se registró (la conversión del día)
   for(const c of calls){const p=per.get(c.uid);if(p&&c.at>p.last)p.last=c.at}
   cur.sort((a,b)=>(b.wait?1:0)-(a.wait?1:0)||(a.talk?1:0)-(b.talk?1:0)||(a.k.last?1:0)-(b.k.last?1:0)||(a.a||now)-(b.a||now));
   const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),R:ritmo(p.m.id),venc:agStats(p.m.id).venc}));
@@ -7918,7 +7921,7 @@ function cmData(){
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
-    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
+    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
     if(p.tu.k==='in'&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`});
   }
   al.sort((a,b)=>a.w-b.w);
@@ -7947,13 +7950,13 @@ V.callman={
     const aRow=p=>`<tr><td><button type="button" class="eq-who lnkp" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}<b>${esc(p.m.name)}</b></button></td>
       <td><span class="${p.tu.cls}">${esc(p.tu.txt)}</span></td>
       <td>${p.newN?sp(p.list.some(x=>x.wait)?'hot b':'b',String(p.newN)):'<span class="d">0</span>'}</td><td>${p.talk?sp('ok b',String(p.talk)):'<span class="d">0</span>'}</td>
-      <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td>
+      <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td><td>${p.hoy?`<b>${p.ftdNew||0}</b><span class="d">/${p.hoy} · ${Math.round(100*(p.ftdNew||0)/p.hoy)}%</span>`:'<span class="d">—</span>'}</td>
       <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span></td><td>${p.R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(p.m.id)}" title="Ver qué pasó">${esc(minsTxt(p.R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
       <td>${p.last?`hace ${cmAgo(D.now-p.last)}`:'<span class="d">—</span>'}</td>
       <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
     const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
-      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th>Llamadas</th><th>Muerto</th><th>Franja</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
+      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="De los news que le llegaron hoy, cuántos depositaron hoy">Conversión hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
     body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
   }

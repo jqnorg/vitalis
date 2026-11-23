@@ -1403,7 +1403,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .cu-more .cu-rec{margin-top:8px}
 .fi-combo .fi-camps{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}.fi-combo .fi-camps>.p-sub{display:block;margin:0 0 4px;font-weight:700}
 .turno-mini .marks{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--dim);font-size:13px}.turno-mini .marks b{color:var(--fg)}
-/* menú: "Call manager" en una sola línea */
+/* menú: "Manager" en una sola línea */
 #nav button .nm{white-space:nowrap}#nav button#navCm kbd{display:none}#nav button#navCm{gap:9px}
 /* celular: la barra en una fila que se desliza (el candado no queda solo en una línea) */
 @media (max-width:820px){#bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar .pill{flex:none}#bar .grow{display:none}#bar .pill.lk .lk-t{display:none}}
@@ -1421,3 +1421,5 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .rt-tl .rs{position:absolute;top:0;height:100%}.rt-tl .rs.call{background:#00875a}.rt-tl .rs.talk{background:#3b82f6}.rt-tl .rs.br{background:#9aa3ad}.rt-tl .rs.dead{background:#f43f5e;opacity:.85}
 .rt-lg{margin:8px 0 4px}.rt-lg .sw.call{background:#00875a}.rt-lg .sw.talk{background:#3b82f6}.rt-lg .sw.br{background:#9aa3ad}.rt-lg .sw.dead{background:#f43f5e}
 .rt-h{margin:14px 0 6px;font-size:14px}.rt-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
+/* RMO: el nombre de la medida del ritmo del día */
+.rmo-t{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--v-ok,#00875a);border:1.5px solid var(--v-ok,#00875a);border-radius:6px;padding:0 5px;line-height:17px;vertical-align:1px}

@@ -668,7 +668,8 @@ function ayuda(){
   <h4>Cola y clientes</h4><dl>
     <dt>De quién es cada cliente</dt><dd>Del Sales Rep que se ve en el CRM. Si lo rotan dentro de la mesa, cambia solo.</dd>
     <dt>Lo tiene otra mesa</dt><dd>Una vez por hora la estación recorre todas las páginas de Clientes del CRM. El que estaba y no aparece lo tiene otra mesa: sale de la Cola, del Siguiente y del pool, y la ficha lo dice. Si vuelve a aparecer, vuelve.</dd></dl>
-  <h4>Tu ritmo del día</h4><dl>
+  <h4>RMO (tu ritmo del día)</h4><dl>
+    <dt>Qué es</dt><dd>RMO es la medida del ritmo del día: cuántas llamadas, cuánto tiempo muerto y en qué franja vas. Se ve en el Inicio, en el Manager y en Equipo; "Ver qué pasó" lo abre con el detalle.</dd>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking o quedó con un status de resultado. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
     <dt>Llamadas de hoy</dt><dd>Se piden 250 (lo fija el team leader). Cada hora hablada descuenta 68: con 2 h 30 habladas se piden 80.</dd>
@@ -778,7 +779,7 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
-  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el call manager
+  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
