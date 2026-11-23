@@ -1393,3 +1393,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .cm-t td{vertical-align:middle}.cm-t td .d{font-size:12px}
 .cm-t tr.cm-wait td{background:color-mix(in srgb,var(--v-err,#e11d48) 7%,transparent)}
 .cm-t .eq-who{display:inline-flex;align-items:center;gap:8px}
+
+/* candado de la barra: cierra Vitalis a mano */
+#bar .pill.lk{gap:6px}#bar .pill.lk .ic{width:16px;height:16px}
+@media (max-width:640px){#bar .pill.lk .lk-t{display:none}}

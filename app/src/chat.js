@@ -335,6 +335,7 @@ V.chat={
     });
     $('#chHead').addEventListener('click',async e=>{const b=e.target.closest('[data-ch]');if(!b)return;const c=chatOf(chatCur),a=b.dataset.ch;
       if(a==='back'){chatCur=null;local.set('chatCur',null);this.render({});return}
+      if(a==='lock'){chatShutNow();return}
       if(!c)return;
       if(a==='mute'){const v=!muted(c.id);if(await B.chatMute(c.id,v))toast(v?`Silenciaste <b>${esc(chatName(c))}</b>: no te llegan avisos (salvo que te nombren con @).`:`Avisos de <b>${esc(chatName(c))}</b> activados.`,v?'warn':'ok')}
       else if(a==='people')chatPeopleModal(c);
@@ -451,7 +452,8 @@ V.chat={
     const hd=`<button type="button" class="ib ch-back" data-ch="back" aria-label="Volver a los chats">←</button>${chatIcon(c)}<div class="ch-ti"><b>${esc(chatName(c))}</b><small>${esc(sub)}</small></div><span class="grow"></span>`+
       (c.kind==='dm'?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+
       (c.kind==='group'?`<button type="button" class="btn sm" data-ch="people">Gente</button>`:'')+
-      `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`;
+      `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`+
+      `<button type="button" class="btn sm" data-ch="lock" title="Cerrar el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Cerrar chat</button>`;
     if($('#chHead').dataset.h!==hd){$('#chHead').innerHTML=hd;$('#chHead').dataset.h=hd}
     if(i.dataset.c!==c.id){i.dataset.c=c.id;i.value=chatDrafts[c.id]||'';growIn(i);i.placeholder=c.kind==='dm'?`Escribile a ${first(dmOther(c))}`:`Escribí en ${chatName(c)}`}
     // mensajes

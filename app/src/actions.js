@@ -731,7 +731,7 @@ function ayuda(){
 /* ---------- clicks y teclas ---------- */
 const hv=el=>el.closest('#iTurno')&&$('#itHora')?($('#itHora').value||''):'';
 const ACT={
-  locks:()=>locksModal(), // Ajustes: privacidad (solo el administrador)
+  lockNow:()=>lockNow(), // el candado de la barra
   importar:()=>importar(),exportar:()=>exportar(),ayuda:()=>ayuda(),
   entrada:el=>marcar('entrada',hv(el)),d10:el=>marcar('d10',hv(el)),bano:el=>marcar('bano',hv(el)),ayuda:()=>pedirAyuda(),d30:el=>marcar('d30',hv(el)),vuelta:el=>marcar('vuelta',hv(el)),salida:el=>marcar('salida',hv(el)),
   deshacer:()=>deshacer(),editHoy:()=>{const t=openTurno()||turnos[todayS()];editTurno(t?t.date:null)},

@@ -117,7 +117,7 @@ const AUTH = {
               return ui.fail(data && data.left <= 2 ? `PIN incorrecto. ${data.left === 1 ? 'Te queda 1 intento.' : `Te quedan ${data.left} intentos.`}` : 'PIN incorrecto.');
             }
             const r = await sb.auth.signInWithPassword({ email: data.email, password: data.password });
-            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); chatOkAt = lastAct = Date.now(); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
+            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
             if (!/invalid login credentials/i.test(r.error.message || '')) throw r.error;
           }
           ui.fail('No se pudo abrir la sesión. Probá de nuevo.');
@@ -144,7 +144,7 @@ const AUTH = {
           const wasAdmin = profile.role === 'admin';
           profile.pin_set = true; if (data && data.role) profile.role = data.role;
           const m = members.find((x) => x.id === me); if (m) Object.assign(m, { pin_set: true, role: profile.role });
-          chatOkAt = lastAct = Date.now(); enter();
+          enter();
           toast(`PIN creado. Desde ahora entrás con tu nombre y ese PIN.${!wasAdmin && profile.role === 'admin' ? '<br>Sos el administrador de la mesa: en Ajustes manejás la gente de la mesa.' : ''}`, 'ok', { ms: 9000 });
         } catch (x) { first = ''; draw(); setTimeout(() => { const mm = box.querySelector('.amsg'); mm.className = 'amsg err'; mm.textContent = authErr(x); }, 0); }
         finally { ui.busy(false); }

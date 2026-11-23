@@ -650,7 +650,7 @@ V.cuenta={
     $('#cfTeamCard').hidden=!isLeader();
     if(!isLeader())return;
     const adm=isAdmin();$('#cfAddM').hidden=!adm;
-    {const el=$('#cfLocks');el.hidden=!adm;if(adm)el.innerHTML=`<span><b>Privacidad</b> · ${esc(locksTxt())}</span><button type="button" class="btn sm" data-act="locks">Cambiar</button>`}
+    {const el=$('#cfLocks');el.hidden=false;el.innerHTML=`<span><b>Privacidad</b> · ${esc(locksTxt())}</span>`}
     $('#cfTeamName').textContent=teamInfo.name;
     const list=members.filter(m=>!m.former).sort((a,b)=>(b.active-a.active)||a.name.localeCompare(b.name)),fm=members.filter(m=>m.former).sort((a,b)=>a.name.localeCompare(b.name));
     const crmIn=document.activeElement&&document.activeElement.dataset&&document.activeElement.dataset.crm;if(crmIn)return; // no pisar lo que estás escribiendo
@@ -858,7 +858,7 @@ function onReady(){
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
   navRoles();
   go(landing()); // la primera vez del día, Inicio; después, directo al Panel
-  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(lockCheck,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
+  status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   if(isLeader()){setTimeout(stationCheck,5000);setInterval(stationCheck,6e4)} // la estación del CRM: avisos a team leader y admin
   addEventListener('online',status);addEventListener('offline',status);
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
