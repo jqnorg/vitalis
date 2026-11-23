@@ -652,7 +652,8 @@
 `;
   }
   const dockComsHTML = (c) => `${c.coms && c.coms.length ? `<span class="lb">Comentarios de la mesa</span><div class="coms">${c.coms.map((x) => `<p><b>${escH(x.w)}</b> <i>${escH(x.t)}</i><br>${escH(x.x)}</p>`).join('')}</div>` : ''}
-      <button class="lnk" data-a="ver">Ver la ficha en Vitalis</button>`;
+      <button class="lnk" data-a="ver">Ver la ficha en Vitalis</button>
+      <p class="note" style="margin-top:8px">¿No es el que tenés abierto en el CRM? <button class="lnk" data-diag style="margin:0">Copiar diagnóstico</button></p>`;
   // el camino del depósito, como en la ficha de Vitalis: ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle
   function dockPay(c) {
     const P = c.pay, $ = dk.$;
@@ -725,6 +726,7 @@
       return;
     }
     if (b.dataset.cp) { const ok = await dockCopy(b.dataset.cp); b.textContent = ok ? 'Copiado' : 'No pude'; setTimeout(() => { if (b.isConnected) b.textContent = 'Copiar ID'; }, 1800); return; }
+    if (b.hasAttribute('data-diag')) { reportCurrent(true); const ok = await dockCopy(diagCur()); b.textContent = ok ? 'Copiado: mandáselo a quien mantiene Vitalis' : 'No pude copiar'; return; }
     if (b.hasAttribute('data-skip')) { dSkip++; dockNext(cl, !!(dock && dock.locked)); return; }
     if (b.dataset.pt && cl) { dPay.t = b.dataset.pt; dPay.all = false; dockPay(cl); return; }
     if (b.hasAttribute('data-pall') && cl) { dPay.all = true; dockPay(cl); return; }
@@ -747,7 +749,7 @@
   // no le gana a la ficha abierta ni hace volver a un cliente de hace rato.
   let curSent = '', curName = '', curFrom = '', urlSeen = '', curMs = 0, missAt = 0, diagAt = 0;
   const ID_RE = /^\s*(?:client|user|lead)?\s*id\s*[:#.]?\s*#?\s*(\d{4,9})(?!\d)/i; // "ID 68636", "ID: 68636", "ID68636" (el número puede estar en otro elemento)
-  const ID_LBL = /^\s*(?:client|user|lead)?\s*id\s*[:#.]?\s*$/i, ID_NUM = /^\s*#?\s*(\d{4,9})\s*$/;
+  const ID_LBL = /^\s*(?:client|user|lead)?\s*id\s*[:#.]?\s*$/i, ID_NUM = /^\s*#?\s*(\d{4,9})\s*$/, ID_LINE = /^(?:client |user |lead )?id\s*[:#.]?\s*#?\s*\d{4,9}$/i;
   const NO_TXT = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA|OPTION|TITLE)$/;
   function idInUrl() {
     const m = (location.pathname + ' ' + location.hash).match(/\/users?\/(?:user\/)?(\d{3,})(?=[/?#\s]|$)/i)
@@ -817,7 +819,9 @@
     for (const c of C) c.near = 0;
     for (const b of B) for (const c of nearest(b.el, C)) { if (!nb.has(c)) nb.set(c, nearest(c.el, B)); if (nb.get(c).includes(b)) c.near = Math.max(c.near, b.v); }
     const rank = (L) => L.sort((a, b) => (b.near * 10 + b.v) - (a.near * 10 + a.v) || fs(b) - fs(a))[0] || null;
-    let pick = rank(C.filter((c) => c.near && Math.max(c.near, c.v) >= 2)); // la ficha o sus botones tienen que estar a la vista (no una ficha vieja fuera de la pantalla)
+    // lo simple primero: un renglón que dice solo "ID 70759" (el de debajo del nombre en la ficha) y está a la vista. Si es uno solo, es ese.
+    const solo = C.filter((c) => c.v === 3 && ID_LINE.test((c.el.textContent || '').trim())), sd = [...new Set(solo.map((c) => c.id))];
+    let pick = sd.length === 1 ? solo[0] : rank(C.filter((c) => c.near && Math.max(c.near, c.v) >= 2)); // la ficha o sus botones tienen que estar a la vista (no una ficha vieja fuera de la pantalla)
     if (!pick && B.some((b) => b.v >= 2)) { // hay botones para llamar pero el ID no dice "ID" al lado: un número solo arriba de los botones
       for (const b of B.filter((x) => x.v >= 2)) {
         for (let e = b.el.parentElement, k = 0; e && k < 8 && !pick; e = e.parentElement, k++) {
@@ -869,15 +873,17 @@
     send({ type: 'crm-current', id, name: name || '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
   }
   function diagCur() { // solo la forma de la ficha (etiquetas, clases y textos tapados): ningún dato del cliente
-    const b = scanCur().lines.find((x) => x.v >= 2); if (!b) return '';
-    let box = b.el; for (let i = 0; i < 7 && box.parentElement && box.parentElement !== document.body; i++) box = box.parentElement;
+    const S = scanCur(), b = S.lines.find((x) => x.v >= 2) || S.ids.find((x) => onTop(x.el) >= 2) || null;
+    let box = b ? b.el : document.body; if (!box) return '';
+    if (b) for (let i = 0; i < 7 && box.parentElement && box.parentElement !== document.body; i++) box = box.parentElement;
+    const P = panelClient(), info = { ids: S.ids.map((x) => onTop(x.el)), lines: S.lines.map((x) => x.v), pick: !!P.pick, same: !!P.pick && P.pick.id === curSent, frames: document.querySelectorAll('iframe').length, shadow: [...document.querySelectorAll('body *')].slice(0, 4000).filter((e) => e.shadowRoot).length, watched, stView: !!stView };
     const cl = box.cloneNode(true), O = [box, ...box.querySelectorAll('*')].slice(0, 800), K = [cl, ...cl.querySelectorAll('*')].slice(0, 800);
     O.forEach((o, i) => { try { const c = getComputedStyle(o, '::before').content; if (c && !/^(none|normal|""|'')$/.test(c)) K[i].setAttribute('data-before', c.slice(0, 30)); } catch (e) {} });
     for (const s of cl.querySelectorAll('script,style,svg,img')) s.replaceWith(document.createElement(s.tagName.toLowerCase()));
     const w = document.createTreeWalker(cl, NodeFilter.SHOW_TEXT); let n;
     while ((n = w.nextNode())) n.nodeValue = n.nodeValue.replace(/[\p{L}\d]+/gu, (s) => /^(id|omega|gizat|voiso|latam|server)$/i.test(s) ? s : s.replace(/\p{L}/gu, 'x').replace(/\d/g, '9'));
     for (const e of [cl, ...cl.querySelectorAll('*')]) for (const a of [...e.attributes]) { if (!/^(class|role|id|data-before)$/i.test(a.name)) e.removeAttribute(a.name); else if (a.name !== 'data-before') e.setAttribute(a.name, a.value.replace(/\d/g, '9').slice(0, 120)); }
-    return JSON.stringify({ v: VER, page: location.pathname.replace(/\d/g, '9'), html: cl.outerHTML.slice(0, 14000) });
+    return JSON.stringify({ v: VER, page: location.pathname.replace(/\d/g, '9'), info, html: cl.outerHTML.slice(0, 14000) });
   }
   let pillT = null;
   function curPill(id, r) {
@@ -898,6 +904,9 @@
     curT = setTimeout(() => { curT = null; curLast = Date.now(); if (live()) reportCurrent(); }, Math.max(120, Math.max(700, curMs * 25) - (Date.now() - curLast)));
   }
   document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible' && !stView) { reportCurrent(true); } });
+  for (const ev of ['transitionend', 'animationend']) addEventListener(ev, () => { if (live()) schedCur(); }, { capture: true, passive: true }); // la ficha terminó de entrar
+  const poll = () => setTimeout(() => { if (!live()) return; if (!watched && !stView && document.visibilityState === 'visible') reportCurrent(); poll(); }, Math.max(1500, curMs * 30)); // y cada 1,5 s, por las dudas
+  poll();
   let lastMs = 0, againT = null;
   const again = () => { clearTimeout(againT); againT = setTimeout(() => { if (live()) refresh(); }, 3000); }; // algo no llegó a la extensión: vuelvo a leer y lo mando
   function refresh(force) {
