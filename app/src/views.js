@@ -856,7 +856,7 @@ function importarRespaldo(){
 function onReady(){
   ready=true;applyTheme();
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
-  $('#navEquipo').hidden=!isLeader();
+  navRoles();
   go(landing()); // la primera vez del día, Inicio; después, directo al Panel
   status();check();setTimeout(avisoCheck,900);setTimeout(()=>imgCacheTrim(),8000);setInterval(check,15000);setInterval(lockCheck,15000);setInterval(tick,1000);turnoBar(true);setTimeout(tcAuto,1500);
   if(isLeader()){setTimeout(stationCheck,5000);setInterval(stationCheck,6e4)} // la estación del CRM: avisos a team leader y admin

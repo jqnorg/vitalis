@@ -120,7 +120,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','cliente','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['inicio','ahora','cliente','callman','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -128,6 +128,7 @@ function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.
 const GROUPS=[
   {g:'inicio',views:['inicio','sueldo','turnos'],tabs:['Hoy','Sueldo','Turnos']},
   {g:'cliente',views:['cliente']}, // el cliente con el que estás hablando: botón propio en el menú, que brilla
+  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante en vez de Cliente
   {g:'panel',views:['ahora','agenda'],tabs:['Cola','Agenda']},
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
@@ -136,13 +137,15 @@ const GROUPS=[
   {g:'equipo',views:['equipo']},
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
+// lo del menú que depende del rol: Equipo y el call manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
+function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());$('#nav [data-g=cliente]').hidden=tlView()}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
 function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.views[0])} // Inicio siempre vuelve a Hoy
 const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
-  if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader()))v='inicio';
+  if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader()))v='inicio';
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
@@ -189,6 +192,7 @@ function status(){
   const so=pendingForMe(),ch=unreadAll(),tk=pendingTasks(),tkv=tk.filter(t=>t.due&&t.due<te).length;$('#nbSo').textContent=so||'';$('#nbCh').textContent=ch?(ch>99?'99+':ch):'';
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const q=queueOf(tlView()||isLeadUid(me)?null:me);$('#nbAh').textContent=q.g1.length||''}
+  if(isLeader())cmBadge(); // call manager: lo que hay que atender ya
   // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
   cliBadge();
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');

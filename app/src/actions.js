@@ -769,7 +769,8 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
-  if(k==='l'){e.preventDefault();go('cliente');return}
+  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el call manager
+  if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}

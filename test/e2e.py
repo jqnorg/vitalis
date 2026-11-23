@@ -82,9 +82,9 @@ async def main():
             await A.evaluate("go('inicio')"); await A.wait_for_function("document.querySelector('#iHero .n')&&document.querySelector('#iHero .n').textContent.trim()==='13'", timeout=5000)
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
-            order = ['inicio', 'cliente', 'panel', 'tareas', 'chat', 'banking', 'analisis', 'ajustes', 'equipo']
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, Cliente, Panel, Tareas, Chat, Banking, Análisis (y Equipo); Ajustes abajo')
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 8, 'en la compu se ven 8 botones (Ajustes va abajo, junto a tu nombre)')
+            order = ['inicio', 'cliente', 'callman', 'panel', 'tareas', 'chat', 'banking', 'analisis', 'ajustes', 'equipo']
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, Cliente, (Call manager), Panel, Tareas, Chat, Banking, Análisis (y Equipo); Ajustes abajo')
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 9, 'el admin ve 9 botones en la compu: con Call manager y Equipo (Ajustes va abajo, junto a tu nombre)')
             ok(await A.evaluate("getComputedStyle(document.querySelector('#nav .nv-cli')).animationName.includes('cliGlow')"), 'Cliente está en el menú, en verde vivo y brillando')
             tabs = {'inicio': ['inicio', 'sueldo', 'turnos'], 'cliente': ['cliente'], 'panel': ['ahora', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'campanas', 'filtros']}
             i = 0
@@ -864,6 +864,27 @@ async def main():
             await D.click('#eqPool [data-hy=min]'); await D.wait_for_timeout(300); await D.fill('#mcN', '200'); await D.click('.mbox .mf .pri'); await D.wait_for_timeout(800)
             ok(sql('select min_calls from public.teams')[0]['min_calls'] == 200, 'el team leader fija el mínimo de llamadas')
             sql('update public.teams set min_calls = 250')
+            # el call manager del team leader: su botón brillante (no tiene clientes, así que no tiene Cliente)
+            await D.evaluate("navRoles()"); await A.evaluate("navRoles()")
+            ok(await D.is_visible('#navCm') and 'nv-cli' in (await D.get_attribute('#navCm', 'class') or '') and await D.locator('#nav [data-g=cliente]').is_hidden(), 'el team leader tiene el Call manager como botón brillante, sin Cliente')
+            ok(await A.is_visible('#navCm') and 'nv-cli' not in (await A.get_attribute('#navCm', 'class') or '') and await A.locator('#nav [data-g=cliente]').is_visible(), 'el admin lo tiene también, sin brillo, y sigue con Cliente')
+            import datetime as _dt
+            r10 = (_dt.datetime.now() - _dt.timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M')
+            sql(f"""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent) select team_id,'Novara Markets','500040','Nadie Lollama','Peru','{r10}','New','new','Joaquín Or' from public.profiles where name='Matias Me'""")
+            sql(f"""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent) select team_id,'Novara Markets','500041','Ya Hablando','Chile','{r10}','Talking','new','Sofía Ar' from public.profiles where name='Matias Me'""")
+            await D.evaluate("crmLoad(true)"); await D.wait_for_timeout(900)
+            await D.keyboard.press('Escape'); await D.keyboard.press('m'); await D.wait_for_timeout(700)
+            ok(await D.evaluate('cur') == 'callman', 'la M abre el call manager')
+            cm = await D.inner_text('#cmBody')
+            ok('Para atender ya' in cm and 'New sin llamar hace' in cm and '500040' in cm, f'arriba, lo que hay que atender: un new que nadie llamó a los 5 min ({cm[:200]!r})')
+            ok('News en curso' in cm and '500041' in cm and 'Talking' in cm, 'los news en curso, New y Talking, con su agente')
+            rows = await D.evaluate("cmData().rows.map(p=>[p.m.name,p.newN,p.talk,p.hoy])")
+            jo = next((x for x in rows if x[0] == 'Joaquín Or'), None); so = next((x for x in rows if x[0] == 'Sofía Ar'), None)
+            ok(jo and jo[1] >= 1 and jo[3] >= 3 and so and so[2] == 1, f'por agente: cuántos tiene en New y en Talking y cuántos news recibió hoy ({rows})')
+            ok(await D.inner_text('#nbCm') != '', 'el botón marca que hay algo para atender')
+            await D.screenshot(path=OUT / 'cm_call_manager.png', full_page=True)
+            sql("delete from public.crm_clients where client_id in ('500040','500041')")
+            await D.evaluate("crmLoad(true);go('inicio')"); await D.wait_for_timeout(600)
             await A.evaluate("go('ventas',{f:{desde:todayS(),hasta:todayS()}})"); await A.wait_for_timeout(500)
             ok('new · 40 min' in await A.inner_text('#pTable'), 'cada venta muestra cuánto tardó desde el registro')
             # el team leader: la cola de cada uno

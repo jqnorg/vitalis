@@ -462,7 +462,7 @@ async function connect(cached){
   }
   closeToast('boot');
   if(profile.login&&!profile.pin_set)return authScreen('newpin'); // primera vez: crear el PIN
-  if(cached){applyTheme();$('#navEquipo').hidden=!isLeader();refresh();crmLoad(true);return}
+  if(cached){applyTheme();navRoles();refresh();crmLoad(true);return}
   enter();
 }
 // arranque instantáneo: con lo guardado de esta persona, antes de que conteste la base

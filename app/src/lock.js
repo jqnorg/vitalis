@@ -95,7 +95,7 @@ const padUp=()=>locked||chatPadOn; // con un teclado de PIN a la vista, las tecl
 
 /* ---------- a dónde se entra ---------- */
 // la primera vez del día, Inicio (tu mes, el turno); después, directo al Panel. Tapado no cuenta: cuenta cuando entrás de verdad.
-function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return 'inicio'}return 'ahora'}
+function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return 'inicio'}return tlView()?'callman':'ahora'} // el team leader, a su call manager
 
 /* ---------- Ajustes: los tiempos (solo el administrador) ---------- */
 function locksTxt(){return `Vitalis se tapa a los ${idleMin()} min sin usar la compu · el chat pide el PIN a los ${chatMin()} min sin mirarlo`}
