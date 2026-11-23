@@ -773,8 +773,8 @@
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n, lbl = null;
     const pair = (a, n) => { for (let e = a, k = 0; e && k < 3; e = e.parentElement, k++) { if (/^(TABLE|TBODY|THEAD|TFOOT)$/.test(e.tagName) || /^(table|grid|rowgroup)$/.test(e.getAttribute('role') || '')) return false; if (e.contains(n)) return true; } return false; };
     while ((n = w.nextNode())) {
-      const t = n.nodeValue; if (!t || t.length > 60) { if (t && t.trim()) lbl = null; continue; }
-      if (!t.trim()) continue;
+      const t = (n.nodeValue || '').trim(); if (!t) continue; // sin la sangría: el CRM real deja "\n            ID 70759\n          "
+      if (t.length > 60) { lbl = null; continue; }
       const p0 = n.parentElement; if (!p0 || NO_TXT.test(p0.tagName) || isMine(p0)) { lbl = null; continue; }
       const nm = t.match(ID_NUM);
       if (lbl && nm && pair(lbl, n)) { ids.push({ id: nm[1], el: p0 }); lbl = null; continue; } // "ID" en una celda y el número en la de al lado (no el encabezado de una lista)
@@ -783,7 +783,7 @@
       if (/(^|[^a-z])id([^a-z]|$)/i.test(t)) {
         let hit = null;
         for (let el = p0, k = 0; el && k < 3 && !hit; k++, el = el.parentElement) {
-          const tx = el.textContent || ''; if (tx.length > 48) break;
+          const tx = (el.textContent || '').replace(/\s+/g, ' ').trim(); if (tx.length > 48) break;
           const m = tx.match(ID_RE); if (m) hit = { id: m[1], el };
         }
         if (hit) { if (ids.length < 300) ids.push(hit); } else if (ID_LBL.test(t)) lbl = p0;
@@ -820,7 +820,7 @@
     for (const b of B) for (const c of nearest(b.el, C)) { if (!nb.has(c)) nb.set(c, nearest(c.el, B)); if (nb.get(c).includes(b)) c.near = Math.max(c.near, b.v); }
     const rank = (L) => L.sort((a, b) => (b.near * 10 + b.v) - (a.near * 10 + a.v) || fs(b) - fs(a))[0] || null;
     // lo simple primero: un renglón que dice solo "ID 70759" (el de debajo del nombre en la ficha) y está a la vista. Si es uno solo, es ese.
-    const solo = C.filter((c) => c.v === 3 && ID_LINE.test((c.el.textContent || '').trim())), sd = [...new Set(solo.map((c) => c.id))];
+    const solo = C.filter((c) => c.v === 3 && ID_LINE.test((c.el.textContent || '').replace(/\s+/g, ' ').trim())), sd = [...new Set(solo.map((c) => c.id))];
     let pick = sd.length === 1 ? solo[0] : rank(C.filter((c) => c.near && Math.max(c.near, c.v) >= 2)); // la ficha o sus botones tienen que estar a la vista (no una ficha vieja fuera de la pantalla)
     if (!pick && B.some((b) => b.v >= 2)) { // hay botones para llamar pero el ID no dice "ID" al lado: un número solo arriba de los botones
       for (const b of B.filter((x) => x.v >= 2)) {
@@ -873,7 +873,8 @@
     send({ type: 'crm-current', id, name: name || '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
   }
   function diagCur() { // solo la forma de la ficha (etiquetas, clases y textos tapados): ningún dato del cliente
-    const S = scanCur(), b = S.lines.find((x) => x.v >= 2) || S.ids.find((x) => onTop(x.el) >= 2) || null;
+    const S = scanCur(), b = S.lines.find((x) => x.v >= 2) || S.ids.find((x) => onTop(x.el) >= 2)
+      || (() => { const e = [...document.querySelectorAll('button,a,[role=button]')].find((x) => LINE_RE.test((x.textContent || '').replace(/\s+/g, ' ').trim())); return e ? { el: e } : null; })();
     let box = b ? b.el : document.body; if (!box) return '';
     if (b) for (let i = 0; i < 7 && box.parentElement && box.parentElement !== document.body; i++) box = box.parentElement;
     const P = panelClient(), info = { ids: S.ids.map((x) => onTop(x.el)), lines: S.lines.map((x) => x.v), pick: !!P.pick, same: !!P.pick && P.pick.id === curSent, frames: document.querySelectorAll('iframe').length, shadow: [...document.querySelectorAll('body *')].slice(0, 4000).filter((e) => e.shadowRoot).length, watched, stView: !!stView };

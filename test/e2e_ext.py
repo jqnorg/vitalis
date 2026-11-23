@@ -309,11 +309,15 @@ async def main():
             await Nv.locator('#vitalis-dock #dmin').click(); await Nv.wait_for_timeout(200)
             # una ficha que entra de costado y termina de llegar sin cambiar nada en la página (como el cajón del CRM real): igual la toma en unos segundos
             await Nv.evaluate('''()=>{const d=document.createElement('div');d.id='drw2';d.style.cssText='position:fixed;top:0;left:120%;width:460px;height:100%;background:#fff;z-index:5';
-              d.innerHTML='<div class=hd><div class=nm>María Del Carmen Soto Ramos</div><small>ID 70759</small></div><p>Server: Stock</p><button>Omega - 1</button> <button>Gizat - 2</button> <button>Voiso LATAM - 3</button>';
+              const ind='\\n'+' '.repeat(44);  // como el CRM real (Angular): renglones con mucha sangría
+              d.innerHTML=`<div class=hd>${ind}<div class=nm>${ind}María Del Carmen Soto Ramos${ind}</div>${ind}<small>${ind}ID 70759${ind}</small>${ind}</div><p>Server: Stock</p><button>${ind}<i></i>${ind}Omega - 9944418${ind}</button> <button>${ind}Gizat - 1371${ind}</button> <button>${ind}Voiso LATAM - 3262${ind}</button>`;
               document.body.appendChild(d);setTimeout(()=>{d.style.left='auto';d.style.right='0'},1500)}''')
             await Nv.wait_for_timeout(5000)
             ok(await A2.evaluate("curCl&&curCl.id") == '70759', f'una ficha que entra de costado: la toma igual, revisando cada 1,5 s ({await A2.evaluate("curCl&&curCl.id")})')
             ok('70759' in await Nv.evaluate(DKT), 'y la mini ficha muestra a ese cliente')
+            ok(await A2.evaluate("curCl&&curCl.name") == 'María Del Carmen Soto Ramos', 'con el nombre, aunque el CRM deje los renglones con sangría')
+            await Nv.click('#drw2 button >> nth=0'); await Nv.wait_for_timeout(2500)
+            ok(sql("select count(*)::int n from public.calls where client_id='70759' and line='omega'")[0]['n'] == 1, 'y el toque en Omega cuenta la llamada')
             await Nv.evaluate("document.getElementById('drw2').remove()")
             # el ID en una tabla de datos ("ID" en una celda y el número en la de al lado) y el "ID" puesto por el estilo
             await Nv.evaluate("document.getElementById('fic').innerHTML='<table class=desc><tr><th>Name</th><td>Rosa Prueba</td></tr><tr><th>ID</th><td>68801</td><th>Server</th><td>Stock</td></tr></table><div class=calls><button>Omega - 9944418</button></div>'")
