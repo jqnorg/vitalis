@@ -2,7 +2,7 @@
    La Cola del agente: a quién llamar, en orden, y por qué (cada cliente y cada grupo dice su motivo).
    1) Los new, solo si hay más de uno (uno solo ya lo avisa la notificación): sueltos, uno tras otro.
    2) Las agendas que ya llegaron, los Pending Payment y los CallBack: sueltos, uno tras otro.
-   3) NA (día 1 a 4), Call Again y Hang Up, agrupados por el motivo para volver a llamarlos
+   3) NA a NA-4, Call Again y Hang Up, agrupados por el motivo para volver a llamarlos
       (campaña caliente, sin llamar hoy, sin tocar hace más de 2 h, llamados hace poco) y en orden.
    4) Los Low potential que el Radar ve con chance hoy.
    El team leader, y quien mira la cola de otro, siguen con la vista de la mesa (ahora.js).
@@ -11,7 +11,7 @@ const SG_STALE=2*36e5; // "sin tocar hace más de 2 h"
 const sgPlain=r=>{ // el status en palabras simples
   if(!r)return '';const g=r.grp,s=norm(r.status);
   if(g==='new')return /talk|habl/.test(s)?'Nuevo, ya habló':'Nuevo';
-  if(g==='na')return `No atendió · día ${naNum(r.status)}`;
+  if(g==='na'){const n=naNum(r.status);return `No atendió · ${n} ${n===1?'día':'días'} de llamadas`} // NA-N: N días en que se lo llamó (sin llamarlo, no cambia)
   if(g==='call_again')return 'Volver a llamar';
   if(g==='hang_up')return 'Cortó';
   if(g==='callback')return 'Pidió que lo llamen';
