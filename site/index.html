@@ -1427,6 +1427,13 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .qb.q2{color:#92400e;border-color:var(--v-warn);background:color-mix(in srgb,var(--v-warn) 14%,transparent)}
 .qb.q3{color:#be123c;border-color:var(--v-err);background:color-mix(in srgb,var(--v-err) 10%,transparent)}
 .ritmo{margin:-4px 0 10px;font-size:13.5px;color:var(--dim)}.ritmo b{color:var(--fg)}.ritmo b.hot{color:#be123c}.ritmo b.warn{color:#b45309}
+
+/* el detalle del ritmo: línea de tiempo del día */
+.rt-sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}.rt-sum b{font-size:18px}.rt-sum b.hot{color:#be123c}.rt-sum b.warn{color:#b45309}
+.rt-tl{position:relative;height:26px;background:var(--line);border-radius:8px;overflow:hidden}
+.rt-tl .rs{position:absolute;top:0;height:100%}.rt-tl .rs.call{background:#00875a}.rt-tl .rs.talk{background:#3b82f6}.rt-tl .rs.br{background:#9aa3ad}.rt-tl .rs.dead{background:#f43f5e;opacity:.85}
+.rt-lg{margin:8px 0 4px}.rt-lg .sw.call{background:#00875a}.rt-lg .sw.talk{background:#3b82f6}.rt-lg .sw.br{background:#9aa3ad}.rt-lg .sw.dead{background:#f43f5e}
+.rt-h{margin:14px 0 6px;font-size:14px}.rt-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
 </style>
 </head>
 <body class="auth">
@@ -1773,7 +1780,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.36.0';
+const VERSION='1.37.0';
 const EXT_VER='1.15.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -7078,19 +7085,23 @@ function ritmo(uid){
     const brIn=(a,b)=>{let x=0;for(const [s,e] of brs){const lo=Math.max(a,s),hi=Math.min(b,e);if(hi>lo)x+=hi-lo}return x}; // descanso dentro de un tramo
     const L=calls.filter(c=>c.uid===uid&&c.at>=t.in&&c.at<=end).sort((a,b)=>a.at-b.at);
     const talked=(c,until)=>stLog.some(l=>l.id===norm(c.id)&&l.at>=c.at&&l.at<=until+10*6e4&&(TALK_G.includes(l.grp)||/talk|habl/.test(l.st))&&!(l.grp==='new'&&!/talk|habl/.test(l.st)));
-    let dead=0,talk=0,cur=t.in;
+    let dead=0,talk=0,cur=t.in;const segs=[]; // segs: qué pasó en cada tramo del día (para el detalle)
+    const seg=(k,a,b,x)=>{if(b-a>=1000)segs.push({k,a,b,...x})}; // k: call · talk · dead · br
+    const deadSeg=(a,b)=>{const d=Math.max(0,b-a-brIn(a,b));dead+=d;if(d>0)seg('dead',a,b,{d})};
     for(let i=0;i<L.length;i++){
       const c=L[i],nx=L[i+1];
-      dead+=Math.max(0,c.at-cur-brIn(cur,c.at)); // antes de esta llamada: nada cubría
+      deadSeg(cur,c.at); // antes de esta llamada: nada cubría
       const until=nx?nx.at:end,gap=Math.max(0,until-c.at-CALL_S),sameCl=nx&&norm(nx.id)===norm(c.id)&&until-c.at<2*6e4; // cambio de línea al mismo cliente: no es hueco
-      if(gap>0&&!sameCl){if(talked(c,until))talk+=Math.min(gap,TALK_MAX);else dead+=Math.max(0,gap-brIn(c.at+CALL_S,until))}
+      seg('call',c.at,Math.min(until,c.at+CALL_S),{id:c.id,line:c.line});
+      if(gap>0&&!sameCl){if(talked(c,until)){const x=Math.min(gap,TALK_MAX);talk+=x;seg('talk',c.at+CALL_S,c.at+CALL_S+x,{id:c.id})}else deadSeg(c.at+CALL_S,until)}
       cur=until;
     }
-    if(!L.length)dead=Math.max(0,end-t.in-brIn(t.in,end));
+    if(!L.length)deadSeg(t.in,end);
+    for(const [s,e] of brs)seg('br',s,e,{});
     const brTot=brIn(t.in,end),useful=Math.max(1,end-t.in-brTot),full=t.out?useful:Math.max(useful,jorMs()-brTot);
     const proj=t.out?dead:Math.round(dead/useful*full);
     const req=Math.max(0,Math.round(minCalls()-talk/CALL_S));
-    R={n:L.length,dead,talk,proj,req,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4};
+    R={n:L.length,dead,talk,proj,req,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4,segs,in:t.in,end,open:!t.out};
   }
   ritmoMemo.m.set(uid,R);return R;
 }
@@ -7099,7 +7110,25 @@ const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.flo
 const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;
 function ritmoLine(uid){ // en palabras: "180 llamadas · 25 min muertos · Q1"
   const R=ritmo(uid);if(!R)return '';
-  return `<span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}${R.req!==minCalls()?` <span class="d">(hoy se piden ${R.req}: hablaste ${esc(minsTxt(R.talk))})</span>`:` <span class="d">de ${R.req}</span>`}</span> · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)}`;
+  return `<span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}${R.req!==minCalls()?` <span class="d">(hoy se piden ${R.req}: hablaste ${esc(minsTxt(R.talk))})</span>`:` <span class="d">de ${R.req}</span>`}</span> · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;
+}
+// el detalle del día: la línea de tiempo (llamadas, conversaciones, descansos y huecos) y los huecos más largos, para entender qué pasó
+function ritmoModal(uid){
+  const R=ritmo(uid);if(!R)return toast('Sin entrada marcada hoy.','warn');
+  const nm=uid===me?'Tu día':first(uid),span=Math.max(1,R.end-R.in),P=ms=>Math.max(0,Math.min(100,(ms-R.in)/span*100));
+  const name=id=>{const r=crmStatusOf(id);return r&&r.name?clip(r.name,22):''};
+  const tl=R.segs.map(s=>`<div class="rs ${s.k}" style="left:${P(s.a)}%;width:${Math.max(.3,P(s.b)-P(s.a))}%" title="${esc(s.k==='call'?`Llamada ${hhmm(s.a)} · ${s.id}`:s.k==='talk'?`Conversación ${hhmm(s.a)}–${hhmm(s.b)} · ${s.id} ${name(s.id)}`:s.k==='br'?`Descanso ${hhmm(s.a)}–${hhmm(s.b)}`:`Sin marcar ${hhmm(s.a)}–${hhmm(s.b)}`)}"></div>`).join('');
+  const holes=R.segs.filter(s=>s.k==='dead'&&s.d>=3*6e4).sort((a,b)=>b.d-a.d).slice(0,8);
+  const talks=R.segs.filter(s=>s.k==='talk').sort((a,b)=>(b.b-b.a)-(a.b-a.a)).slice(0,6);
+  const before=(s)=>{const prev=[...R.segs].filter(x=>x.k==='call'&&x.b<=s.a+1000).sort((x,y)=>y.a-x.a)[0];return prev?`después de llamar a <b>${esc(prev.id)}</b> ${esc(name(prev.id))}`:'antes de la primera llamada'};
+  modal({wide:true,title:`${esc(nm)} · ${qBadge(R,true)}`,body:`
+    <div class="rt-sum"><span><b>${R.n}</b> llamadas <span class="d">de ${R.req}</span></span><span><b>${esc(minsTxt(R.talk))}</b> hablando</span><span><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos${R.open?` <span class="d">(a fin de día serían ${esc(minsTxt(R.proj))})</span>`:''}</span></div>
+    <div class="rt-tl" role="img" aria-label="Línea de tiempo del día">${tl}</div><div class="tll"><span>${hhmm(R.in)}</span><span>${R.open?'ahora':'salida'} ${hhmm(R.end)}</span></div>
+    <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
+    <h4 class="rt-h">Huecos sin marcar</h4>${holes.length?`<ul class="rt-list">${holes.map(s=>`<li><b>${esc(minsTxt(s.d))}</b> de ${hhmm(s.a)} a ${hhmm(s.b)}, ${before(s)}</li>`).join('')}</ul>`:'<p class="p-sub" style="margin:0">Ninguno de más de 3 minutos.</p>'}
+    ${talks.length?`<h4 class="rt-h">Conversaciones</h4><ul class="rt-list">${talks.map(s=>`<li><b>${esc(minsTxt(s.b-s.a))}</b> desde las ${hhmm(s.a)} con <b>${esc(s.id)}</b> ${esc(name(s.id))}</li>`).join('')}</ul>`:''}
+    <p class="p-sub" style="margin:10px 0 0">Una llamada cubre 53 s. Es conversación si después el cliente cambió de status antes de la siguiente llamada. Los descansos marcados no cuentan.</p>`,
+    actions:[{l:'Listo',cls:'pri'}]});
 }
 
 /* ---------- en Equipo: las llamadas de hoy de cada agente (texto; el team leader fija el mínimo) ---------- */
@@ -7109,7 +7138,7 @@ function callsMesaCard(){
   const all=sellers(team).filter(m=>!isLeadUid(m.id)).map(m=>({m,pc:dayPace(m.id),P:crm.ok?dayPool(m.id):null})).sort((a,b)=>b.pc.n-a.pc.n||a.m.name.localeCompare(b.m.name));
   const on=all.filter(x=>x.pc.n||(x.P&&x.P.total)),off=all.filter(x=>!(x.pc.n||(x.P&&x.P.total)));
   const row=({m,pc,P})=>{const R=ritmo(m.id);return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span></td>
-    <td>${R?esc(minsTxt(R.dead)):'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`};
+    <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`};
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">llamadas, tiempo muerto y franja: Q1 menos de 30 min muertos en el día · Q2 hasta 1 h · Q3 más</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
     ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th>Tiempo muerto</th><th>Franja</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
@@ -7125,6 +7154,7 @@ document.addEventListener('click',e=>{
   const a=b.dataset.hy||b.dataset.hb;
   if(a==='ficha')return openFicha(b.dataset.id);
   if(a==='min')return minModal();
+  if(a==='ritmo')return ritmoModal(b.dataset.uid||me);
 });
 
 /* ============================================================
@@ -7840,7 +7870,7 @@ function cmData(){
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
-    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy`});
+    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
     if(p.tu.k==='in'&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`});
   }
   al.sort((a,b)=>a.w-b.w);
@@ -7870,7 +7900,7 @@ V.callman={
       <td><span class="${p.tu.cls}">${esc(p.tu.txt)}</span></td>
       <td>${p.newN?sp(p.list.some(x=>x.wait)?'hot b':'b',String(p.newN)):'<span class="d">0</span>'}</td><td>${p.talk?sp('ok b',String(p.talk)):'<span class="d">0</span>'}</td>
       <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td>
-      <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span></td><td>${p.R?esc(minsTxt(p.R.dead)):'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
+      <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span></td><td>${p.R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(p.m.id)}" title="Ver qué pasó">${esc(minsTxt(p.R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
       <td>${p.last?`hace ${cmAgo(D.now-p.last)}`:'<span class="d">—</span>'}</td>
       <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
     const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea

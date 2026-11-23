@@ -1414,3 +1414,10 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .qb.q2{color:#92400e;border-color:var(--v-warn);background:color-mix(in srgb,var(--v-warn) 14%,transparent)}
 .qb.q3{color:#be123c;border-color:var(--v-err);background:color-mix(in srgb,var(--v-err) 10%,transparent)}
 .ritmo{margin:-4px 0 10px;font-size:13.5px;color:var(--dim)}.ritmo b{color:var(--fg)}.ritmo b.hot{color:#be123c}.ritmo b.warn{color:#b45309}
+
+/* el detalle del ritmo: línea de tiempo del día */
+.rt-sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}.rt-sum b{font-size:18px}.rt-sum b.hot{color:#be123c}.rt-sum b.warn{color:#b45309}
+.rt-tl{position:relative;height:26px;background:var(--line);border-radius:8px;overflow:hidden}
+.rt-tl .rs{position:absolute;top:0;height:100%}.rt-tl .rs.call{background:#00875a}.rt-tl .rs.talk{background:#3b82f6}.rt-tl .rs.br{background:#9aa3ad}.rt-tl .rs.dead{background:#f43f5e;opacity:.85}
+.rt-lg{margin:8px 0 4px}.rt-lg .sw.call{background:#00875a}.rt-lg .sw.talk{background:#3b82f6}.rt-lg .sw.br{background:#9aa3ad}.rt-lg .sw.dead{background:#f43f5e}
+.rt-h{margin:14px 0 6px;font-size:14px}.rt-list{margin:0;padding-left:18px;font-size:13.5px;line-height:1.6}
