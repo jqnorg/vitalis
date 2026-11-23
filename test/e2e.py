@@ -459,7 +459,7 @@ async def main():
             await A.click('#soPeople [data-prof]:has-text("Matias Me")'); await A.wait_for_timeout(700)
             ok(await A.is_visible('.mbox .pf') and 'Matias Me' in await A.inner_text('.mbox .pf-h'), 'tocar a alguien abre su perfil')
             k = await A.inner_text('.mbox .pf-k')
-            ok('Puesto del mes' in k and '%Cr' in k, 'con sus estadísticas')
+            ok('Puesto del mes' in k and 'CR (%)' in k, 'con sus estadísticas')
             ok(await A.locator('.mbox #pfChart svg').count() == 1, 'y el gráfico de los últimos 14 días')
             await A.click('.mbox [data-pa=toque]'); await A.wait_for_timeout(800)
             ok(sql("select count(*)::int c from public.pings where kind='toque' and from_id=(select id from public.profiles where name='Joaquín Or')")[0]['c'] == 1, 'Joaquín le da un toque')

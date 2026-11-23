@@ -1437,7 +1437,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 /* RMO: el nombre de la medida del ritmo del día */
 .rmo-t{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--v-ok,#00875a);border:1.5px solid var(--v-ok,#00875a);border-radius:6px;padding:0 5px;line-height:17px;vertical-align:1px}
 
-/* %Cr en la tarjeta del mes (el segundo dato del rendimiento, lo pidió el dueño) */
+/* CR (%) en la tarjeta del mes (el segundo dato del rendimiento, lo pidió el dueño) */
 .hero .cr{margin-top:8px;font-size:14px}.hero .cr .cr-t{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--v-ok,#00875a);border:1.5px solid var(--v-ok,#00875a);border-radius:6px;padding:0 5px;line-height:17px;vertical-align:1px;margin-right:2px}.hero .cr .cr-v{font-size:16px}
 /* Manager del agente: la solapa Cliente lleva el ID del cliente actual; "(agente)" solo en la compu */
 #subnav .tab-id{font-weight:800;color:var(--v-ok,#00875a)}#navPanel small.ag{font-weight:500;opacity:.85}@media (max-width:760px){#navPanel small.ag{display:none}}
@@ -1793,7 +1793,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.43.0';
+const VERSION='1.44.0';
 const EXT_VER='1.16.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -3588,7 +3588,7 @@ function ayuda(){
     <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliador y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
     <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
-    <dt>%Cr (conversión)</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
+    <dt>CR (%) (conversión)</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
   <h4>Banking</h4><dl>
     <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
     <dt>Bancos</dt><dd>Cómo conviene pagar según el banco del cliente: pasos, qué usar y qué evitar (por ejemplo, Falabella Chile: no transferencia). Lo cargan el administrador y el team leader, con fotos.</dd></dl>
@@ -3740,8 +3740,8 @@ V.inicio={
     const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`tus clientes depositaron ${money(s.monto)} USD`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
-    const cr=convPeriod(ym+'-01',te,me); // %Cr del mes: de tus news del mes, cuántos depositaron (el segundo dato del rendimiento)
-    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}<div class="cr" title="%Cr: conversión del mes. De tus clientes new del mes, cuántos depositaron."><b class="cr-t">%Cr</b> <b class="cr-v">${cr.rate==null?'—':esc(pct(cr.rate))}</b> <span class="d">${cr.leads?`${plural(cr.ftd,'FTD')} de ${plural(cr.leads,'new')} este mes`:'sin news este mes todavía'}</span></div></div><span class="grow"></span>
+    const cr=convPeriod(ym+'-01',te,me); // CR (%) del mes: de tus news del mes, cuántos depositaron (el segundo dato del rendimiento)
+    if(TL)$('#iHero').innerHTML=mesaHero();else $('#iHero').innerHTML=`<div class="top"><div><div class="n">${s.n}</div><div class="lab">Tus FTDs en ${esc(mes)}</div><div class="msg">${msg}</div>${utLine(s.n)}<div class="cr" title="CR (%): conversión del mes. De tus clientes new del mes, cuántos depositaron."><b class="cr-t">CR (%)</b> <b class="cr-v">${cr.rate==null?'—':esc(pct(cr.rate))}</b> <span class="d">${cr.leads?`${plural(cr.ftd,'FTD')} de ${plural(cr.leads,'new')} este mes`:'sin news este mes todavía'}</span></div></div><span class="grow"></span>
       <div class="usd"><div class="v">${money(s.usd)} <small>USD</small></div><div class="s">${cfg.porftd} USD por FTD${s.bono?` + bono ${s.bono}`:''} · ${esc(sub)}</div></div></div>${bonoTrack(s.n,false,utOf(me))}`;
     const ws=weekStart(te),wN=ftds.filter(f=>f.date>=ws&&f.date<=te).length,pw=addDays(ws,-7),pwN=ftds.filter(f=>f.date>=pw&&f.date<=addDays(te,-7)).length;
     $('#iKpis').innerHTML=TL?mesaSide():
@@ -4299,7 +4299,7 @@ V.equipo={
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+
-      (()=>{const c=convPeriod(mFrom,mTo,null);return k('%Cr de la mesa',c.rate==null?'—':pct(c.rate),`${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente new','clientes new')}`)})()+
+      (()=>{const c=convPeriod(mFrom,mTo,null);return k('CR (%) de la mesa',c.rate==null?'—':pct(c.rate),`${plural(c.ftd,'FTD')} de ${plural(c.leads,'cliente new','clientes new')}`)})()+
       (per[0]&&per[0].n?k('Primero',per[0].m.name,plural(per[0].n,'FTD')):'');
     const max=Math.max(1,...per.map(p=>p.n));
     $('#eqRank').innerHTML=`<div class="rk" style="--vw:${Math.max(6,...per.map(p=>(`${p.n} · ${money(p.monto)}${p.late?' · '+p.late+' late':''}`).length))}ch">`+
@@ -4310,7 +4310,7 @@ V.equipo={
     colChart($('#eqChart'),data,{h:210,capMin:18,int:true,label:'FTDs por día de la mesa',empty:'Sin FTDs este mes.',
       tip:d=>({title:`${DIAL[d.dw]} ${z(d.d)}/${z(M)}`,rows:[{v:String(d.a+d.b),l:'FTDs'},{key:'var(--s1)',v:String(d.a),l:'new'},{key:'var(--s2)',v:String(d.b),l:'late'},{v:money(d.m),l:'USD depositados'}]})});
     $('#eqCount').textContent=`${plural(conV,'agente')} con ventas · ${nf(days?R.n/days:0,2)} FTDs por día`;
-    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th>${utOk?'<th>Target</th>':''}<th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r" title="%Cr: conversión">%Cr</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
+    $('#eqTable').innerHTML=`<table class="pt"><thead><tr><th>Agente</th><th>Hoy</th><th class="r">FTDs</th>${utOk?'<th>Target</th>':''}<th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Clientes new</th><th class="r" title="CR (%): conversión">CR (%)</th><th class="r">Agenda</th><th>Último FTD</th><th class="act"></th></tr></thead><tbody>`+
       per.map(p=>{const act_=p.m.role!=null,th=act_?turnoHoy(p.m.id):{txt:'',cls:'d'},ag=act_?agStats(p.m.id):null;
         return `<tr${p.m.id===me?' class="cur"':''}><td><button type="button" class="who-cell lnkp" data-prof="${esc(p.m.id)}" title="Ver perfil">${avatar(p.m.name)}${esc(p.m.name)}</button></td><td class="eq-hoy ${th.cls}">${esc(th.txt)}</td><td class="r">${p.n}</td>${utOk?`<td>${act_?utCell(p.m.id,eqYm,p.n):''}</td>`:''}<td class="r">${p.n-p.late}</td><td class="r">${p.late}</td><td class="r">${money(p.monto)}</td><td class="r">${p.cv.leads}</td><td class="r">${p.cv.rate==null?'<span class="d">—</span>':pct(p.cv.rate)}</td><td class="r">${ag?(ag.open?`${ag.open}${ag.venc?` · <span class="hot b">${ag.venc} venc.</span>`:''}`:'<span class="d">0</span>'):''}</td><td class="d">${p.last?`${dm(p.last.date)} ${esc(p.last.time||'')}, ${esc(p.last.id)}`:''}</td><td class="act">${act_?`<button type="button" class="btn sm" data-act="ficha" data-uid="${esc(p.m.id)}">Ficha</button>`:''}</td></tr>`}).join('')+'</tbody></table>';
   },
@@ -4770,7 +4770,7 @@ function openProfile(uid){
   const body=`<div class="pf">
     <div class="pf-h">${own?`<button type="button" class="av-edit" data-own data-act="foto" title="Cambiar mi foto">${avatar(m.name,'xl')}<span>Cambiar</span></button>`:avatar(m.name,'xl')}<div><h2>${esc(m.name)}</h2><p>${esc(roleTxt(m.role))}${own?' · vos':''}${quiet(m)?' · <span class="hot">🔕 avisos silenciados</span>':''}${m.active?'':' · de baja'}</p></div></div>
     <div class="pf-k">${k('Hoy',S.hoy,'FTDs')}${k('Esta semana',S.sem,'FTDs')}${k(MES[new Date().getMonth()][0].toUpperCase()+MES[new Date().getMonth()].slice(1),S.mes,`FTDs · ${esc(money(S.usd))} USD`)}
-      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('%Cr del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
+      ${k('Puesto del mes',S.pos?`${S.pos}º`:'—',S.pos?`de ${S.of}`:'sin FTDs todavía')}${k('CR (%) del mes',S.cv.rate==null?'—':esc(pct(S.cv.rate)),`${plural(S.cv.ftd,'FTD')} de ${plural(S.cv.leads,'cliente new','clientes new')}`)}${k('Último FTD',lastTxt,`${plural(S.total,'FTD')} en total`)}</div>
     <div class="pf-ch"><div class="lb">FTDs de los últimos 14 días <span class="pf-lg"><span class="sw"></span>new <span class="sw s2"></span>late</span></div><div id="pfChart"></div></div>
     ${own?'':`<div class="pf-acts" id="pfActs"></div>`}
   </div>`;
@@ -8012,7 +8012,7 @@ V.callman={
       <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
     const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
-      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="%Cr de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">%Cr hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
+      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="CR (%) de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">CR (%) hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
     body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
   }
