@@ -279,6 +279,24 @@ r = await say(B, TC, '   ');
 ok(!!r.error, 'no se mandan mensajes vacíos');
 r = await as(B, 'insert into public.messages (chat_id, user_id, body) values ($1, $2, $3)', [TC, A, 'soy A']);
 ok(!!r.error, 'B no escribe a nombre de A');
+// editar el propio mensaje hasta 1 minuto después; quién leyó
+r = await say(A, TC, 'mensage con error');
+const EM = r.rows[0].id;
+r = await as(A, 'update public.messages set body = $2 where id = $1 returning body, edited_at is not null ed', [EM, 'mensaje sin error']);
+ok(!r.error && r.rows[0].body === 'mensaje sin error' && r.rows[0].ed, `A edita su mensaje recién mandado (queda marcado como editado) (${JSON.stringify(r.error || r.rows)})`);
+r = await as(B, 'update public.messages set body = $2 where id = $1 returning body', [EM, 'B lo cambia']);
+ok(r.error || r.rows.length === 0, 'B no edita el mensaje de A');
+r = await as(A, 'update public.messages set user_id = $2 where id = $1', [EM, B]);
+ok(!!r.error, 'solo se cambia el texto');
+await db.query("update public.messages set created_at = now() - interval '2 minutes' where id = $1", [EM]);
+r = await as(A, 'update public.messages set body = $2 where id = $1 returning body', [EM, 'tarde']);
+ok(r.error || r.rows.length === 0, 'pasado el minuto ya no se edita');
+r = await as(A, "update public.chat_reads set read_at = now() where user_id = $1 and chat_id = $2", [A, TC]);
+await as(B, 'insert into public.chat_reads (chat_id, read_at) values ($1, now()) on conflict (user_id, chat_id) do update set read_at = now()', [TC]);
+r = await as(A, 'select public.chat_reads_of($1) j', [TC]);
+ok(!r.error && r.rows.some((x) => String(x.j).includes(B)), 'A ve hasta dónde leyó B (quién leyó)');
+r = await as(null, 'select public.chat_reads_of($1) j', [TC]);
+ok(r.error || r.rows.length === 0, 'sin sesión no se ven las lecturas');
 R = await rid(A, 'select public.chat_create($1, $2::uuid[])::text j', ['Los del fondo', [B, M, '00000000-0000-0000-0000-000000000000']]);
 ok(!R.error && typeof R === 'string', 'A crea un grupo con B y Matias');
 const G = R;
@@ -479,10 +497,10 @@ r = await as(A, 'delete from public.messages where chat_id = $1 returning id', [
 ok(!r.error && r.rows.length === 0, 'A no borra mensajes de C');
 r = await as(C, 'delete from public.messages where chat_id = $1 returning id', [D1]);
 ok(!r.error && r.rows.length === 1, 'C borra su mensaje');
-r = await as(A, 'update public.messages set body = $2 where chat_id = $1', [TC, 'editado']);
-ok(!!r.error, 'los mensajes no se editan');
+r = await as(A, 'update public.messages set body = $2 where chat_id = $1 and user_id <> $3 returning id', [TC, 'editado', A]);
+ok(!r.error && r.rows.length === 0, 'los mensajes de otros no se editan');
 // leídos y silenciar
-r = await as(B, 'insert into public.chat_reads (chat_id, read_at, muted) values ($1, now(), true) returning muted', [TC]);
+r = await as(B, 'insert into public.chat_reads (chat_id, read_at, muted) values ($1, now(), true) on conflict (user_id, chat_id) do update set muted = true returning muted', [TC]);
 ok(!r.error && r.rows[0].muted === true, 'B marca leído y silencia el chat de la mesa');
 r = await as(A, 'select * from public.chat_reads');
 ok(r.rows.length === 0, 'A no ve lo que leyó B');

@@ -1443,6 +1443,11 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 #subnav .tab-id{font-weight:800;color:var(--v-ok,#00875a)}#navPanel small.ag{font-weight:500;opacity:.85}@media (max-width:760px){#navPanel small.ag{display:none}}
 /* ficha: el perfil, a la izquierda y más grande, invita a completarlo */
 .fi-main .fi-prof h4{font-size:17px}.fi-pinv{margin:0 0 10px;font-size:14.5px;line-height:1.45}.fi-prof .btn.lg{font-size:15px;padding:10px 18px}
+
+/* chat: quién leyó y editado */
+.ch-seen{display:block;margin:2px 0 0;padding:0;border:0;background:none;font:inherit;font-size:11.5px;color:var(--dim);cursor:pointer;text-align:inherit}.ch-seen:hover{color:var(--fg)}
+.ch-m.mine .ch-seen{text-align:right}.ch-ed{font-style:normal;opacity:.8}
+.ch-seen-l{list-style:none;margin:0;padding:0;display:grid;gap:6px}.ch-seen-l li{display:flex;align-items:center;gap:8px}.ch-seen-l li small{margin-left:auto;color:var(--dim)}.ch-seen-l li.d span{color:var(--dim)}
 </style>
 </head>
 <body class="auth">
@@ -1788,7 +1793,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.42.0';
+const VERSION='1.43.0';
 const EXT_VER='1.16.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1909,7 +1914,7 @@ const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified
 const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,global:!!r.global,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
-const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,aviso:!!r.aviso,at:r.created_at,t:+new Date(r.created_at)});
+const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,aviso:!!r.aviso,at:r.created_at,t:+new Date(r.created_at),edited:r.edited_at||null});
 const quiet=(m=profile)=>!!(m&&m.quiet_until&&new Date(m.quiet_until)>new Date()); // avisos sociales silenciados
 function mine(){ftds=team.filter(f=>f.uid===me)}
 function errMsg(e){
@@ -2198,6 +2203,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'messages'},p=>{
       if(p.eventType==='DELETE'){msgGone(p.old&&p.old.id);return}
       if(p.eventType==='INSERT')msgIn(M2X(p.new),true);
+      if(p.eventType==='UPDATE')msgEdit(M2X(p.new));
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'chats'},p=>{
       if(p.eventType==='DELETE'){chatGone(p.old&&p.old.id);return}
@@ -4964,6 +4970,17 @@ function msgIn(m){
   return true;
 }
 function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=>m._id!==id);chatSig='';refresh()}
+// un mensaje editado (hasta 1 minuto después de mandarlo): se cambia el texto, en el lugar
+function msgEdit(m){const l=msgs[m.chat];if(!l)return;const x=l.find(y=>y._id===m._id);if(!x||(x.body===m.body&&x.edited===m.edited))return;x.body=m.body;x.edited=m.edited;chatSig='';refresh()}
+// quién leyó: hasta dónde leyó cada uno del chat (chat_reads_of), se trae al abrir el chat y cada 30 s mientras se mira
+let chatReads={},chatReadsAt={},chatEdit=null;
+async function readsLoad(cid,force){
+  if(!cid||!sb||!ready)return;if(!force&&Date.now()-(chatReadsAt[cid]||0)<25e3)return;chatReadsAt[cid]=Date.now();
+  try{const rows=await Q(sb.rpc('chat_reads_of',{cid}));const m={};for(const r of rows||[])m[r.user_id]=+new Date(r.read_at);
+    if(JSON.stringify(m)!==JSON.stringify(chatReads[cid]||{})){chatReads[cid]=m;chatSig='';if(cur==='chat'&&chatCur===cid)V.chat.render({})}}catch(e){}
+}
+function readersOf(m){const c=chatOf(m.chat);if(!c)return {yes:[],no:[]};const R=chatReads[m.chat]||{},yes=[],no=[];
+  for(const u of chatPeople(c)){if(u===me||u===m.uid||isBot(u))continue;if((R[u]||0)>=m.t)yes.push(u);else no.push(u)}return {yes,no}}
 function chatGone(cid){if(!cid)return;chats=chats.filter(c=>c.id!==cid);chatMem=chatMem.filter(x=>x.chat_id!==cid);delete msgs[cid];if(chatCur===cid)chatCur=null;closeToast('ch'+cid);extSocialClose('c:'+cid);refresh()}
 // mientras el chat pide el PIN (o Vitalis está tapado), los avisos dicen quién escribió pero no lo que escribió
 const chatShut=()=>locked||chatLocked();
@@ -5030,6 +5047,8 @@ async function chatPoll(){
     for(const c of chats.filter(c=>!keep.has(c.id)))chatGone(c.id);
     chats=ch.filter(c=>c.team_id===profile.team_id);chatMem=cm;
     for(const r of rows)msgIn(M2X(r));
+    try{const ed=await Q(sb.from('messages').select('*').gte('edited_at',new Date(Date.now()-15*6e4).toISOString()).limit(100));for(const r of ed||[])msgEdit(M2X(r))}catch(e){} // lo editado hace poco
+    if(chatCur)readsLoad(chatCur);
     if(reactOk)try{ // reacciones de la última semana (por si se perdió alguna en vivo)
       const since7=Date.now()-7*864e5,rx=await Q(sb.from('message_reactions').select('message_id,user_id,emoji').gte('created_at',new Date(since7).toISOString()).limit(3000)),map={};
       for(const r of rx)(map[r.message_id]||(map[r.message_id]=[])).push({uid:r.user_id,e:r.emoji});
@@ -5062,6 +5081,8 @@ Object.assign(B,{
     catch(e){toast(esc(errMsg(e)),/^SLOW/.test(String(e.message||''))?'warn':'err');return false}
   },
   async delMsg(id){try{await Q(sb.from('messages').delete().eq('id',id));msgGone(id);return true}catch(e){dbErr(e);return false}},
+  async editMsg(id,body){try{const row=await Q(sb.from('messages').update({body}).eq('id',id).select().single());msgEdit(M2X(row));return true}
+    catch(e){toast(/EDIT_LATE/.test(String(e&&e.message||''))?'Ya pasó el minuto: no se puede editar.':esc(errMsg(e)),'warn');return false}},
   async chatCreate(nm,people){try{const id=await Q(sb.rpc('chat_create',{nm,people}));await chatPoll();return id}catch(e){toast(esc(errMsg(e)),'err');return null}},
   async chatAdd(cid,people){try{await Q(sb.rpc('chat_add',{cid,people}));await chatPoll();return true}catch(e){toast(esc(errMsg(e)),'err');return false}},
   async chatLeave(cid,uid){
@@ -5145,7 +5166,7 @@ V.chat={
     i.addEventListener('click',()=>this.men());
     i.addEventListener('blur',()=>setTimeout(()=>this.men(true),150));
     $('#chMen').addEventListener('mousedown',e=>{const b=e.target.closest('[data-men]');if(!b)return;e.preventDefault();this.menPut(b.dataset.men)});
-    $('#chRep').addEventListener('click',e=>{if(e.target.closest('[data-repx]'))this.reply(null)});
+    $('#chRep').addEventListener('click',e=>{if(e.target.closest('[data-repx]')){if(chatEdit)this.editOff();else this.reply(null)}});
     i.addEventListener('paste',e=>{const it=[...(e.clipboardData&&e.clipboardData.items||[])].find(x=>x.kind==='file'&&/^image\//.test(x.type));
       if(!it)return;const f=it.getAsFile();if(!f)return;
       if(!e.clipboardData.types.includes('text/plain'))e.preventDefault();
@@ -5166,6 +5187,8 @@ V.chat={
       if(pic){const x=imgs[pic.dataset.img];if(x&&x.url)imgView(x.url);return}
       const d=e.target.closest('[data-del]');
       if(d){if(await confirmar('Borrar mensaje','¿Lo borro para todos?','borrar',true))B.delMsg(d.dataset.del);return}
+      const ed=e.target.closest('[data-edit]');if(ed){const m=msgById(ed.dataset.edit);if(m)this.edit(m);return}
+      const sn=e.target.closest('[data-seen]');if(sn){const m=msgById(sn.dataset.seen);if(m)this.seen(m);return}
       const o=e.target.closest('[data-older]');
       if(o){o.disabled=true;const el=$('#chMsgs'),h=el.scrollHeight;await B.olderMsgs(chatCur);chatSig='';this.render({});el.scrollTop=el.scrollHeight-h}
     });
@@ -5180,7 +5203,8 @@ V.chat={
   },
   open(cid){
     if(chatReply&&chatReply.chat!==cid)this.reply(null);
-    chatCur=cid;local.set('chatCur',cid);chatSig='';this.render({});
+    if(chatEdit)this.editOff();
+    chatCur=cid;local.set('chatCur',cid);chatSig='';this.render({});readsLoad(cid,true);
     if(chatMore[cid]===undefined&&(msgs[cid]||[]).length<40)B.olderMsgs(cid).then(()=>{chatSig='';if(cur==='chat'&&chatCur===cid)this.render({})});
     setTimeout(()=>{const i=$('#chIn');if(i&&!matchMedia('(pointer:coarse)').matches)i.focus()},0);
   },
@@ -5195,6 +5219,10 @@ V.chat={
       if(!ok){i.value=v;chatDrafts[cid]=v;growIn(i)}
       return;
     }
+    if(chatEdit){ // editar en vez de mandar
+      const m=chatEdit,pre=(m.body.match(/^\[(?:img|card):[^\]]*\]\s?/)||[''])[0];
+      if(!v&&!pre)return;this.editOff();const ok=await B.editMsg(m._id,pre?pre.replace(/\s?$/,'')+(v?' '+v:''):v);if(!ok)this.edit(m);return;
+    }
     i.value='';chatDrafts[cid]='';growIn(i);this.men(true);const back=chatReply;this.reply(null);
     if(att){this.att(null,true);const sb_=$('#chForm .pri');sb_.disabled=true;
       const ok=await B.sendImg(cid,att,v,rep);sb_.disabled=false;
@@ -5202,7 +5230,21 @@ V.chat={
     const ok=await B.sendMsg(cid,v,rep);
     if(!ok){this.reply(back);if(!i.value){i.value=v;chatDrafts[cid]=v;growIn(i)}}
   },
+  edit(m){ // editar el propio mensaje (hasta 1 minuto después de mandarlo)
+    if(Date.now()-m.t>6e4)return toast('Ya pasó el minuto: no se puede editar.','warn');
+    this.reply(null);chatEdit=m;const el=$('#chRep'),i=$('#chIn');el.hidden=false;
+    el.innerHTML=`<span class="ic">✎</span><span class="tx">Editando tu mensaje <span class="d">(hasta 1 minuto después de mandarlo)</span></span><button type="button" class="ib" data-repx aria-label="No editar">✕</button>`;
+    i.value=msgTxt(m.body);growIn(i);i.focus();
+  },
+  editOff(){if(!chatEdit)return;chatEdit=null;const el=$('#chRep'),i=$('#chIn');el.hidden=true;el.innerHTML='';i.value=chatDrafts[chatCur]||'';growIn(i)},
+  seen(m){ // quién leyó este mensaje
+    const {yes,no}=readersOf(m),c=chatOf(m.chat),R=chatReads[m.chat]||{};
+    const li=(u,ok)=>`<li class="${ok?'ok':'d'}">${avatar(memberName(u))}<span>${esc(memberName(u))}</span><small>${ok?esc(whenTxt(new Date(R[u]))):'todavía no'}</small></li>`;
+    modal({title:'Quién lo leyó',body:`<p class="p-sub" style="margin:0 0 8px">${esc(clip(msgTxt(m.body),120))}</p>${yes.length||no.length?`<ul class="ch-seen-l">${yes.map(u=>li(u,true)).join('')}${no.map(u=>li(u,false)).join('')}</ul>`:'<p class="p-sub">No hay nadie más en este chat.</p>'}`});
+    readsLoad(m.chat,true);
+  },
   reply(m){ // responder a un mensaje
+    if(m)this.editOff();
     chatReply=m||null;const el=$('#chRep');el.hidden=!m;
     el.innerHTML=m?`<span class="ic">↩</span><span class="tx">Respondiendo a <b>${esc(m.uid===me?'vos':first(m.uid))}</b>: ${esc(clip(msgTxt(m.body),90))}</span><button type="button" class="ib" data-repx aria-label="No responder">✕</button>`:'';
     if(m)$('#chIn').focus();
@@ -5294,7 +5336,9 @@ V.chat={
     if(i.dataset.c!==c.id){i.dataset.c=c.id;i.value=chatDrafts[c.id]||'';growIn(i);i.placeholder=c.kind==='dm'?`Escribile a ${first(dmOther(c))}`:`Escribí en ${chatName(c)}`}
     // mensajes
     const el=$('#chMsgs'),l=msgs[c.id]||[];
-    const sig=c.id+'|'+l.length+'|'+(l.length?l[l.length-1]._id:'')+'|'+chatMore[c.id]+'|'+todayS()+'|'+reactVer;
+    readsLoad(c.id);
+    const lastM=l.length?l[l.length-1]:null,seenSig=lastM?readersOf(lastM).yes.join(','):'',editable=l.filter(m=>m.uid===me&&Date.now()-m.t<6e4).length;
+    const sig=c.id+'|'+l.length+'|'+(l.length?l[l.length-1]._id:'')+'|'+chatMore[c.id]+'|'+todayS()+'|'+reactVer+'|'+seenSig+'|'+editable+'|'+l.filter(m=>m.edited).length;
     if(sig!==chatSig){
       const same=chatSig.split('|')[0]===c.id,atBottom=!same||el.scrollHeight-el.scrollTop-el.clientHeight<90;
       chatSig=sig;
@@ -5308,10 +5352,13 @@ V.chat={
         const rq=m.reply?msgById(m.reply):null,quote=m.reply?`<button type="button" class="ch-q" data-goto="${esc(m.reply)}" title="Ir al mensaje"><b>${rq?esc(rq.uid===me?'Vos':first(rq.uid)):'Mensaje'}</b><span>${rq?esc(clip(msgTxt(rq.body),90)):'más viejo'}</span></button>`:'';
         const RX=reacts[m._id]||[],grp=EMOJIS.map(e=>({e,u:RX.filter(x=>x.e===e).map(x=>x.uid)})).filter(g=>g.u.length);
         const rxs=grp.length?`<div class="ch-rx">${grp.map(g=>`<button type="button" class="rx${g.u.includes(me)?' on':''}" data-rx="${g.e}" data-mid="${esc(m._id)}" title="${esc(g.u.map(u=>u===me?'vos':first(u)).join(', '))}">${g.e}<b>${g.u.length}</b></button>`).join('')}</div>`:'';
-        const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button>${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
+        const canEdit=mine&&Date.now()-m.t<6e4&&!/^\[(?:img|card):/.test(m.body); // solo texto: una imagen o datos compartidos no se editan
+        const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button><button type="button" data-seen="${esc(m._id)}" title="Quién lo leyó" aria-label="Quién lo leyó">👁</button>${canEdit?`<button type="button" data-edit="${esc(m._id)}" title="Editar (hasta 1 minuto)" aria-label="Editar">✎</button>`:''}${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
+        const seenLine=m===lastM&&!isBot(m.uid)?(()=>{const {yes,no}=readersOf(m);if(!yes.length&&!no.length)return '';const nm_=u=>first(u);
+          return `<button type="button" class="ch-seen" data-seen="${esc(m._id)}" title="Quién lo leyó">${yes.length?`Leído por ${esc(yes.slice(0,4).map(nm_).join(', '))}${yes.length>4?` y ${yes.length-4} más`:''}`:'Nadie lo leyó todavía'}${yes.length&&no.length?` <span class="d">· faltan ${no.length}</span>`:''}</button>`})():'';
         h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}${m.aviso?' aviso':''}" data-mid="${esc(m._id)}">`+
           (mine?'':head?(isBot(m.uid)?`<span class="avb">${avatar(nm)}</span>`:`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`):'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}${cd?' crd':''}">${m.aviso?'<span class="ch-aviso"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Aviso</span>':''}${quote}${cd?`<div class="ch-card${cards[cd.id]&&cards[cd.id].html?'':' wait'}" data-card="${esc(cd.id)}"><div class="chc-b">${cards[cd.id]&&cards[cd.id].html?cards[cd.id].html:'<span class="d">Trayendo los datos…</span>'}</div><div class="chc-f"><b>${esc(cd.title||'Datos')}</b><span class="chc-w">${cards[cd.id]&&cards[cd.id].at?' · datos '+cardWhen(cards[cd.id].at):''}</span></div></div>${cd.rest?`<span class="ch-cap">${fmtBody(cd.rest)}</span>`:''}`:im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${hhmm(m.t)}</span></div>${rxs}</div>${tools}</div>`;
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}${cd?' crd':''}">${m.aviso?'<span class="ch-aviso"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Aviso</span>':''}${quote}${cd?`<div class="ch-card${cards[cd.id]&&cards[cd.id].html?'':' wait'}" data-card="${esc(cd.id)}"><div class="chc-b">${cards[cd.id]&&cards[cd.id].html?cards[cd.id].html:'<span class="d">Trayendo los datos…</span>'}</div><div class="chc-f"><b>${esc(cd.title||'Datos')}</b><span class="chc-w">${cards[cd.id]&&cards[cd.id].at?' · datos '+cardWhen(cards[cd.id].at):''}</span></div></div>${cd.rest?`<span class="ch-cap">${fmtBody(cd.rest)}</span>`:''}`:im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${m.edited?'<i class="ch-ed" title="Editado">editado · </i>':''}${hhmm(m.t)}</span></div>${rxs}${seenLine}</div>${tools}</div>`;
         pu=m.uid;pt=m.t;
       }
       el.innerHTML=h;imgPaint(el);for(const k of el.querySelectorAll('[data-card]'))cardPaint(k);shAvatars(el);

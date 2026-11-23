@@ -594,6 +594,39 @@ begin
 end $$;
 drop trigger if exists messages_guard on public.messages;
 create trigger messages_guard before insert on public.messages for each row execute function public.msg_guard();
+-- editar el propio mensaje hasta 1 minuto después (lo pidió el dueño): solo cambia el texto; la imagen o los datos compartidos quedan
+alter table public.messages add column if not exists edited_at timestamptz;
+create or replace function public.msg_edit_guard() returns trigger
+  language plpgsql set search_path = public as $$ -- sin security definer: current_user es quien edita
+declare pre_o text; pre_n text;
+begin
+  if (select auth.uid()) is null or current_user not in ('authenticated') then return new; end if; -- sin sesión o SQL del administrador (arreglos): no es una edición
+  if old.user_id <> (select auth.uid()) then raise exception 'EDIT: solo el que lo escribió'; end if;
+  if now() - old.created_at > interval '70 seconds' then raise exception 'EDIT_LATE: ya pasó el minuto para editarlo'; end if;
+  if new.chat_id <> old.chat_id or new.user_id <> old.user_id or new.reply_to is distinct from old.reply_to or new.aviso <> old.aviso or new.created_at <> old.created_at then
+    raise exception 'EDIT: solo se cambia el texto';
+  end if;
+  new.body := left(btrim(coalesce(new.body, ''), E' \t\r\n'), 2000);
+  pre_o := substring(old.body from '^\[(?:img|card):[^\]]*\]');
+  pre_n := substring(new.body from '^\[(?:img|card):[^\]]*\]');
+  if pre_o is distinct from pre_n then raise exception 'EDIT: la imagen o los datos no se cambian'; end if;
+  if new.body = '' or (pre_o is null and new.body = old.body) then raise exception 'MSG_EMPTY: escribí algo'; end if;
+  new.edited_at := now();
+  return new;
+end $$;
+drop trigger if exists messages_edit_guard on public.messages;
+create trigger messages_edit_guard before update on public.messages for each row execute function public.msg_edit_guard();
+drop policy if exists messages_update on public.messages;
+create policy messages_update on public.messages for update to authenticated
+  using (user_id = (select auth.uid()) and created_at > now() - interval '70 seconds') with check (user_id = (select auth.uid()));
+grant update on public.messages to authenticated;
+-- quién leyó: hasta dónde leyó cada miembro del chat (sin el silencio, que es privado)
+create or replace function public.chat_reads_of(cid uuid) returns table (user_id uuid, read_at timestamptz)
+  language sql security definer stable set search_path = public as $$
+  select r.user_id, r.read_at from public.chat_reads r where r.chat_id = cid and public.in_chat(cid);
+$$;
+revoke all on function public.chat_reads_of(uuid), public.msg_edit_guard() from public, anon;
+grant execute on function public.chat_reads_of(uuid) to authenticated;
 -- al borrar un mensaje con imagen, se borra la imagen
 create or replace function public.msg_gone() returns trigger
   language plpgsql security definer set search_path = public as $$
@@ -1000,8 +1033,7 @@ grant select, insert, delete on public.pings to authenticated;
 revoke update on public.pings from authenticated;
 grant select on public.chats, public.chat_members to authenticated;
 revoke insert, update, delete on public.chats, public.chat_members from authenticated;
-grant select, insert, delete on public.messages to authenticated;
-revoke update on public.messages from authenticated;
+grant select, insert, delete, update on public.messages to authenticated; -- update: solo el propio texto y hasta 1 minuto (messages_update + msg_edit_guard)
 grant select, insert, delete on public.chat_files to authenticated;
 revoke update on public.chat_files from authenticated;
 revoke all on public.chat_files from anon;

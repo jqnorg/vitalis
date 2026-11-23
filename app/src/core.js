@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.42.0';
+const VERSION='1.43.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -124,7 +124,7 @@ const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified
 const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,global:!!r.global,updated:r.updated_at});
 const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
-const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,aviso:!!r.aviso,at:r.created_at,t:+new Date(r.created_at)});
+const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,aviso:!!r.aviso,at:r.created_at,t:+new Date(r.created_at),edited:r.edited_at||null});
 const quiet=(m=profile)=>!!(m&&m.quiet_until&&new Date(m.quiet_until)>new Date()); // avisos sociales silenciados
 function mine(){ftds=team.filter(f=>f.uid===me)}
 function errMsg(e){
@@ -413,6 +413,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
     .on('postgres_changes',{event:'*',schema:'public',table:'messages'},p=>{
       if(p.eventType==='DELETE'){msgGone(p.old&&p.old.id);return}
       if(p.eventType==='INSERT')msgIn(M2X(p.new),true);
+      if(p.eventType==='UPDATE')msgEdit(M2X(p.new));
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'chats'},p=>{
       if(p.eventType==='DELETE'){chatGone(p.old&&p.old.id);return}
