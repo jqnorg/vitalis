@@ -972,6 +972,20 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok((await db.query('select count(*)::int c from public.station_state')).rows[0].c === 0, 'sin vistas, la estación queda vacía');
 }
 
+// ---------- RMO por día ----------
+{
+  R = await rpc(B, 'select public.rmo_save($1::jsonb) j', [JSON.stringify([{ n: 120, talk: 600000, dead: 1800000, req: 240, q: 2, open: true }, { uid: A, n: 5, talk: 0, dead: 0, q: 3 }])]);
+  ok(R && R.ok && R.n === 1, `un agente guarda su RMO del día, no el de otro (${JSON.stringify(R)})`);
+  R = await rpc(M, 'select public.rmo_save($1::jsonb) j', [JSON.stringify([{ uid: A, n: 50, talk: 60000, dead: 3600000, req: 250, q: 3, open: false }, { uid: B, n: 130, talk: 600000, dead: 1700000, req: 240, q: 2, open: true }])]);
+  ok(R && R.ok && R.n === 2, 'el team leader guarda el de todos');
+  const qr = await as(A, 'select user_id, n, q, open from public.rmo_days order by n');
+  ok(qr.rows.length === 2 && qr.rows[0].user_id === A && qr.rows[0].q === 3 && qr.rows[1].n === 130 && qr.rows[1].open === true, `la mesa lo lee; el último guardado pisa al anterior (${JSON.stringify(qr.rows)})`);
+  R = await rpc(B, 'select public.rmo_save($1::jsonb) j', [JSON.stringify([{ date: '2020-01-01', n: 1 }])]);
+  ok(R && R.n === 0, 'un día viejo no se guarda');
+  r = await as(B, 'insert into public.rmo_days (user_id, date) values ($1, current_date)', [B]);
+  ok(!!r.error, 'nadie escribe directo en rmo_days');
+}
+
 // ---------- Vitalis felicita las ventas de hoy ----------
 {
   const hoy = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 10);

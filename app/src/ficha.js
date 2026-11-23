@@ -184,12 +184,17 @@ async function profCopyCrm(p){ // copia lo que va al CRM; true si copió
   return true;
 }
 function fiProfHTML(d){
-  const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p,'es'),st=profStatus(p);
-  return `<div class="fi-c fi-prof${done?'':' fp-falta'}"><h4>Perfil del cliente ${done?'<span class="badge paid">completo</span>':'<span class="badge warn">faltan datos</span>'}</h4>
-    ${p&&txt?`<div class="fi-ptext">${esc(txt)}</div>`:'<p class="fi-pinv">Contá quién es este cliente: edad, ocupación y qué busca. Con eso la mesa y el CRM lo tienen, y el cierre queda justificado.</p>'}
+  const p=d.prof,falta=profFalta(p),done=!falta.length,txt=profText(p,'es'),st=profStatus(p),open=!done||fiProfEdit===String(d.id);
+  if(open) // se completa adentro de la tarjeta, a la vista mientras habla (lo pidió el dueño en la auditoría del 23/11)
+    return `<div class="fi-c fi-prof fp-open${done?'':' fp-falta'}"><h4>Perfil del cliente ${done?'<span class="badge paid">completo</span>':'<span class="badge warn">faltan datos</span>'}</h4>
+    ${done?'':`<p class="fi-pinv">Contá quién es este cliente: edad, ocupación y qué busca. Con eso la mesa y el CRM lo tienen, y el cierre queda justificado.${falta.length?` <b class="hot">Faltan: ${esc(falta.join(', '))}</b>`:''}</p>`}
+    <div id="fiPf">${profFormHTML(p||{})}</div>
+    <div class="fi-prow"><button type="button" class="btn lg pri" data-fa="profSave">Guardar</button><button type="button" class="btn sm" data-fa="profSaveCopy">Guardar y copiar al CRM</button>${done?'<button type="button" class="btn sm" data-fa="profCancel">Cancelar</button>':''}</div>
+    <div class="ebox" id="pfErr"></div></div>`;
+  return `<div class="fi-c fi-prof"><h4>Perfil del cliente <span class="badge paid">completo</span></h4>
+    ${txt?`<div class="fi-ptext">${esc(txt)}</div>`:''}
     ${st?`<p class="fi-pst">Status sugerido en el CRM: <b>${esc(st)}</b></p>`:''}
-    ${!done?`<p class="fi-pfalta">Faltan: ${esc(falta.join(', '))}</p>`:''}
-    <div class="fi-prow"><button type="button" class="btn ${done?'sm':'lg'} pri" data-fa="profEdit">${p?(done?'Editar perfil':'Completar lo que falta'):'Completar perfil'}</button>${p&&txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
+    <div class="fi-prow"><button type="button" class="btn sm pri" data-fa="profEdit">Editar perfil</button>${txt?'<button type="button" class="btn sm" data-fa="profCopy">Copiar al CRM (inglés + español)</button>':''}${p&&p.updated_by?`<span class="p-sub">${esc(first(p.updated_by))} · ${esc(rel(new Date(p.updated_at)))}</span>`:''}</div></div>`;
 }
 function fiComsHTML(d){
   return `<div class="fi-c fi-coms"><h4>Comentarios</h4>
@@ -204,6 +209,7 @@ function fichaWire(root,getD,rerender){
     if(pt){const v=pt.dataset.fpt;fiPayT.t=v==='digital'&&['tarjeta','transferencia'].includes(fiPayT.t)?fiPayT.t:v;fiPayT.all=false}else fiPayT.all=true;
     box.outerHTML=fiPayHTML(d);
   });
+  for(const ev of ['input','change'])root.addEventListener(ev,e=>{const box=e.target.closest('#fiPf');if(box)profDraw(s=>box.querySelector(s))});
   root.addEventListener('click',async e=>{
     const b=e.target.closest('[data-fa]');if(!b)return;const a=b.dataset.fa,d=getD();if(!d)return;
     if(a==='banking'){bkPais=b.dataset.pais||'';bkTipo='';closeAllModals();go('banking');return}
@@ -211,7 +217,9 @@ function fichaWire(root,getD,rerender){
     if(a==='campAdd'||a==='campEdit')return campModal(d,b.dataset.c,a==='campEdit',rerender);
     if(a==='campReq')return campReqModal(d,b.dataset.c);
     if(a==='campReqs')return campReqsModal(d,b.dataset.c,rerender);
-    if(a==='profEdit')return profModal(d,rerender);
+    if(a==='profEdit'){fiProfEdit=String(d.id);return rerender(true)}
+    if(a==='profCancel'){fiProfEdit='';return rerender(true)}
+    if(a==='profSave'||a==='profSaveCopy'){const box=root.querySelector('#fiPf');if(!box)return;b.disabled=true;try{const ok=await profSaveFrom(d,box,a==='profSaveCopy',rerender);if(ok)fiProfEdit=''}finally{b.disabled=false}return}
     if(a==='profCopy'){trOpen();if(!d.prof)return;if(await profCopyCrm(d.prof))toast('Copiado en inglés, con el español debajo. Pegalo en el comentario del CRM.');else toast('No pude copiar. Copialo a mano.','warn');return}
     if(a==='comAdd'){const t=root.querySelector('[data-fcom]'),body=t.value.trim();if(!body)return t.focus();b.disabled=true;
       try{await Q(sb.from('client_comments').insert({client_id:String(d.id),brand:d.r&&d.r.brand||DEF_BRAND,body:body.slice(0,1000)}));t.value='';await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}finally{b.disabled=false}return}
@@ -249,18 +257,43 @@ function campModal(d,camp,edit,rerender){
       toast(edit?'Campaña actualizada.':'Campaña cargada.');await rerender(true)}}]});
 }
 // el armador del perfil: los campos que pide la gerencia. Al guardar arma el comentario estándar para pegar en el CRM.
+// el formulario del perfil (lo usan la tarjeta de la ficha y el modal): lo que hay escrito, con la forma de un perfil guardado
+let fiProfEdit='';
+const profRead=q=>{const e=q('#pfE').value.trim();return {edad:e===''?null:+e,ocupacion:q('#pfO').value.trim(),desocupado:q('#pfD').checked,desocupado_desde:q('#pfDd').value.trim(),objetivo:q('#pfG').value.trim(),anuncio:q('#pfA').value.trim(),vio_min:q('#pfM').checked?true:null,outcome:q('#pfR').value||null,motivo:q('#pfMo').value.trim()}};
+function profDraw(q){const x=profRead(q),o=x.outcome&&PROF_OUT[x.outcome],st=profStatus(x),es=profText(x,'es');
+  q('#pfDwrap').style.display=x.desocupado?'':'none';
+  q('#pfSt').innerHTML=st?`Status sugerido en el CRM: <b>${esc(st)}</b>`:o?'':'<span class="dim">Al elegir cómo terminó, te digo qué status poner en el CRM.</span>';
+  const pv=q('#pfPrev');if(pv)pv.textContent=es&&(x.edad!=null||x.ocupacion||x.desocupado||x.objetivo||x.anuncio||x.outcome||x.motivo)?es:'Completá los datos y acá vas viendo el comentario.';
+  return x;}
+async function profSaveFrom(d,box,copy,rerender){ // guardar lo escrito en la tarjeta (o el modal) y, si se pide, copiarlo al CRM
+  const q=s=>box.querySelector(s),x=profRead(q),err=box.querySelector('#pfErr')||box.parentElement.querySelector('#pfErr');
+  if(x.edad!=null&&(!Number.isFinite(x.edad)||x.edad<16||x.edad>110)){if(err)err.textContent='La edad tiene que estar entre 16 y 110.';return false}
+  try{await Q(sb.rpc('prof_save',{p_client:String(d.id),p_brand:d.r&&d.r.brand||DEF_BRAND,p_data:{...x,edad:x.edad==null?'':String(x.edad)}}))}catch(e){if(err)err.textContent=errMsg(e);return false}
+  if(copy)trOpen();
+  await rerender(true); // primero se ve guardado; después se copia (traducir puede tardar un poco)
+  if(copy){if(await profCopyCrm(x))toast('Perfil guardado y copiado. Pegalo en el comentario del CRM.');else toast('Perfil guardado. No pude copiar: usá "Copiar al CRM" en la ficha.','warn')}
+  else toast('Perfil guardado.');
+  return true;
+}
+function profFormHTML(p){const chk=v=>v?'checked':'';
+  return `<div class="fgrid">
+        <label class="fld"><span>Edad <i>*</i></span><input id="pfE" type="number" min="16" max="110" value="${esc(p.edad!=null?p.edad:'')}" placeholder="Ej.: 34"></label>
+        <label class="fld"><span>Ocupación <i>*</i></span><input id="pfO" maxlength="120" value="${esc(p.ocupacion||'')}" placeholder="Ej.: taxista, comerciante…"></label>
+      </div>
+      <label class="fck"><input type="checkbox" id="pfD" ${chk(p.desocupado)}> Está desocupado</label>
+      <label class="fld" id="pfDwrap" style="${p.desocupado?'':'display:none'}"><span>¿Hace cuánto?</span><input id="pfDd" maxlength="60" value="${esc(p.desocupado_desde||'')}" placeholder="Ej.: 6 meses"></label>
+      <label class="fld"><span>Objetivo del cliente <i>*</i></span><input id="pfG" maxlength="200" value="${esc(p.objetivo||'')}" placeholder="Ej.: conseguir un ingreso extra"></label>
+      <label class="fld"><span>¿Qué vio en el anuncio?</span><input id="pfA" maxlength="300" value="${esc(p.anuncio||'')}" placeholder="Ej.: inversión con IA"></label>
+      <label class="fck"><input type="checkbox" id="pfM" ${chk(p.vio_min===true)}> Vio el monto mínimo</label>
+      <label class="fld"><span>¿Cómo terminó la llamada?</span><select id="pfR"><option value="">Elegí cómo terminó…</option>${PROF_ORDER.map(k=>`<option value="${k}" ${p.outcome===k?'selected':''}>${esc(PROF_OUT[k].l)}</option>`).join('')}</select></label>
+      <p class="pf-st" id="pfSt"></p>
+      <label class="fld"><span>Detalle <small class="dim">(opcional)</small></span><textarea id="pfMo" rows="2" maxlength="400" placeholder="Ej.: quiere consultarlo con la esposa / se le ofreció efectivo y transferencia">${esc(p.motivo||'')}</textarea></label>
+      <p class="p-sub" style="margin:4px 0 0">Así queda: <span id="pfPrev" class="pf-inline"></span></p>`;}
 function profModal(d,rerender){
   const p=d.prof||{},chk=v=>v?'checked':'';
   // lo que hay en el formulario, con la forma de un perfil guardado (para la vista previa y para guardar)
-  const read=api=>{const e=api.q('#pfE').value.trim();return {edad:e===''?null:+e,ocupacion:api.q('#pfO').value.trim(),desocupado:api.q('#pfD').checked,desocupado_desde:api.q('#pfDd').value.trim(),objetivo:api.q('#pfG').value.trim(),anuncio:api.q('#pfA').value.trim(),vio_min:api.q('#pfM').checked?true:null,outcome:api.q('#pfR').value||null,motivo:api.q('#pfMo').value.trim()}};
-  const save=async(api,copy)=>{
-    const x=read(api);
-    if(x.edad!=null&&(!Number.isFinite(x.edad)||x.edad<16||x.edad>110)){api.q('#pfErr').textContent='La edad tiene que estar entre 16 y 110.';return false}
-    try{await Q(sb.rpc('prof_save',{p_client:String(d.id),p_brand:d.r&&d.r.brand||DEF_BRAND,p_data:{...x,edad:x.edad==null?'':String(x.edad)}}))}catch(e){api.q('#pfErr').textContent=errMsg(e);return false}
-    await rerender(true); // primero se ve guardado; después se copia (traducir puede tardar un poco)
-    if(copy){if(await profCopyCrm(x))toast('Perfil guardado y copiado. Pegalo en el comentario del CRM.');else toast('Perfil guardado. No pude copiar: usá "Copiar al CRM" en la ficha.','warn')}
-    else toast('Perfil guardado.');
-  };
+  const read=api=>profRead(api.q);
+  const save=async(api,copy)=>{const ok=await profSaveFrom(d,api.mb,copy,rerender);return ok?undefined:false};
   modal({wide:true,title:`Perfil · ${esc(d.name||d.id)}`,body:`<p class="mp">Lo que la gerencia pide de cada cliente. Lo ve toda la mesa.</p>
     <div class="pf-grid"><div>
       <div class="fgrid">
@@ -357,6 +390,7 @@ async function cuRender(force){
   const ta=body.querySelector('[data-fcom]'),txt=ta&&body.dataset.fid===id?ta.value:'',foc=ta&&document.activeElement===ta,bs=body.querySelector('[data-fbank]'),bv=bs&&body.dataset.fid===id?bs.value:'';
   const opened=body.dataset.fid===id?openKeys(body):new Set();
   body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);reopen(body,opened);bkHydrate(body);
+  {const box=body.querySelector('#fiPf');if(box)profDraw(s=>box.querySelector(s))} // el perfil adentro de la tarjeta: status sugerido y vista previa
   const t2=body.querySelector('[data-fcom]');if(t2&&txt){t2.value=txt;if(foc)t2.focus()}
   const b2=body.querySelector('[data-fbank]');if(b2&&bv){b2.value=bv;b2.dispatchEvent(new Event('change',{bubbles:true}))}
   if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)}

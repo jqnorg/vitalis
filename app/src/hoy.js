@@ -136,6 +136,34 @@ function ritmo(uid){
   }
   ritmoMemo.m.set(uid,R);return R;
 }
+// la historia del RMO (rmo_days): se guarda cada 5 min —lo propio; el team leader y el admin, lo de todos— y se lee en Equipo y en Turnos
+let rmoLastSig='',rmoRows={},rmoAt={};
+function rmoSave(){
+  if(!ready||!sb||readOnly||!me)return;
+  const te=todayS(),rows=[];
+  const add=uid=>{const R=ritmo(uid);if(!R||!R.in)return;rows.push({uid,date:te,n:R.n,talk:Math.round(R.talk),dead:Math.round(R.dead),req:R.req,q:R.q,open:!!R.open})};
+  if(isLeader())for(const m of members.filter(m=>m.active&&!isLeadUid(m.id)))add(m.id);else add(me);
+  if(!rows.length)return;
+  const sig=JSON.stringify(rows.map(r=>[r.uid,r.n,Math.round(r.talk/6e4),Math.round(r.dead/6e4),r.q,r.open]));
+  if(sig===rmoLastSig)return;rmoLastSig=sig;
+  Q(sb.rpc('rmo_save',{rows})).catch(()=>{rmoLastSig=''});
+}
+setInterval(()=>{if(!document.hidden)rmoSave()},5*6e4);
+async function rmoLoad(from,to){ // los días guardados de la mesa en un rango (cache de 2 min por rango)
+  const k=from+'|'+to;if(Date.now()-(rmoAt[k]||0)<12e4)return rmoRows[k]||[];rmoAt[k]=Date.now();
+  try{rmoRows[k]=await Q(sb.from('rmo_days').select('user_id,date,n,talk_ms,dead_ms,req,q,open').gte('date',from).lte('date',to).limit(2000))||[]}catch(e){rmoRows[k]=rmoRows[k]||[]}
+  return rmoRows[k];
+}
+const rmoCell=r=>r?`<span class="qb q${r.q}" title="${esc(`${r.n} llamadas de ${r.req??'—'} · ${minsTxt(r.talk_ms)} hablando · ${minsTxt(r.dead_ms)} muertos${r.open?' · en curso':''}`)}">Q${r.q}</span>`:'<span class="d">—</span>';
+function rmoHistCard(rows,people,title){ // una tabla agentes × días (los últimos 10 con datos)
+  const days=[...new Set(rows.map(r=>r.date))].sort().slice(-10);if(!days.length)return '';
+  const by=new Map(rows.map(r=>[r.user_id+'|'+r.date,r]));
+  const tr=people.map(m=>{const cells=days.map(d=>`<td>${rmoCell(by.get(m.id+'|'+d))}</td>`).join('');if(!days.some(d=>by.has(m.id+'|'+d)))return '';
+    const mine=days.map(d=>by.get(m.id+'|'+d)).filter(Boolean),avg=mine.reduce((a,r)=>a+r.dead_ms,0)/mine.length;
+    return `<tr><td><span class="eq-who">${avatar(m.name)}${esc(m.name)}</span></td>${cells}<td class="r"><span class="${avg>=Q_MIN[1]?'hot':avg>=Q_MIN[0]?'warn':''}">${esc(minsTxt(avg))}</span></td></tr>`}).join('');
+  return `<div class="card-h"><h3>${esc(title)}</h3><span class="p-sub">la franja de cada día (Q1 la mejor, Q3 la peor) · tocá una para ver llamadas, hablado y muerto</span></div>
+    <div class="p-tablewrap"><table class="pt rmo-t"><thead><tr><th>Agente</th>${days.map(d=>`<th title="${esc(dm(d))}">${DIA[parseYMD(d).getDay()]} ${+d.slice(8)}</th>`).join('')}<th class="r">Muerto prom.</th></tr></thead><tbody>${tr}</tbody></table></div>`;
+}
 const qCls=q=>q===1?'ok':q===2?'warn':'hot';
 const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
 const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;

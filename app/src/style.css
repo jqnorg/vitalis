@@ -1442,3 +1442,10 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 @media (max-width:1220px){#bar{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}#bar::-webkit-scrollbar{display:none}#bar .pill{flex:none}}
 /* Manager: avisos agrupados por agente */
 .cm-g summary{cursor:pointer;list-style:none}.cm-g summary::-webkit-details-marker{display:none}.cm-g summary::after{content:' · ver';color:var(--dim);font-weight:500}.cm-g[open] summary::after{content:' · cerrar'}.cm-g ul{margin:6px 0 0;padding-left:18px}.cm-g li{margin:2px 0}
+
+/* el perfil se completa adentro de la tarjeta de la ficha */
+.fi-prof.fp-open .fgrid{grid-template-columns:1fr 1fr;gap:8px}.fi-prof.fp-open .fld{margin:6px 0}.fi-prof.fp-open .fck{display:block;margin:6px 0}.fi-prof .pf-inline{color:var(--fg)}
+@media (max-width:1000px){.fi-prof.fp-open .fgrid{grid-template-columns:1fr}}
+
+/* RMO por día (Equipo) */
+.rmo-t td,.rmo-t th{text-align:center}.rmo-t td:first-child,.rmo-t th:first-child{text-align:left}.rmo-t .qb{cursor:help}

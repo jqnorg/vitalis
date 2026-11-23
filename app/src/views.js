@@ -323,8 +323,10 @@ V.turnos={
       fmt:v=>durS(v*36e5),fmtY:v=>nf(v,v%1?1:0)+'h',
       tip:d=>({title:`${DIAL[parseYMD(d.r.t.date).getDay()]} ${dm(d.r.t.date)}`,rows:[{key:'var(--s1)',v:dur(d.r.total),l:'trabajadas'},{v:`${hhmm(d.r.t.in)}–${d.r.t.out?hhmm(d.r.t.out):'…'}`,l:''},{v:mins(d.r.desc)+' min',l:'descansos'+(d.r.exceso>=6e4?` (+${mins(d.r.exceso)})`:'')},{v:String(d.r.ftd),l:'FTDs'}]})});
     $('#tuCount').textContent=plural(n,'jornada');
-    $('#tuTable').innerHTML=`<table class="pt"><thead><tr><th>Día</th><th>Entrada</th><th>Salida</th><th class="r">Horas</th><th class="r">Extra</th><th class="r">Descansos</th><th class="r">FTDs</th><th class="r">FTD/h</th><th class="r">Contactos</th><th class="act"></th></tr></thead><tbody>`+
-      [...rows].reverse().map(r=>`<tr${r.t.out?'':' class="cur"'}><td>${DIA[parseYMD(r.t.date).getDay()]} ${dm(r.t.date)}</td><td>${hhmm(r.t.in)}</td><td>${r.t.out?hhmm(r.t.out):'<span class="info">en curso</span>'}</td><td class="r">${durS(r.total)}</td><td class="r${r.extra>=6e4&&r.t.out?' hot':''}">${!r.t.out?'':Math.abs(r.extra)<6e4?'0':(r.extra>0?'+':'−')+durS(Math.abs(r.extra))}</td><td class="r${r.exceso>=6e4?' hot':''}">${mins(r.desc)} min${r.exceso>=6e4?' (+'+mins(r.exceso)+')':''}</td><td class="r">${r.ftd}</td><td class="r">${r.fph!=null?nf(r.fph,2):'—'}</td><td class="r d">${r.cont||''}</td><td class="act wr"><button type="button" class="ib" data-act="editTurno" data-d="${r.t.date}" title="Editar">Editar</button></td></tr>`).join('')+'</tbody></table>';
+    const rmoK=rows[0].t.date+'|'+rows[rows.length-1].t.date,rmoMine=new Map((rmoRows[rmoK]||[]).filter(r=>r.user_id===me).map(r=>[r.date,r]));
+    if(!rmoAt[rmoK])rmoLoad(rows[0].t.date,rows[rows.length-1].t.date).then(()=>{if(cur==='turnos')this.render({})}); // el RMO de cada jornada, cuando llega
+    $('#tuTable').innerHTML=`<table class="pt"><thead><tr><th>Día</th><th>Entrada</th><th>Salida</th><th class="r">Horas</th><th class="r">Extra</th><th class="r">Descansos</th><th class="r">FTDs</th><th class="r">FTD/h</th><th class="r">Contactos</th><th title="RMO: la franja del día">RMO</th><th class="act"></th></tr></thead><tbody>`+
+      [...rows].reverse().map(r=>`<tr${r.t.out?'':' class="cur"'}><td>${DIA[parseYMD(r.t.date).getDay()]} ${dm(r.t.date)}</td><td>${hhmm(r.t.in)}</td><td>${r.t.out?hhmm(r.t.out):'<span class="info">en curso</span>'}</td><td class="r">${durS(r.total)}</td><td class="r${r.extra>=6e4&&r.t.out?' hot':''}">${!r.t.out?'':Math.abs(r.extra)<6e4?'0':(r.extra>0?'+':'−')+durS(Math.abs(r.extra))}</td><td class="r${r.exceso>=6e4?' hot':''}">${mins(r.desc)} min${r.exceso>=6e4?' (+'+mins(r.exceso)+')':''}</td><td class="r">${r.ftd}</td><td class="r">${r.fph!=null?nf(r.fph,2):'—'}</td><td class="r d">${r.cont||''}</td><td>${rmoCell(rmoMine.get(r.t.date))}</td><td class="act wr"><button type="button" class="ib" data-act="editTurno" data-d="${r.t.date}" title="Editar">Editar</button></td></tr>`).join('')+'</tbody></table>';
   },
 };
 
@@ -595,6 +597,7 @@ V.equipo={
     $('#eqTarget').innerHTML=eqTargetCard(eqYm);
     {const pr=eqYm===now?pronCard():'';$('#eqPron').hidden=!pr;$('#eqPron').innerHTML=pr;const cv=eqYm===now?curvaCard():'';$('#eqCurva').hidden=!cv;$('#eqCurva').innerHTML=cv} // pronóstico y curva del agente nuevo: solo team leader y admin
     {const pm=eqYm===now?callsMesaCard():'';$('#eqPool').hidden=!pm;$('#eqPool').innerHTML=pm} // las llamadas de hoy de cada uno
+    rmoLoad(eqYm+'-01',eqYm===now?todayS():eqYm+'-31').then(rows=>{if(cur!=='equipo')return;const h=rmoHistCard(rows,act.filter(m=>!isLeadUid(m.id)),'RMO por día');const el=$('#eqRmo');el.hidden=!h;el.innerHTML=h}); // la historia del ritmo
     stDraw();stLoad().then(()=>{if(cur==='equipo')stDraw()}); // la estación: hace cuánto se leyó cada vista del CRM
     crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+

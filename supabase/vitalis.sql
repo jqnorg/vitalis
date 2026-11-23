@@ -1706,6 +1706,50 @@ create policy calls_read on public.calls for select to authenticated using (team
 grant select on public.calls to authenticated;
 revoke insert, update, delete, truncate on public.calls from authenticated;
 revoke all on public.calls from anon;
+-- ---------- RMO por día: la historia del ritmo de cada uno (lo pidió el dueño, auditoría 23/11) ----------
+-- Lo calcula la app (ritmo) y lo guarda cada 5 min: el propio agente lo suyo, y el team leader/admin lo de todos. La mesa lo lee (Equipo y Turnos).
+create table if not exists public.rmo_days (
+  team_id    uuid not null default public.my_team() references public.teams(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  date       date not null,
+  n          integer not null default 0,      -- llamadas
+  talk_ms    integer not null default 0,      -- hablado
+  dead_ms    integer not null default 0,      -- tiempo muerto
+  req        integer,                         -- llamadas requeridas ese día
+  q          smallint check (q between 1 and 3),
+  open       boolean not null default true,   -- la jornada seguía abierta al guardar
+  updated_at timestamptz not null default now(),
+  primary key (user_id, date));
+create index if not exists rmo_days_team on public.rmo_days (team_id, date);
+alter table public.rmo_days enable row level security;
+drop policy if exists rmo_read on public.rmo_days;
+create policy rmo_read on public.rmo_days for select to authenticated using (team_id = (select public.my_team()));
+grant select on public.rmo_days to authenticated;
+revoke insert, update, delete, truncate on public.rmo_days from authenticated;
+revoke all on public.rmo_days from anon;
+create or replace function public.rmo_save(rows jsonb) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); r jsonb; u uuid; d date; n int := 0; lead boolean := coalesce(public.my_role(), '') in ('admin', 'leader');
+begin
+  if t is null then raise exception 'sin mesa'; end if;
+  if rows is null or jsonb_typeof(rows) <> 'array' or jsonb_array_length(rows) > 50 then raise exception 'BAD: lista de hasta 50'; end if;
+  for r in select * from jsonb_array_elements(rows) loop
+    u := case when r->>'uid' ~ '^[0-9a-f-]{36}$' then (r->>'uid')::uuid else auth.uid() end;
+    if u <> auth.uid() and not lead then continue; end if; -- lo de otro solo lo guarda el team leader o el admin
+    if not exists (select 1 from public.profiles p where p.id = u and p.team_id = t) then continue; end if;
+    d := case when r->>'date' ~ '^\d{4}-\d\d-\d\d$' then (r->>'date')::date else current_date end;
+    if d > current_date or d < current_date - 2 then continue; end if; -- solo hoy y los dos días anteriores
+    insert into public.rmo_days (team_id, user_id, date, n, talk_ms, dead_ms, req, q, open, updated_at)
+      values (t, u, d, greatest(0, least(100000, coalesce((r->>'n')::int, 0))), greatest(0, least(86400000, coalesce((r->>'talk')::int, 0))), greatest(0, least(86400000, coalesce((r->>'dead')::int, 0))),
+        case when r->>'req' ~ '^\d{1,6}$' then (r->>'req')::int end, case when r->>'q' in ('1','2','3') then (r->>'q')::smallint end, coalesce(r->>'open', 'true') = 'true', now())
+      on conflict (user_id, date) do update set n = excluded.n, talk_ms = excluded.talk_ms, dead_ms = excluded.dead_ms, req = excluded.req, q = excluded.q, open = excluded.open, updated_at = now();
+    n := n + 1;
+  end loop;
+  return json_build_object('ok', true, 'n', n);
+end $$;
+revoke all on function public.rmo_save(jsonb) from public, anon;
+grant execute on function public.rmo_save(jsonb) to authenticated;
+
 -- se escriben solo por acá: de a 500, con la hora del toque (la extensión las guarda si Vitalis está cerrado)
 create or replace function public.calls_add(rows jsonb) returns json
   language plpgsql security definer set search_path = public as $$
