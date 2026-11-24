@@ -3,8 +3,8 @@
    Sin tablas nuevas: sale de las ventas (`team`), los clientes del CRM (`crm_clients`, por rango de registro: `campLoad`),
    el RMO guardado por día (`rmo_days`) y el de hoy (`ritmo`).
    Período: Hoy · cada semana del mes · el mes (y el mes anterior con ‹ ›). Cada número va con el del período anterior y una flecha.
-   1) La tabla de la mesa: por agente, FTDs · CR (%) · RMO.   2) El embudo: registrados → atendieron → boleto → FTD.
-   3) Lead Quality: por afiliador (y adentro campaña · país): atienden, inválidos, depositan, días al depósito y dónde terminan sus leads.
+   1) La tabla de la mesa: por agente, FTDs · CR (%) · RMO · velocidad al new.   2) El embudo: news → llamados → depositaron (new · late).
+   3) Lead Quality: por afiliador (y adentro campaña · país): llamados, depositan, late, días al depósito y en qué quedaron sus leads.
    La ven team leader y admin (botón Gerencia) y el rol `director`, que solo ve esto (sin clientes, chat ni cola).
    ============================================================ */
 let gerP={ym:ymNow(),k:'mes'},gerBusy=false;
@@ -48,40 +48,37 @@ function gerTabla(R,rows,prevRows){
     :'<div class="p-empty">Sin datos en el período.</div>'}</section>`;
 }
 /* ---------- el embudo ---------- */
-const BOLETO=['pending','failed'];
 function embudoDe(rows){
-  const S=soldIdx(),o={reg:0,at:0,bol:0,ftd:0,no:0,inv:0,esp:0};
-  for(const r of rows){const paid=!!S.get(ckey(r.brand,r.id))||paidCrm(r);o.reg++;
-    if(paid){o.at++;o.bol++;o.ftd++;continue}
-    if(ATIENDEN.includes(r.grp)){o.at++;if(BOLETO.includes(r.grp))o.bol++}
-    else if(r.grp==='invalid')o.inv++;else if(NO_ATIENDEN.includes(r.grp))o.no++;else o.esp++}
+  const S=soldIdx(),o={reg:0,at:0,ftd:0,nw:0,lt:0,no:0};
+  for(const r of rows){const f=S.get(ckey(r.brand,r.id)),paid=!!f||paidCrm(r);o.reg++;
+    if(paid){o.at++;o.ftd++;const same=f?!isLate(f):!!(r.ftd&&r.ftd.slice(0,10)===regDay(r));if(same)o.nw++;else o.lt++;continue}
+    if(llamado(r))o.at++;else o.no++}
   return o;
 }
 function gerEmbudo(R,rows,prev){
-  const E=embudoDe(rows),P=embudoDe(prev),st=[['Registrados',E.reg,P.reg,null],['Atendieron',E.at,P.at,E.reg],['Boleto creado',E.bol,P.bol,E.at],['FTD',E.ftd,P.ftd,E.bol]];
+  const E=embudoDe(rows),P=embudoDe(prev),st=[['News',E.reg,P.reg,null],['Llamados',E.at,P.at,E.reg],['Depositaron',E.ftd,P.ftd,E.at]];
   const mx=E.reg||1;
-  const steps=st.map(([l,v,pv,base],i)=>`<div class="emb-s"><div class="emb-l"><span>${l}</span><b>${nf(v)}</b> ${arrow(v,pv)}</div><div class="emb-b"><i style="width:${Math.max(v?2:0,v/mx*100)}%"></i></div><div class="emb-p">${i?`${E.reg?pct(v/E.reg):'—'} de los registrados${base?` · ${pct(v/base)} del paso anterior`:''}`:`${E.no?`${pct(E.no/E.reg)} no atendieron`:''}${E.inv?` · ${pct(E.inv/E.reg)} inválidos`:''}${E.esp?` · ${pct(E.esp/E.reg)} todavía sin resultado`:''}`}</div></div>`).join('');
+  const steps=st.map(([l,v,pv,base],i)=>`<div class="emb-s"><div class="emb-l"><span>${l}</span><b>${nf(v)}</b> ${arrow(v,pv)}</div><div class="emb-b"><i style="width:${Math.max(v?2:0,v/mx*100)}%"></i></div><div class="emb-p">${i?`${E.reg?pct(v/E.reg):'—'} de los news${base?` · ${pct(v/base)} del paso anterior`:''}${i===2&&E.ftd?` · ${E.nw} el mismo día, ${E.lt} late`:''}`:`${E.no?`${pct(E.no/E.reg)} todavía sin llamar`:'todos llamados'}`}</div></div>`).join('');
   // por agente
   const by=new Map();for(const r of rows){const u=convOwner(r)||'';(by.get(u)||by.set(u,[]).get(u)).push(r)}
   const A=gerAgents().map(m=>({m,e:embudoDe(by.get(m.id)||[])})).filter(x=>x.e.reg).sort((a,b)=>b.e.ftd-a.e.ftd||b.e.reg-a.e.reg);
   const pc=(a,b)=>b?`<b>${pct(a/b)}</b> <span class="d">${a}</span>`:'<span class="d">—</span>';
-  const tr=A.map(({m,e})=>`<tr><td><span class="eq-who">${avatar(m.name)}${esc(m.name)}</span></td><td class="r">${e.reg}</td><td class="r">${pc(e.at,e.reg)}</td><td class="r">${pc(e.bol,e.reg)}</td><td class="r">${pc(e.ftd,e.reg)}</td></tr>`).join('');
-  return `<section class="card"><div class="card-h"><h3>El embudo</h3><span class="p-sub">de los registrados en el período, dónde se queda cada cliente · ${esc(R.l)}</span></div>
-    ${E.reg?`<div class="emb">${steps}</div>${A.length?`<details class="ger-d" data-k="emb-ag"><summary>Por agente <span class="d">(del primero que lo llamó)</span></summary><div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">Registrados</th><th class="r">Atendieron</th><th class="r">Boleto</th><th class="r">FTD</th></tr></thead><tbody>${tr}</tbody></table></div></details>`:''}`
-    :'<div class="p-empty">Sin registrados en el período.</div>'}</section>`;
+  const tr=A.map(({m,e})=>`<tr><td><span class="eq-who">${avatar(m.name)}${esc(m.name)}</span></td><td class="r">${e.reg}</td><td class="r">${pc(e.at,e.reg)}</td><td class="r">${pc(e.ftd,e.reg)}</td><td class="r">${e.ftd?`${e.nw} · ${e.lt}`:'<span class="d">—</span>'}</td></tr>`).join('');
+  return `<section class="card"><div class="card-h"><h3>El embudo</h3><span class="p-sub">de los news del período: cuántos se llamaron y cuántos depositaron · ${esc(R.l)}</span></div>
+    ${E.reg?`<div class="emb">${steps}</div>${A.length?`<details class="ger-d" data-k="emb-ag"><summary>Por agente <span class="d">(del primero que lo llamó)</span></summary><div class="p-tablewrap"><table class="pt"><thead><tr><th>Agente</th><th class="r">News</th><th class="r">Llamados</th><th class="r">Depositaron</th><th class="r">New · late</th></tr></thead><tbody>${tr}</tbody></table></div></details>`:''}`
+    :'<div class="p-empty">Sin news en el período.</div>'}</section>`;
 }
 /* ---------- Lead Quality ---------- */
 function lqGroups(rows){ // por afiliador, y adentro por campaña · país
   const S=soldIdx(),m=new Map();
-  const mk=(k,aff,camp,pais)=>({k,aff,camp,pais,reg:0,at:0,no:0,inv:0,dep:0,days:[],grp:{},sub:new Map()});
-  const add=(g,r)=>{const f=S.get(ckey(r.brand,r.id)),paid=!!f||paidCrm(r),grp=paid?'ftd':CGK.has(r.grp)?r.grp:'otro';
+  const mk=(k,aff,camp,pais)=>({k,aff,camp,pais,reg:0,at:0,no:0,dep:0,lt:0,days:[],grp:{},sub:new Map()});
+  const add=(g,r)=>{const f=S.get(ckey(r.brand,r.id)),paid=!!f||paidCrm(r),grp=cgOf(r,paid);
     g.reg++;g.grp[grp]=(g.grp[grp]||0)+1;
-    if(paid||ATIENDEN.includes(r.grp))g.at++;else if(NO_ATIENDEN.includes(r.grp))g.no++;
-    if(r.grp==='invalid')g.inv++;
-    if(paid){g.dep++;const fd=f?f.date:r.ftd&&r.ftd.slice(0,10),rd=regDay(r);if(fd&&rd)g.days.push(Math.max(0,Math.round((parseYMD(fd)-parseYMD(rd))/864e5)))}};
+    if(paid||llamado(r))g.at++;else g.no++;
+    if(paid){g.dep++;const same=f?!isLate(f):!!(r.ftd&&r.ftd.slice(0,10)===regDay(r));if(!same)g.lt++;const fd=f?f.date:r.ftd&&r.ftd.slice(0,10),rd=regDay(r);if(fd&&rd)g.days.push(Math.max(0,Math.round((parseYMD(fd)-parseYMD(rd))/864e5)))}};
   for(const r of rows){const aff=String(r.aff||'').trim()||'sin afiliador';let g=m.get(norm(aff));if(!g)m.set(norm(aff),g=mk(norm(aff),aff,'','' ));add(g,r);
     const sk=comboKey(aff,r.camp,r.country);let s=g.sub.get(sk);if(!s)g.sub.set(sk,s=mk(sk,aff,camN(r.camp)||'sin campaña',paisOf(r.country)||'sin país'));add(s,r)}
-  const fin=g=>{g.atP=g.at+g.no?g.at/(g.at+g.no):null;g.invP=g.reg?g.inv/g.reg:0;g.depP=g.reg?g.dep/g.reg:0;g.dmed=g.days.length?quant(g.days,.5):null;g.subs=[...g.sub.values()].sort((a,b)=>b.reg-a.reg);g.subs.forEach(fin);return g};
+  const fin=g=>{g.atP=g.reg?g.at/g.reg:null;g.ltP=g.dep?g.lt/g.dep:0;g.depP=g.reg?g.dep/g.reg:0;g.dmed=g.days.length?quant(g.days,.5):null;g.subs=[...g.sub.values()].sort((a,b)=>b.reg-a.reg);g.subs.forEach(fin);return g};
   return [...m.values()].map(fin).sort((a,b)=>b.reg-a.reg);
 }
 const lqDays=d=>d==null?'<span class="d">—</span>':d===0?'el mismo día':d===1?'1 día':`${nf(d,0)} días`;
@@ -89,15 +86,15 @@ function lqRow(g,avg,sub){
   const few=g.reg<POCOS,cls=v=>few?'':v>=avg*1.25?'ok':v<=avg*.6?'hot':'';
   return `<tr class="${sub?'lq-sub':'lq-aff'}"><td>${sub?`<span class="d">${esc(g.camp)} · ${esc(g.pais)}</span>`:`<b>${esc(g.aff)}</b>${g.subs.length>1?` <span class="d">${g.subs.length} campañas</span>`:''}`}</td>
     <td class="r">${g.reg}${few?' <span class="d" title="con menos de 10 registrados, los porcentajes dicen poco">*</span>':''}</td>
-    <td class="r">${g.atP==null?'<span class="d">—</span>':pct(g.atP)}</td><td class="r ${g.invP>=.2&&!few?'hot':''}">${pct(g.invP)}</td>
-    <td class="r"><b class="${cls(g.depP)}">${pct(g.depP)}</b> <span class="d">${g.dep}</span></td><td class="r">${lqDays(g.dmed)}</td>
+    <td class="r">${g.atP==null?'<span class="d">—</span>':pct(g.atP)}</td>
+    <td class="r"><b class="${cls(g.depP)}">${pct(g.depP)}</b> <span class="d">${g.dep}</span></td><td class="r">${g.dep?pct(g.ltP):'<span class="d">—</span>'}</td><td class="r">${lqDays(g.dmed)}</td>
     <td>${stBar(g)}<div class="lq-leg">${CG.filter(([k])=>g.grp[k]).map(([k,l])=>`<span><i class="cg-${k}"></i>${esc(l)} <b>${pct(g.grp[k]/g.reg)}</b></span>`).join('')}</div></td></tr>`;
 }
 function gerLQ(R,rows){
   const G=lqGroups(rows),tot=rows.length,avg=tot?G.reduce((a,g)=>a+g.dep,0)/tot:0;
   const body=G.map(g=>lqRow(g,avg)+(g.subs.length>1?g.subs.map(s=>lqRow(s,avg,true)).join(''):'')).join('');
   return `<section class="card ger-lq"><div class="card-h"><h3>Lead Quality</h3><span class="p-sub">por afiliador y campaña: qué leads mandan y dónde terminan · ${esc(R.l)} · la mesa deposita ${tot?pct(avg):'—'} de sus leads</span></div>
-    ${G.length?`<div class="p-tablewrap"><table class="pt lq-t"><thead><tr><th>Afiliador · campaña · país</th><th class="r">Leads</th><th class="r" title="de los que ya tienen resultado, cuántos atendieron">Atienden</th><th class="r">Inválidos</th><th class="r">Depositan</th><th class="r" title="mediana de días del registro al depósito">Depositan a los</th><th>Dónde terminan</th></tr></thead><tbody>${body}</tbody></table></div>
+    ${G.length?`<div class="p-tablewrap"><table class="pt lq-t"><thead><tr><th>Afiliador · campaña · país</th><th class="r">Leads</th><th class="r" title="de los news, cuántos ya se llamaron">Llamados</th><th class="r">Depositan</th><th class="r" title="de los que depositan, cuántos otro día que el del registro">Late</th><th class="r" title="mediana de días del registro al depósito">Depositan a los</th><th>En qué quedaron</th></tr></thead><tbody>${body}</tbody></table></div>
     <p class="p-sub" style="margin:8px 2px 0">En verde, deposita bastante más que la mesa; en rojo, bastante menos. * pocos leads. Los porcentajes de "dónde terminan" son sobre los leads del afiliador.</p>`
     :'<div class="p-empty">Sin leads en el período.</div>'}</section>`;
 }
@@ -114,18 +111,18 @@ async function teamsLoad(){try{gerTeams=await Q(sb.rpc('teams_list'))}catch(e){g
 const dPct=(a,b)=>b?pct(a/b):'<span class="d">—</span>';
 function companyCard(R,C){
   if(!C||!C.teams)return `<section class="card"><div class="card-h"><h3>Todas las mesas</h3></div><div class="p-empty">No se pudo cargar.</div></section>`;
-  const T=C.teams,S=T.reduce((o,t)=>{for(const k of ['ftd','ftd_new','reg','atend','boleto','dep','agents'])o[k]=(o[k]||0)+(+t[k]||0);return o},{});
+  const T=C.teams,S=T.reduce((o,t)=>{for(const k of ['ftd','ftd_new','reg','atend','dep','agents'])o[k]=(o[k]||0)+(+t[k]||0);return o},{});
   const q=d=>d==null?'<span class="d">—</span>':`<span class="qb q${d<Q_MIN[0]?1:d<Q_MIN[1]?2:3}">Q${d<Q_MIN[0]?1:d<Q_MIN[1]?2:3}</span> <span class="d">${esc(minsTxt(+d))}/día</span>`;
   const row=t=>`<tr${t.id===profile.team_id?' class="cur"':''}><td><b>${esc(t.name)}</b>${t.id===profile.team_id?' <span class="d">(estás acá)</span>':`<button type="button" class="ib" data-gerin="${esc(t.slug)}" title="Pasar a esta mesa">Entrar</button>`}<div class="d">${plural(+t.agents,'agente')}</div></td>
     <td class="r"><b>${t.ftd}</b></td><td class="r"><b>${dPct(+t.ftd_new,+t.reg)}</b> <span class="d">${t.ftd_new} de ${t.reg}</span></td><td>${q(t.dead)}</td>
-    <td class="r">${nf(+t.reg)}</td><td class="r">${dPct(+t.atend,+t.reg)}</td><td class="r">${dPct(+t.boleto,+t.reg)}</td><td class="r">${dPct(+t.dep,+t.reg)}</td></tr>`;
-  const lq=new Map();for(const t of T)for(const a of t.affs||[]){const k=norm(a.aff);const o=lq.get(k)||lq.set(k,{aff:a.aff,reg:0,dep:0,inv:0,at:0,noat:0,by:[]}).get(k);for(const f of ['reg','dep','inv','at','noat'])o[f]+=+a[f]||0;o.by.push([t.name,+a.reg,+a.dep])}
+    <td class="r">${nf(+t.reg)}</td><td class="r">${dPct(+t.atend,+t.reg)}</td><td class="r">${dPct(+t.dep,+t.reg)}</td></tr>`;
+  const lq=new Map();for(const t of T)for(const a of t.affs||[]){const k=norm(a.aff);const o=lq.get(k)||lq.set(k,{aff:a.aff,reg:0,dep:0,at:0,by:[]}).get(k);for(const f of ['reg','dep','at'])o[f]+=+a[f]||0;o.by.push([t.name,+a.reg,+a.dep])}
   const L=[...lq.values()].sort((a,b)=>b.reg-a.reg).slice(0,15),avg=S.reg?S.dep/S.reg:0;
   return `<section class="card ger-co"><div class="card-h"><h3>Todas las mesas</h3><span class="p-sub">${esc(R.l)} · ${esc(R.t)} · mesa contra mesa</span></div>
-    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th class="r">FTDs</th><th class="r" title="de los registrados en el período, cuántos depositaron el mismo día">CR (%)</th><th title="tiempo muerto promedio por agente y día">RMO</th><th class="r">Leads</th><th class="r">Atendieron</th><th class="r">Boleto</th><th class="r">Depositan</th></tr></thead>
-    <tbody>${T.map(row).join('')}</tbody><tfoot><tr><td><b>La empresa</b> <span class="d">${plural(S.agents,'agente')}</span></td><td class="r"><b>${S.ftd}</b></td><td class="r"><b>${dPct(S.ftd_new,S.reg)}</b></td><td></td><td class="r">${nf(S.reg)}</td><td class="r">${dPct(S.atend,S.reg)}</td><td class="r">${dPct(S.boleto,S.reg)}</td><td class="r">${dPct(S.dep,S.reg)}</td></tr></tfoot></table></div>
-    ${L.length?`<details class="ger-d" data-k="co-lq"><summary>Lead Quality de la empresa <span class="d">(por afiliador, todas las mesas juntas)</span></summary><div class="p-tablewrap"><table class="pt"><thead><tr><th>Afiliador</th><th class="r">Leads</th><th class="r">Atienden</th><th class="r">Inválidos</th><th class="r">Depositan</th><th>Por mesa</th></tr></thead><tbody>
-      ${L.map(a=>`<tr><td><b>${esc(a.aff)}</b></td><td class="r">${a.reg}</td><td class="r">${dPct(a.at,a.at+a.noat)}</td><td class="r">${dPct(a.inv,a.reg)}</td><td class="r"><b class="${a.reg>=POCOS?(a.dep/a.reg>=avg*1.25?'ok':a.dep/a.reg<=avg*.6?'hot':''):''}">${dPct(a.dep,a.reg)}</b></td><td class="d">${a.by.map(([n,r,d])=>`${esc(n)} ${d}/${r}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`;
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th class="r">FTDs</th><th class="r" title="de los registrados en el período, cuántos depositaron el mismo día">CR (%)</th><th title="tiempo muerto promedio por agente y día">RMO</th><th class="r">Leads</th><th class="r" title="news que ya se llamaron">Llamados</th><th class="r">Depositan</th></tr></thead>
+    <tbody>${T.map(row).join('')}</tbody><tfoot><tr><td><b>La empresa</b> <span class="d">${plural(S.agents,'agente')}</span></td><td class="r"><b>${S.ftd}</b></td><td class="r"><b>${dPct(S.ftd_new,S.reg)}</b></td><td></td><td class="r">${nf(S.reg)}</td><td class="r">${dPct(S.atend,S.reg)}</td><td class="r">${dPct(S.dep,S.reg)}</td></tr></tfoot></table></div>
+    ${L.length?`<details class="ger-d" data-k="co-lq"><summary>Lead Quality de la empresa <span class="d">(por afiliador, todas las mesas juntas)</span></summary><div class="p-tablewrap"><table class="pt"><thead><tr><th>Afiliador</th><th class="r">Leads</th><th class="r">Llamados</th><th class="r">Depositan</th><th>Por mesa</th></tr></thead><tbody>
+      ${L.map(a=>`<tr><td><b>${esc(a.aff)}</b></td><td class="r">${a.reg}</td><td class="r">${dPct(a.at,a.reg)}</td><td class="r"><b class="${a.reg>=POCOS?(a.dep/a.reg>=avg*1.25?'ok':a.dep/a.reg<=avg*.6?'hot':''):''}">${dPct(a.dep,a.reg)}</b></td><td class="d">${a.by.map(([n,r,d])=>`${esc(n)} ${d}/${r}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`;
 }
 function mesasCard(T){ // las mesas (solo el dueño): la lista con su link y "Nueva mesa"
   if(!T)return '';

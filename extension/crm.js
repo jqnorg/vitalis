@@ -230,8 +230,7 @@
   // la elegida se actualiza cada 10 s y avisa de los new; las demás quedan quietas y solo suman clientes al registro
   let myTab = null, watches = {}, watch = null, watched = false, owner = null, noTableSince = 0;
   // estación (el Chrome del team leader): esta pestaña puede ser la de una vista; la extensión la actualiza a su ritmo, solo en horario
-  const SV = [['todo', 'Clientes (todos, por Modified Time)', 10], ['trx', 'Transactions', 15], ['news', 'News', 10], ['cola', 'Cola', 30], ['agen', 'Agendables', 60], ['cerr', 'Cerrados', 600]];
-  const SV_OLD = ['news', 'cola', 'agen', 'cerr']; // las de antes: con la de Clientes no hacen falta
+  const SV = [['news', 'News (New y Talking)', 10], ['trx', 'Transactions', 15]]; // solo news y FTDs (24/11/2026)
   let stProb = '';
   const ST_HOURS = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 17 * 60 + 30 };
   let station = { views: {} }, stView = '', stHoursCfg = null;
@@ -282,48 +281,8 @@
       else { reply({ reload: true }); setTimeout(() => location.reload(), 50); }
       return false;
     }
-    if (m && m.type === 'crm-page') { // el pase de la estación: pasar a la página siguiente, o volver a la primera (solo clics en el paginado)
-      if (document.hasFocus() && Date.now() - lastInput < 15000) { reply({ skipped: true }); return false; }
-      const P = pager();
-      if (!P.ok) { reply({ err: 'sin-paginado', diag: pagerDiag() }); return false; }
-      const b = m.dir === 'first' ? P.first : P.next;
-      stLast = ''; // después de un paso del pase, la lectura se manda siempre (aunque la página se vea igual)
-      if (m.dir === 'first' && (P.page === 1 || (!b && P.prev && pgOff(P.prev)))) { reply({ ok: true, page: 1, same: true }); setTimeout(() => refresh(true), 300); return false; }
-      if (!b) { if (m.dir === 'first') { reply({ reload: true }); setTimeout(() => location.reload(), 50); } else reply({ err: 'sin-siguiente', last: true, page: P.page }); return false; }
-      refAt = Date.now();
-      b.click(); reply({ ok: true, page: P.page, last: P.last }); setTimeout(() => refresh(true), 2500);
-      return false;
-    }
     return false;
   });
-  // ---- el paginado de la lista (para el pase de la estación): botón siguiente, primera, en qué página estamos y si es la última ----
-  const PG_BOX = '.mat-mdc-paginator,.mat-paginator,mat-paginator,.ant-pagination,.dx-pager,.p-paginator,.pagination,[class*=paginat],[class*=pager]';
-  const vis = (e) => !!e && e.offsetParent !== null && !(ui && ui.h.contains(e));
-  const pgLab = (b) => ((b.getAttribute('aria-label') || '') + ' ' + (b.getAttribute('title') || '') + ' ' + (b.className && typeof b.className === 'string' ? b.className : '') + ' ' + (b.textContent || '')).toLowerCase();
-  const pgOff = (b) => b.disabled || b.getAttribute('aria-disabled') === 'true' || /\bdisabled\b/.test(String(b.className || '')) || !!b.closest('.ant-pagination-disabled,.disabled,[aria-disabled=true]');
-  function pager() {
-    const boxes = [...document.querySelectorAll(PG_BOX)].filter(vis).slice(0, 10);
-    const btns = boxes.length ? boxes.flatMap((x) => [...x.querySelectorAll('button,a,[role=button],li')]).filter(vis).slice(0, 400)
-      : [...document.querySelectorAll('button,a,[role=button]')].filter((b) => vis(b) && /pag|next|prev|first|siguiente|anterior/i.test((b.getAttribute('aria-label') || '') + ' ' + String(b.className || ''))).slice(0, 40); // sin caja de paginado: solo botones que lo digan en su etiqueta o clase
-    const find = (re) => btns.find((b) => re.test(pgLab(b)));
-    const next = find(/next|siguiente|navigation-next|dx-next|ant-pagination-next|p-paginator-next|^\s*[›>»]\s*$/) || null;
-    const first = find(/first|primera|navigation-first|dx-first|p-paginator-first|^\s*[«⇤]\s*$|ant-pagination-item-1\b/) || null;
-    const prev = find(/prev|anterior|navigation-previous|dx-prev|ant-pagination-prev|p-paginator-prev|^\s*[‹<«]\s*$/) || null;
-    const txt = boxes.map((x) => (x.textContent || '').replace(/\s+/g, ' ')).join(' | ').slice(0, 400);
-    let page = null, pages = null;
-    let m = txt.match(/(?:page|p[aá]g(?:ina)?)\s*(\d+)\s*(?:of|de|\/)\s*(\d+)/i); if (m) { page = +m[1]; pages = +m[2]; }
-    if (page == null) { m = txt.match(/(\d[\d.,]*)\s*[-–]\s*(\d[\d.,]*)\s*(?:of|de)\s*(\d[\d.,]*)/i); if (m) { const a = +m[1].replace(/[.,]/g, ''), b = +m[2].replace(/[.,]/g, ''), n = +m[3].replace(/[.,]/g, ''), sz = b - a + 1; if (sz > 0) { page = Math.ceil(b / sz); pages = Math.ceil(n / sz); } } }
-    if (page == null) { const act = btns.find((b) => /\bactive\b|ant-pagination-item-active|mat-mdc-paginator-page-active|dx-selection|p-highlight/i.test(String(b.className || '')) || b.getAttribute('aria-current')); if (act && /^\d+$/.test((act.textContent || '').trim())) page = +act.textContent.trim(); }
-    const last = next ? pgOff(next) : pages != null && page != null ? page >= pages : false;
-    const ok = !!(next || first || prev || page != null);
-    return { ok, next: next && !pgOff(next) ? (next.closest('button,a,[role=button]') || next) : null, first: first && !pgOff(first) ? (first.closest('button,a,[role=button]') || first) : null, prev, page: page == null && prev && pgOff(prev) ? 1 : page, pages, last, txt };
-  }
-  function pagerDiag() { // solo la forma del paginado (etiquetas, clases, textos con los números tapados): ningún dato de clientes
-    const sh = (e) => ({ tag: e.tagName.toLowerCase(), cls: String(e.className || '').slice(0, 100), aria: (e.getAttribute('aria-label') || '').slice(0, 40), txt: (e.textContent || '').replace(/\s+/g, ' ').replace(/\d/g, '#').trim().slice(0, 60), off: pgOff(e) });
-    const boxes = [...document.querySelectorAll(PG_BOX)].slice(0, 6);
-    return JSON.stringify({ v: VER, page: location.pathname + location.hash.replace(/\d/g, '#').slice(0, 60), boxes: boxes.map((x) => ({ ...sh(x), vis: vis(x), btns: [...x.querySelectorAll('button,a,[role=button],li')].slice(0, 20).map(sh) })),
-      tail: !boxes.length ? [...document.querySelectorAll('button,a,[role=button]')].filter(vis).slice(-25).map(sh) : [] });
-  }
   let lastReport = '';
   function report(clients, force) {
     if (!watched) return;
@@ -399,7 +358,7 @@
     curFrom = 'panel'; sendCurrent(id, pc && pc.id === id ? pc.name : '', true); // a quien llamás es tu cliente actual
   }, true);
 
-  // en la pestaña que se actualiza: un Talking que desaparece de la lista ya cambió de status en el CRM.
+  // en la pestaña que se actualiza: un New o Talking que desaparece de la lista ya cambió de status en el CRM (dejó de ser new).
   // Cuenta si sigue sin estar 12 s (más de una vuelta de actualización), en la misma lista, y no lo empujaron a la página siguiente los que entraron.
   let gPrev = null; const gCand = new Map(), gSent = new Set();
   function goneCheck(all) {
@@ -421,7 +380,7 @@
       if (now - c.since >= 12000) { gCand.delete(k); if (!gSent.has(k)) { gSent.add(k); sentSig.delete(k); out.push({ id: c.row.id, brand: c.row.brand, gone: 1 }); } }
     }
     for (const k of ids) gSent.delete(k);
-    gPrev = { loc, ids, set: cur, talk: new Map(L.filter((c) => /^talking\b/i.test(c.status)).map((c) => [keyOf(c), c])) };
+    gPrev = { loc, ids, set: cur, talk: new Map(L.filter((c) => /^(talking|new)\b/i.test(c.status)).map((c) => [keyOf(c), c])) };
     if (out.length) send({ type: 'crm-seen', rows: out });
   }
 
@@ -494,13 +453,13 @@
     root.getElementById('stv').addEventListener('change', async (e) => { // estación: qué vista es esta pestaña
       const v = e.target.value, r = await send({ type: 'station-set', view: v });
       stMsg = !r || r.err ? ['err', (r && r.err) || 'La extensión se actualizó: recargá la página.'] : ['ok', (v ? 'Listo: la fijé y se actualiza sola, solo en horario. Si la cerrás, vuelve.' : 'Ya no es parte de la estación.')
-        + (r.freed ? ` Las ${r.freed} pestañas de antes (News, Cola…) ya no hacen falta: podés cerrarlas.` : '')];
+        + (r.freed ? ` Las ${r.freed} pestañas de antes ya no hacen falta: podés cerrarlas.` : '')];
       clearTimeout(stMsgT); stMsgT = setTimeout(() => { stMsg = null; render(); }, 8000); render();
     });
     root.getElementById('who').addEventListener('change', (e) => { whoSel = e.target.value; render(); });
     root.getElementById('min').addEventListener('click', () => root.querySelector('.box').classList.toggle('min'));
     root.getElementById('wids').addEventListener('click', (e) => { if (e.target.closest('[data-diag]')) diagClients(); });
-    root.getElementById('stids').addEventListener('click', (e) => { if (e.target.closest('[data-pgdiag]')) navigator.clipboard.writeText(pagerDiag()).then(() => setMsg('Copiado (sin datos de clientes). Mandáselo a quien mantiene Vitalis.', 'ok', 10000), () => setMsg('No pude copiar.', 'err')); });
+    root.getElementById('stids').addEventListener('click', (e) => { if (false) navigator.clipboard.writeText('').then(() => setMsg('Copiado (sin datos de clientes). Mandáselo a quien mantiene Vitalis.', 'ok', 10000), () => setMsg('No pude copiar.', 'err')); });
     root.getElementById('msg').addEventListener('click', (e) => { if (e.target.closest('[data-open]')) send({ type: 'open-panel' }); });
     for (const e of document.querySelectorAll('#ftd-crm-button')) e.remove(); // el panel de una copia vieja
     document.documentElement.appendChild(h);
@@ -550,18 +509,15 @@
     const stOk = isLeader() && !!(sales || seen || stView);
     $('sStation').hidden = !stOk;
     if (stOk) {
-      const other = new Set(Object.entries(station.views || {}).filter(([, c]) => c.tabId !== myTab).map(([k]) => k)), todo = other.has('todo') || stView === 'todo';
-      const opts = [['', 'No es parte de la estación'], ...SV.filter(([k]) => !todo || !SV_OLD.includes(k) || k === stView).map(([k, n, e]) => [k, `${n}, cada ${e < 60 ? e + ' s' : e / 60 + ' min'}${other.has(k) ? ' (ya hay una: la reemplaza)' : ''}`])];
+      const other = new Set(Object.entries(station.views || {}).filter(([, c]) => c.tabId !== myTab).map(([k]) => k));
+      const opts = [['', 'No es parte de la estación'], ...SV.map(([k, n, e]) => [k, `${n}, cada ${e < 60 ? e + ' s' : e / 60 + ' min'}${other.has(k) ? ' (ya hay una: la reemplaza)' : ''}`])];
       const sel = $('stv'), sig = opts.map((o) => o.join(':')).join('|');
       if (sel.dataset.sig !== sig) { sel.innerHTML = opts.map(([v, l]) => `<option value="${v}">${escH(l)}</option>`).join(''); sel.dataset.sig = sig; }
       sel.value = stView;
       const sv = SV.find((x) => x[0] === stView), nv = Object.keys(station.views || {}).length;
       $('stst').innerHTML = stView ? `<span class="on">Estación: la pestaña de ${escH(sv ? sv[1].replace(/ \(.*/, '') : stView)}</span>${stInHours() ? '' : ' · fuera de horario, quieta'}` : `Estación${nv ? ` · ${plural(nv, 'vista', 'vistas')}` : ''}: ¿qué vista es esta pestaña?`;
-      const bad = stView === 'todo' && stProb === 'orden' && !stMsg, noPg = stView === 'todo' && stProb === 'paginado' && !stMsg && !bad;
-      $('stids').className = 'ids' + (stMsg ? ' ' + stMsg[0] : bad || noPg ? ' err' : '');
-      $('stids').innerHTML = stMsg ? escH(stMsg[1]) : bad ? 'No está ordenada por Modified Time: tocá esa columna hasta que quede la más nueva arriba.'
-        : noPg ? 'No encuentro el paginado de la lista (para el pase de todas las páginas). <button class="lnk" data-pgdiag>Copiar diagnóstico</button>'
-        : stView === 'todo' ? 'Fijada. Que quede con todos los status, ordenada por Modified Time (la más nueva arriba) y 100 por página. Cada hora recorre todas las páginas.' : stView ? 'Fijada: se actualiza sola y, si la cerrás, vuelve.' : '';
+      $('stids').className = 'ids' + (stMsg ? ' ' + stMsg[0] : '');
+      $('stids').innerHTML = stMsg ? escH(stMsg[1]) : stView === 'news' ? 'Fijada. Que quede filtrada en New y Talking, con la columna Sales Status y 100 por página.' : stView ? 'Fijada: se actualiza sola y, si la cerrás, vuelve.' : '';
     }
     $('sWatch').hidden = !(sales || seen) || !!stView;
     if ((sales || seen) && !stView) {
@@ -588,7 +544,7 @@
   }
   function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } if (dk) { dk.h.remove(); dk = null; } clearInterval(dTimer); }
   /* ================= la mini ficha de Vitalis (abajo a la izquierda) ================= */
-  // El cliente actual en corto, el siguiente de la Cola y el turno: lo manda Vitalis y acá no se escribe nada en el CRM.
+  // El cliente actual en corto, el siguiente new y el turno: lo manda Vitalis y acá no se escribe nada en el CRM.
   // Si al perfil del cliente le falta algo, el formulario arranca abierto: se completa acá y lo guarda Vitalis (se copia en inglés).
   // Se minimiza (queda una pastilla, en todas las pestañas). El comentario se escribe acá y se copia solo en inglés.
   const TOP = (() => { try { return window.top === window; } catch (e) { return false; } })();
@@ -1153,9 +1109,7 @@
     const trx = stView === 'trx', list = trx ? sales : seen, statuses = {};
     if (!trx && seen) for (const c of seen) { const k = String(c.status || '').slice(0, 60); if (k) statuses[k] = (statuses[k] || 0) + 1; }
     const m = { type: 'station-scan', login: loginPage(), table: !!list, n: list ? list.length : 0, total: pagerTotal(), statuses };
-    if (stView === 'todo' && seen) { const o = seen.mod; m.ord = !o || !o.n ? 'sin' : o.n >= 3 && o.bad > Math.max(1, o.n * 0.05) ? 'mal' : 'ok'; m.old = (o && o.old) || ''; // la de Clientes sirve solo con el último que cambió arriba
-      m.ids = seen.slice(0, 500).map((c) => String(c.id || '')).filter(Boolean); m.brand = (seen.find((c) => c.brand) || {}).brand || ''; const P = pager(); m.pager = P.ok ? { page: P.page, pages: P.pages, last: P.last } : null; }
-    const sig = JSON.stringify([m.login, m.table, m.n, m.total, statuses, m.ord, m.pager, m.ids]);
+    const sig = JSON.stringify([m.login, m.table, m.n, m.total, statuses]);
     if (sig === stLast && Date.now() - stLastAt < 8000) return;
     stLast = sig; stLastAt = Date.now();
     send(m).then((r) => { const p = (r && r.problem) || ''; if (p !== stProb) { stProb = p; if (ui) render(); } });

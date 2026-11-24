@@ -238,7 +238,6 @@ function bindAgForm(form){
     const R=readAg(form);
     if(R.err){toast(R.err,'err');const el=form.querySelector(`[name=${R.k}]`);el.classList.add('bad');el.focus();return}
     if(parseDue(R.due)<new Date(Date.now()-6e4)){toast('Esa fecha y hora ya pasó.','err');form.querySelector('[name=ptime]').classList.add('bad');return}
-    if(await dncBlock(R.id))return;
     const n=pend.reduce((a,p)=>Math.max(a,p.n||0),0)+1;
     if(!await B.addPend({n,id:R.id,kw:R.kw,due:R.due,notified:false,done:false,created:new Date().toISOString()}))return;
     syncAgKw(R.id,R.kw);
@@ -520,7 +519,7 @@ const extOld=()=>extOn()&&/^\d/.test(EXT_VER)&&vcmp(extVer||'0',EXT_VER)<0; // l
 function postTop(msg){try{window.postMessage(msg,location.origin);return true}catch(e){return false}} // la extensión escucha en esta misma ventana
 function syncExt(){
   if(!ready)return;
-  const items=pend.filter(p=>!p.done&&!soldOf(p.id)&&!isDnc(p.id)).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
+  const items=pend.filter(p=>!p.done&&!soldOf(p.id)).map(p=>({k:p._id,n:p.n,id:p.id,kw:p.kw,due:parseDue(p.due).getTime()})).sort((a,b)=>a.due-b.due);
   // ventas que ya están en la mesa: el botón del CRM ofrece solo las nuevas
   const known={ids:team.map(f=>norm(f.brand||'')+'|'+norm(f.id)),txs:team.filter(f=>f.tx).map(f=>norm(f.brand||'')+'|'+f.tx)};
   const snips=activeSnips().map(s=>({s:s.shortcut,t:s.title||'',b:s.body}));
@@ -556,7 +555,6 @@ window.addEventListener('message',e=>{
     return;
   }
   if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return}
-  if(d&&d.type==='ftd-agenda-sweep'&&d.v===1&&d.sweep){const src=e.source;sweepFromExt(d.sweep).then(r=>{try{src.postMessage({type:'ftd-agenda-sweep-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // el pase completo de la pestaña de Clientes // la extensión de esta compu es la estación: cómo le fue con cada vista
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir')){dockCmd(d);return} // desde la mini ficha del CRM
@@ -644,8 +642,8 @@ function check(){
   for(const p of pend){
     if(p.done)continue;
     const d=parseDue(p.due);if(d>now)continue;
-    if(!p.notified){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true;continue}
-    const late=now-d;if(late<AG_RE||late>AG_RE_MAX||soldOf(p.id)||isDnc(p.id))continue;
+    if(!p.notified){if(!soldOf(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true;continue}
+    const late=now-d;if(late<AG_RE||late>AG_RE_MAX||soldOf(p.id))continue;
     const k=p._id,last=agRe[k]||+d;if(now-last>=AG_RE){agRe[k]=+now;refire(p,late)}
   }
   status();syncExt();
@@ -680,22 +678,22 @@ function ayuda(){
     <dt>Fechas</dt><dd>En <b>Período</b>: hoy, ayer, la semana, el mes o un mes entero. O días exactos en Desde y Hasta. Con un rango de hasta dos meses, el gráfico va por día.</dd>
     <dt>Filtros</dt><dd>Campaña y afiliador exactos. País sin importar tildes. Tocar un ranking filtra; otro toque lo saca.</dd>
     <dt>Duplicados</dt><dd>Mismo ID y misma marca en la mesa: avisa antes de guardar.</dd></dl>
-  <h4>Cola y clientes</h4><dl>
-    <dt>De quién es cada cliente</dt><dd>Del Sales Rep que se ve en el CRM. Si lo rotan dentro de la mesa, cambia solo.</dd>
-    <dt>Lo tiene otra mesa</dt><dd>Una vez por hora la estación recorre todas las páginas de Clientes del CRM. El que estaba y no aparece lo tiene otra mesa: sale de la Cola, del Siguiente y del pool, y la ficha lo dice. Si vuelve a aparecer, vuelve.</dd></dl>
+  <h4>News y clientes</h4><dl>
+    <dt>Solo news y FTDs</dt><dd>Vitalis mira dos cosas del CRM: los <b>news</b> (New y Talking) y los <b>depósitos</b>. Nada de otros status: cuando un new deja de ser New (se lo llamó y siguió su camino en el CRM), Vitalis lo sabe y ya no lo cuenta como new. Un new es new una sola vez.</dd>
+    <dt>De quién es cada new</dt><dd>Del Sales Rep que se ve en el CRM. Si lo rotan dentro de la mesa, cambia solo. La conversión es del primero que lo llamó.</dd>
+    <dt>Velocidad al new</dt><dd>Del registro a la primera llamada (el primer toque en Omega, Gizat o Voiso, o el paso a Talking). Se ve en el Manager, en Equipo y en el cierre del día.</dd></dl>
   <h4>RMO (tu ritmo del día)</h4><dl>
     <dt>Qué es</dt><dd>RMO es la medida del ritmo del día: cuántas llamadas, cuánto tiempo muerto y en qué franja vas. Se ve en el Inicio, en el Manager y en Equipo; "Ver qué pasó" lo abre con el detalle.</dd>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
-    <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking o quedó con un status de resultado. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
+    <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
     <dt>Lo que se pide por día</dt><dd>Una de dos, sin compensar: <b>250 llamadas</b> (lo fija el team leader) o <b>2 h 30 habladas</b>. Con cualquiera de las dos el día está cumplido.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
-  <h4>Ahora</h4><dl>
-    <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer a NA-4: el número son los días en que se lo llamó, no días de calendario; NA-5 queda para repasos). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
-    <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país. En Volver a llamar van primero los de un país que está en su hora fuerte (y lo dice en la fila); al Agendar, aparece un botón con la hora que más deposita su país.</dd>
-    <dt>Fuera</dt><dd>Not interested y Low potential (estos se pueden agendar). Do Not Call no aparece nunca y no se puede agendar. Los que ya depositaron salen solos.</dd>
-    <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliador y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
+  <h4>Cliente (tu Manager)</h4><dl>
+    <dt>El que tenés abierto</dt><dd>La ficha del cliente que abrís en el CRM, o del último new que entró: su campaña con sus números, el depósito (qué ofrecerle según Banking), el perfil que pide la gerencia, los comentarios de la mesa y la palabra clave. Cuando entra un new, la ficha se abre sola.</dd>
+    <dt>En New</dt><dd>La pastilla roja de la barra cuenta los tuyos que están en New: llamalos ya. Se va cuando dejan de ser New.</dd>
+    <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país: al Agendar, aparece un botón con la hora que más deposita el país del cliente.</dd></dl>
   <h4>Clientes</h4><dl>
-    <dt>Registro</dt><dd>Con la extensión, todos los clientes que ves en cualquier pestaña del CRM se guardan con su status, registro y agente. Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
+    <dt>Registro</dt><dd>Con la extensión, los news que ves en el CRM se guardan con su registro, campaña y agente (los otros status no). Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
     <dt>CR (%) (conversión)</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
   <h4>Banking</h4><dl>
     <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
@@ -735,13 +733,13 @@ function ayuda(){
     <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd>
     <dt>Agendas vencidas</dt><dd>El Manager avisa cuando alguien tiene una agenda vencida hace más de 30 minutos sin cerrar (agrupadas por agente).</dd>
-    <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, boletos sin pagar, agendas vencidas y perfiles cargados. Los viernes, con el ranking de la semana.</dd></dl>
+    <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, velocidad al new, agendas vencidas y perfiles cargados. Los viernes, con el ranking de la semana.</dd></dl>
   <h4>Gerencia (team leader, admin y director)</h4><dl>
     <dt>Qué es</dt><dd>La mesa en números para los de arriba, por período: Hoy, cada semana del mes y el mes (y los meses anteriores). Cada número lleva una flecha contra el período anterior.</dd>
     <dt>La mesa, por agente</dt><dd>FTDs, CR (%) y RMO de cada uno y de la mesa.</dd>
-    <dt>El embudo</dt><dd>De los registrados en el período: cuántos atendieron, a cuántos se les creó un boleto y cuántos depositaron; abajo, por agente (del primero que lo llamó).</dd>
-    <dt>Lead Quality</dt><dd>Por afiliador y campaña: cuántos leads mandan, cuántos atienden, cuántos son inválidos, cuántos depositan y a los cuántos días, y en qué status terminan (en porcentajes).</dd>
-    <dt>Director</dt><dd>Un rol para los de arriba: entra con su PIN y ve solo Gerencia, sin clientes, cola ni chat. Lo crea el administrador en Ajustes → Mesa.</dd></dl>
+    <dt>El embudo</dt><dd>De los news del período: cuántos se llamaron y cuántos depositaron (el mismo día o después); abajo, por agente (del primero que lo llamó).</dd>
+    <dt>Lead Quality</dt><dd>Por afiliador y campaña: cuántos leads mandan, cuántos se llamaron, cuántos depositan (y cuántos late), a los cuántos días, y en qué quedaron (en New, en llamada, dejó de ser new, depositó).</dd>
+    <dt>Director</dt><dd>Un rol para los de arriba: entra con su PIN y ve solo Gerencia, sin clientes ni chat. Lo crea el administrador en Ajustes → Mesa.</dd></dl>
   <h4>Historial (Inicio → Historial, tecla H)</h4><dl>
     <dt>Qué es</dt><dd>Todas tus ventas, venta por venta: cuándo, quién, de qué país y campaña, el monto, cuándo se registró y si fue new o late. Mes por mes contra tu target y con el CR (%); dónde vendés (país, afiliador, campaña, hora y día de la semana).</dd>
     <dt>Tus lates</dt><dd>Cuántos son, cuánto tardan en depositar (al día siguiente, a los 2–3 días…), de qué país y afiliador vienen y el que más tardó. Un late es un cliente que depositó otro día que el del registro.</dd></dl>
@@ -763,7 +761,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>6</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Panel, Tareas, Chat, Banking, Análisis; 0 Ajustes)</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>6</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Manager, Tareas, Chat, Banking, Análisis; 0 Ajustes)</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 

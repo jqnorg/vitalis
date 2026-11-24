@@ -50,7 +50,7 @@ V.inicio={
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
       (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
     $('#iBank').hidden=true; // las fallas de pago ya no van en el Inicio (lo pidió el dueño): quedan en Banking y en la marca del menú
-    crmLoad();const ah=TL?ahoraCard():'';$('#iAhora').hidden=!ah;$('#iAhora').innerHTML=ah; // la cola de la mesa (team leader); al agente la franja y el Panel ya se lo dicen
+    crmLoad();
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
     $('#iHoy').innerHTML=hoyMesaCard();
     {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
@@ -599,7 +599,7 @@ V.equipo={
     {const pm=eqYm===now?callsMesaCard():'';$('#eqPool').hidden=!pm;$('#eqPool').innerHTML=pm} // las llamadas de hoy de cada uno
     rmoLoad(eqYm+'-01',eqYm===now?todayS():eqYm+'-31').then(rows=>{if(cur!=='equipo')return;const h=rmoHistCard(rows,act.filter(m=>!isLeadUid(m.id)),'RMO por día');const el=$('#eqRmo');el.hidden=!h;el.innerHTML=h}); // la historia del ritmo
     stDraw();stLoad().then(()=>{if(cur==='equipo')stDraw()}); // la estación: hace cuánto se leyó cada vista del CRM
-    crmLoad();const cola=eqYm===now?colaMesaCard():'';$('#eqCola').hidden=!cola;$('#eqCola').innerHTML=cola;
+    crmLoad();
     $('#eqKpis').innerHTML=k('FTDs de la mesa',nf(R.n),T?`de ${T} de target · ${pct(R.n/T)}`:mLong(eqYm),true)+k('Monto',money(R.monto)+' USD',`prom ${nf(R.prom,1)} por FTD`)+
       k('Lates',`${R.lates} · ${pct(R.latePct)}`,R.lates?`prom ${nf(R.lateDias,1)} días`:'todos new')+
       k('Agentes con ventas',`${conV} de ${act.length}`,`${nf(conV?R.n/conV:0,1)} FTDs por agente`)+

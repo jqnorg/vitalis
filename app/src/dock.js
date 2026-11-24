@@ -1,7 +1,7 @@
 /* ---------- la extensión en el CRM: la mini ficha ----------
    Vitalis le pasa a la extensión lo justo para trabajar sin salir del CRM (no se escribe nada en el CRM):
    el cliente actual en corto (status, palabra clave, agenda, el perfil para completar ahí mismo, comentarios de la mesa, cómo depositar),
-   el siguiente de la Cola con su porqué y el turno (baño, 10 y 30 min). El comentario se escribe allá y se copia en inglés.
+   el siguiente new y el turno (baño, 10 y 30 min). El comentario se escribe allá y se copia en inglés.
    Con Vitalis tapado solo dice que está tapado. El team leader no la tiene (no gestiona clientes). */
 let dockSig='',dockAt=0,dockT=null,dockRun=false,dockAgain=false;
 const PF_KEYS=['edad','ocupacion','desocupado','desocupado_desde','objetivo','anuncio','vio_min','outcome','motivo'];
@@ -14,7 +14,7 @@ function dockCl(d){
     return [k,{ok:L.filter(o=>!o.falla).slice(0,12).map(opt),bad:L.filter(o=>o.falla).slice(0,8).map(o=>o.x.m.name+' · '+o.p.name)}]}))}:null;
   return {id,name:d.name||'',pais:d.pais||d.country||'',hora:cliTime(d.country)||'',
     st:r?(sgPlain(r)||r.status||''):'',crm:r&&r.status||'',
-    stop:r&&r.grp==='dnc'?'dnc':(f||(r&&paidCrm(r)))?'paid':'',
+    stop:(f||(r&&paidCrm(r)))?'paid':'',
     paid:f?`Depositó ${f.date===todayS()?'hoy':dm(f.date)}`:r&&paidCrm(r)?'Tiene FTD en el CRM':'',
     kw:clientKw(id)||'',ag:ags.slice(0,2),falta:profFalta(d.prof),
     prof:d.prof?Object.fromEntries(PF_KEYS.map(k=>[k,d.prof[k]??null])):null,po:PROF_ORDER.map(k=>[k,PROF_OUT[k].l,profStatus({outcome:k})]),
@@ -25,7 +25,7 @@ async function dockData(){
   if(locked)return {locked:1};
   const {t,b}=turnoState(),h=turnos[todayS()];
   const tu=!t?{st:h&&h.out?'out':'none'}:b?{st:'br',k:b.k||0,s:b.s}:{st:'in'};
-  let next=[];if(crm.ok)try{next=colaNext(queueOf(me),6)}catch(e){}
+  let next=[];if(crm.ok)try{next=newsOf(me).filter(inNew).slice(0,6).map(r=>({id:r.id,name:r.name,why:'En New: llamalo ya'}))}catch(e){}
   let cl=null;
   if(curCl&&curCl.id){
     const c=fichaCache.get(curCl.id),d=c?c.d:await fichaData(curCl.id).catch(()=>null);

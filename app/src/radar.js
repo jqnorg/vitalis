@@ -72,63 +72,19 @@ function hotChance(n){
   if(p==null)return n>=3?'casi la mitad de las veces llega otro':'1 de cada 3 veces llega otro';
   return tenTxt(p)+' llega otro';
 }
-function hotMine(q){ // q: la cola de quien mira; devuelve las campañas calientes con sus clientes sin depositar
-  const H=hotCamps();if(!H.length||!q)return [];
-  const L=[...q.g1,...q.cb,...q.g3,...q.low];
-  return H.map(h=>({...h,cl:L.filter(r=>comboKey(r.aff,r.camp,r.country)===h.k)})).filter(h=>h.cl.length);
-}
-function hotCard(q){
-  const H=hotMine(q);if(!H.length)return '';
-  return `<section class="card rd-hot"><div class="card-h"><svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg><h3>Campaña caliente</h3><span class="p-sub">está depositando hoy: llamá primero a los de esa campaña</span></div>
-    ${H.map(h=>`<div class="rd-hot-r"><div><b>${esc(h.txt)}</b> <span class="d">lleva ${h.n} FTDs hoy · ${hotChance(h.n)}</span></div>
-      <div class="rd-ids">${h.cl.slice(0,14).map(r=>`<button type="button" class="chip" data-ah="ficha" data-id="${esc(r.id)}" title="${esc(r.name)} · ${esc(r.status)}">${esc(r.id)}</button>`).join('')}${h.cl.length>14?`<span class="d">+${h.cl.length-14}</span>`:''}</div></div>`).join('')}</section>`;
+function hotMine(list){ // list: los news de quien mira; devuelve las campañas calientes con sus news sin depositar
+  const H=hotCamps();if(!H.length||!list)return [];
+  return H.map(h=>({...h,cl:list.filter(r=>comboKey(r.aff,r.camp,r.country)===h.k)})).filter(h=>h.cl.length);
 }
 function hotNotify(){ // un aviso por campaña y por día, cuando llega a 2 y tenés clientes de esa campaña
   if(!ready||!crm.ok||isLeadUid(me))return;
   const H=hotCamps();if(!H.length)return;
   const te=todayS(),seen=local.get('hot',{d:te,k:[]});if(seen.d!==te){seen.d=te;seen.k=[]}
   const fresh=H.filter(h=>!seen.k.includes(h.k));if(!fresh.length)return;
-  const mine=hotMine(queueOf(me));
+  const mine=hotMine(newsOf(me));
   for(const h of fresh){seen.k.push(h.k);const x=mine.find(y=>y.k===h.k);
-    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'cliente')} de esa campaña sin depositar.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Ver la cola',fn:()=>go('ahora')}]})}
+    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'new')} de esa campaña sin depositar: ${x.cl.slice(0,4).map(r=>`<b>${esc(r.id)}</b>`).join(', ')}${x.cl.length>4?'…':''}.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Ver',fn:()=>openFicha(x.cl[0].id)}]})}
   local.set('hot',seen);
-}
-
-/* ---------- 3) segundas oportunidades ---------- */
-// de los que depositan otro día (late): 47% al día siguiente, 64% en 3 días, 87% en 7
-const SEG_GRP=['pending','failed','callback','call_again','low_potential'];
-function segList(q){
-  if(!q)return [];
-  const te=todayS(),seen=new Set(),out=[];
-  for(const r of [...q.cb,...q.g3,...q.low,...q.failed]){
-    if(!SEG_GRP.includes(r.grp)||seen.has(r.id))continue;seen.add(r.id);
-    const rd=regDay(r);if(!rd||rd>=te)continue;
-    const d=bizDays(rd,te);if(d<1||d>10)continue;
-    out.push({r,d,w:(d<=1?0:d<=3?10:d<=7?20:30)+SEG_GRP.indexOf(r.grp)});
-  }
-  return out.sort((a,b)=>a.w-b.w||(regAt(b.r)||0)-(regAt(a.r)||0));
-}
-// de los que depositan otro día: cuántos días hábiles después del registro
-const SEG_FIX={d1:.47,d3:.64,d7:.87},SEG_MIN=40;
-const segLearn=perPass(()=>{
-  const d=[];
-  for(const f of rdBase().list){
-    if(!isLate(f))continue;const a=String(f.reg).slice(0,10);
-    if((parseYMD(f.date)-parseYMD(a))/864e5>60)continue; // un registro mal cargado no cuenta
-    d.push(bizDays(a,f.date));
-  }
-  if(d.length<SEG_MIN)return {...SEG_FIX,n:0};
-  const sh=x=>d.filter(v=>v<=x).length/d.length;
-  return {d1:sh(1),d3:sh(3),d7:sh(7),n:d.length};
-});
-const segTag=d=>d<=1?sp('rl on','hoy es su mejor día'):d<=3?sp('rl mid','todavía a tiempo'):d<=7?sp('rl off','última semana'):sp('rl off','poca chance');
-function segCard(q,who){
-  const L=segList(q);if(!L.length)return '';
-  const row=({r,d})=>`<tr><td><button type="button" class="lnkp" data-ah="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td><td class="d">hace ${plural(d,'día hábil','días hábiles')}</td><td>${segTag(d)}</td><td>${esc(r.country)}</td>${who?`<td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td>`:''}
-    <td class="act wr"><button type="button" class="ib" data-ah="ag" data-id="${esc(r.id)}" data-nm="${esc(r.status)}">Agendar</button></td></tr>`;
-  return `<section class="card ah-g"><details data-k="seg"${L.some(x=>x.d<=1)?' open':''}><summary class="card-h"><h3>Segundas oportunidades</h3><span class="p-sub">${L.length} que hablaron y no depositaron · ${(S=>`de los que vuelven, ${pct(S.d1)} lo hace al día hábil siguiente y ${pct(S.d7)} antes de los 7 días hábiles`)(segLearn())}</span></summary>
-    <div class="p-tablewrap"><table class="pt ah-t"><thead><tr><th>Cliente</th><th>Status</th><th>Registro</th><th>Chance</th><th>País</th>${who?'<th>Agente</th>':''}<th class="act"></th></tr></thead><tbody>${L.slice(0,25).map(row).join('')}</tbody></table></div>
-    ${L.length>25?`<p class="p-sub" style="margin-top:8px">y ${L.length-25} más.</p>`:''}</details></section>`;
 }
 
 /* ---------- 5) el mapa del día ---------- */
@@ -147,7 +103,7 @@ function mapCard(){
     <div class="p-tablewrap"><table class="rd-map"><thead><tr><th></th>${hs.map(h=>`<th class="${h===hr?'now':''}">${h}</th>`).join('')}</tr></thead><tbody>
     ${M.map(o=>{const mx=Math.max(...o.h.slice(H0,H1+1))||1,top=o.h.indexOf(Math.max(...o.h));
       return `<tr><th>${esc(o.p)} <span class="d">${o.n}</span></th>${hs.map(h=>{const v=o.h[h]/mx;return `<td class="${h===hr?'now':''}" title="${esc(o.p)} · ${h} h: ${o.h[h]} FTDs (${pct(o.h[h]/o.n)})"><i style="opacity:${v?Math.max(.08,v).toFixed(2):0}"></i>${h===top?'<b>●</b>':''}</td>`}).join('')}</tr>`}).join('')}
-    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país. La Cola pone primero a los de un país en su hora fuerte, y Agendar sugiere esa hora.</p></section>`;
+    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país. Al agendar, Vitalis sugiere esa hora.</p></section>`;
 }
 
 // la hora de cada país, del mismo mapa: para la Cola (hora fuerte ahora) y para Agendar (la hora que más deposita)

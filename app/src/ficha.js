@@ -41,11 +41,11 @@ function fichaHTML(d){
   const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
   return `<div class="fi" data-fid="${esc(id)}">
     <div class="fi-h"><div><div class="fi-nm">${esc(d.name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${d.pais?' · '+esc(d.pais):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
-      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}${r&&r.grp==='dnc'?'<span class="badge bad">No se llama</span>':''}${r&&offDesk(r)?`<span class="badge bad" title="No apareció en el CRM de la mesa en el último pase de la estación">Lo tiene otra mesa${r.goneAt?' · desde '+esc(dm(r.goneAt.slice(0,10))):''}</span>`:''}</div></div>
+      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}</div></div>
     <div class="fi-cols"><div class="fi-col fi-main">${fiProfHTML(d)}${fiComsHTML(d)}</div>
       <div class="fi-col">
       <div class="fi-c"><h4>Cliente</h4>
-        ${rw2('Status',r?esc(r.status||'—'):'<span class="d">todavía no se vio en el CRM</span>')}
+        ${rw2('En el CRM',r?esc(sgPlain(r)||'—'):'<span class="d">todavía no se vio en el CRM</span>')}
         <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
         ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
         ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}

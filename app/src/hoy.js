@@ -1,8 +1,7 @@
 /* ============================================================
-   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), el pool del día y la franja de los que están en New.
+   El día: las llamadas (cada toque en Omega, Gizat o Voiso desde la ficha del CRM), los news del día y la pastilla de los que están en New.
    Un cliente en New es lo más urgente, pase lo que pase y haya pasado el tiempo que haya pasado (lo dijo el dueño): no hay "repaso" ni reloj.
-   Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader), cada NA (NA a NA-4: días de llamadas, sin llamarlo no avanza), CA, HU, CallBack y Pending
-   llamado al menos una vez en el día, y los news del día repasados cada menos de 2 h. Un intento completo es por las tres líneas.
+   Lo que pide la empresa: un mínimo de llamadas (lo fija el team leader) o 2 h 30 habladas, y cada new llamado. Un intento completo es por las tres líneas.
    ============================================================ */
 let calls=[],callsOk=null,callsDay='',stLog=[]; // stLog: los cambios de status de hoy (para saber qué llamadas fueron conversación)
 const LINES={omega:'Omega',gizat:'Gizat',voiso:'Voiso'};
@@ -41,26 +40,15 @@ function contactOf(r){
   const c=callIdx().by.get(norm(r.id)),ca=callAt(r),crmHoy=!!ca&&ymd(ca)===todayS();
   return {lines:c?c.lines:new Set(),last:Math.max(c?c.last:0,ca?+ca:0),first:c?c.first:Infinity,today:!!c||crmHoy,full:!!c&&c.lines.size>=3};
 }
-const NEWS_OUT=['dnc','invalid','not_interested','ftd','crm','failed','otro','low_potential'];
-// el pool del día de alguien: news registrados hoy + NA 1 a 4, CA, HU, CallBack y Pending (sin los depositados)
+// los news del día de alguien: los que están en New o Talking y los registrados hoy, sin los depositados
 const poolMemo={p:-1,m:new Map()};
 function dayPool(uid){
   if(poolMemo.p!==pass){poolMemo.p=pass;poolMemo.m.clear()}
   if(poolMemo.m.has(uid))return poolMemo.m.get(uid);
-  const S=soldIdx(),te=todayS(),now=Date.now();
-  const rotIn=new Set((crm.rot||[]).filter(x=>agentUid(x.new_agent)===uid).map(x=>norm(x.client_id)));
-  const items=[];
-  for(const r of crm.rows.values()){
-    if(isArch(r.brand)||offDesk(r)||crmOwner(r)!==uid||paidCrm(r)||S.has(ckey(r.brand,r.id)))continue;
-    const inNew=r.grp==='new'&&!/talk|habl/.test(norm(r.status)),news=inNew||(regDay(r)===te&&!NEWS_OUT.includes(r.grp));
-    const g=news?'news':['callback','pending'].includes(r.grp)?'cb':(['call_again','hang_up'].includes(r.grp)||(r.grp==='na'&&naNum(r.status)<=NA_MAX))?'g3':null;
-    if(!g)continue;
-    const k=contactOf(r);
-    if(!news&&rotIn.has(norm(r.id))&&k.today)continue; // te lo rotaron hoy y ya lo llamó alguien: no entra en tu meta
-    items.push({r,k,g,due:inNew}); // en New: urgente siempre
-  }
+  const now=Date.now(),items=[];
+  for(const r of newsOf(uid)){const k=contactOf(r);items.push({r,k,g:'news',due:inNew(r)})} // en New: urgente siempre
   const done=items.filter(x=>x.k.today).length,half=items.filter(x=>x.k.today&&!x.k.full&&x.k.lines.size&&now-x.k.last>3*6e4);
-  const P={items,done,total:items.length,due:items.filter(x=>x.due).sort((a,b)=>byRegDesc(a.r,b.r)),half,n:callsOf(uid)};
+  const P={items,done,total:items.length,due:items.filter(x=>x.due),half,n:callsOf(uid)};
   poolMemo.m.set(uid,P);return P;
 }
 // el ritmo: desde tu entrada (o tu primera llamada) hasta el fin de tu jornada
@@ -88,13 +76,13 @@ function hoyBand(){ // los clientes en New, como pastilla en la barra (lo pidió
 /* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
    Hablar no suma ni resta: no depende del agente que el cliente atienda. Lo que se mide es si, cuando no está hablando, marca al ritmo.
    Una llamada cubre CALL_S (50 s de espera + 3 s para cambiar de línea). Los toques seguidos al mismo cliente (Omega, Gizat, Voiso) son un
-   intento. Un intento es conversación si después el cliente pasó a Talking o quedó con un resultado (Call Again, Hang Up, CallBack, Pending,
-   Low Potential, Not Interested, Do Not Call, Failed, FTD) antes del siguiente intento. Lo hablado es el tiempo en Talking (o hasta ese
-   resultado) menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s): el tiempo que costó llamarlo no es charla.
+   intento. Un intento es conversación si después el cliente pasó a Talking (o depositó) antes del siguiente intento. Lo hablado es el tiempo
+   en Talking menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s): el tiempo que costó llamarlo no es charla.
    Lo demás, sin descanso marcado, es tiempo muerto.
    El día se cumple con una de dos, sin compensar (lo corrigió el dueño, 24/11/2026): 250 llamadas (teams.min_calls) o 2 h 30 habladas
    (TALK_MIN). La franja sale del tiempo muerto proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
-const TALK_MIN=150*6e4,CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
+const TALK_MIN=150*6e4,CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['ftd']; // solo news y FTDs: el resultado que se ve es Talking (o el depósito)
+const isTalk=l=>/talk|habl/.test(l.st); // Talking: tiempo de llamada justificado
 const ritmoMemo={p:-1,m:new Map()};
 function ritmo(uid){
   if(ritmoMemo.p!==pass){ritmoMemo.p=pass;ritmoMemo.m.clear()}
@@ -105,8 +93,7 @@ function ritmo(uid){
     const end=t.out||now,brs=(t.breaks||[]).map(b=>[b.s,b.e||now]);
     const brIn=(a,b)=>{let x=0;for(const [s,e] of brs){const lo=Math.max(a,s),hi=Math.min(b,e);if(hi>lo)x+=hi-lo}return x}; // descanso dentro de un tramo
     const L=calls.filter(c=>c.uid===uid&&c.at>=t.in&&c.at<=end).sort((a,b)=>a.at-b.at);
-    const isTalk=l=>/talk|habl/.test(l.st); // Talking: tiempo de llamada justificado
-    const talked=(id,from,until)=>{ // pasó a Talking (o ya lo estaba) o quedó con un resultado antes del siguiente intento
+    const talked=(id,from,until)=>{ // pasó a Talking (o ya lo estaba) o depositó antes del siguiente intento
       const k=norm(id),cur=crmStatusOf(id);
       if(cur&&/talk|habl/.test(norm(cur.status))&&cur.since){const t=Date.parse(cur.since);if(t>=from-10*6e4&&t<=until+10*6e4)return true} // pasó a Talking alrededor del intento (uno colgado de días es un error del CRM, no charla)
       return stLog.some(l=>l.id===k&&l.at>=from&&l.at<=until+10*6e4&&(isTalk(l)||TALK_G.includes(l.grp)));
@@ -186,7 +173,7 @@ function ritmoModal(uid){
     <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
     <h4 class="rt-h">Huecos sin marcar</h4>${holes.length?`<ul class="rt-list">${holes.map(s=>`<li><b>${esc(minsTxt(s.d))}</b> de ${hhmm(s.a)} a ${hhmm(s.b)}, ${before(s)}</li>`).join('')}</ul>`:'<p class="p-sub" style="margin:0">Ninguno de más de 3 minutos.</p>'}
     ${talks.length?`<h4 class="rt-h">Conversaciones</h4><ul class="rt-list">${talks.map(s=>`<li><b>${esc(minsTxt(s.b-s.a))}</b> desde las ${hhmm(s.a)} con <b>${esc(s.id)}</b> ${esc(name(s.id))}${s.n>1?` <span class="d">(atendió a la ${s.n}ª línea)</span>`:''}</li>`).join('')}</ul>`:''}
-    <p class="p-sub" style="margin:10px 0 0">Cada línea marcada cubre 50 s. Es conversación si después el cliente pasó a Talking o quedó con un status de resultado antes del siguiente intento; se le restan 50 s por línea marcada. Los descansos marcados no cuentan.</p>`,
+    <p class="p-sub" style="margin:10px 0 0">Cada línea marcada cubre 50 s. Es conversación si después el cliente pasó a Talking antes del siguiente intento; se le restan 50 s por línea marcada. Los descansos marcados no cuentan.</p>`,
     actions:[{l:'Listo',cls:'pri'}]});
 }
 
@@ -196,10 +183,10 @@ function callsMesaCard(){
   if(callsOk===false)return '';
   const all=sellers(team).filter(m=>!isLeadUid(m.id)).map(m=>({m,pc:dayPace(m.id),P:crm.ok?dayPool(m.id):null})).sort((a,b)=>b.pc.n-a.pc.n||a.m.name.localeCompare(b.m.name));
   const on=all.filter(x=>x.pc.n||(x.P&&x.P.total)),off=all.filter(x=>!(x.pc.n||(x.P&&x.P.total)));
-  const row=({m,pc,P})=>{const R=ritmo(m.id);return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span>${R?` <span class="d">· <b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> hablados</span>`:''}</td>
-    <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`};
+  const row=({m,pc,P})=>{const R=ritmo(m.id),sp2=crm.ok?newSpeedOf(m.id,todayS(),todayS()):null;return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span>${R?` <span class="d">· <b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> hablados</span>`:''}</td>
+    <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td><td title="Del registro a la primera llamada (mediana de los news de hoy)">${sp2&&sp2.n?`<b class="${sp2.med>5?'hot':'ok'}">${esc(minTxt2(sp2.med))}</b>`:'<span class="d">—</span>'}</td></tr>`};
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">llamadas, tiempo muerto y franja: Q1 menos de 30 min muertos en el día · Q2 hasta 1 h · Q3 más</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>News de hoy llamados</th><th>En New</th><th title="Velocidad al new: del registro a la primera llamada">Al new en</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){
@@ -260,7 +247,7 @@ async function cierreModal(){ // "Tu día", al marcar Salida
 }
 const nombres=L=>L.map(x=>first(x.m.id)).join(', ');
 async function cierreTxt(){ // el resumen de la mesa, en texto plano para el chat
-  const te=todayS(),ym=ymNow(),D=cmData(),P=await profilesHoy(),rows=D.rows.filter(p=>p.tu.k!=='none'||p.ftd||p.pc.n),S=soldIdx();
+  const te=todayS(),ym=ymNow(),D=cmData(),P=await profilesHoy(),rows=D.rows.filter(p=>p.tu.k!=='none'||p.ftd||p.pc.n);
   const mes=team.filter(f=>f.date.slice(0,7)===ym).length,T=+targets[ym]||0,hoy=team.filter(f=>f.date===te);
   const L=[`Cierre del ${AG_DIA[parseYMD(te).getDay()].toLowerCase()} ${dm(te)}`];
   const porAg=rows.filter(p=>p.ftd).sort((a,b)=>b.ftd-a.ftd).map(p=>`${first(p.m.id)} ${p.ftd}`).join(', ');
@@ -270,9 +257,9 @@ async function cierreTxt(){ // el resumen de la mesa, en texto plano para el cha
   const q=n=>rows.filter(p=>p.R&&!p.R.young&&p.R.q===n);
   if(q(1).length+q(2).length+q(3).length)L.push(`RMO: ${[q(1).length&&`Q1 ${nombres(q(1))}`,q(2).length&&`Q2 ${nombres(q(2))}`,q(3).length&&`Q3 ${q(3).map(p=>`${first(p.m.id)} (${minsTxt(p.R.dead)} muertos)`).join(', ')}`].filter(Boolean).join(' · ')}`);
   const cv=convPeriod(te,te,null);if(cv.leads)L.push(`CR (%) del día: ${pct(cv.ftd/cv.leads)} (${cv.ftd} de ${plural(cv.leads,'new')})`);
-  let pendN=0;for(const r of crm.rows.values())if(r.grp==='pending'&&!isArch(r.brand)&&!offDesk(r)&&!paidCrm(r)&&!S.has(ckey(r.brand,r.id)))pendN++;
+  const sp2=newSpeedOf(null,te,te);if(sp2.n)L.push(`Velocidad al new: ${minTxt2(sp2.med)} del registro a la primera llamada (mediana de ${plural(sp2.n,'new')}${sp2.slow?`; ${sp2.slow} tardaron más de 5 min`:''})`);
   const venc=rows.filter(p=>p.venc).map(p=>`${first(p.m.id)} ${p.venc}`).join(', ');
-  L.push(`Boletos sin pagar: ${pendN} · agendas vencidas: ${venc||'ninguna'}`);
+  L.push(`Agendas vencidas: ${venc||'ninguna'}`);
   const pf=rows.map(p=>[p,(P.get(p.m.id)||new Set()).size]),pfN=pf.reduce((a,[,n])=>a+n,0);
   L.push(`Perfiles cargados hoy: ${pfN}${pf.length?` (${pf.filter(([,n])=>n).map(([p,n])=>`${first(p.m.id)} ${n}`).join(', ')}${pf.some(([,n])=>!n)?`; sin ninguno: ${pf.filter(([,n])=>!n).map(([p])=>first(p.m.id)).join(', ')}`:''})`:''}`);
   if(parseYMD(te).getDay()===5){ // viernes: el ranking de la semana

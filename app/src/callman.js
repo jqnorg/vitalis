@@ -25,9 +25,9 @@ function cmData(){
   const ag=sellers(team).filter(m=>!isLeadUid(m.id)),per=new Map(ag.map(m=>[m.id,{m,newN:0,talk:0,hoy:0,ftd:0,last:0,list:[]}]));
   const cur=[];let hoyMesa=0;
   for(const r of crm.rows.values()){
-    if(isArch(r.brand)||offDesk(r))continue;
+    if(isArch(r.brand))continue;
     const paid=paidCrm(r)||S.has(ckey(r.brand,r.id)),reg=regDay(r)===te;
-    if(reg&&!['crm','otro','invalid'].includes(r.grp)){hoyMesa++;const o=fa.get(norm(r.id)),u=notLead(o?agentUid(o):crmOwner(r));const p=u&&per.get(u);if(p)p.hoy++}
+    if(reg){hoyMesa++;const o=fa.get(norm(r.id)),u=notLead(o?agentUid(o):crmOwner(r));const p=u&&per.get(u);if(p)p.hoy++}
     if(r.grp!=='new'||paid)continue;
     const u=crmOwner(r),k=contactOf(r),a=regAt(r),talk=cmIsTalk(r),x={r,u,k,a:a?+a:0,talk,wait:!!(!talk&&!k.last&&a&&now-a>=CM_NEW)};
     cur.push(x);const p=u&&per.get(u);if(p){if(talk)p.talk++;else p.newN++;p.list.push(x)}
@@ -35,7 +35,7 @@ function cmData(){
   for(const f of team)if(f.date===te){const p=per.get(f.uid);if(p){p.ftd++;if(!isLate(f))p.ftdNew=(p.ftdNew||0)+1}} // ftdNew: depositó el mismo día que se registró (la conversión del día)
   for(const c of calls){const p=per.get(c.uid);if(p&&c.at>p.last)p.last=c.at}
   cur.sort((a,b)=>(b.wait?1:0)-(a.wait?1:0)||(a.talk?1:0)-(b.talk?1:0)||(a.k.last?1:0)-(b.k.last?1:0)||(a.a||now)-(b.a||now));
-  const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),R:ritmo(p.m.id),venc:agStats(p.m.id).venc}));
+  const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),R:ritmo(p.m.id),venc:agStats(p.m.id).venc,sp:newSpeedOf(p.m.id,te,te)}));
   const ord={br:0,in:0,none:2,out:3};
   rows.sort((a,b)=>ord[a.tu.k]-ord[b.tu.k]||(b.newN+b.talk)-(a.newN+a.talk)||a.m.name.localeCompare(b.m.name));
   // lo que hay que atender ya, lo más urgente primero
@@ -53,7 +53,7 @@ function cmData(){
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
-    const vz=agOf(p.m.id).filter(x=>!x.done&&now-parseDue(x.due)>=CM_AG&&!soldOf(x.id)&&!isDnc(x.id)).sort((a,b)=>parseDue(a.due)-parseDue(b.due)); // agendas vencidas sin "Ya lo llamé"
+    const vz=agOf(p.m.id).filter(x=>!x.done&&now-parseDue(x.due)>=CM_AG&&!soldOf(x.id)).sort((a,b)=>parseDue(a.due)-parseDue(b.due)); // agendas vencidas sin "Ya lo llamé"
     if(vz.length===1)al.push({w:2,id:vz[0].id,html:`${nm} tiene la agenda de <b>${esc(vz[0].id)}</b> (${esc(vz[0].due.slice(11,16))}) vencida <b>${cmHace(now-parseDue(vz[0].due))}</b> y sin cerrar`});
     else if(vz.length)al.push({w:2,html:`<details class="cm-g"><summary>${nm} tiene <b>${vz.length}</b> agendas vencidas sin cerrar, la más vieja <b>${cmHace(now-parseDue(vz[0].due))}</b></summary><ul>${vz.map(x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button> agenda de las ${esc(x.due.slice(11,16))} · ${cmHace(now-parseDue(x.due))}${x.kw?` · ${esc(x.kw)}`:''}</li>`).join('')}</ul></details>`});
     if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
@@ -71,7 +71,8 @@ V.callman={
     if(crm.ok===false){body.innerHTML='<div class="card"><div class="p-empty">Sin clientes del CRM todavía: hace falta la estación o la extensión.</div></div>';return}
     const D=cmData(),op=openKeys(body);
     const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin llamar hace +5 min</span>`:'todos llamados','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+
-      kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`);
+      kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`)+
+      (sp0=>kpi('Al new en',sp0.n?esc(minTxt2(sp0.med)):'—',sp0.n?`del registro a la primera llamada · ${sp0.slow?`${sp0.slow} de ${sp0.n} tardaron +5 min`:'todos antes de 5 min'}`:'sin news llamados hoy'))(newSpeedOf(null,todayS(),todayS()));
     const alerts=D.al.length?`<section class="card cm-al"><div class="card-h"><h3>Para atender ya</h3><span class="p-sub">${plural(D.al.length,'cosa','cosas')}</span></div>
       <ul class="cm-list">${D.al.slice(0,20).map(a=>`<li class="w${a.w}"><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg><span>${a.html}</span>${a.id?`<button type="button" class="btn sm" data-hy="ficha" data-id="${esc(a.id)}">Ficha</button>`:''}</li>`).join('')}</ul></section>`:'';
     const cRow=x=>{const r=x.r,c=x.k;
@@ -87,11 +88,12 @@ V.callman={
       <td>${p.newN?sp(p.list.some(x=>x.wait)?'hot b':'b',String(p.newN)):'<span class="d">0</span>'}</td><td>${p.talk?sp('ok b',String(p.talk)):'<span class="d">0</span>'}</td>
       <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td><td>${p.hoy?`<b>${p.ftdNew||0}</b><span class="d">/${p.hoy} · ${Math.round(100*(p.ftdNew||0)/p.hoy)}%</span>`:'<span class="d">—</span>'}</td>
       <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span>${p.R?` <span class="d">· <b class="${p.R.talkOk?'ok':''}">${esc(minsTxt(p.R.talk))}</b> hablados</span>`:''}</td><td>${p.R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(p.m.id)}" title="Ver qué pasó">${esc(minsTxt(p.R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
+      <td>${p.sp&&p.sp.n?`<b class="${p.sp.med>5?'hot':'ok'}">${esc(minTxt2(p.sp.med))}</b>${p.sp.slow?` <span class="d">· ${p.sp.slow} +5 min</span>`:''}`:'<span class="d">—</span>'}</td>
       <td>${p.last?cmHace(D.now-p.last):'<span class="d">—</span>'}</td>
       <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
     const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
-      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="CR (%) de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">CR (%) hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
+      ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="CR (%) de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">CR (%) hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th title="Velocidad al new: del registro a la primera llamada (mediana de sus news de hoy)">Al new en</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
     body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
   }

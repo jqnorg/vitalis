@@ -495,8 +495,8 @@ async function focusCrm() { // la pestaña de clientes (la que tiene clientes en
 // El team leader arma cada vista una vez (filtro, orden, filas por página) y en el botón de Vitalis del CRM dice cuál es.
 // Desde ahí la extensión la fija, la actualiza a su ritmo (con un poco de variación) y, si se cierra, la vuelve a abrir.
 // Solo en horario: fuera de hora no toca el CRM. Cada 30 s le cuenta a Vitalis cómo le fue con cada vista (latido).
-const SVIEWS = { todo: { n: 'Clientes', every: 10 }, trx: { n: 'Transactions', every: 15 }, news: { n: 'News', every: 10 }, cola: { n: 'Cola', every: 30 }, agen: { n: 'Agendables', every: 60 }, cerr: { n: 'Cerrados', every: 600 } };
-const SV_OLD = ['news', 'cola', 'agen', 'cerr']; // las de antes: "Clientes" (todos los status, el último que cambió arriba) las reemplaza
+// Nuevo rumbo (24/11/2026): Vitalis es solo news y FTDs. La estación son dos pestañas: la lista de news (New y Talking) y la de depósitos.
+const SVIEWS = { news: { n: 'News', every: 10 }, trx: { n: 'Transactions', every: 15 } };
 const ST_HOURS = { days: [1, 2, 3, 4, 5], from: 9 * 60, to: 17 * 60 + 30 }; // lunes a viernes, 9:00 a 17:30
 async function stGet() { return (await chrome.storage.local.get('station')).station || { views: {} }; }
 const stUpd = (fn) => lock('station', async () => { const s = await stGet(), n = fn(s); if (n && n !== s) await chrome.storage.local.set({ station: n }); return n || s; }); // fn devuelve la nueva (o null si no cambia)
@@ -510,13 +510,11 @@ const stationOf = (tabId) => (Object.entries(stCache.views || {}).find(([, c]) =
 async function stationSet(tab, view) { // "Esta pestaña es la de…" desde el botón del CRM ('' = ya no es parte de la estación)
   if (!['leader', 'admin'].includes(await deskRole())) return { err: 'Solo el team leader o el administrador' };
   if (view && !SVIEWS[view]) return { err: 'vista desconocida' };
-  if (SV_OLD.includes(view) && Object.entries((await stGet()).views).some(([k, c]) => k === 'todo' && c.tabId !== tab.id)) return { err: 'Con la pestaña de Clientes esta ya no hace falta.' };
   const freed = [];
   await stUpd((s) => {
     const views = { ...s.views };
     for (const [k, c] of Object.entries(views)) if (c.tabId === tab.id) delete views[k];
     if (view) { if (views[view]) freed.push(views[view].tabId); views[view] = { tabId: tab.id, url: tab.url, title: tab.title || '', at: Date.now() }; }
-    if (view === 'todo') for (const k of SV_OLD) if (views[k]) { freed.push(views[k].tabId); delete views[k]; } // las de antes quedan como pestañas comunes
     return { ...s, views };
   });
   for (const id of freed) if (id !== tab.id) { try { await chrome.tabs.update(id, { pinned: false }); } catch (e) {} } // la que tenía esa vista antes queda como una pestaña común
@@ -526,7 +524,7 @@ async function stationSet(tab, view) { // "Esta pestaña es la de…" desde el b
     await stRun(view, { nextAt: 0, problem: '', noTable: 0 });
   }
   await stLoop(); stFlushSoon();
-  return { ok: true, freed: view === 'todo' ? freed.filter((id) => id !== tab.id).length : 0 };
+  return { ok: true, freed: 0 };
 }
 async function stationOff() { // apagar la estación entera (desde el ícono): las pestañas quedan como pestañas comunes
   const s = await stGet();
@@ -570,8 +568,7 @@ async function stTick() {
         if (!(await stReopen(v, cfg, s))) await stRun(v, { problem: 'cerrada', lastTry: now });
         continue;
       }
-      if (tab.discarded) { if (r.sw) await stRun(v, { sw: null }); try { await chrome.tabs.reload(tab.id); } catch (e) {} continue; }
-      if (v === 'todo' && (await stSweep(tab, r, now))) continue; // en medio del pase de páginas no se toca el ⟳
+      if (tab.discarded) { try { await chrome.tabs.reload(tab.id); } catch (e) {} continue; }
       if ((r.nextAt || 0) > now) continue;
       await stRun(v, { lastTry: now, nextAt: now + SVIEWS[v].every * 1000 * (0.7 + Math.random() * 0.6) }); // un poco de variación: no es un reloj exacto
       let res = null; try { res = await withTimeout(chrome.tabs.sendMessage(tab.id, { type: 'crm-refresh' }), 5000); } catch (e) {}
@@ -580,55 +577,6 @@ async function stTick() {
     await stVitalis();
   } finally { stBusy = false; }
 }
-/* ---------- el pase: la pestaña de Clientes recorre todas las páginas una vez por hora ----------
-   Con eso Vitalis sabe todos los clientes de la mesa y de quién es cada uno; lo que estaba y no aparece lo tiene otra mesa.
-   Una página cada 10 s (700 clientes = 7 páginas ≈ 1 min); si la mesa crece, el pase se espacia solo (nunca más de un tercio del
-   tiempo) y se corta en los que no cambiaron hace más de 60 días (esos no se marcan: no se vieron). Solo clics en el paginado. */
-const SWEEP = { every: 60 * 6e4, step: 1e4, maxPages: 300, oldDays: 60, scanWait: 45e3 };
-const ymdOf = (ms) => { const d = new Date(ms), z = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()); };
-async function stSweep(tab, r, now) {
-  const sw = r.sw;
-  if (!sw) {
-    if (r.problem || !r.lastOk || now - r.lastOk > 12e4) return false; // solo con la vista sana
-    if (!r.swAt) { await stRun('todo', { swAt: now - SWEEP.every + 12e4 }); return false; } // el primero, 2 min después de que la vista esté sana
-    if (now - r.swAt < Math.max(SWEEP.every, 3 * (r.swMs || 0))) return false;
-    if (r.swNoPager && now - r.swNoPager < 36e5) return false; // sin paginado: pruebo de nuevo en una hora
-    await stRun('todo', { sw: { started: now, ids: {}, pages: 0, stepAt: now, phase: 'go', scanAt: 0, prevSig: '', tries: 0 } });
-    try { await withTimeout(chrome.tabs.sendMessage(tab.id, { type: 'crm-page', dir: 'first' }), 5000); } catch (e) {} // arranca en la primera página (y fuerza una lectura)
-    return true;
-  }
-  const page = async (dir) => { let res = null; try { res = await withTimeout(chrome.tabs.sendMessage(tab.id, { type: 'crm-page', dir }), 5000); } catch (e) {} return res; };
-  const home = async (why) => { const res = await page('first'); await stRun('todo', { sw: { ...sw, phase: 'home', stepAt: now, why: sw.why || why || '', tries: (sw.tries || 0) + 1, homeSame: !!(res && res.same) } }); };
-  if (sw.phase === 'go') {
-    if (sw.scanAt > sw.stepAt) { // ya leí esta página
-      if (sw.last || sw.pages >= SWEEP.maxPages || sw.oldHit) { await home(sw.last ? '' : 'tope'); return true; }
-      if (now - sw.stepAt < SWEEP.step) return true;
-      const res = await page('next');
-      if (res && res.err === 'sin-paginado') { await stRun('todo', { sw: null, swAt: now, swNoPager: now, swDiag: String(res.diag || '').slice(0, 4000) }); stFlushSoon(); return true; }
-      if (!res || res.skipped) { await stRun('todo', { sw: { ...sw, stepAt: now, tries: (sw.tries || 0) + 1 } }); if ((sw.tries || 0) > 6) await home('sin-respuesta'); return true; }
-      if (res.err || res.reload) { await home(res.last ? '' : 'sin-siguiente'); return true; }
-      await stRun('todo', { sw: { ...sw, stepAt: now, tries: 0 } });
-    } else if (now - sw.stepAt > SWEEP.scanWait) await home('sin-lectura'); // la página no se leyó: vuelvo a la primera y cierro el pase
-    return true;
-  }
-  // phase home: esperar a ver la primera página de nuevo
-  if (sw.homeSame || (sw.scanAt > sw.stepAt && (sw.page == null || sw.page === 1))) { await stSweepDone(r, now); return true; }
-  if (now - sw.stepAt > SWEEP.scanWait) { if ((sw.tries || 0) > 4) { await stRun('todo', { sw: null, swAt: now, swErr: 'no-vuelve' }); try { await chrome.tabs.reload(tab.id); } catch (e) {} } else await home(); }
-  return true;
-}
-async function stSweepDone(r, now) {
-  const sw = r.sw, ids = Object.keys(sw.ids || {}), n = ids.length, bounded = !!sw.oldHit || sw.pages >= SWEEP.maxPages, total = r.total, ms = now - sw.started;
-  const incomplete = !!sw.why && sw.why !== 'tope' || n < 1 || (!bounded && total != null && n < total * 0.8);
-  const patch = { sw: null, swAt: now, swMs: ms, swN: n, swPages: sw.pages, swErr: incomplete ? (sw.why || 'incompleto') : '', swOut: null };
-  if (!incomplete) patch.swOut = { started: new Date(sw.started).toISOString(), ended: new Date(now).toISOString(), n, total, pages: sw.pages, bounded, cutoff: bounded ? ymdOf(now - SWEEP.oldDays * 864e5) : null, brand: sw.brand || '', ids: ids.slice(0, 20000), ms };
-  await stRun('todo', patch);
-  await stSweepSend(); stFlushSoon();
-}
-async function stSweepSend() { // el resultado del pase va a Vitalis (lo guarda el team leader); si no está abierto, queda para el próximo latido
-  const r = (await sess.get('stRuns', {})).todo || {}; if (!r.swOut) return;
-  if (Date.now() - Date.parse(r.swOut.ended) > 2 * 36e5) { await stRun('todo', { swOut: null }); return; }
-  for (const t of await vitalisTabs()) { try { const x = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'station-sweep', sweep: r.swOut }), 15000); if (x && x.ok) { await stRun('todo', { swOut: null, swSent: Date.now() }); return; } } catch (e) {} }
-}
 // lo que vio una pestaña de la estación al leer (lo manda crm.js después de cada lectura)
 async function stScan(tabId, m, url) {
   const v = Object.entries((await stGet()).views).find(([, c]) => c.tabId === tabId);
@@ -636,18 +584,9 @@ async function stScan(tabId, m, url) {
   const [view] = v, now = Date.now(), prev = (await sess.get('stRuns', {}))[view] || {};
   const patch = { n: Math.max(0, +m.n || 0), total: m.total == null ? null : +m.total, statuses: m.statuses || {}, seenAt: now };
   if (m.login) { patch.problem = 'login'; patch.noTable = 0; }
-  else if (m.table && view === 'todo' && (m.ord === 'mal' || m.ord === 'sin')) { patch.problem = 'orden'; patch.noTable = 0; } // sin el último que cambió arriba, no sirve
   else if (m.table) { patch.problem = ''; patch.lastOk = now; patch.noTable = 0; }
   else if (!prev.noTable) patch.noTable = now; // la lista desaparece un momento al actualizar: recién a los 20 s es un problema
   else if (now - prev.noTable > 2e4) patch.problem = 'sin-tabla';
-  if (view === 'todo' && prev.sw && m.table && Array.isArray(m.ids)) { // en medio del pase: sumo la página (si ya cambió)
-    const sw = { ...prev.sw }, sig = m.ids.slice(0, 30).join(','), pg = m.pager || null;
-    if (sig && sig !== sw.prevSig || sw.homeSame) {
-      if (sw.phase === 'go') { for (const id of m.ids.slice(0, 500)) sw.ids[String(id).slice(0, 60)] = 1; sw.pages++; sw.last = !!(pg && pg.last); sw.oldHit = !!(m.old && m.old.slice(0, 10) < ymdOf(now - SWEEP.oldDays * 864e5)); if (!sw.brand && m.brand) sw.brand = String(m.brand).slice(0, 40); }
-      sw.prevSig = sig; sw.page = pg ? pg.page : null; sw.scanAt = now;
-    }
-    patch.sw = sw;
-  }
   await stRun(view, patch);
   if (url && await isCrmUrl(url)) await stUpd((s) => (s.views[view] && s.views[view].url !== url ? { ...s, views: { ...s.views, [view]: { ...s.views[view], url } } } : null)); // el filtro puede vivir en la dirección: guardo la última
   if ((patch.problem ?? prev.problem ?? '') !== (prev.problem || '')) {
@@ -657,7 +596,7 @@ async function stScan(tabId, m, url) {
       await alertCard({ k: 'crm:stlogin', kind: 'crm', title: 'La estación quedó sin sesión', id: 'Volvé a entrar al CRM', kw: `La pestaña de ${SVIEWS[view].n} pide entrar de nuevo. Mientras tanto no se leen clientes.`, meta: hm(now), btns: [['crm', 'Ir al CRM', 1], ['close', 'Ok']] }, 'crm', 'La estación quedó sin sesión del CRM', 'Volvé a entrar para que siga leyendo.');
     }
   }
-  return { station: view, problem: (patch.problem ?? prev.problem ?? '') || (view === 'todo' && prev.swNoPager ? 'paginado' : '') };
+  return { station: view, problem: patch.problem ?? prev.problem ?? '' };
 }
 // cada 30 s (y cuando algo cambia) le cuento a Vitalis cómo está cada vista; al apagarla, una vez más vacía
 async function stFlush() {
@@ -665,9 +604,7 @@ async function stFlush() {
   if (views.length && !(await stHours())) return false; // fuera de horario no hay nada que contar
   if (!views.length && !(await sess.get('stWasOn', false))) return false; // acá nunca hubo estación
   const runs = await sess.get('stRuns', {}), iso = (ms) => (ms ? new Date(ms).toISOString() : null);
-  const rows = views.map((v) => { const r = runs[v] || {}; return { vista: v, ok: iso(r.lastOk), try: iso(r.lastTry || r.seenAt), n: r.n || 0, total: r.total ?? null, statuses: r.statuses || {}, problem: r.problem || '',
-    sweep: v === 'todo' ? { at: iso(r.swAt), n: r.swN || 0, pages: r.swPages || 0, ms: r.swMs || 0, err: r.swErr || '', pager: r.swNoPager ? 'no' : '', busy: !!r.sw } : undefined }; });
-  await stSweepSend();
+  const rows = views.map((v) => { const r = runs[v] || {}; return { vista: v, ok: iso(r.lastOk), try: iso(r.lastTry || r.seenAt), n: r.n || 0, total: r.total ?? null, statuses: r.statuses || {}, problem: r.problem || '' }; });
   let sent = false; // a todas las pestañas de Vitalis: lo guarda la del team leader (o admin); las demás lo ignoran
   for (const t of await vitalisTabs()) { try { const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'station', views: rows }), 8000); if (r && r.ok) sent = true; } catch (e) {} }
   if (sent) await sess.set('stWasOn', views.length > 0);
@@ -692,7 +629,7 @@ async function tellCrm(res) {
   for (const t of await chrome.tabs.query({ url: await crmUrls() })) { try { await chrome.tabs.sendMessage(t.id, { type: 'import-result', res }); } catch (e) {} }
 }
 
-/* ---------- la mini ficha del CRM: lo que manda Vitalis (cliente actual, el siguiente de la Cola, el turno) ----------
+/* ---------- la mini ficha del CRM: lo que manda Vitalis (cliente actual, el siguiente new, el turno) ----------
    Solo en memoria (storage.session): se borra al cerrar Chrome. Va a todas las pestañas del CRM menos las de la estación. */
 async function dockSet(d) {
   const dk = { ...(d && typeof d === 'object' ? d : { off: 1 }), at: Date.now() };

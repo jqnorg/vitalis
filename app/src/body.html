@@ -40,7 +40,7 @@
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-g="callman" data-v="callman" id="navCm" class="nv-cli" hidden title="Manager (M)"><svg><use href="#i-cm"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbCm"></span><kbd>M</kbd></button>
-    <button type="button" data-g="panel" data-v="ahora" id="navPanel" class="nv-cli" title="Manager: tu cliente, tu cola y tu agenda (2)"><svg><use href="#i-cliente"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
+    <button type="button" data-g="panel" data-v="cliente" id="navPanel" class="nv-cli" title="Manager: tu cliente y tu agenda (2)"><svg><use href="#i-cliente"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
     <button type="button" data-g="banking" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>5</kbd></button>
@@ -65,7 +65,7 @@
   <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
   <button type="button" class="pill" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
-  <button type="button" class="pill new wr" id="sNew" data-go="ahora" title="Clientes en New: llamalos ya" hidden></button>
+  <button type="button" class="pill new wr" id="sNew" data-go="cliente" title="Clientes en New: llamalos ya" hidden></button>
   <button type="button" class="pill ayuda wr" id="sAyuda" data-act="ayuda" title="Le avisa al team leader y a los administradores" hidden><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Pedir ayuda</button>
   <div class="pill turno" id="sTurno"></div>
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
@@ -93,15 +93,8 @@
     <div id="itTl"></div>
   </section>
   <section class="card bk-alert" id="iBank" aria-label="Fallas de pago" hidden></section>
-  <section class="card ah-card" id="iAhora" aria-label="Lo que toca ahora" hidden></section>
   <section class="card ms" id="iMesa" aria-label="La mesa" hidden></section>
   <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
-</section>
-
-<section class="view" id="v-ahora" hidden>
-  <div class="vh"><div><h1>Cola</h1><p class="sub" id="ahSub"></p></div><span class="grow"></span>
-    <div class="tools"><select id="ahWho" aria-label="De quién"></select></div></div>
-  <div id="ahBody"></div>
 </section>
 
 <section class="view" id="v-ventas" hidden>
@@ -337,7 +330,6 @@
   <section class="card" id="eqRmo" aria-label="RMO por día" hidden></section>
   <section class="card" id="eqStation" aria-label="Estación del CRM" hidden></section>
   <section class="card" id="eqCurva" aria-label="Curva del agente nuevo" hidden></section>
-  <section class="card" id="eqCola" aria-label="La cola de cada uno" hidden></section>
   <section class="card"><div class="card-h"><h3>Agentes</h3><span class="p-sub" id="eqCount"></span><span class="grow"></span><span class="p-sub">Tocá <b>Ficha</b> para ver su agenda, turnos, clientes y tareas</span></div><div class="p-tablewrap" id="eqTable"></div></section>
 </section>
 

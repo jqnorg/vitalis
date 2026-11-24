@@ -629,65 +629,53 @@ ok(r.rows.length === 0, 'otra mesa no');
 r = await as(M, "insert into public.targets (ym, ftds) values ('nov', 10)");
 ok(!!r.error, 'el mes va como AAAA-MM');
 
-// ---------- clientes del CRM: todos los que se ven, con su status ----------
+// ---------- clientes del CRM: solo news (New y Talking) y FTDs ----------
 {
   const rows = [
     { id: '900001', brand: 'Novara Markets', name: 'Ana Uno', country: 'Peru', status: 'New', reg: '2026-11-19 10:02', agent: 'Sofia Arias', camp: 'Google ES', aff: '88843' },
-    { id: '900002', brand: 'Novara Markets', name: 'Beto Dos', status: 'NA 2', reg: '19/11/2026' },
+    { id: '900002', brand: 'Novara Markets', name: 'Beto Dos', status: 'Talking', reg: '19/11/2026' },
     { id: '900003', status: 'Do Not Call' },
     { id: '900004', status: 'call again' },
     { id: '900005', status: 'Raro raro' },
+    { id: '900007', status: 'FTD' },
+    { id: '900008', ftd: '2026-11-19 10:15' },
     { id: ' ', status: 'New' },
   ];
   R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(rows)]);
-  ok(R && R.ok && R.new === 5 && R.changed === 0 && R.fresh.length === 1 && R.fresh[0] === '900001', `crm_seen guarda los clientes vistos (las filas sin ID no) (${JSON.stringify(R)})`);
-  r = await as(B, 'select client_id, brand, status_group g, reg, crm_agent, camp, (first_seen_by = $1) mio from public.crm_clients order by client_id', [B]);
+  ok(R && R.ok && R.new === 4 && R.changed === 0 && R.fresh.length === 2 && R.fresh[0] === '900001', `crm_seen guarda los New, los Talking y los FTD; cualquier otro status no entra (${JSON.stringify(R)})`);
+  r = await as(B, 'select client_id, brand, status, status_group g, reg, crm_agent, camp, ftd_at, (first_seen_by = $1) mio from public.crm_clients order by client_id', [B]);
   const G = Object.fromEntries(r.rows.map((x) => [x.client_id, x]));
-  ok(G['900001'].g === 'new' && G['900002'].g === 'na' && G['900003'].g === 'dnc' && G['900004'].g === 'call_again' && G['900005'].g === 'otro', 'cada status cae en su grupo (New, NA 2, Do Not Call, call again, uno desconocido)');
-  ok(G['900001'].reg === '2026-11-19 10:02' && G['900002'].reg === null && G['900003'].brand === 'Novara Markets' && G['900001'].crm_agent === 'Sofia Arias' && G['900001'].camp === 'Google ES' && G['900001'].mio, 'guarda registro, agente, campaña y quién lo vio; un registro con otro formato queda vacío; sin marca es Novara');
+  ok(r.rows.length === 4 && G['900001'].g === 'new' && G['900002'].g === 'new' && G['900007'].g === 'ftd' && G['900008'].g === 'ftd' && G['900008'].status === 'FTD' && G['900008'].ftd_at === '2026-11-19 10:15', 'New y Talking son new; FTD (por status o por la hora del depósito) es ftd');
+  ok(G['900001'].reg === '2026-11-19 10:02' && G['900002'].reg === null && G['900003'] == null && G['900001'].crm_agent === 'Sofia Arias' && G['900001'].camp === 'Google ES' && G['900001'].mio, 'guarda registro, agente, campaña y quién lo vio; un registro con otro formato queda vacío; un Do Not Call no entra');
   r = await as(B, 'select count(*)::int c from public.crm_status_log');
-  ok(r.rows[0].c === 5, 'el historial arranca con el primer status de cada uno');
+  ok(r.rows[0].c === 4, 'el historial arranca con el primer status de cada uno');
   R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(rows)]);
   ok(R.new === 0 && R.changed === 0, 'ver lo mismo otra vez no cambia nada');
-  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'No Answer' }])]);
-  r = await as(Dh, "select status, status_group g, camp, reg, (first_seen_by = $1) b, (last_seen_by = $2) d from public.crm_clients where client_id = '900001'", [B, Dh]);
-  ok(R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].g === 'na' && r.rows[0].camp === 'Google ES' && r.rows[0].reg === '2026-11-19 10:02' && r.rows[0].b && r.rows[0].d, 'otro agente actualiza el status de un cliente que vio otro, sin perder campaña ni registro');
-  r = await as(Dh, "select old_status, new_status from public.crm_status_log where client_id = '900001' order by id");
-  ok(r.rows.length === 2 && r.rows[1].old_status === 'New' && r.rows[1].new_status === 'No Answer', 'el cambio de status queda en el historial');
-  // "es imposible que un new vuelva a New" (24/11): si para uno que ya tiene otro status llega New, la fila está mal leída y no se toma nada de ella
-  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'New', agent: 'Otro Rep' }, { id: '900004', status: 'Talking' }])]);
-  r = await as(Dh, "select status, crm_agent, (select count(*)::int from public.crm_status_log where client_id = '900001') l, (select count(*)::int from public.crm_agent_log where client_id = '900001') a from public.crm_clients where client_id = '900001'");
-  ok(R.bad === 1 && R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].crm_agent === 'Sofia Arias' && r.rows[0].l === 2 && r.rows[0].a === 0, `un No Answer que "vuelve a New" se ignora entero (ni status, ni agente, ni historial) y se cuenta en bad; Call Again → Talking sí vale (${JSON.stringify(R)}, ${JSON.stringify(r.rows[0])})`);
-  // "los new solo son new una vez" (24/11): un Talking que el CRM vuelve a poner en New sigue en Talking (la fila sí se toma)
-  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900004', status: 'New', note: 'volvió' }])]);
-  r = await as(Dh, "select status, note, (select count(*)::int from public.crm_status_log where client_id = '900004' and new_status = 'New') l from public.crm_clients where client_id = '900004'");
-  ok(R.bad === 0 && R.changed === 0 && r.rows[0].status === 'Talking' && r.rows[0].note === 'volvió' && r.rows[0].l === 0, `Talking → New: queda en Talking, sin cambio en el historial, y el resto de la fila se toma (${JSON.stringify(r.rows[0])})`);
-  await db.query("update public.crm_clients set status = 'Call Again', status_group = 'call_again' where client_id = '900004'");
-  await db.query("delete from public.crm_status_log where client_id = '900004' and new_status = 'Talking'");
-  // la columna "Status" de registro o de una transacción (Full Registration, Success…) no le cambia el status a nadie
-  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Full Registration', camp: 'Google ES' }, { id: '900050', brand: 'Novara Markets', status: 'Success' }])]);
-  r = await as(Dh, "select (select status from public.crm_clients where client_id = '900001') s, (select count(*)::int from public.crm_clients where client_id = '900050') n, (select count(*)::int from public.crm_status_log where client_id in ('900001','900050')) l");
-  ok(R.changed === 0 && R.new === 0 && r.rows[0].s === 'No Answer' && r.rows[0].n === 0 && r.rows[0].l === 2, `"Full Registration" o "Success" no son su status: no cambia, no se anota, y uno nuevo así no entra (${JSON.stringify(R)})`);
-  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Llamar de nuevo' }])]);
-  const R2 = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Call Again' }])]);
-  r = await as(Dh, "select status, status_group g from public.crm_clients where client_id = '900001'");
-  ok(R.changed === 1 && R2.changed === 0 && r.rows[0].status === 'Call Again' && r.rows[0].g === 'call_again', 'el CRM en español ("Llamar de nuevo") es el mismo status que en inglés: no cambia de uno a otro');
-  // lo que ya se había colado se limpia: el historial queda con los cambios de verdad y el cliente vuelve a su status, con la hora en que entró
-  await db.exec(`insert into public.crm_clients (team_id, brand, client_id, status, status_group, status_since) select team_id, 'Novara Markets', '900060', 'Full Registration', 'otro', now() from public.profiles where id = '${B}';
-    insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_at) select team_id, 'Novara Markets', '900060', o, n, 'x', now() - (k || ' minutes')::interval from public.profiles,
-      (values (50, null, 'Full Registration'), (40, 'Full Registration', 'NA - DAY2'), (30, 'NA - DAY2', 'Full Registration'), (20, 'Full Registration', 'NA - DAY2'), (10, 'NA - DAY2', 'Full Registration')) v(k, o, n) where profiles.id = '${B}';`);
-  await db.exec(sql.slice(sql.indexOf('-- una vez: el status de registro'), sql.indexOf('-- el admin clasifica un status')));
-  r = await db.query("select old_status o, new_status n, round(extract(epoch from now() - seen_at) / 60)::int m from public.crm_status_log where client_id = '900060' order by seen_at");
-  const c60 = (await db.query("select status, status_group g, round(extract(epoch from now() - status_since) / 60)::int m from public.crm_clients where client_id = '900060'")).rows[0];
-  ok(r.rows.length === 1 && r.rows[0].o === null && r.rows[0].n === 'NA - DAY2' && r.rows[0].m === 40, `el historial queda con el cambio de verdad (${JSON.stringify(r.rows)})`);
-  ok(c60.status === 'NA - DAY2' && c60.g === 'na' && c60.m === 40, `y el cliente vuelve a NA - DAY2 desde que entró, no desde el último ida y vuelta (${JSON.stringify(c60)})`);
-  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', status: 'Talking' }])]);
-  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', gone: 1 }, { id: '900002', brand: 'Novara Markets', gone: 1 }])]);
-  r = await as(B, "select client_id, status, status_group g, left_new_at is not null salio from public.crm_clients where client_id in ('900009','900002') order by client_id");
-  ok(R.changed === 1 && !r.rows[0].salio && r.rows[0].g === 'na' && r.rows[1].salio && r.rows[1].status === 'Talking', 'un Talking que desapareció de la lista queda como que salió (y solo un Talking: un NA no se toca)');
-  await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', status: 'Hang Up' }])]);
-  r = await as(B, "select status_group g, left_new_at is null limpio from public.crm_clients where client_id = '900009'");
-  ok(r.rows[0].g === 'hang_up' && r.rows[0].limpio, 'cuando se lo vuelve a ver, vale su status nuevo');
+  // otro status para un new: dejó de ser new (no se guarda cuál)
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'No Answer', agent: 'Sofia Arias' }])]);
+  r = await as(Dh, "select status, status_group g, left_new_at is not null salio, camp, (last_seen_by = $1) d, (select count(*)::int from public.crm_status_log where client_id = '900001') l from public.crm_clients where client_id = '900001'", [Dh]);
+  ok(R.changed === 1 && r.rows[0].status === 'New' && r.rows[0].g === 'new' && r.rows[0].salio && r.rows[0].camp === 'Google ES' && r.rows[0].d && r.rows[0].l === 1, `un new visto con otro status deja de ser new (left_new_at) sin guardar el status ni anotarlo (${JSON.stringify(r.rows[0])})`);
+  // "los new solo son new una vez": el que dejó New no vuelve, aunque el CRM lo ponga otra vez en New o en Talking
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'New', agent: 'Otro Rep', note: 'volvió' }])]);
+  r = await as(Dh, "select status, left_new_at is not null salio, crm_agent, note, (select count(*)::int from public.crm_status_log where client_id = '900001') l from public.crm_clients where client_id = '900001'");
+  ok(R.bad === 0 && R.changed === 0 && r.rows[0].salio && r.rows[0].crm_agent === 'Otro Rep' && r.rows[0].note === 'volvió' && r.rows[0].l === 1, `vuelto a New: sigue fuera de los new (la fila sí se toma: agente, nota) (${JSON.stringify(r.rows[0])})`);
+  // la columna "Status" de registro o de una transacción (Full Registration, Success…) no es su status
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900002', brand: 'Novara Markets', status: 'Full Registration', camp: 'Google ES' }, { id: '900050', brand: 'Novara Markets', status: 'Success' }])]);
+  r = await as(Dh, "select (select status from public.crm_clients where client_id = '900002') s, (select count(*)::int from public.crm_clients where client_id = '900050') n, (select camp from public.crm_clients where client_id = '900002') c");
+  ok(R.changed === 0 && R.new === 0 && r.rows[0].s === 'Talking' && r.rows[0].n === 0 && r.rows[0].c === 'Google ES', `"Full Registration" o "Success" no son su status: no cambia, y uno nuevo así no entra (${JSON.stringify(R)})`);
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900002', brand: 'Novara Markets', status: 'Hablando' }])]);
+  ok(R.changed === 0, 'el CRM en español ("Hablando") es el mismo status que en inglés');
+  // desaparecer de la lista de news: dejó de ser new (New o Talking)
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', status: 'Talking' }, { id: '900010', brand: 'Novara Markets', status: 'New' }])]);
+  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', gone: 1 }, { id: '900010', brand: 'Novara Markets', gone: 1 }, { id: '900007', brand: 'Novara Markets', gone: 1 }])]);
+  r = await as(B, "select client_id, status, left_new_at is not null salio from public.crm_clients where client_id in ('900009','900010','900007') order by client_id");
+  ok(R.changed === 2 && !r.rows[0].salio && r.rows[1].salio && r.rows[2].salio && r.rows[1].status === 'Talking', 'un New o un Talking que desapareció de la lista de news queda como que salió (un FTD no se toca)');
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900009', brand: 'Novara Markets', status: 'Talking' }])]);
+  r = await as(B, "select left_new_at is not null salio from public.crm_clients where client_id = '900009'");
+  ok(R.changed === 0 && r.rows[0].salio, 'y si vuelve a aparecer como Talking, sigue fuera (new una sola vez)');
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900010', brand: 'Novara Markets', status: 'FTD', ftd: '2026-11-20 09:00' }])]);
+  r = await as(B, "select status, status_group g, ftd_at from public.crm_clients where client_id = '900010'");
+  ok(R.changed === 1 && r.rows[0].g === 'ftd' && r.rows[0].ftd_at === '2026-11-20 09:00', 'un new que depositó pasa a FTD');
   r = await as(B, "insert into public.crm_clients (brand, client_id) values ('Novara Markets', '1')");
   ok(!!r.error, 'nadie escribe directo en crm_clients');
   r = await as(B, "update public.crm_clients set status = 'x' returning 1");
@@ -698,51 +686,29 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!r.error && r.rows.length === 0, 'otra mesa no ve los clientes');
   R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(Array.from({ length: 501 }, (_, i) => ({ id: 'z' + i, status: 'New' })))]);
   ok(!!R.error, 'de a 500 filas como máximo');
-  R = await rpc(B, "select public.crm_map_status('Raro raro', 'low_potential') j");
-  ok(!!R.error, 'un agente no clasifica status');
-  R = await rpc(A, "select public.crm_map_status('raro-raro', 'low_potential') j");
-  r = await as(B, "select status_group g from public.crm_clients where client_id = '900005'");
-  ok(R.ok && R.clientes === 1 && r.rows[0].g === 'low_potential', 'el admin clasifica un status desconocido y se reclasifican los clientes');
-  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900006', status: 'RARO RARO' }])]);
-  r = await as(B, "select status_group g from public.crm_clients where client_id = '900006'");
-  ok(r.rows[0].g === 'low_potential', 'y los nuevos con ese status ya entran clasificados');
-  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([
-    { id: '70936', status: 'NA - DAY3', call: '2026-11-19 09:45', note: 'NA 3.1' }, { id: '70916', status: 'NA - DAY2' }, { id: '70759', status: 'Hang Up', call: '19/11/2026 09:46' },
-    { id: '70604', status: 'Call Again', note: 'x'.repeat(300) }])]);
-  r = await as(B, "select client_id, status_group g, last_call, note from public.crm_clients where client_id in ('70936','70916','70759','70604') order by client_id");
+  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '70936', status: 'New', call: '2026-11-19 09:45', note: 'NA 3.1' }, { id: '70759', status: 'New', call: '19/11/2026 09:46' }, { id: '70604', status: 'Talking', note: 'x'.repeat(300) }])]);
+  r = await as(B, "select client_id, last_call, note from public.crm_clients where client_id in ('70936','70759','70604') order by client_id");
   const N = Object.fromEntries(r.rows.map((x) => [x.client_id, x]));
-  ok(N['70936'].g === 'na' && N['70916'].g === 'na' && N['70759'].g === 'hang_up' && N['70604'].g === 'call_again', 'los status de Novara: NA - DAY2, NA - DAY3, Hang Up, Call Again');
   ok(N['70936'].last_call === '2026-11-19 09:45' && N['70936'].note === 'NA 3.1' && N['70759'].last_call === null && N['70604'].note.length === 200, 'guarda el último contacto y la última nota (otro formato de fecha queda vacío; la nota, hasta 200)');
-  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '70936', status: 'NA - DAY3', call: '2026-11-19 11:02' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '70936', status: 'New', call: '2026-11-19 11:02' }])]);
   r = await as(B, "select last_call, note from public.crm_clients where client_id = '70936'");
   ok(r.rows[0].last_call === '2026-11-19 11:02' && r.rows[0].note === 'NA 3.1', 'un contacto nuevo actualiza la hora y no borra la nota');
-  // la tabla de status de la mesa
-  R = await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify(['Talking','CallBack','POTENTIAL NO KYC','Pending Payment','Failed Deposit','Bank Block','Declined','FTD','Invalid Number','Language Barrier','Reassign','FAKE','Special - New','Voicemail']
-    .map((st, i) => ({ id: 'G' + i, status: st })))]);
-  r = await as(B, "select client_id, status_group g from public.crm_clients where client_id like 'G%' order by length(client_id), client_id");
-  ok(r.rows.map((x) => x.g).join(',') === 'new,callback,call_again,pending,failed,failed,failed,ftd,invalid,invalid,crm,crm,otro,otro', 'cada status de la tabla de la mesa en su grupo (' + r.rows.map((x) => x.g).join(',') + ')');
   // FTD, desk y rotaciones
-  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', status: 'Call Again', agent: 'Ana Uno', desk: 'Team Matías' }])]);
-  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', status: 'Call Again', agent: 'Beto Dos', ftd: '2026-11-19 10:15' }])]);
-  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', agent: 'beto dos' }])]);
-  r = await as(B, "select crm_agent, ftd_at, desk from public.crm_clients where client_id = 'R1'");
-  ok(r.rows[0].crm_agent === 'beto dos' && r.rows[0].ftd_at === '2026-11-19 10:15' && r.rows[0].desk === 'Team Matías', 'guarda el agente actual, la hora del FTD y el desk');
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', status: 'New', agent: 'Ana Uno', desk: 'Team Matías' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', status: 'New', agent: 'Beto Dos' }])]);
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'R1', agent: 'beto dos', ftd: '2026-11-19 10:15' }])]);
+  r = await as(B, "select crm_agent, ftd_at, desk, status_group g from public.crm_clients where client_id = 'R1'");
+  ok(r.rows[0].crm_agent === 'beto dos' && r.rows[0].ftd_at === '2026-11-19 10:15' && r.rows[0].desk === 'Team Matías' && r.rows[0].g === 'ftd', 'guarda el agente actual, la hora del FTD (y pasa a ftd) y el desk');
   r = await as(B, "select old_agent, new_agent, status from public.crm_agent_log where client_id = 'R1'");
-  ok(r.rows.length === 1 && r.rows[0].old_agent === 'Ana Uno' && r.rows[0].new_agent === 'Beto Dos' && r.rows[0].status === 'Call Again', 'una rotación queda anotada una vez (mayúsculas no cuentan)');
+  ok(r.rows.length === 1 && r.rows[0].old_agent === 'Ana Uno' && r.rows[0].new_agent === 'Beto Dos' && r.rows[0].status === 'New', 'una rotación queda anotada una vez (mayúsculas no cuentan)');
   // la conversión del new es del primero que lo llamó: si lo rotan antes de llamarlo, del que lo llama
   await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'F1', status: 'New', agent: 'Ana Uno' }, { id: 'F2', status: 'New', agent: 'Ana Uno' }])]);
   await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'F1', status: 'New', agent: 'Beto Dos' }, { id: 'F2', status: 'Talking', agent: 'Ana Uno' }])]);
   await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: 'F1', status: 'No Answer', agent: 'Beto Dos' }, { id: 'F2', status: 'No Answer', agent: 'Beto Dos' }])]);
-  r = await as(B, "select client_id, first_agent, first_call_at is not null t from public.crm_clients where client_id in ('F1','F2') order by client_id");
-  ok(r.rows[0].first_agent === 'Beto Dos' && r.rows[1].first_agent === 'Ana Uno' && r.rows[0].t && r.rows[1].t, 'primer agente: rotado antes de llamarlo → el que llamó; llamado y después rotado → el primero');
+  r = await as(B, "select client_id, first_agent, first_call_at is not null t, left_new_at is not null salio from public.crm_clients where client_id in ('F1','F2') order by client_id");
+  ok(r.rows[0].first_agent === 'Beto Dos' && r.rows[1].first_agent === 'Ana Uno' && r.rows[0].t && r.rows[1].t && r.rows[0].salio && r.rows[1].salio, `primer agente: rotado antes de llamarlo → el que llamó; llamado y después rotado → el primero (${JSON.stringify(r.rows)})`);
   r = await as(B, "insert into public.crm_agent_log (team_id, brand, client_id) values (public.my_team(), 'x', 'y')");
   ok(!!r.error, 'nadie escribe las rotaciones a mano');
-  R = await rpc(B, 'select public.set_queue_cap(40) j');
-  ok(!!R.error, 'un agente no cambia el tope del grupo 3');
-  R = await rpc(M, 'select public.set_queue_cap(40) j');
-  r = await as(B, 'select queue_cap from public.teams');
-  ok(R.ok && r.rows[0].queue_cap === 40, 'el team leader cambia el tope del grupo 3 y lo ve toda la mesa');
-  await rpc(M, 'select public.set_queue_cap(60) j');
   // registro de accesos
   r = await as(B, "insert into public.sales (date, client_id, amount, tx) values ('2026-11-19', '900009', 100, 'TXAUD1') returning id");
   const sid = r.rows[0].id;
@@ -925,59 +891,23 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(!!R.error, 'un agente no puede latir como estación');
   R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([
     { vista: 'news', ok: ts, try: ts, n: 3, statuses: { New: 2, Talking: 1 } },
-    { vista: 'cola', ok: ts, try: ts, n: 8, total: 634, statuses: { 'NA - DAY2': 3, 'Call Again': 2, 'Hang Up': 1, New: 1, 'Not Interested': 1 } },
-    { vista: 'agen', ok: ts, try: ts, n: 6, statuses: { New: 5, CallBack: 1 } },
     { vista: 'trx', try: ts, n: 0, problem: 'login' },
+    { vista: 'cola', ok: ts, try: ts, n: 8 },
     { vista: 'nada', n: 1 },
   ])]);
-  ok(!R.error && R.n === 4, 'el team leader late con sus vistas (las que no existen se ignoran)');
+  ok(!R.error && R.n === 2, 'el team leader late con sus dos vistas (news y trx; las demás ya no existen)');
   q = await as(B, 'select vista, n, total, off_pct, problem, last_ok is not null ok from public.station_state order by vista');
   const S = Object.fromEntries(q.rows.map((x) => [x.vista, x]));
-  ok(q.rows.length === 4 && S.news.problem === '' && S.news.off_pct === 0 && S.cola.total === 634, 'la mesa ve el estado de cada vista');
-  ok(S.cola.off_pct === 25 && S.cola.problem === '', 'unos pocos clientes de otra vista no son un filtro perdido (25%)');
-  ok(S.agen.off_pct === 83 && S.agen.problem === 'filtro', 'una vista llena de status que no son suyos: perdió el filtro');
+  ok(q.rows.length === 2 && S.news.problem === '' && S.news.off_pct === 0, 'la mesa ve el estado de cada vista');
   ok(S.trx.problem === 'login' && !S.trx.ok, 'una vista sin sesión del CRM queda marcada, sin lectura buena');
+  R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([{ vista: 'news', ok: ts, try: ts, n: 6, statuses: { New: 1, CallBack: 5 } }])]);
+  q = await as(B, 'select vista, off_pct, problem, last_ok is not null ok from public.station_state');
+  ok(!R.error && q.rows.length === 1 && q.rows[0].vista === 'news' && q.rows[0].off_pct === 83 && q.rows[0].problem === 'filtro', 'las vistas que ya no vienen salen; la de news llena de otros status perdió el filtro');
   R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([{ vista: 'news', try: ts, n: 0, ok: 'mañana' }])]);
-  q = await as(B, 'select vista, last_ok is not null ok from public.station_state');
-  ok(!R.error && q.rows.length === 1 && q.rows[0].vista === 'news' && q.rows[0].ok, 'las vistas que ya no vienen salen; una hora rara no borra la última lectura buena');
+  q = await as(B, 'select last_ok is not null ok from public.station_state');
+  ok(!R.error && q.rows[0].ok, 'una hora rara no borra la última lectura buena');
   q = await as(X, 'select * from public.station_state');
   ok(q.rows.length === 0, 'otra mesa no ve la estación');
-  R = await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([
-    { vista: 'todo', ok: ts, try: ts, n: 100, total: 904, statuses: { New: 2, 'Call Again': 40, 'Not Interested': 30, 'Do Not Call': 28 } },
-    { vista: 'trx', ok: ts, try: ts, n: 26, problem: 'orden' },
-  ])]);
-  q = await as(B, 'select vista, n, total, off_pct, problem from public.station_state order by vista');
-  const T = Object.fromEntries(q.rows.map((x) => [x.vista, x]));
-  ok(!R.error && T.todo && T.todo.n === 100 && T.todo.total === 904 && T.todo.problem === '' && T.todo.off_pct == null, 'la vista Clientes (todos los status) no tiene filtro que perder');
-  ok(T.trx.problem === '', '"sin orden" solo vale para la de Clientes');
-  await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([{ vista: 'todo', try: ts, n: 100, problem: 'orden' }])]);
-  q = await as(B, 'select problem from public.station_state where vista = $1', ['todo']);
-  ok(q.rows[0] && q.rows[0].problem === 'orden', 'la de Clientes sin el último que cambió arriba queda marcada');
-  // el pase completo de la pestaña de Clientes: lo que no aparece lo tiene otra mesa
-  await rpc(M, 'select public.station_beat($1::jsonb) j', [JSON.stringify([{ vista: 'todo', ok: ts, try: ts, n: 100, total: 3, sweep: { busy: true, pager: '' } }])]);
-  q = await as(B, "select sweep_err, pager from public.station_state where vista = 'todo'");
-  ok(q.rows[0] && q.rows[0].sweep_err === 'busy' && q.rows[0].pager === '', 'el latido dice que el pase está en marcha');
-  await rpc(M, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '910001', brand: 'Novara Markets', status: 'No Answer' }, { id: '910002', brand: 'Novara Markets', status: 'Call Again' }, { id: '910003', brand: 'Novara Markets', status: 'Hang Up' }])]);
-  const live0 = (await db.query("select count(*)::int c from public.crm_clients where brand = 'Novara Markets' and gone_at is null")).rows[0].c;
-  R = await rpc(B, 'select public.station_sweep($1::jsonb) j', [JSON.stringify({ ids: ['910001'], n: 1 })]);
-  ok(!!R.error, 'un agente no puede mandar el pase');
-  R = await rpc(M, 'select public.station_sweep($1::jsonb) j', [JSON.stringify({ started: ts, ended: ts, ids: ['910001'], n: 1, total: 3, pages: 1 })]);
-  ok(R && R.ok === false && R.err === 'incompleto', `un pase con menos del 80% del total no marca a nadie (${JSON.stringify(R)})`);
-  const allIds = (await db.query("select client_id from public.crm_clients where brand = 'Novara Markets' and client_id <> '910002'")).rows.map((x) => x.client_id);
-  R = await rpc(M, 'select public.station_sweep($1::jsonb) j', [JSON.stringify({ started: ts, ended: ts, ids: allIds, n: allIds.length, total: allIds.length, pages: 2, ms: 20000 })]);
-  ok(R && R.ok === true && R.gone === 1, `el pase completo marca al que no apareció (${JSON.stringify(R)})`);
-  q = await db.query("select client_id, gone_at is not null g from public.crm_clients where client_id in ('910001','910002') order by 1");
-  ok(q.rows[0].g === false && q.rows[1].g === true, '910002 lo tiene otra mesa; 910001 sigue en la mesa');
-  q = await as(B, "select sweep_n, sweep_pages, sweep_gone, sweep_err from public.station_state where vista = 'todo'");
-  ok(q.rows[0] && q.rows[0].sweep_n === allIds.length && q.rows[0].sweep_pages === 2 && q.rows[0].sweep_gone === 1 && q.rows[0].sweep_err === '', 'la mesa ve cuándo fue el pase y cuántos se fueron');
-  await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '910002', brand: 'Novara Markets', status: 'Call Again' }])]);
-  q = await db.query("select gone_at from public.crm_clients where client_id = '910002'");
-  ok(q.rows[0].gone_at === null, 'al verlo de nuevo vuelve a la mesa');
-  R = await rpc(M, 'select public.station_sweep($1::jsonb) j', [JSON.stringify({ started: ts, ended: ts, ids: ['910001'], n: 1, total: null, pages: 1 })]);
-  ok(R && R.ok === false, 'un pase que dejaría fuera a más de la mitad de la mesa no marca a nadie');
-  R = await rpc(M, 'select public.station_sweep($1::jsonb) j', [JSON.stringify({ started: ts, ended: ts, ids: allIds.filter((x) => x !== '910003'), n: allIds.length - 1, total: null, pages: 1, bounded: true, cutoff: '2099-01-01' })]);
-  q = await db.query("select gone_at from public.crm_clients where client_id = '910003'");
-  ok(R && R.ok === true && R.gone === 0 && q.rows[0].gone_at === null, 'un pase cortado por fecha no marca a los que no recorrió');
   await rpc(M, "select public.station_beat('[]'::jsonb) j");
   ok((await db.query('select count(*)::int c from public.station_state')).rows[0].c === 0, 'sin vistas, la estación queda vacía');
 }

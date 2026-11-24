@@ -1104,7 +1104,7 @@ alter table public.crm_clients add column if not exists first_agent text;
 alter table public.crm_clients add column if not exists first_call_at timestamptz;
 -- un Talking que desapareció de la lista que se actualiza: ya cambió de status en el CRM (cuál, se sabe cuando aparezca en otra pestaña)
 alter table public.crm_clients add column if not exists left_new_at timestamptz;
--- lo tiene otra mesa: no apareció en el pase completo de la pestaña de Clientes de la estación (station_sweep); vuelve a null al verlo de nuevo
+  -- gone_at: quedó de la versión con pase completo (ya no se usa)
 alter table public.crm_clients add column if not exists gone_at timestamptz;
 create table if not exists public.crm_status_log ( -- cada cambio de status que se vio (no la hora exacta del cambio en el CRM)
   id         bigserial primary key,
@@ -1186,7 +1186,9 @@ begin
     else 'otro' end;
 end $$;
 
--- lo que vio la extensión (hasta 500 filas): completa o actualiza cada cliente y anota el cambio de status
+-- lo que vio la extensión (hasta 500 filas). Nuevo rumbo (el dueño, 24/11/2026): Vitalis es solo news y FTDs.
+-- Se guardan los New y Talking (la lista de news del CRM) y el FTD; cualquier otro status solo dice que el cliente dejó de ser new
+-- (left_new_at) y no se guarda. "Los new solo son new una vez": el que dejó New no vuelve, aunque el CRM lo ponga otra vez ahí.
 create or replace function public.crm_seen(rows jsonb) returns json
   language plpgsql security definer set search_path = public as $$
 declare
@@ -1201,9 +1203,9 @@ begin
     cid := public._clip(r->>'id', 60);
     if cid is null then continue; end if;
     br := coalesce(public._clip(r->>'brand', 40), 'Novara Markets');
-    if coalesce(r->>'gone', '') in ('1', 'true') then -- salió de Talking: deja de ser new hasta que se lo vuelva a ver
+    if coalesce(r->>'gone', '') in ('1', 'true') then -- desapareció de la lista de news: dejó de ser new
       update public.crm_clients set left_new_at = now()
-        where team_id = t and brand = br and client_id = cid and status_group = 'new' and public.crm_key(status) = 'talking' and left_new_at is null;
+        where team_id = t and brand = br and client_id = cid and status_group = 'new' and left_new_at is null;
       if found then n_chg := n_chg + 1; end if;
       continue;
     end if;
@@ -1218,24 +1220,29 @@ begin
     if fa is not null and (fa !~ '^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$' or left(fa, 10) > to_char((now() at time zone 'America/Montevideo') + interval '1 day', 'YYYY-MM-DD')) then fa := null; end if;
     ag := public._clip(r->>'agent', 80);
     g := public.crm_group(st, t);
-    hit := public.crm_key(st) = 'talking' or (st is not null and g <> 'new') or lc is not null; -- ya lo contactaron
+    if fa is not null and st is null then st := 'FTD'; g := 'ftd'; end if; -- la lista de depósitos: el cliente ya depositó
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
-    if not found and st is null then continue; end if; -- sin su status de venta, se lo anota cuando se lo vea en la lista que lo tiene
-    -- "Es imposible que un new vuelva a New" (el dueño, 24/11/2026): si para uno que ya tiene otro status llega "New", la columna
-    -- está mal leída (otra columna "Status", o la fila corrida): no se toma nada de esa fila y se cuenta en 'bad' para avisar
-    -- Y "los new solo son new una vez" (el dueño, 24/11/2026): apenas cambió de status una vez (Talking incluido), jamás vuelve a New,
-    -- aunque el CRM lo vuelva a poner ahí: si estaba en Talking se toma la fila pero no el status (sigue en Talking)
-    if found and st is not null and public.crm_key(st) = 'new' and cur.status is not null and public.crm_key(cur.status) <> 'new' then
-      if cur.status_group = 'new' then st := null; else n_bad := n_bad + 1; continue; end if;
+    if st is not null and g not in ('new', 'ftd') then -- otro status: no se guarda; solo dice que ya no es new
+      if found and cur.status_group = 'new' and cur.left_new_at is null then
+        update public.crm_clients set left_new_at = now(), last_seen = now(), last_seen_by = auth.uid(), crm_agent = coalesce(ag, crm_agent), last_call = coalesce(lc, last_call),
+          first_agent = coalesce(first_agent, ag, crm_agent), first_call_at = coalesce(first_call_at, case when coalesce(ag, crm_agent) is not null then now() end) -- ya lo llamaron: la conversión es de ese
+          where team_id = t and brand = br and client_id = cid;
+        n_chg := n_chg + 1;
+      end if;
+      continue;
     end if;
+    if not found and st is null then continue; end if; -- sin status de venta y sin registro previo: nada que anotar
+    -- "los new solo son new una vez": el que ya dejó New (otro status visto, o salió de la lista de news) no vuelve a New ni a Talking
+    if found and st is not null and g = 'new' and (cur.status_group <> 'new' or cur.left_new_at is not null) then
+      if cur.status_group = 'new' or cur.status_group = 'ftd' then st := null; else n_bad := n_bad + 1; continue; end if;
+    end if;
+    hit := public.crm_key(st) = 'talking' or lc is not null or g = 'ftd'; -- ya lo contactaron
     if not found then
       insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_agent, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
               ag, public._clip(r->>'camp', 120), public._clip(r->>'aff', 60), lc, nt, fa, public._clip(r->>'desk', 80), case when hit then ag end, auth.uid(), auth.uid())
       on conflict do nothing;
-      if st is not null then
-        insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, null, st, g, auth.uid());
-      end if;
+      insert into public.crm_status_log (team_id, brand, client_id, old_status, new_status, new_group, seen_by) values (t, br, cid, null, st, g, auth.uid());
       n_new := n_new + 1;
       if g = 'new' then fresh := fresh || cid; end if;
     else
@@ -1255,8 +1262,7 @@ begin
         status = coalesce(st, status),
         status_group = case when st is null then status_group else g end,
         status_since = case when st is not null and st is distinct from cur.status then now() else status_since end,
-        left_new_at = case when st is null then left_new_at end, -- se lo vio con su status: vale lo que se ve
-        gone_at = null, -- se lo ve: está en la mesa
+        gone_at = null,
         last_seen = now(), last_seen_by = auth.uid()
       where team_id = t and brand = br and client_id = cid;
       if ag is not null and cur.crm_agent is not null and lower(ag) <> lower(cur.crm_agent) then -- lo rotaron
@@ -1269,68 +1275,6 @@ begin
     end if;
   end loop;
   return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'bad', n_bad, 'fresh', to_json(fresh));
-end $$;
-
--- una vez: el status de registro o de transacción que se coló (Full Registration, Success…) y los nombres en español.
--- Se sacan del historial los cambios a esos status, se arregla el "de" de los que venían de ahí, se borran los que quedan sin cambio,
--- y cada cliente vuelve a su último status de venta con la hora en que entró en él. Re-ejecutable: si no hay nada que arreglar, no toca nada.
-do $$
-begin
-  update public.crm_status_log set new_status = public.crm_canon(new_status) where new_status is distinct from public.crm_canon(new_status);
-  update public.crm_status_log set old_status = public.crm_canon(old_status) where old_status is distinct from public.crm_canon(old_status);
-  update public.crm_clients set status = public.crm_canon(status) where status is distinct from public.crm_canon(status);
-  drop table if exists _ruido;
-  create temp table _ruido on commit drop as
-    select distinct team_id, brand, client_id from public.crm_status_log where public.crm_not_sales(new_status) or public.crm_not_sales(old_status)
-    union select team_id, brand, client_id from public.crm_status_log group by 1, 2, 3 having count(*) filter (where old_status is not distinct from new_status) > 0;
-  if not exists (select 1 from _ruido) then return; end if;
-  delete from public.crm_status_log where public.crm_not_sales(new_status);
-  update public.crm_status_log l set old_status = (select p.new_status from public.crm_status_log p
-      where p.team_id = l.team_id and p.brand = l.brand and p.client_id = l.client_id and (p.seen_at, p.id) < (l.seen_at, l.id) order by p.seen_at desc, p.id desc limit 1)
-    where public.crm_not_sales(l.old_status);
-  delete from public.crm_status_log l using _ruido r
-    where l.team_id = r.team_id and l.brand = r.brand and l.client_id = r.client_id and l.old_status is not distinct from l.new_status;
-  update public.crm_clients c set status = x.new_status, status_group = public.crm_group(x.new_status, c.team_id), status_since = x.seen_at
-    from (select distinct on (team_id, brand, client_id) team_id, brand, client_id, new_status, seen_at from public.crm_status_log
-          order by team_id, brand, client_id, seen_at desc, id desc) x, _ruido r
-    where x.team_id = c.team_id and x.brand = c.brand and x.client_id = c.client_id
-      and r.team_id = c.team_id and r.brand = c.brand and r.client_id = c.client_id
-      and (public.crm_not_sales(c.status) or c.status = x.new_status);
-end $$;
-update public.crm_clients c set status_group = public.crm_group(c.status, c.team_id)
-  where c.status is not null and c.status_group is distinct from public.crm_group(c.status, c.team_id);
-
--- el admin clasifica un status que no se reconoce (y se reclasifican los clientes que lo tienen)
--- los que quedaron en "otro" con una versión vieja de crm_group (p. ej. NA - DAY3) pasan a su grupo
-update public.crm_clients c set status_group = public.crm_group(c.status, c.team_id)
-  where c.status is not null and c.status_group is distinct from public.crm_group(c.status, c.team_id);
--- los ya contactados sin primer agente: si lo rotaron estando contactado, lo llamó el de antes; si no, el actual
-update public.crm_clients c set first_agent = coalesce((select case when public.crm_group(l.status, c.team_id) = 'new' and public.crm_key(l.status) <> 'talking' then null else l.old_agent end
-    from public.crm_agent_log l where l.team_id = c.team_id and l.brand = c.brand and l.client_id = c.client_id order by l.seen_at limit 1), c.crm_agent)
-  where c.first_agent is null and (c.status_group <> 'new' or public.crm_key(c.status) = 'talking' or c.last_call is not null);
-
-create or replace function public.crm_map_status(st text, grp text) returns json
-  language plpgsql security definer set search_path = public as $$
-declare t uuid := public.my_team(); k text := public.crm_key(st); n integer;
-begin
-  if coalesce(public.my_role(), '') <> 'admin' then raise exception 'Solo el administrador clasifica status'; end if;
-  if k = '' then raise exception 'STATUS: falta el status'; end if;
-  if grp not in ('new','na','callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd','dnc','invalid','crm','otro') then raise exception 'GRP: grupo inválido'; end if;
-  insert into public.crm_status_map (team_id, status_key, grp) values (t, k, grp)
-    on conflict (team_id, status_key) do update set grp = excluded.grp;
-  update public.crm_clients set status_group = grp where team_id = t and public.crm_key(status) = k;
-  get diagnostics n = row_count;
-  return json_build_object('ok', true, 'clientes', n);
-end $$;
-
--- team leader o admin: hasta cuántos del grupo 3 se llaman todos (si hay más, solo los registrados en el mes)
-create or replace function public.set_queue_cap(n integer) returns json
-  language plpgsql security definer set search_path = public as $$
-begin
-  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
-  if n is null or n < 1 or n > 1000 then raise exception 'CAP: entre 1 y 1000'; end if;
-  update public.teams set queue_cap = n where id = public.my_team();
-  return json_build_object('ok', true, 'cap', n);
 end $$;
 
 -- ---------- registro de accesos: exportaciones y cambios a ventas ajenas (lo ven team leader y admin) ----------
@@ -1387,8 +1331,8 @@ create policy audit_read on public.audit_log for select to authenticated using (
 grant select on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log to authenticated;
 revoke insert, update, delete, truncate on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log from authenticated;
 revoke all on public.crm_clients, public.crm_status_log, public.crm_agent_log, public.crm_status_map, public.audit_log from anon;
-revoke all on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) from public, anon;
-grant execute on function public.crm_seen(jsonb), public.crm_map_status(text, text), public.set_queue_cap(integer), public.audit_note(text, jsonb) to authenticated;
+revoke all on function public.crm_seen(jsonb), public.audit_note(text, jsonb) from public, anon;
+grant execute on function public.crm_seen(jsonb), public.audit_note(text, jsonb) to authenticated;
 revoke execute on function public.crm_group(text, uuid), public.audit_sales() from public, anon, authenticated;
 
 -- ---------- banking: procesadores, sus métodos de pago y bancos con su flujo recomendado ----------
@@ -1815,16 +1759,9 @@ create table if not exists public.station_state (
   by_user    uuid references public.profiles(id) on delete set null,
   updated_at timestamptz not null default now(),
   primary key (team_id, vista));
--- el pase completo de la pestaña de Clientes (todas las páginas, una vez por hora): cuándo, cuántos vio, páginas, cuánto tardó, y si no encuentra el paginado
-alter table public.station_state add column if not exists sweep_at timestamptz;
-alter table public.station_state add column if not exists sweep_n integer;
-alter table public.station_state add column if not exists sweep_pages integer;
-alter table public.station_state add column if not exists sweep_ms integer;
-alter table public.station_state add column if not exists sweep_err text not null default '';
-alter table public.station_state add column if not exists sweep_gone integer;
-alter table public.station_state add column if not exists pager text not null default '';
 alter table public.station_state drop constraint if exists station_state_vista_check;
-alter table public.station_state add constraint station_state_vista_check check (vista in ('todo', 'news', 'trx', 'cola', 'agen', 'cerr'));
+alter table public.station_state add constraint station_state_vista_check check (vista in ('news', 'trx'));
+delete from public.station_state where vista not in ('news', 'trx');
 alter table public.station_state enable row level security;
 drop policy if exists station_read on public.station_state;
 create policy station_read on public.station_state for select to authenticated using (team_id = public.my_team());
@@ -1838,11 +1775,10 @@ begin
   if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
   for r in select x from jsonb_array_elements(case when jsonb_typeof(p) = 'array' then p else '[]'::jsonb end) x limit 10 loop
     v := r->>'vista';
-    if v is null or v not in ('todo', 'news', 'trx', 'cola', 'agen', 'cerr') or v = any(got) then continue; end if;
+    if v is null or v not in ('news', 'trx') or v = any(got) then continue; end if;
     got := got || v;
-    want := case v when 'news' then array['new'] when 'cola' then array['na', 'call_again', 'hang_up']
-      when 'agen' then array['callback', 'pending', 'low_potential', 'failed'] when 'cerr' then array['not_interested', 'dnc', 'invalid', 'ftd', 'crm', 'otro'] end;
-    prob := case when r->>'problem' in ('login', 'sin-tabla', 'cerrada') or (v = 'todo' and r->>'problem' = 'orden') then r->>'problem' else '' end;
+    want := case v when 'news' then array['new'] end;
+    prob := case when r->>'problem' in ('login', 'sin-tabla', 'cerrada') then r->>'problem' else '' end;
     ts_ok := case when r->>'ok' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((r->>'ok')::timestamptz, now()) end;
     ts_try := case when r->>'try' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((r->>'try')::timestamptz, now()) end;
     off := null;
@@ -1861,11 +1797,6 @@ begin
         case when r->>'total' ~ '^\d{1,7}$' then (r->>'total')::int end, off, prob, auth.uid(), now())
       on conflict (team_id, vista) do update set last_ok = coalesce(excluded.last_ok, station_state.last_ok), last_try = coalesce(excluded.last_try, station_state.last_try),
         n = excluded.n, total = excluded.total, off_pct = excluded.off_pct, problem = excluded.problem, by_user = excluded.by_user, updated_at = now();
-    if v = 'todo' and jsonb_typeof(r->'sweep') = 'object' then
-      update public.station_state set pager = case when r->'sweep'->>'pager' = 'no' then 'no' else '' end,
-        sweep_err = case when r->'sweep'->>'busy' = 'true' then 'busy' else public._clip(r->'sweep'->>'err', 20) end
-        where team_id = t and vista = v;
-    end if;
     nv := nv + 1;
   end loop;
   delete from public.station_state where team_id = t and not (vista = any(got));
@@ -1873,42 +1804,9 @@ begin
 end $$;
 revoke all on function public.station_beat(jsonb) from public, anon;
 grant execute on function public.station_beat(jsonb) to authenticated;
--- el pase completo: p = {started, ended, n, total, pages, bounded, cutoff, brand, ids}. Los clientes de la mesa que no están en ids
--- los tiene otra mesa (gone_at); si el pase se cortó por fecha (bounded), solo los vistos desde cutoff (los más viejos no se recorrieron).
--- Frenos: un pase con menos del 80% del total del CRM, o que dejaría fuera a más de la mitad de la mesa, no marca a nadie.
-create or replace function public.station_sweep(p jsonb) returns json
-  language plpgsql security definer set search_path = public as $$
-declare t uuid := public.my_team(); ids text[]; br text; nn int; tot int; bounded boolean; cutoff timestamptz; ng int := 0; nb int := 0; live int; ts_s timestamptz; ts_e timestamptz;
-begin
-  if t is null then raise exception 'sin mesa'; end if;
-  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador'; end if;
-  if jsonb_typeof(p->'ids') <> 'array' or jsonb_array_length(p->'ids') > 20000 then raise exception 'BAD: ids'; end if;
-  select array_agg(public._clip(x, 60)) into ids from jsonb_array_elements_text(p->'ids') x where x <> '';
-  nn := coalesce(array_length(ids, 1), 0);
-  br := coalesce(public._clip(p->>'brand', 40), 'Novara Markets');
-  tot := case when p->>'total' ~ '^\d{1,7}$' then (p->>'total')::int end;
-  bounded := coalesce(p->>'bounded', '') = 'true';
-  cutoff := case when bounded and p->>'cutoff' ~ '^\d{4}-\d\d-\d\d$' then (p->>'cutoff')::date::timestamptz end;
-  ts_s := case when p->>'started' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((p->>'started')::timestamptz, now()) end;
-  ts_e := case when p->>'ended' ~ '^\d{4}-\d\d-\d\dT[0-9:.]+Z$' then least((p->>'ended')::timestamptz, now()) else now() end;
-  if bounded and cutoff is null then raise exception 'BAD: cutoff'; end if;
-  select count(*) into live from public.crm_clients where team_id = t and brand = br and gone_at is null;
-  if nn < 1 or (tot is not null and not bounded and nn < tot * 0.8) or (live > 20 and nn < live * 0.5) then
-    update public.station_state set sweep_at = ts_e, sweep_n = nn, sweep_pages = case when p->>'pages' ~ '^\d{1,5}$' then (p->>'pages')::int end,
-      sweep_ms = case when p->>'ms' ~ '^\d{1,9}$' then (p->>'ms')::int end, sweep_err = 'incompleto', sweep_gone = 0, updated_at = now() where team_id = t and vista = 'todo';
-    return json_build_object('ok', false, 'err', 'incompleto', 'n', nn, 'total', tot, 'live', live);
-  end if;
-  update public.crm_clients set gone_at = null where team_id = t and brand = br and gone_at is not null and client_id = any(ids);
-  get diagnostics nb = row_count;
-  update public.crm_clients set gone_at = now()
-    where team_id = t and brand = br and gone_at is null and not (client_id = any(ids)) and (cutoff is null or last_seen >= cutoff);
-  get diagnostics ng = row_count;
-  update public.station_state set sweep_at = ts_e, sweep_n = nn, sweep_pages = case when p->>'pages' ~ '^\d{1,5}$' then (p->>'pages')::int end,
-    sweep_ms = case when p->>'ms' ~ '^\d{1,9}$' then (p->>'ms')::int end, sweep_err = '', sweep_gone = ng, updated_at = now() where team_id = t and vista = 'todo';
-  return json_build_object('ok', true, 'n', nn, 'gone', ng, 'back', nb, 'started', ts_s);
-end $$;
-revoke all on function public.station_sweep(jsonb) from public, anon;
-grant execute on function public.station_sweep(jsonb) to authenticated;
+drop function if exists public.station_sweep(jsonb);
+drop function if exists public.set_queue_cap(integer);
+drop function if exists public.crm_map_status(text, text);
 
 -- ---------- cambios en vivo ----------
 do $$
@@ -2239,22 +2137,16 @@ begin
          and (left(c.ftd_at, 10) = left(c.reg, 10) or exists (select 1 from public.sales s where s.team_id = t.id and s.brand = c.brand and s.client_id = c.client_id and s.date::text = left(c.reg, 10)))) ftd_new, -- CR (%): de los registrados, los que depositaron el mismo día
       (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text) reg,
       (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
-         and (c.status_group in ('callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd') or c.ftd_at is not null)) atend,
-      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
-         and (c.status_group in ('pending','failed','ftd') or c.ftd_at is not null)) boleto,
+         and (c.first_agent is not null or c.left_new_at is not null or c.last_call is not null or c.status_group <> 'new' or c.ftd_at is not null)) atend, -- llamados: se lo vio contactado
       (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
          and (c.status_group = 'ftd' or c.ftd_at is not null or exists (select 1 from public.sales s where s.team_id = t.id and s.brand = c.brand and s.client_id = c.client_id))) dep,
-      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text and c.status_group = 'invalid') inv,
-      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text and c.status_group in ('na','invalid','dnc')) noat,
       (select round(avg(r.dead_ms)) from public.rmo_days r where r.team_id = t.id and r.date between d1 and d2) dead,
       (select count(distinct r.user_id) from public.rmo_days r where r.team_id = t.id and r.date between d1 and d2) rmo_people,
       (select count(*) from public.profiles p where p.team_id = t.id and p.active and not p.bot and not p.global and p.role in ('agent','admin')) agents,
-      (select coalesce(json_agg(json_build_object('aff', a.aff, 'reg', a.reg, 'dep', a.dep, 'inv', a.inv, 'at', a.at, 'noat', a.noat) order by a.reg desc), '[]'::json) from (
+      (select coalesce(json_agg(json_build_object('aff', a.aff, 'reg', a.reg, 'dep', a.dep, 'at', a.at) order by a.reg desc), '[]'::json) from (
          select coalesce(nullif(trim(c.aff), ''), 'sin afiliador') aff, count(*) reg,
            count(*) filter (where c.status_group = 'ftd' or c.ftd_at is not null) dep,
-           count(*) filter (where c.status_group = 'invalid') inv,
-           count(*) filter (where c.status_group in ('callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd') or c.ftd_at is not null) at,
-           count(*) filter (where c.status_group in ('na','invalid','dnc')) noat
+           count(*) filter (where c.first_agent is not null or c.left_new_at is not null or c.last_call is not null or c.status_group <> 'new' or c.ftd_at is not null) at
          from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
          group by 1 order by 2 desc limit 12) a) affs
     from public.teams t where t.active) x), '[]'::json)) into out;
@@ -2281,23 +2173,6 @@ create policy crm_map_read on public.crm_status_map for select to authenticated 
 drop policy if exists snip_read on public.snippets;
 create policy snip_read on public.snippets for select to authenticated using (user_id = (select auth.uid()) or global or (shared and team_id = (select public.my_team())));
 
--- Una vez (24/11/2026): la mañana del 24 una columna "Status" mal leída mandó a New a clientes que eran FTD, Pending, Call Again, Low
--- Potential, Not Interested… ("es imposible que un new vuelva a New"). Cada cliente vuelve a su status anterior, se borran esos cambios del
--- historial y las rotaciones que vinieron en la misma lectura (la fila venía corrida). Re-ejecutable: si no hay nada que arreglar, no toca nada.
-do $$
-declare r record;
-begin
-  for r in select l.* from public.crm_status_log l where public.crm_key(l.new_status) = 'new' and l.old_status is not null and public.crm_key(l.old_status) <> 'new' order by l.seen_at desc loop
-    update public.crm_clients c set status = r.old_status, status_group = public.crm_group(r.old_status, r.team_id),
-      status_since = coalesce((select max(p.seen_at) from public.crm_status_log p where p.team_id = r.team_id and p.brand = r.brand and p.client_id = r.client_id and p.seen_at < r.seen_at), c.status_since)
-      where c.team_id = r.team_id and c.brand = r.brand and c.client_id = r.client_id and public.crm_key(c.status) = 'new';
-    update public.crm_clients c set crm_agent = a.old_agent from public.crm_agent_log a
-      where a.team_id = r.team_id and a.brand = r.brand and a.client_id = r.client_id and a.seen_at between r.seen_at - interval '2 minutes' and r.seen_at + interval '2 minutes'
-        and c.team_id = a.team_id and c.brand = a.brand and c.client_id = a.client_id and lower(c.crm_agent) = lower(a.new_agent);
-    delete from public.crm_agent_log a where a.team_id = r.team_id and a.brand = r.brand and a.client_id = r.client_id and a.seen_at between r.seen_at - interval '2 minutes' and r.seen_at + interval '2 minutes';
-    delete from public.crm_status_log where id = r.id;
-  end loop;
-end $$;
 
 -- ---------- encuestas en el chat (pedido del dueño, 24/11/2026) ----------
 -- Cualquiera arma una encuesta en cualquier chat (botón o "/vitalis encuesta ¿Pregunta? | opción | opción"). El que la arma elige si es
