@@ -105,7 +105,7 @@ async def main():
             hk = await A.inner_text('#hiKpis'); hb = await A.inner_text('#hiBody')
             ok('FTDs' in hk and 'Lates' in hk and 'Mejor mes' in hk and 'Racha más larga' in hk, f'Historial: los números de arriba ({hk[:120]!r})')
             ok('Mes por mes' in hb and 'La mesa' in hb and 'Tus lates' in hb and 'Dónde vendés' in hb and 'Venta por venta' in hb, 'Historial: mes por mes, la mesa, tus lates, dónde vendés y venta por venta')
-            ok('El que más vende' in hb and 'El que más lates tiene' in hb and await A.locator('#hiBody table.pt tr.me').count() >= 2, 'La mesa en tablas: quién vende más y quién tiene más lates, con tu fila marcada')
+            ok('El que más vende' in hb and 'El que más lates tiene' in hb and await A.locator('#hiBody table.pt tr.hi-me').count() >= 2, 'La mesa en tablas: quién vende más y quién tiene más lates, con tu fila marcada')
             ok(await A.locator('#hiBody details.hi-m').count() >= 1 and await A.locator('#hiBody details.hi-m[open] table.pt').count() >= 1, 'el mes actual viene abierto con la tabla')
             ok(await A.locator('#hiBody tr.hi-day').count() >= 1 and await A.locator('#hiBody .hi-t .lnk').count() >= 1, 'las ventas agrupadas por día, cada cliente lleva a su ficha')
             ok(await A.locator('#hiBody tr.late').count() >= 1 and 'al día siguiente' in hb or 'a los' in hb, 'los lates marcados y cuánto tardan')
