@@ -273,9 +273,9 @@ function paceAt(day){
 }
 function proj(n,day){const p=paceAt(day);if(!p)return null;return {mid:Math.max(n,Math.round(n/p.mid)),lo:Math.max(n,Math.round(n/p.hi)),hi:Math.max(n,Math.round(n/p.lo)),months:p.n}}
 function pronCard(){
-  if(!isLeader())return '';
+  if(!isMgmt())return '';
   const ym=ymNow(),day=new Date().getDate(),L=team.filter(f=>f.date.slice(0,7)===ym),tg=+targets[ym]||0,P=proj(L.length,day);
-  const head=`<div class="card-h"><h3>Pronóstico del mes</h3><span class="p-sub">solo team leader y admin · según cómo cerraron ${(m=>m?plural(m,'mes','meses')+' de historia':'los meses de historia')((paceAt(Math.max(8,day))||{}).n)}</span></div>`;
+  const head=`<div class="card-h"><h3>Pronóstico del mes</h3><span class="p-sub">según cómo cerraron ${(m=>m?plural(m,'mes','meses')+' de historia':'los meses de historia')((paceAt(Math.max(8,day))||{}).n)}</span></div>`;
   if(!P)return head+`<div class="p-empty">Antes del día 8 es muy temprano para proyectar.</div>`;
   const verdict=(p,t)=>!t?'':p.lo>=t?sp('ok b','llega'):p.hi<t?sp('hot b','no llega a este ritmo'):p.mid>=t?sp('ok','en camino'):sp('warn','justo');
   const rows=sellers(team).filter(m=>!isLeadUid(m.id)||L.some(f=>f.uid===m.id)).map(m=>{const n=L.filter(f=>f.uid===m.id).length;return {m,n,p:proj(n,day),t:utOf(m.id,ym)}}).sort((a,b)=>b.n-a.n);

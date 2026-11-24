@@ -419,7 +419,7 @@ begin
   if coalesce(public.my_role(), '') <> 'admin' then raise exception 'Solo el administrador puede sumar gente'; end if;
   nm := regexp_replace(trim(coalesce(nm, '')), '\s+', ' ', 'g');
   if nm = '' or length(nm) > 40 then raise exception 'NAME: escribí un nombre (hasta 40 letras)'; end if;
-  if rl not in ('agent', 'leader', 'admin') then raise exception 'ROLE: rol inválido'; end if;
+  if rl not in ('agent', 'leader', 'admin', 'director') then raise exception 'ROLE: rol inválido'; end if;
   if exists (select 1 from public.profiles where team_id = public.my_team() and lower(name) = lower(nm) and active) then
     raise exception 'NAME_TAKEN: ya hay alguien con ese nombre';
   end if;
@@ -563,8 +563,8 @@ grant execute on function public.reply_ping(uuid, text) to authenticated;
 -- ¿puedo ver/escribir en este chat? (el de la mesa: todos; grupos y privados: sus integrantes)
 create or replace function public.in_chat(cid uuid) returns boolean
   language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.chats c where c.id = cid and c.team_id = public.my_team()
-    and (c.kind = 'team' or exists (select 1 from public.chat_members m where m.chat_id = c.id and m.user_id = auth.uid()))) $$;
+  select coalesce(public.my_role(), '') <> 'director' and exists (select 1 from public.chats c where c.id = cid and c.team_id = public.my_team()
+    and (c.kind = 'team' or exists (select 1 from public.chat_members m where m.chat_id = c.id and m.user_id = auth.uid()))) $$; -- el director no tiene chat
 
 -- cada mensaje: sin espacios de más, con la hora del servidor y sin inundar el chat
 create or replace function public.msg_guard() returns trigger
@@ -2017,6 +2017,15 @@ begin
 end $$;
 grant execute on function public.vitalis_say(text, uuid) to authenticated;
 revoke all on function public.vitalis_say(text, uuid) from public, anon;
+
+-- El rol director (pedido del dueño, noviembre 2026): los de arriba. Entra con PIN y ve solo Gerencia (la mesa en números);
+-- sin chat (in_chat), sin cola, sin ficha. No escribe nada: ninguna función lo deja (no es admin ni leader).
+do $$ declare c text; begin
+  for c in select conname from pg_constraint where conrelid = 'public.profiles'::regclass and contype = 'c' and pg_get_constraintdef(oid) like '%role%' loop
+    execute format('alter table public.profiles drop constraint %I', c);
+  end loop;
+  alter table public.profiles add constraint profiles_role_check check (role in ('agent', 'leader', 'admin', 'director'));
+end $$;
 
 -- El cierre del día (pedido del dueño, noviembre 2026): a las 17:35 el Vitalis del team leader o del admin arma el resumen de la
 -- mesa y lo manda con day_close: queda en day_closes (uno por día: el primero que llega lo manda, los demás reciben dup) y Vitalis

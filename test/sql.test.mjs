@@ -1049,6 +1049,24 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("delete from public.messages where user_id = $1 and body like 'Cierre del lunes%'", [bot]);
 }
 
+// ---------- el rol director: entra, ve los números de la mesa y nada más ----------
+{
+  R = await rpc(A, "select public.add_member('Dir Ector', 'director') j");
+  ok(!R.error && R.ok, `el admin suma un director (${JSON.stringify(R)})`);
+  const DR = R.id;
+  r = await as(DR, 'select count(*)::int c from public.sales'); ok(!r.error && r.rows[0].c > 0, 'el director lee las ventas de la mesa');
+  r = await as(DR, 'select count(*)::int c from public.crm_clients'); ok(!r.error, 'y los clientes del CRM');
+  r = await as(DR, 'select count(*)::int c from public.rmo_days'); ok(!r.error, 'y el RMO guardado');
+  r = await as(DR, 'select public.in_chat($1) ic', [TC]); ok(!r.error && r.rows[0].ic === false, 'no tiene chat, ni el de la mesa');
+  r = await as(DR, 'select count(*)::int c from public.messages'); ok(!r.error && r.rows[0].c === 0, 'y no lee ningún mensaje');
+  r = await as(DR, "select public.set_min_calls(100) j"); ok(!!r.error, 'no cambia nada de la mesa');
+  r = await as(DR, "select public.day_close(current_date, 'x') j"); ok(!!r.error, 'ni cierres');
+  r = await as(DR, "select public.vitalis_say('hola') j"); ok(!!r.error, 'ni habla por Vitalis');
+  r = await as(DR, "update public.profiles set role = 'admin' where id = $1 returning role", [DR]); ok(r.error || r.rows.length === 0 || r.rows[0].role !== 'admin', 'no se hace admin solo');
+  r = await as(A, "update public.profiles set role = 'gerente' where id = $1 returning role", [DR]); ok(!!r.error, 'un rol inventado no entra');
+  await db.query("update public.profiles set active = false where id = $1", [DR]);
+}
+
 // ---------- privacidad: cuándo se tapa Vitalis y cuándo el chat pide el PIN ----------
 {
   let q = await as(B, 'select idle_min, chat_lock_min from public.teams');

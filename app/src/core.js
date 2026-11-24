@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.47.0';
+const VERSION='1.48.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -109,6 +109,7 @@ let chats=[],chatMem=[],msgs={},reads={};
 let avatars={},avOk=false; // fotos de perfil: uid → {url, at}
 let tasks=[],taskPeople=[]; // tareas que veo y quién ya las hizo // chat: chats que veo, integrantes de grupos/privados, mensajes por chat, hasta dónde leí
 const isAdmin=()=>profile&&profile.role==='admin',isLeader=()=>profile&&(profile.role==='leader'||profile.role==='admin');
+const isDirector=()=>!!profile&&profile.role==='director',isMgmt=()=>isLeader()||isDirector(); // director: solo ve Gerencia (los de arriba)
 const canEdit=f=>f&&(f.uid===me||isLeader());
 // Vitalis: el compañero ficticio que felicita las ventas en el chat. No es de la mesa (no va en `members`).
 let botU=null;const isBot=uid=>!!botU&&uid===botU.id;

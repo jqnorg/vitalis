@@ -90,7 +90,7 @@ const AUTH = {
     const people = (roster && roster.people) || [];
     const ordered = lastU ? [...people].sort((a, b) => (b.id === lastU) - (a.id === lastU)) : people;
     box.innerHTML = `<h2>¿Quién sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
-      <div class="people">${ordered.map((p) => `<button type="button" class="person${p.id === lastU ? ' last' : ''}" data-id="${esc(p.id)}">${avatar(p.name)}<span class="nm">${esc(p.name)}${p.role === 'leader' ? '<small>Team leader</small>' : p.role === 'admin' ? '<small>Administrador</small>' : p.id === lastU ? '<small>La última vez</small>' : ''}</span></button>`).join('')}</div>
+      <div class="people">${ordered.map((p) => `<button type="button" class="person${p.id === lastU ? ' last' : ''}" data-id="${esc(p.id)}">${avatar(p.name)}<span class="nm">${esc(p.name)}${p.role === 'leader' ? '<small>Team leader</small>' : p.role === 'admin' ? '<small>Administrador</small>' : p.role === 'director' ? '<small>Director</small>' : p.id === lastU ? '<small>La última vez</small>' : ''}</span></button>`).join('')}</div>
       ${people.length ? '' : '<p class="p-empty">Todavía no hay nadie en la mesa.</p>'}`;
     box.querySelector('.people').addEventListener('click', (e) => {
       const b = e.target.closest('[data-id]'); if (!b) return;

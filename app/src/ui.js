@@ -120,7 +120,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['inicio','ahora','cliente','callman','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','inicio','ahora','cliente','callman','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -134,10 +134,11 @@ const GROUPS=[
   {g:'banking',views:['banking']},
   {g:'analisis',views:['ventas','clientes','campanas','filtros','radar'],tabs:['Ventas','Clientes','Campañas','Filtros','Radar']}, // Clientes: solo team leader y admin
   {g:'equipo',views:['equipo']},
+  {g:'gerencia',views:['gerencia']}, // los de arriba: team leader, admin y el rol director (que solo ve esto)
   {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
 ];
 // lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
-function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navCm').classList.toggle('nv-cli',tlView());
+function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navGer').hidden=!isMgmt();document.body.classList.toggle('dir',isDirector());$('#navCm').classList.toggle('nv-cli',tlView());
   const p=$('#navPanel');p.classList.toggle('nv-cli',!tlView());p.querySelector('.nm').innerHTML=tlView()?'Panel':isLeader()?'Manager<small class="ag"> (agente)</small>':'Manager';p.title=tlView()?'Panel: la cola y la agenda (2)':'Manager: tu cliente, tu cola y tu agenda (2)'}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
@@ -145,7 +146,8 @@ function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab
 const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
-  if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader()))v='inicio';
+  if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';
+  if(isDirector()&&v!=='gerencia'&&v!=='config')v='gerencia'; // el director solo ve Gerencia (y sus Ajustes)
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
   if(v==='cliente'&&tlView())v='ahora'; // el team leader no tiene clientes
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
@@ -174,7 +176,7 @@ const avHue=s=>{let h=0;for(const c of String(s||''))h=(h*31+c.charCodeAt(0))%36
 const initials=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
 const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name)||(botU&&botU.name===name?botU:null),a=m&&avatars[m.id]; // con foto, si la subió (Vitalis también)
   return a?`<span class="av pic ${cls}" aria-hidden="true"><img src="${a.url}" alt=""></span>`:`<span class="av ${cls}" style="--h:${avHue(name)}" aria-hidden="true">${esc(initials(name))}</span>`};
-const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':'Agente';
+const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':r==='director'?'Director':'Agente';
 function status(){
   pass++;
   const now=new Date(),te=todayS();

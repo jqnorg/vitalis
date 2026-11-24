@@ -60,7 +60,7 @@ Object.assign(B,{
 
 /* ---------- cálculos ---------- */
 const tlView=()=>!!profile&&profile.role==='leader'; // el team leader no vende: su inicio es el de la mesa
-function sellers(list){return members.filter(m=>m.active&&(m.role!=='leader'||list.some(f=>f.uid===m.id)))} // agentes: sin el team leader (salvo que venda)
+function sellers(list){return members.filter(m=>m.active&&m.role!=='director'&&(m.role!=='leader'||list.some(f=>f.uid===m.id)))} // agentes: sin el team leader (salvo que venda)
 const habil=d=>{const r=noTrabajo(d);return !r||r==='falta'}; // día hábil de la mesa (mis faltas no le cambian el mes a la mesa)
 function mesaMes(ym){
   const te=todayS(),list=team.filter(f=>f.date.slice(0,7)===ym),T=targets[ym]||0;

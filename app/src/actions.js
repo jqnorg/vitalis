@@ -736,6 +736,12 @@ function ayuda(){
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd>
     <dt>Agendas vencidas</dt><dd>El Manager avisa cuando alguien tiene una agenda vencida hace más de 30 minutos sin cerrar (agrupadas por agente).</dd>
     <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, boletos sin pagar, agendas vencidas y perfiles cargados. Los viernes, con el ranking de la semana.</dd></dl>
+  <h4>Gerencia (team leader, admin y director)</h4><dl>
+    <dt>Qué es</dt><dd>La mesa en números para los de arriba, por período: Hoy, cada semana del mes y el mes (y los meses anteriores). Cada número lleva una flecha contra el período anterior.</dd>
+    <dt>La mesa, por agente</dt><dd>FTDs, CR (%) y RMO de cada uno y de la mesa.</dd>
+    <dt>El embudo</dt><dd>De los registrados en el período: cuántos atendieron, a cuántos se les creó un boleto y cuántos depositaron; abajo, por agente (del primero que lo llamó).</dd>
+    <dt>Lead Quality</dt><dd>Por afiliador y campaña: cuántos leads mandan, cuántos atienden, cuántos son inválidos, cuántos depositan y a los cuántos días, y en qué status terminan (en porcentajes).</dd>
+    <dt>Director</dt><dd>Un rol para los de arriba: entra con su PIN y ve solo Gerencia, sin clientes, cola ni chat. Lo crea el administrador en Ajustes → Mesa.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
@@ -803,6 +809,7 @@ document.addEventListener('keydown',e=>{
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}
+  if(k==='g'&&isMgmt()){e.preventDefault();go('gerencia');return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}
   if(e.key==='/'){e.preventDefault();go('ventas');setTimeout(()=>$('#pQ').focus(),0);return}
   if(e.key==='?'){e.preventDefault();ayuda();return}

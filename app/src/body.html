@@ -47,6 +47,7 @@
     <button type="button" data-g="analisis" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Análisis</span><kbd>6</kbd></button>
     <button type="button" data-g="ajustes" data-v="config" class="mob-only"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span></button>
     <button type="button" data-g="equipo" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
+    <button type="button" data-g="gerencia" data-v="gerencia" id="navGer" hidden title="Gerencia: la mesa para los de arriba (G)"><svg><use href="#i-ventas"/></svg><span class="nm">Gerencia</span><kbd>G</kbd></button>
   </nav>
   <span hidden aria-hidden="true"><span id="nbCli"></span><span id="nbAh"></span><span id="nbCl"></span><span id="nbAg"></span><span id="nbCh"></span><span id="nbSo"></span></span>
   <div class="side-foot">
@@ -308,6 +309,11 @@
 <section class="view" id="v-radar" hidden>
   <div class="vh"><div><h1>Radar</h1><p class="sub" id="rdSub"></p></div></div>
   <div id="rdBody"></div>
+</section>
+
+<section class="view" id="v-gerencia" hidden>
+  <div class="vh"><div><h1>Gerencia</h1><p class="sub">La mesa en números: por agente, el embudo y la calidad de los leads.</p></div></div>
+  <div id="gerBody"></div>
 </section>
 
 <section class="view" id="v-equipo" hidden>
