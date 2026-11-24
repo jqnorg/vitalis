@@ -235,7 +235,8 @@ const affLate=perPass(()=>{
 });
 function affLateHint(aff){
   const A=affLate(),o=A.L.find(x=>norm(x.a)===norm(String(aff||'').trim()));
-  return o&&o.slow?`Este afiliador madura tarde: ${pct(o.sh)} de sus ventas llegan otro día (la mesa: ${pct(A.mesa)}). Conviene insistir varios días.`:'';
+  // la base es la historia del afiliador entera (todas sus campañas y países, también Trade24Seven mientras falten datos), no esta campaña
+  return o&&o.slow?`El afiliador ${o.a} madura tarde: de sus ${o.n} ventas (todas sus campañas${rdBase().all?', con la historia de Trade24Seven':''}), ${pct(o.sh)} llegaron otro día; en la mesa, ${pct(A.mesa)}. Vale insistir varios días.`:'';
 }
 function lateCard(){
   const A=affLate();
