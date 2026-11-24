@@ -36,6 +36,19 @@ function hiMeses(list){ // mes por mes, del más nuevo: FTDs, new, late, monto, 
     return `<tr><td>${esc(mLabel(ym))}</td><td class="r"><b>${o.n}</b> ${arrow(o.n,prev?prev.n:null)}</td><td class="r">${o.n-o.late}</td><td class="r">${o.late?`${o.late} <span class="d">(${pct(o.late/o.n)})</span>`:'<span class="d">0</span>'}</td><td class="r">${money(o.monto)}</td><td class="r">${o.days.size}</td><td class="r">${ut?`${ut} ${o.n>=ut?'<b class="ok">✓</b>':`<span class="d">faltaron ${ut-o.n}</span>`}`:'<span class="d">—</span>'}</td><td class="r">${cr.rate==null?'<span class="d">—</span>':pct(cr.rate)}</td></tr>`}).join('');
   return `<section class="card"><div class="card-h"><h3>Mes por mes</h3><span class="p-sub">la flecha compara con el mes anterior</span></div><div class="p-tablewrap"><table class="pt"><thead><tr><th>Mes</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th><th class="r">Días con venta</th><th class="r">Target</th><th class="r">CR (%)</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
 }
+function hiMesa(){ // la mesa en tablas (pedido del dueño): quién vende más y quién tiene más lates, de todo el historial y de este mes
+  const ym=todayS().slice(0,7),uid=hiWho==='me'?me:hiWho;
+  const by=list=>{const m=new Map();for(const f of list){let o=m.get(f.uid);if(!o){o={uid:f.uid,n:0,late:0,monto:0};m.set(f.uid,o)}o.n++;o.monto+=+f.amount||0;if(isLate(f))o.late++}return [...m.values()]};
+  const all=by(team),mes=by(team.filter(f=>f.date.slice(0,7)===ym));if(!all.length)return '';
+  const nm=o=>`<td class="trunc${o.uid===uid?' me':''}">${o.uid===uid?'<b>':''}${esc(memberName(o.uid))}${o.uid===uid?' (vos)</b>':''}</td>`;
+  const tV=(rows,t,sub)=>{rows=[...rows].sort((a,b)=>b.n-a.n||b.monto-a.monto);return `<div><h4>${t} <span class="d">· ${sub}</span></h4><div class="p-tablewrap"><table class="pt"><thead><tr><th>#</th><th>Quién</th><th class="r">FTDs</th><th class="r">New</th><th class="r">Late</th><th class="r">Monto USD</th></tr></thead><tbody>${rows.map((o,i)=>`<tr class="${o.uid===uid?'me':''}"><td class="d">${i+1}</td>${nm(o)}<td class="r"><b>${o.n}</b></td><td class="r">${o.n-o.late}</td><td class="r">${o.late}</td><td class="r">${money(o.monto)}</td></tr>`).join('')}</tbody></table></div></div>`};
+  const tL=(rows,t,sub)=>{rows=rows.filter(o=>o.late).sort((a,b)=>b.late-a.late||b.late/b.n-a.late/a.n);if(!rows.length)return `<div><h4>${t} <span class="d">· ${sub}</span></h4><p class="note">Sin lates.</p></div>`;
+    return `<div><h4>${t} <span class="d">· ${sub}</span></h4><div class="p-tablewrap"><table class="pt"><thead><tr><th>#</th><th>Quién</th><th class="r">Lates</th><th class="r">De sus FTDs</th><th class="r">% late</th></tr></thead><tbody>${rows.map((o,i)=>`<tr class="${o.uid===uid?'me':''}"><td class="d">${i+1}</td>${nm(o)}<td class="r"><b>${o.late}</b></td><td class="r">${o.n}</td><td class="r">${pct(o.late/o.n)}</td></tr>`).join('')}</tbody></table></div></div>`};
+  const tot=all.reduce((a,o)=>a+o.n,0),lt=all.reduce((a,o)=>a+o.late,0),top=[...all].sort((a,b)=>b.n-a.n)[0],topL=[...all].sort((a,b)=>b.late-a.late)[0];
+  return `<section class="card"><div class="card-h"><h3>La mesa</h3><span class="p-sub">${plural(tot,'FTD')} · ${lt} late${lt===1?'':'s'} (${pct(tot?lt/tot:0)})</span></div>
+    <p class="note">El que más vende: <b>${esc(memberName(top.uid))}</b> (${plural(top.n,'FTD')}).${topL&&topL.late?` El que más lates tiene: <b>${esc(memberName(topL.uid))}</b> (${topL.late} de ${topL.n}, ${pct(topL.late/topL.n)}).`:''}</p>
+    <div class="grid2">${tV(all,'Más ventas','todo el historial')}${tV(mes,'Más ventas',mLabel(ym))}${tL(all,'Más lates','todo el historial')}${tL(mes,'Más lates',mLabel(ym))}</div></section>`;
+}
 function hiLates(list){ // tus lates: cuánto tardan, de qué país y afiliador vienen, el que más tardó
   const lat=list.filter(isLate),n=list.length;
   if(!lat.length)return `<section class="card"><div class="card-h"><h3>Tus lates</h3></div><p class="note">Todavía ningún late: todos tus clientes depositaron el mismo día que se registraron.</p></section>`;
@@ -101,6 +114,6 @@ V.historial={
     $('#hiSub').textContent=list.length?`${who} · ${plural(R.n,'FTD')} · ${R.lates} late${R.lates===1?'':'s'} (${pct(R.latePct)}) · ${money(R.monto)} USD`:`${who} · todavía sin ventas`;
     if($('#hiQ')!==document.activeElement)$('#hiQ').value=hiQ;
     $('#hiKpis').innerHTML=hiKpis(list);
-    $('#hiBody').innerHTML=hiMeses(list)+hiLates(list)+hiDonde(list)+hiTimeline(list);
+    $('#hiBody').innerHTML=hiMeses(list)+hiMesa()+hiLates(list)+hiDonde(list)+hiTimeline(list);
   },
 };
