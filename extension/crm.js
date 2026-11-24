@@ -236,7 +236,12 @@
   let station = { views: {} }, stView = '', stHoursCfg = null;
   function setStation(s) { station = s || { views: {} }; stView = myTab == null ? '' : (Object.entries(station.views || {}).find(([, c]) => c.tabId === myTab) || [''])[0]; }
   const stInHours = () => { const h = stHoursCfg || ST_HOURS, d = new Date(), m = d.getHours() * 60 + d.getMinutes(); return h.days.includes(d.getDay()) && m >= h.from && m < h.to; };
-  send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; setWatch(watches); setStation(station); refresh(); });
+  // modo prueba (vTL / vAgente): la extensión sola, sin Vitalis. Solo lee: news, llamadas y la info de la campaña. Sin ventas, snippets ni estación.
+  let trial = null; // {role, joined, name, desk, code}
+  const who = () => send({ type: 'whoami' }).then((r) => { myTab = r && r.tabId; trial = (r && r.trial) || null; setWatch(watches); setStation(station); refresh(); });
+  who();
+  try { chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.trial) who(); }); } catch (e) {}
+  const trialOff = () => !!(trial && !trial.joined); // extensión de prueba sin código: no se manda nada
   function setWatch(all) {
     watches = all || {}; watch = myTab != null ? watches[myTab] || null : null; watched = !!watch;
     owner = Object.values(watches).find((w) => w && w.tabId !== myTab) || null; // otra pestaña ya tiene la vigilancia
@@ -250,6 +255,7 @@
     else if (Date.now() - noTableSince > 20000) { noTableSince = 0; send({ type: 'crm-watch-stop', auto: 1 }); }
   }
   async function watchBtn() {
+    if (trialOff()) { setMsg('Primero entrá con tu código: tocá el ícono de Vitalis arriba a la derecha de Chrome.', 'warn', 8000); return; }
     if (watched) { await send({ type: 'crm-watch-stop' }); return; }
     if (owner && !multiWatch()) { await send({ type: 'crm-watch-go' }); return; }
     const r = await send({ type: 'crm-watch-start' });
@@ -296,7 +302,7 @@
   // clientes en "new": van al registro de Vitalis (para la conversión del día), estés vigilando o no
   let lastLeads = '';
   function reportLeads(list) {
-    if (!list || !list.length) return;
+    if (!list || !list.length || trial) return;
     const rows = list.filter((c) => c.id || c.name).map((c) => ({ id: c.id, name: c.name, country: c.country, reg: c.reg }));
     const sig = rows.map((c) => c.id || c.name).join('|');
     if (sig === lastLeads) return;
@@ -310,7 +316,7 @@
   const HEART = 20 * 6e4;
   const flying = new Map(); // mandados, esperando que la extensión confirme
   function reportSeen(all) {
-    if (!all || !all.length) return;
+    if (!all || !all.length || trialOff()) return;
     const rows = [], now = Date.now();
     for (const c of all) {
       if (!c.id) continue;
@@ -353,7 +359,7 @@
       for (let e = t0, k = 0; e && k < 4 && !m; e = e.parentElement, k++) { const tx = (e.textContent || '').replace(/\s+/g, ' ').trim(); if (tx.length <= 40 && (m = tx.match(LINE_RE))) b = e; }
     }
     if (!m) return;
-    const pc = panelClient().pick, id = idNear(b) || (pc && pc.id) || idInUrl(); if (!id) return;
+    const pc = panelClient().pick, id = idNear(b) || (pc && pc.id) || idInUrl(); if (!id || trialOff()) return;
     sendSure({ type: 'crm-seen', rows: [{ id, brand, ln: m[1].toLowerCase(), at: new Date().toISOString() }] });
     curFrom = 'panel'; sendCurrent(id, pc && pc.id === id ? pc.name : '', true); // a quien llamás es tu cliente actual
   }, true);
@@ -470,8 +476,9 @@
     if (!ui) return;
     const $ = ui.$, head = [];
     // ventas
-    const looksFtd = !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
+    const looksFtd = !trial && !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
     ui.diag = looksFtd;
+    if (trial) head.push(trial.joined ? `Prueba · ${trial.desk} · ${trial.name}` : 'Prueba: entrá con tu código en el ícono de la extensión');
     $('sSales').hidden = !sales && !looksFtd;
     if (looksFtd) { head.push('no encuentro la tabla de FTDs'); $('go').disabled = false; $('go').textContent = 'Copiar diagnóstico'; $('ids').textContent = ''; }
     else if (sales) {
@@ -503,10 +510,10 @@
       }
     }
     $('msg').className = 'msg ' + (msg ? msg.cls : '');
-    $('msg').innerHTML = msg ? msg.html : (sales && !known ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
+    $('msg').innerHTML = msg ? msg.html : (sales && !known && !trial ? '<span class="warn">Abrí Vitalis una vez para saber cuáles ya están.</span>' : '');
     // vigilancia: una sola pestaña se actualiza; las demás suman clientes
     // estación: el team leader (o el admin) elige qué vista es esta pestaña; esa ya no hace falta elegirla para actualizarse
-    const stOk = isLeader() && !!(sales || seen || stView);
+    const stOk = !trial && isLeader() && !!(sales || seen || stView);
     $('sStation').hidden = !stOk;
     if (stOk) {
       const other = new Set(Object.entries(station.views || {}).filter(([, c]) => c.tabId !== myTab).map(([k]) => k));
@@ -603,12 +610,54 @@
     .two{display:flex;gap:8px}.two>div:first-child{width:70px;flex:none}.two>div:last-child{flex:1;min-width:0}
     .pst{margin:5px 0 0;font-size:12.5px;color:#4b5563}.pst:empty{display:none}.pst b{color:#0f1720}
     .pf .row{margin-top:10px}
+    .tr #cmt,.tr #cmt+.row,.tr #pay,.tr .lb.cm,.tr #pmsg,.tr #cmsg{display:none}
     :focus-visible{outline:2px solid #00875a;outline-offset:2px}`;
   if (TOP) {
     chrome.storage.local.get('dockMin').then((x) => { dMin = !!x.dockMin; dockDraw(); }).catch(() => {});
     send({ type: 'dock-get' }).then((r) => { if (r) { dock = r.d || null; dDrafts = r.drafts || {}; dockDraw(); } });
   }
   const dockShow = () => !!(TOP && dock && !dock.off && !stView && document.body && !loginPage());
+  // la mini ficha de la prueba: el cliente abierto, la info de su campaña (con el número del afiliador), el siguiente new y tus números de hoy
+  let dCamp = { id: '', open: false };
+  function dockTrialHTML(c) {
+    if (!c) return `<p class="note">Abrí un cliente en el CRM (o tocá Omega/Gizat/Voiso) y acá te muestro su campaña.</p>`;
+    const stTxt = c.status ? escH(c.status) : '<i>no lo vi en una lista de news</i>';
+    const camps = c.camps, mine = camps ? camps.find((x) => x.mine) : null, others = camps ? camps.filter((x) => !x.mine) : [];
+    const ed = dCamp.id === c.id && dCamp.open;
+    let h = `<div class="cid"><b>${escH(c.id)}</b>${c.name ? `<span class="nm">${escH(c.name)}</span>` : ''}</div>
+      <div class="meta">${[c.country ? escH(c.country) : '', c.agent ? 'de ' + escH(c.agent) : ''].filter(Boolean).join(' · ') || '&nbsp;'}</div>
+      <div class="kv"><span>Status</span><b>${stTxt}</b></div>
+      ${c.reg ? `<div class="kv"><span>Registro</span><b>${escH(c.reg)}</b></div>` : ''}
+      <span class="lb">Campaña</span>`;
+    if (!c.aff && !c.camp) h += `<p class="note">No sé de qué campaña es: cuando aparezca en tu lista de news lo aprendo.</p>`;
+    else {
+      h += `<div class="kv"><span>Afiliado</span><b>${c.aff ? escH(c.aff) : '<i>?</i>'}</b></div><div class="kv"><span>Campaña</span><b>${c.camp ? escH(c.camp) : '<i>?</i>'}</b></div>`;
+      if (camps == null) h += `<p class="note warn">No pude traer la info de la campaña: ¿hay internet?</p>`;
+      else if (ed) h += `<div class="pf"><label for="cmin">Monto mínimo del anuncio</label><input id="cmin" type="text" maxlength="60" value="${escH(mine && mine.min ? mine.min : '')}" placeholder="250 USD">
+        <label for="cad">¿Qué ve la persona en el anuncio?</label><textarea id="cad" rows="3" maxlength="2000" placeholder="Invertí desde 250 USD con el banco…">${escH(mine && mine.ad ? mine.ad : '')}</textarea>
+        <div class="row"><button class="go" data-cs="1">Guardar</button><button class="go alt sm" data-cx="1">Cancelar</button></div><div class="msg" id="csmsg"></div></div>`;
+      else if (mine && (mine.min || mine.ad)) h += `<div class="op"><b>${mine.min ? 'Mínimo ' + escH(mine.min) : 'Sin monto mínimo cargado'}</b>${mine.ad ? `<div class="opn">${escH(mine.ad)}</div>` : ''}</div><button class="lnk" data-ce="1" style="margin-top:2px">Editar</button>`;
+      else h += `<p class="note">Todavía no sabemos el monto mínimo ni qué ve en el anuncio. ${c.camp ? '<button class="lnk" data-ce="1" style="margin:0">Agregar</button>' : ''}</p>`;
+      if (others.length) h += `<p class="note">Otras de ${escH(c.aff || '?')}${c.country ? ' en ' + escH(c.country) : ''}: ${others.map((x) => `<b>${escH(x.camp)}</b>${x.min ? ' (mín. ' + escH(x.min) + ')' : ''}`).join(', ')}</p>`;
+    }
+    return h;
+  }
+  const dockStatsHTML = (s) => (!s ? '' : `<span class="lb">Tus news de hoy</span><div class="kv"><span>Te llegaron</span><b>${s.news}</b></div><div class="kv"><span>Llamados</span><b>${s.called} de ${s.news}</b></div><div class="kv"><span>Llamadas</span><b>${s.calls}</b></div><div class="kv"><span>Al new en</span><b>${s.med == null ? '<i>—</i>' : (Math.round(s.med) + ' min') + (s.slow ? ` <i>· ${s.slow} pasaron de 5</i>` : '')}</b></div>`);
+  function dockTrialDraw(cl) {
+    const $ = dk.$;
+    $('dk').classList.add('tr'); $('cl').hidden = false; $('prof').hidden = true;
+    const a = dk.root.activeElement, keep = !!(a && (a.id === 'cmin' || a.id === 'cad'));
+    if (!keep) $('clh').innerHTML = dockTrialHTML(cl) + dockStatsHTML(dock.stats);
+    $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('pff').innerHTML = '';
+    if (dk.clId !== (cl ? cl.id : '')) { dk.clId = cl ? cl.id : ''; dCamp = { id: '', open: false }; }
+  }
+  async function dockCampSave() {
+    const c = dock && dock.cl; if (!c || !dk || !dk.$('cmin')) return;
+    const b = dk.root.querySelector('[data-cs]'), m = dk.$('csmsg'); b.disabled = true; b.textContent = 'Guardando…';
+    const r = await send({ type: 'dock-camp-set', aff: c.aff, camp: c.camp, country: c.country || '', min: dk.$('cmin').value.trim(), ad: dk.$('cad').value.trim() });
+    if (!r || !r.ok) { b.disabled = false; b.textContent = 'Guardar'; m.className = 'msg err'; m.textContent = (r && r.err) || 'No pude guardarlo.'; return; }
+    dCamp = { id: c.id, open: false }; dockDraw(); // la extensión ya mandó la ficha de nuevo con lo guardado
+  }
   function dockVis() { if (dockShow() !== !!dk) dockDraw(); } // la pestaña pasó a ser de la estación, o el CRM pidió login
   function dockBuild() {
     for (const e of document.querySelectorAll('#vitalis-dock')) e.remove(); // la de una copia vieja
@@ -622,7 +671,7 @@
         <div class="bd"><div id="info"></div>
           <div id="cl"><div id="clh"></div>
             <details id="prof" hidden><summary>Perfil del cliente <span id="pfs"></span></summary><div id="pff" class="pf"></div></details><div class="msg" id="pmsg"></div>
-            <span class="lb">Comentario para el CRM</span><textarea id="cmt" rows="3" maxlength="2000" placeholder="Escribilo en español: se copia en inglés" aria-label="Comentario para el CRM"></textarea>
+            <span class="lb cm">Comentario para el CRM</span><textarea id="cmt" rows="3" maxlength="2000" placeholder="Escribilo en español: se copia en inglés" aria-label="Comentario para el CRM"></textarea>
             <div class="row"><button class="go" id="cpen">Copiar en inglés</button><button class="lnk" id="cclr" style="margin:0">Borrar</button></div><div class="msg" id="cmsg"></div>
             <details id="pay"><summary>Depósito <span id="payp"></span></summary><div id="payb"></div></details>
             <div id="clc"></div></div></div>
@@ -655,6 +704,7 @@
     $('ht').textContent = lk ? 'tapado' : old ? 'Vitalis no contesta' : '';
     $('info').innerHTML = lk ? '<p class="note">Vitalis está tapado: poné tu PIN para ver al cliente.</p><button class="go alt" data-a="abrir">Abrir Vitalis</button>'
       : old ? `<p class="note warn">Vitalis no contesta desde hace ${Math.round((now - dock.at) / 6e4)} min: esto puede estar viejo.</p><button class="go alt" data-a="abrir">Abrir Vitalis</button>` : '';
+    if (dock.trial) { $('ht').textContent = dock.me ? `${dock.me.desk} · ${dock.me.name}` : ''; $('info').innerHTML = ''; dockTrialDraw(cl); dockNext(cl, false); $('tu').innerHTML = ''; return; }
     $('cl').hidden = !cl;
     if (!cl && dk.clId) { dk.clId = ''; dk.pfId = ''; $('clh').innerHTML = ''; $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('pff').innerHTML = ''; $('pmsg').textContent = ''; $('cmt').value = ''; $('cmsg').textContent = ''; } // tapado o sin cliente: nada del cliente queda en la página
     if (cl) {
@@ -818,6 +868,9 @@
       else setTimeout(() => { if (dk) for (const x of dk.root.querySelectorAll('[data-t]')) x.disabled = false; }, 2500);
       return;
     }
+    if (b.hasAttribute('data-ce') && cl) { dCamp = { id: cl.id, open: true }; dockDraw(); const i = dk.$('cmin'); if (i) i.focus(); return; }
+    if (b.hasAttribute('data-cx')) { dCamp = { id: '', open: false }; dockDraw(); return; }
+    if (b.hasAttribute('data-cs')) return dockCampSave();
     if (b.dataset.cp) { const ok = await dockCopy(b.dataset.cp); b.textContent = ok ? 'Copiado' : 'No pude'; setTimeout(() => { if (b.isConnected) b.textContent = 'Copiar ID'; }, 1800); return; }
     if (b.hasAttribute('data-diag')) { reportCurrent(true); const ok = await dockCopy(diagCur()); b.textContent = ok ? 'Copiado: mandáselo a quien mantiene Vitalis' : 'No pude copiar'; return; }
     if (b.hasAttribute('data-skip')) { dSkip++; dockNext(cl, !!(dock && dock.locked)); return; }
@@ -1035,7 +1088,7 @@
     schedCur();
     for (const e of document.querySelectorAll('#ftd-crm-button')) if (!ui || e !== ui.h) e.remove(); // paneles de copias viejas
     const T = tables();
-    sales = scanSales(T);
+    sales = trial ? null : scanSales(T); // en la prueba no se pasan ventas
     seen = scanAll(T);
     clients = scanClients(seen);
     const looksFtd = !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');

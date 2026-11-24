@@ -24,6 +24,97 @@ const sess = {
   set(k, v) { return chrome.storage.session.set({ [k]: v }); },
 };
 
+/* ---------- modo prueba: la extensión sola, sin Vitalis (vTL y vAgente) ----------
+   El zip de prueba trae prueba.json {role, url, key}: todo va directo a la base con el código de la mesa y el nombre (como aparece en el CRM).
+   Solo lee el CRM: los news (New y Talking), las llamadas (Omega/Gizat/Voiso) y la info de la campaña. Nada de Vitalis, snippets ni agenda. */
+let TRIAL = null;
+const trialReady = fetch(chrome.runtime.getURL('prueba.json')).then((r) => (r.ok ? r.json() : null)).then((c) => { TRIAL = c && c.url && c.key ? { role: c.role === 'tl' ? 'tl' : 'agent', url: String(c.url).replace(/\/$/, ''), key: c.key } : null; return TRIAL; }).catch(() => null);
+const trialCfg = () => trialReady;
+const trialMe = async () => (await chrome.storage.local.get('trial')).trial || null; // {code, name, role, desk}
+async function rpc(fn, args) { // una función de la base, con la clave pública (el código de la mesa es la llave)
+  const T = await trialCfg(); if (!T) throw new Error('sin prueba');
+  const r = await fetch(`${T.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: T.key, Authorization: 'Bearer ' + T.key }, body: JSON.stringify(args || {}) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function trialJoin(code, name) {
+  const T = await trialCfg(); if (!T) return { ok: false, err: 'Esta no es la extensión de prueba' };
+  let r; try { r = await rpc('trial_join', { code: String(code || '').trim().toUpperCase(), nm: String(name || '').trim(), rl: T.role, device: navigator.userAgent.slice(0, 80) }); } catch (e) { return { ok: false, err: 'No pude hablar con la base: ¿hay internet?' }; }
+  if (!r || !r.ok) return r || { ok: false, err: 'No pude entrar' };
+  const trial = { code: r.code, name: r.name, role: r.role, desk: r.desk, at: Date.now() };
+  await chrome.storage.local.set({ trial, me: r.name, desk: { role: r.role === 'tl' ? 'leader' : 'agent', trial: 1, me: '', members: [] } });
+  trialBoardTick(true);
+  return { ok: true, trial };
+}
+async function trialOut() { await chrome.storage.local.remove(['trial', 'me', 'desk', 'watches']); await sess.set('trialBoard', null); await sess.set('trialCur', null); await dockSet({ off: 1 }); }
+// la entrega en modo prueba: la cola de clientes del CRM va a la base (trial_seen) en vez de a Vitalis
+const trialRow = ({ k, sig, ...r }) => r;
+async function trialDeliver() {
+  const me = await trialMe(); if (!me) return false;
+  for (let round = 0; round < 10; round++) {
+    const crmQ = await crmQGet(); if (!crmQ.length) return true;
+    const part = crmQ.slice(0, 500);
+    await lock('tcl', async () => { // lo que sé de cada cliente visto (campaña, afiliador, país): para la ficha
+      const all = await sess.get('trialCl', {});
+      for (const r of part) if (!r.ln && r.id) all[r.id] = { name: r.name, country: r.country, aff: r.aff, camp: r.camp, agent: r.agent, status: r.status, reg: r.reg, at: Date.now() };
+      const ks = Object.keys(all); if (ks.length > 4000) for (const k of ks.sort((a, b) => all[a].at - all[b].at).slice(0, ks.length - 4000)) delete all[k];
+      await sess.set('trialCl', all);
+    });
+    let r; try { r = await rpc('trial_seen', { code: me.code, nm: me.name, rows: part.map(trialRow) }); } catch (e) { return false; }
+    if (!r || !r.ok) { if (r && /no existe/.test(r.err || '')) await seenDone(part.map((x) => x.k)); return false; }
+    await seenDone(part.map((x) => x.k));
+    if (Array.isArray(r.fresh) && r.fresh.length && me.role !== 'tl') await trialFresh(r.fresh);
+    if (r.new || r.changed) trialBoardTick();
+  }
+  return true;
+}
+async function trialFresh(fresh) { // un new mío que vio otra pestaña (la del team leader): avisar como si lo hubiera visto yo
+  const now = Date.now(), shown = new Set((await liveNow()).map((x) => x.k));
+  for (const c of fresh.filter((c) => !shown.has('crm:id:' + c.id)).slice(0, 5)) {
+    await alertCard({ k: 'crm:id:' + c.id, kind: 'crm', title: 'Cliente new: llamalo ya', id: c.id, kw: c.name || '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente new: ${c.id}`, [c.name, c.country].filter(Boolean).join(' · '));
+  }
+}
+// el tablero de la mesa (cada 30 s): el team leader recibe aviso por cada New sin llamar a los 5 min; el agente ve su siguiente new y sus números
+const TR_SLOW = 5;
+let trialTicking = false, trialAgain = false;
+async function trialBoardTick(force) {
+  if (trialTicking) { trialAgain = true; return; } trialTicking = true; trialAgain = false;
+  try {
+    const me = await trialMe(); if (!me) return;
+    let b; try { b = await rpc('trial_board', { code: me.code }); } catch (e) { return; }
+    if (!b || !b.ok) return;
+    await sess.set('trialBoard', { ...b, at: Date.now() });
+    if (me.role === 'tl') {
+      const late = b.news.filter((x) => !x.called && !x.talking && x.min >= TR_SLOW), lateK = new Set(late.map((x) => 'crm:tl:' + x.id)), shown = new Set((await liveNow()).map((x) => x.k));
+      for (const x of late.filter((x) => !shown.has('crm:tl:' + x.id)).slice(0, 6)) {
+        await alertCard({ k: 'crm:tl:' + x.id, kind: 'crm', lvl: 'urg', title: 'New sin llamar', id: x.id, kw: [x.agent || 'sin agente', x.name].filter(Boolean).join(' · '), meta: `hace ${trMin(x.min)}${x.country ? ' · ' + x.country : ''}`, btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `New sin llamar: ${x.id}`, `${x.agent || 'sin agente'} · hace ${trMin(x.min)}`);
+      }
+      for (const k of shown) if (k.startsWith('crm:tl:') && !lateK.has(k)) await dismiss(k); // ya lo llamaron (o dejó de ser new)
+    }
+    await trialDockPush();
+  } finally { trialTicking = false; if (trialAgain) setTimeout(() => trialBoardTick(), 500); }
+}
+const trMin = (m) => (m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m / 60)} h ${z(m % 60)}` : `${Math.round(m / 1440)} días`);
+async function trialCurrent(id, name) { // el cliente abierto en el CRM: lo que sé de él y la info de su campaña
+  const me = await trialMe(); if (!me) return dockSet({ off: 1 });
+  const cl = { id, name: name || '', ...((await sess.get('trialCl', {}))[id] || {}) };
+  try {
+    const r = await rpc('trial_camp', { code: me.code, aff_: cl.aff || null, camp_: cl.camp || null, country_: cl.country || null, cid_: id });
+    if (r && r.ok) { if (r.cl) for (const k of ['name', 'country', 'aff', 'camp', 'agent', 'status', 'reg', 'called']) if (r.cl[k] != null && !cl[k]) cl[k] = r.cl[k]; cl.camps = r.camps || []; cl.aff = cl.aff || r.aff || ''; cl.country = cl.country || r.country || ''; }
+  } catch (e) { cl.camps = null; }
+  if (!cl.name && name) cl.name = name;
+  await sess.set('trialCur', { ...cl, at: Date.now() });
+  await trialDockPush();
+}
+async function trialDockPush() {
+  const me = await trialMe(); if (!me) return;
+  if (me.role === 'tl') return dockSet({ off: 1 }); // el team leader no gestiona clientes: lo suyo está en el ícono
+  const b = await sess.get('trialBoard', null), cur = await sess.get('trialCur', null), low = (s) => String(s || '').trim().toLowerCase();
+  const mine = b ? b.news.filter((x) => low(x.agent) === low(me.name) && !x.talking).sort((a, c) => c.min - a.min) : [];
+  const st = b ? (b.agents || []).find((a) => low(a.name) === low(me.name)) : null;
+  await dockSet({ trial: 1, me: { name: me.name, desk: me.desk }, cl: cur, next: mine.slice(0, 20).map((x) => ({ id: x.id, name: x.name, why: `En New: llamalo ya · hace ${trMin(x.min)}` })), stats: st ? { news: st.news, called: st.called, calls: st.calls, med: st.med, slow: st.slow } : null, inNew: mine.length });
+}
+
 // Lo guardado se lee, se cambia y se vuelve a escribir: si dos cosas lo hacen a la vez, una pisa a la otra.
 // Con esto van de a una (por lista): no se pierde un aviso, un cliente en cola ni una llamada.
 const locks = {};
@@ -316,6 +407,7 @@ let delivering = false;
 async function deliverSeen() {
   if (delivering) return false; delivering = true;
   try {
+    if (await trialCfg()) return await trialDeliver();
     for (let round = 0; round < 10; round++) {
       const crmQ = await crmQGet(); if (!crmQ.length) return true;
       let done = false;
@@ -413,6 +505,7 @@ async function tickOne(w) {
   let tab = null; try { tab = await chrome.tabs.get(w.tabId); } catch (e) {}
   if (!tab || !(await isCrmUrl(tab.url))) return watchStop(w.tabId); // se cerró o se fue del CRM
   if (tab.discarded) { try { await chrome.tabs.reload(w.tabId); } catch (e) {} return; }
+  if ((await trialCfg()) && !(await stHours())) return; // modo prueba: fuera de horario, quieta
   let r = null;
   try { r = await withTimeout(chrome.tabs.sendMessage(w.tabId, { type: 'crm-refresh' }), 5000); } catch (e) {}
   if (!r && tab.status === 'complete') { try { await chrome.tabs.reload(w.tabId); } catch (e) {} } // la página no responde: la recargo
@@ -465,7 +558,7 @@ async function crmClients(tabId, m) {
   });
   if (!got) return { watched: false };
   if ((await deskRole()) === 'leader') return { watched: true, fresh: 0 }; // el team leader no recibe avisos de new: los gestionan los agentes
-  for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
+  if (!(await trialCfg())) for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
   const shown = new Set((await liveNow()).map((x) => x.k)); // Vitalis ya avisó por la estación: no repito tarjeta ni sonido
   for (const c of fresh.filter((c) => !shown.has('crm:' + c.key)).slice(0, 5)) {
     await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
@@ -705,7 +798,20 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
   if (msg.type === 'dock-prof' && msg.id && msg.p && typeof msg.p === 'object') { dockProf(String(msg.id).slice(0, 60), msg.p).then(reply, () => reply({ err: 'cerrado' })); return true; }
   if (msg.type === 'dock-tr' && typeof msg.txt === 'string') { dockTr(msg.txt.slice(0, 4000)).then(reply, () => reply({ why: 'no' })); return true; }
-  if (msg.type === 'whoami') { reply({ tabId: sender.tab ? sender.tab.id : null }); return false; }
+  if (msg.type === 'whoami') { Promise.all([trialCfg(), trialMe()]).then(([T, me]) => reply({ tabId: sender.tab ? sender.tab.id : null, trial: T ? { role: T.role, joined: !!me, name: me ? me.name : '', desk: me ? me.desk : '', code: me ? me.code : '' } : null })); return true; }
+  if (msg.type === 'trial-get') { Promise.all([trialCfg(), trialMe(), sess.get('trialBoard', null)]).then(([T, me, board]) => reply({ trial: T ? { role: T.role } : null, me, board })); return true; }
+  if (msg.type === 'trial-join') { trialJoin(msg.code, msg.name).then(reply, (e) => reply({ ok: false, err: String(e && e.message || e) })); return true; }
+  if (msg.type === 'trial-out') { trialOut().then(() => reply({ ok: true }), () => reply({ ok: false })); return true; }
+  if (msg.type === 'trial-board') { trialBoardTick(true).then(() => sess.get('trialBoard', null)).then(reply, () => reply(null)); return true; }
+  if (msg.type === 'dock-camp-set' && msg.aff && msg.camp) {
+    (async () => {
+      const me = await trialMe(); if (!me) return { ok: false, err: 'Entrá con tu código' };
+      const r = await rpc('trial_camp_set', { code: me.code, nm: me.name, aff_: String(msg.aff).slice(0, 60), camp_: String(msg.camp).slice(0, 120), country_: String(msg.country || '').slice(0, 60), min_: String(msg.min || '').slice(0, 60), ad_: String(msg.ad || '').slice(0, 2000) });
+      const cur = await sess.get('trialCur', null); if (cur) await trialCurrent(cur.id, cur.name);
+      return r;
+    })().then(reply, (e) => reply({ ok: false, err: 'No pude guardarlo: ¿hay internet?' }));
+    return true;
+  }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }
   if (msg.type === 'crm-current' && msg.id && sender.tab && (watchedTab(sender.tab.id) || stationOf(sender.tab.id))) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news y las de la estación no cuentan (copias viejas de crm.js)
@@ -714,6 +820,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'station-off') { stationOff().then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-current' && msg.id) { // el cliente abierto en el CRM: Vitalis lo muestra como cliente actual (en la cola queda solo el último)
     (async () => {
+      if (await trialCfg()) { await trialCurrent(String(msg.id).slice(0, 60), String(msg.name || '').slice(0, 120)); await chrome.storage.local.set({ curLast: { id: String(msg.id).slice(0, 60), sent: true, at: Date.now() } }); return true; }
       const c = { cmd: 'actual', k: String(msg.id).slice(0, 60), r: String(msg.name || '').slice(0, 120), at: Date.now() };
       const done = (sent) => chrome.storage.local.set({ curLast: { id: c.k, sent, at: c.at } }).then(() => sent, () => sent); // para el ícono de la extensión
       for (const t of await vitalisTabs()) { try { const r = await chrome.tabs.sendMessage(t.id, { type: 'cmds', cmds: [c] }); if (r && r.ok) return done(true); } catch (e) {} }
@@ -791,6 +898,7 @@ async function tickVitalis() {
   if (st.crmQ.length) deliverSeen();
   if (st.leadQ.length) deliverLeads();
   if ((await liveNow()).length) { const { tab } = await cardTab(); if (tab) injectInto(tab.id); }
+  if (await trialCfg()) return trialBoardTick();
   stFlush(); // la estación (si esta compu lo es): el latido
 }
 chrome.alarms.get('vt').then((a) => { if (!a) chrome.alarms.create('vt', { periodInMinutes: 0.5 }); });
@@ -835,26 +943,28 @@ chrome.notifications.onButtonClicked.addListener(async (nid, btn) => {
 // al instalar o actualizar, los pongo en las pestañas que ya estaban abiertas (sin tener que recargarlas)
 const VITALIS_URL = ['https://vitalis.joaquin-or24.workers.dev/*', 'https://*.joaquin-or24.workers.dev/*', 'https://vitaliscrm.netlify.app/*']; // Cloudflare (y un dominio por mesa: vitalis-<mesa>.joaquin-or24.workers.dev), y la vieja mientras dure el cambio
 chrome.runtime.onInstalled.addListener(async () => {
-  snipMenu();
-  for (const t of await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] })) {
-    chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, files: ['snip.js'] }).catch(() => {});
-  }
-  for (const t of await chrome.tabs.query({ url: VITALIS_URL })) {
-    chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['bridge.js'] }).catch(() => {});
+  if (!(await trialCfg())) {
+    snipMenu();
+    for (const t of await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] })) {
+      chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, files: ['snip.js'] }).catch(() => {});
+    }
+    for (const t of await chrome.tabs.query({ url: VITALIS_URL })) {
+      chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['bridge.js'] }).catch(() => {});
+    }
   }
   // las pestañas del CRM abiertas también reciben la copia nueva (si no, quedaban sin andar hasta recargarlas)
   for (const t of await chrome.tabs.query({ url: await crmUrls() })) {
     chrome.scripting.executeScript({ target: { tabId: t.id, allFrames: true }, files: ['crm.js'] }).catch(() => {});
   }
 });
-chrome.runtime.onStartup.addListener(() => snipMenu());
+chrome.runtime.onStartup.addListener(async () => { if (!(await trialCfg())) snipMenu(); });
 chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.snips) snipMenu(); });
 // clic derecho en cualquier campo → Snippets de Vitalis → el que quieras (por si el /atajo no anda en alguna página)
 let menuT = null;
 function snipMenu() {
   clearTimeout(menuT);
   menuT = setTimeout(async () => {
-    if (!chrome.contextMenus) return;
+    if (!chrome.contextMenus || (await trialCfg())) return;
     const { snips = [] } = await chrome.storage.local.get('snips');
     await new Promise((r) => chrome.contextMenus.removeAll(r));
     chrome.contextMenus.create({ id: 'snip', title: 'Snippets de Vitalis', contexts: ['editable'] });

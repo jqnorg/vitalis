@@ -12,7 +12,7 @@ await db.exec(fs.readFileSync(new URL('./auth-stub.sql', import.meta.url), 'utf8
 const sql = fs.readFileSync(new URL('../supabase/vitalis.sql', import.meta.url), 'utf8');
 await db.exec(sql);
 await db.exec(sql); // se puede correr dos veces
-ok((await db.query('select count(*)::int c from public.teams')).rows[0].c === 1, 'una sola mesa aunque se corra dos veces');
+ok((await db.query("select count(*)::int c from public.teams where slug is distinct from 'pruebas'")).rows[0].c === 1, 'una sola mesa aunque se corra dos veces (más la de Pruebas, que no es una mesa)');
 ok((await db.query("select count(*)::int c from pg_publication_tables where pubname='supabase_realtime'")).rows[0].c === 28, 'tablas en tiempo real');
 
 async function as(uid, q, params = []) {
@@ -910,6 +910,65 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(q.rows.length === 0, 'otra mesa no ve la estación');
   await rpc(M, "select public.station_beat('[]'::jsonb) j");
   ok((await db.query('select count(*)::int c from public.station_state')).rows[0].c === 0, 'sin vistas, la estación queda vacía');
+}
+
+// ---------- la extensión de prueba: código de mesa + nombre, solo news y llamadas, la campaña compartida ----------
+{
+  R = await rpc(B, "select public.trial_desk_create('Mesa Prueba') j");
+  ok(!!R.error, 'un agente no crea mesas de prueba');
+  await db.query("update public.profiles set global = true where id = $1", [A]);
+  R = await rpc(A, "select public.trial_desk_create('Mesa Prueba') j");
+  ok(R.ok && /^[A-Z0-9]{6}$/.test(R.code), `el dueño crea una mesa de prueba y recibe el código (${R.code})`);
+  const CODE = R.code;
+  R = await rpc(null, "select public.trial_join('ZZZZZZ', 'Pepe Rep', 'agent', 'dev1') j");
+  ok(R.ok === false && /no existe/.test(R.err), 'un código que no existe no entra');
+  R = await rpc(null, `select public.trial_join('${CODE.toLowerCase()}', 'Pepe Rep', 'agent', 'dev1') j`);
+  ok(R.ok && R.desk === 'Mesa Prueba' && R.role === 'agent', 'con el código (en minúscula también) y el nombre entra, sin cuenta');
+  await rpc(null, `select public.trial_join('${CODE}', 'Lider Prueba', 'tl', 'dev2') j`);
+  const te = (await db.query("select public._trial_now_mvd() d")).rows[0].d;
+  R = await rpc(null, `select public.trial_seen('${CODE}', 'Pepe Rep', $1::jsonb) j`, [JSON.stringify([
+    { id: 'T1', name: 'Nuevo Uno', country: 'Peru', status: 'New', reg: te + ' 09:00', agent: 'Pepe Rep', camp: 'Finvera AI', aff: '97275' },
+    { id: 'T2', name: 'De Otro', status: 'New', reg: te + ' 09:05', agent: 'Otro Rep' },
+    { id: 'T3', name: 'Viejo', status: 'Call Again', reg: te + ' 08:00', agent: 'Pepe Rep' },
+    { id: 'T4', status: 'Talking', reg: te + ' 09:10', agent: 'Pepe Rep' }])]);
+  ok(R.ok && R.new === 3 && R.fresh.length === 1 && R.fresh[0].id === 'T1', `guarda los news; un Call Again no entra; avisa solo de los míos en New (${JSON.stringify(R)})`);
+  r = await db.query("select client_id, status, first_call_at is not null c from public.trial_news where desk = $1 order by client_id", [CODE]);
+  ok(r.rows.map((x) => x.client_id).join() === 'T1,T2,T4' && r.rows[2].c && !r.rows[0].c, 'T4 en Talking ya cuenta como llamado; T1 todavía no');
+  R = await rpc(null, `select public.trial_seen('${CODE}', 'Pepe Rep', $1::jsonb) j`, [JSON.stringify([{ id: 'T1', ln: 'omega', at: new Date(Date.now()).toISOString() }, { id: 'T1', ln: 'omega', at: new Date(Date.now() + 5000).toISOString() }, { id: 'T1', ln: 'gizat', at: new Date(Date.now() + 9000).toISOString() }])]);
+  r = await db.query("select (select count(*)::int from public.trial_calls where desk = $1) n, (select first_call_by from public.trial_news where desk = $1 and client_id = 'T1') by", [CODE]);
+  ok(R.ok && r.rows[0].n === 2 && r.rows[0].by === 'Pepe Rep', `las llamadas se guardan (la misma línea en 30 s cuenta una) y marcan la primera llamada al new (${JSON.stringify(r.rows[0])})`);
+  R = await rpc(null, `select public.trial_seen('${CODE}', 'Pepe Rep', $1::jsonb) j`, [JSON.stringify([{ id: 'T2', status: 'No Answer', agent: 'Otro Rep' }, { id: 'T4', gone: 1 }])]);
+  r = await db.query("select client_id, left_new_at is not null l from public.trial_news where desk = $1 order by client_id", [CODE]);
+  ok(R.changed === 2 && r.rows.map((x) => x.l).join() === 'false,true,true', 'otro status o desaparecer de la lista: dejó de ser new');
+  R = await rpc(null, `select public.trial_seen('${CODE}', 'Pepe Rep', $1::jsonb) j`, [JSON.stringify([{ id: 'T2', status: 'New', agent: 'Pepe Rep' }])]);
+  ok(R.new === 0 && R.fresh.length === 0 && (await db.query("select left_new_at is not null l from public.trial_news where desk = $1 and client_id = 'T2'", [CODE])).rows[0].l, 'new una sola vez: vuelto a New no vuelve ni avisa');
+  R = await rpc(null, `select public.trial_board('${CODE}') j`);
+  const pepe = (R.agents || []).find((a) => a.name === 'Pepe Rep');
+  ok(R.ok && R.desk === 'Mesa Prueba' && R.news.length === 1 && R.news[0].id === 'T1' && R.news[0].called && typeof R.news[0].min === 'number', `el tablero: los que siguen en New, llamados o no, y hace cuánto (${JSON.stringify(R.news)})`);
+  ok(pepe && pepe.news === 3 && pepe.called === 3 && pepe.calls === 2 && pepe.med != null, `y por agente: news de hoy, llamados, llamadas y la velocidad al new (${JSON.stringify(pepe)})`);
+  // la info de la campaña: compartida entre todas las mesas (Team Matías la ve, y lo que cargan las de prueba también)
+  await as(A, "insert into public.campaign_info (aff, camp, country, min_amount, ad_text) values ('97275', 'Banamex', 'México', '250 USD', 'Invertí con el banco')");
+  R = await rpc(null, `select public.trial_camp_set('${CODE}', 'Pepe Rep', '97275', 'Finvera AI', 'México', '300 USD', 'Gana con IA') j`);
+  ok(R.ok, 'una mesa de prueba carga el anuncio de una campaña');
+  R = await rpc(null, `select public.trial_camp('${CODE}', '97275', 'Finvera AI', 'México') j`);
+  ok(R.ok && R.camps.length === 2 && R.camps[0].camp === 'Finvera AI' && R.camps[0].mine && R.camps[0].min === '300 USD' && R.camps[1].camp === 'Banamex' && R.camps[1].min === '250 USD', `la ficha ve la del cliente primero y las otras del afiliador en su país, de cualquier mesa (${JSON.stringify(R.camps)})`);
+  R = await rpc(null, `select public.trial_camp('${CODE}', null, null, null, 'T1') j`);
+  ok(R.ok && R.aff === '97275' && R.cl && R.cl.name === 'Nuevo Uno' && R.country === 'Peru' && R.camps.length === 0, `con solo el ID del cliente: lo que la mesa sabe de él (y en Perú no hay anuncios cargados) (${JSON.stringify(R)})`);
+  r = await as(B, "select camp from public.campaign_info where aff = '97275' order by camp");
+  ok(r.rows.length === 2, 'y Team Matías ve también lo que cargó la mesa de prueba (la info del anuncio se comparte)');
+  R = await rpc(null, 'select public.trial_invite() j');
+  ok(R && R.name === 'Joaquín Or', `la invitación dice quién invita (${R && R.name})`);
+  R = await rpc(A, 'select public.trial_desks_list() j');
+  ok(R.length === 1 && R[0].code === CODE && R[0].people === 2 && R[0].news_today === 3 && R[0].in_new === 1, `el dueño ve las mesas de prueba con su gente y sus news (${JSON.stringify(R)})`);
+  R = await rpc(B, 'select public.trial_desks_list() j');
+  ok(Array.isArray(R) && R.length === 0, 'un agente no las ve');
+  r = await as(null, 'select * from public.trial_news');
+  ok(!!r.error || r.rows.length === 0, 'anon no lee las tablas de prueba directo');
+  r = await as(B, 'select * from public.trial_calls');
+  ok(!!r.error || r.rows.length === 0, 'ni un agente');
+  await db.query("update public.profiles set global = false where id = $1", [A]);
+  await db.query("delete from public.trial_desks where code = $1", [CODE]);
+  await db.query("delete from public.campaign_info where aff = '97275'");
 }
 
 // ---------- RMO por día ----------

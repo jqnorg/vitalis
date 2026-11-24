@@ -1486,3 +1486,7 @@ details.hi-m{border-top:1px solid var(--soft);padding:8px 0}details.hi-m>summary
 #v-historial .tools input{min-width:220px}
 .pt tr.hi-me td{background:var(--pri-soft,rgba(0,135,90,.08))}#v-historial .grid2 h4,.hi-mesa h4{margin:14px 0 4px}.hi-mesa{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px}.hi-mesa>div{min-width:0}@media (max-width:860px){.hi-mesa{grid-template-columns:1fr}}
 @media (max-width:720px){.hi-b{grid-template-columns:110px 1fr 70px}#v-historial .tools input{min-width:0}}
+
+/* mesas de prueba (Gerencia) */
+.trial-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;letter-spacing:.12em;background:var(--soft);border-radius:8px;padding:2px 8px}
+.ger-trial .card-h a.btn{text-decoration:none}

@@ -147,6 +147,28 @@ function mesaNuevaModal(){
   const n=$('#mnN'),s=$('#mnS');if(n&&s)n.addEventListener('input',()=>{if(!s.dataset.touched)s.value=n.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^team\s+/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')});
   if(s)s.addEventListener('input',()=>{s.dataset.touched='1'});
 }
+/* ---------- las mesas de prueba (la extensión sola, para otras mesas): el dueño las crea y ve cómo les va; los directores las ven ---------- */
+const PRUEBA_URL=location.origin.replace(/\/$/,'')+'/prueba/';
+let gerTrial=null;
+async function trialLoad(){try{gerTrial=await Q(sb.rpc('trial_desks_list'))}catch(e){gerTrial=gerTrial||[]}return gerTrial}
+function trialCard(T){
+  if(!T)return '';
+  const ago=iso=>{if(!iso)return 'nunca';const m=Math.round((Date.now()-new Date(iso))/6e4);return m<1?'recién':m<60?`hace ${m} min`:m<1440?`hace ${Math.round(m/60)} h`:`hace ${Math.round(m/1440)} días`};
+  return `<section class="card ger-trial"><div class="card-h"><h3>Mesas de prueba</h3><span class="p-sub">la extensión sola, sin Vitalis: solo news y velocidad al new</span><span class="grow"></span><a class="btn sm" href="${PRUEBA_URL}" target="_blank" rel="noopener">Ver la invitación</a><button type="button" class="btn sm pri" data-act="trialNueva">Nueva mesa de prueba</button></div>
+    ${T.length?`<div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th>Código</th><th class="r">Personas</th><th class="r">News hoy</th><th class="r">En New</th><th class="r" title="mediana de hoy del registro a la primera llamada">Al new en</th><th>Última señal</th></tr></thead><tbody>
+    ${T.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td><code class="trial-code">${esc(t.code)}</code> <button type="button" class="ib" data-copy="${esc(t.code)}" title="Copiar el código">Copiar</button></td><td class="r">${t.people}</td><td class="r">${t.news_today}</td><td class="r">${t.in_new?`<b class="hot">${t.in_new}</b>`:0}</td><td class="r">${t.med==null?'<span class="d">—</span>':`<b class="${t.med>5?'hot':'ok'}">${Math.round(t.med)} min</b>`}</td><td class="d">${ago(t.last)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía no hay ninguna. Creá una, pasale el código y el link de la invitación al team leader de esa mesa.</div>'}
+    <p class="p-sub" style="margin:8px 2px 0">Cada persona instala la extensión desde la invitación (vTL o vAgente) y entra con el código de la mesa y su nombre tal como aparece en el CRM. La extensión solo lee el CRM.</p></section>`;
+}
+function trialNuevaModal(){
+  modal({title:'Nueva mesa de prueba',body:`<label class="fld"><span>Nombre de la mesa</span><input id="tnN" maxlength="40" placeholder="Mesa de Carlos" autofocus></label>
+    <p class="note">Te doy un código de 6 letras y números: se lo pasás al team leader junto con el link de la invitación.</p><div class="ebox" id="tnErr"></div>`,
+    actions:[{l:'Cancelar'},{l:'Crear',cls:'pri',fn:async api=>{
+      const nm=api.q('#tnN').value.trim();if(!nm){api.q('#tnErr').textContent='Escribí el nombre de la mesa.';return false}
+      const {data,error}=await sb.rpc('trial_desk_create',{nm});
+      if(error||!data||!data.ok){api.q('#tnErr').textContent=error?errMsg(error):'No se pudo crear.';return false}
+      toast(`Mesa de prueba <b>${esc(nm)}</b> creada. Código: <b class="trial-code">${esc(data.code)}</b> · invitación: ${esc(PRUEBA_URL)}`,'ok',{ms:20000});
+      gerTrial=null;V.gerencia.render({})}}]});
+}
 async function mesaEntrar(slug){ // pasar a otra mesa: el perfil cambia de mesa y Vitalis arranca de nuevo ahí
   if(!await B.rpc('switch_team',{slug}))return;
   local.set('mesa',slug);await snapClear();location.reload();
@@ -164,6 +186,8 @@ V.gerencia={
     b.addEventListener('click',e=>{const p=e.target.closest('[data-ger]');if(p){gerP.k=p.dataset.ger;this.render({});return}
       const i=e.target.closest('[data-gerin]');if(i){mesaEntrar(i.dataset.gerin);return}
       const a=e.target.closest('[data-act=mesaNueva]');if(a){mesaNuevaModal();return}
+      const tn=e.target.closest('[data-act=trialNueva]');if(tn){trialNuevaModal();return}
+      const cp=e.target.closest('[data-copy]');if(cp){navigator.clipboard.writeText(cp.dataset.copy).then(()=>toast('Código copiado.','ok'),()=>toast('No pude copiar.','err'));return}
       const m=e.target.closest('[data-germ]');if(m){gerP.ym=ymStep(gerP.ym,+m.dataset.germ);if(gerP.ym>ymNow())gerP.ym=ymNow();gerP.k='mes';this.render({})}});
     setInterval(()=>{if(ready&&cur==='gerencia'&&!document.hidden)this.render({})},6e4);
   },
@@ -178,9 +202,9 @@ V.gerencia={
     const pron=R.k==='mes'&&gerP.ym===ymNow()?`<section class="card">${pronCard()}</section>`:'';
     let top='';
     if(isGlobal()||isDirector()){ // todas las mesas, comparadas; y las mesas (solo el dueño)
-      const [C,T]=await Promise.all([companyLoad(R),isGlobal()&&isAdmin()?teamsLoad():Promise.resolve(null)]);
+      const [C,T,P]=await Promise.all([companyLoad(R),isGlobal()&&isAdmin()?teamsLoad():Promise.resolve(null),trialLoad()]);
       if(cur!=='gerencia')return;
-      top=companyCard(R,C)+(T?mesasCard(T):'');
+      top=companyCard(R,C)+(T?mesasCard(T):'')+((isGlobal()&&isAdmin())||P&&P.length?trialCard(P):'');
     }
     const mesa=members.length||teamInfo?`<h2 class="ger-h2">${esc(teamInfo&&teamInfo.name||'Esta mesa')}</h2>`:'';
     b.innerHTML=gerHead(R)+top+(top?mesa:'')+gerTabla(R,rmR,rmP)+pron+gerEmbudo(R,rows,prev)+gerLQ(R,rows);

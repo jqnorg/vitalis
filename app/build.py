@@ -56,4 +56,22 @@ for f in (ROOT/'app'/'fonts').iterdir(): shutil.copy(f, D/'fonts'/f.name)
 with zipfile.ZipFile(D/'vitalis-extension.zip','w',zipfile.ZIP_DEFLATED) as z:   # la extensión se descarga desde la app
     for p in sorted((ROOT/'extension').rglob('*')):
         if p.is_file(): z.write(p, p.relative_to(ROOT/'extension'))
+# la extensión de prueba (vTL y vAgente): la misma extensión con prueba.json adentro, sin Vitalis (ni bridge ni snippets)
+man=json.loads((ROOT/'extension'/'manifest.json').read_text())
+TRIAL_SKIP={'bridge.js','snip.js','manifest.json'}
+for role,label in [('tl','TL'),('agente','Agente')]:
+    m=dict(man); m['name']=f'Vitalis · Prueba ({label})'
+    m['description']='Vitalis de prueba, solo lectura del CRM: avisa de cada new al instante, mide cuánto se tarda en llamarlo y muestra la info de la campaña. '+('El team leader ve quién sigue en New y hace cuánto.' if role=='tl' else 'El agente ve su siguiente new y sus números del día.')
+    m['permissions']=[x for x in man['permissions'] if x not in ('contextMenus','idle')]
+    m['content_scripts']=[c for c in man['content_scripts'] if 'crm.js' in c['js']]
+    m['action']=dict(man['action'],default_title=m['name'])
+    with zipfile.ZipFile(D/f'vitalis-prueba-{role}.zip','w',zipfile.ZIP_DEFLATED) as z:
+        for q in sorted((ROOT/'extension').rglob('*')):
+            if q.is_file() and q.name not in TRIAL_SKIP: z.write(q, q.relative_to(ROOT/'extension'))
+        z.writestr('manifest.json', json.dumps(m, ensure_ascii=False, indent=2))
+        z.writestr('prueba.json', json.dumps({'role':'tl' if role=='tl' else 'agent','url':cfg['url'],'key':cfg['key']}))
+# la página pública de invitación a la prueba
+(D/'prueba').mkdir(exist_ok=True)
+pr=(ROOT/'app'/'prueba.html').read_text().replace('__URL__',cfg['url']).replace('__KEY__',cfg['key']).replace('__VER__',man['version']).replace('__LOGO_INNER__',re.sub(r'\s+',' ',logo))
+(D/'prueba'/'index.html').write_text(pr)
 print('site/:', sorted(p.name for p in D.iterdir()), len(html))
