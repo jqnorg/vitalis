@@ -2018,6 +2018,47 @@ end $$;
 grant execute on function public.vitalis_say(text, uuid) to authenticated;
 revoke all on function public.vitalis_say(text, uuid) from public, anon;
 
+-- El cierre del día (pedido del dueño, noviembre 2026): a las 17:35 el Vitalis del team leader o del admin arma el resumen de la
+-- mesa y lo manda con day_close: queda en day_closes (uno por día: el primero que llega lo manda, los demás reciben dup) y Vitalis
+-- lo escribe en el privado de cada team leader y admin (el chat con Vitalis se crea acá: chat_dm no deja, porque Vitalis está inactivo).
+create table if not exists public.day_closes (
+  team_id uuid not null references public.teams(id),
+  date    date not null,
+  body    text not null,
+  sent_by uuid references public.profiles(id) on delete set null,
+  sent_at timestamptz not null default now(),
+  primary key (team_id, date)
+);
+alter table public.day_closes enable row level security;
+drop policy if exists day_closes_read on public.day_closes;
+create policy day_closes_read on public.day_closes for select to authenticated using (team_id = public.my_team());
+grant select on public.day_closes to authenticated;
+create or replace function public.day_close(d date, txt text) returns json
+  language plpgsql security definer set search_path = public, extensions as $$
+declare t uuid := public.my_team(); b uuid; p record; c uuid; k text; n int := 0;
+begin
+  if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el team leader o el administrador manda el cierre'; end if;
+  txt := left(btrim(coalesce(txt, '')), 2000);
+  if txt = '' then raise exception 'Vacío'; end if;
+  if d is null or d > current_date + 1 or d < current_date - 3 then raise exception 'Fecha fuera de rango'; end if;
+  begin
+    insert into public.day_closes (team_id, date, body, sent_by) values (t, d, txt, auth.uid());
+  exception when unique_violation then return json_build_object('ok', true, 'dup', true);
+  end;
+  b := public.vitalis_bot(t);
+  for p in select id from public.profiles where team_id = t and active and not bot and role in ('leader', 'admin') loop
+    k := least(b::text, p.id::text) || ':' || greatest(b::text, p.id::text);
+    select id into c from public.chats where team_id = t and dm_key = k;
+    if c is null then insert into public.chats (team_id, kind, created_by, dm_key) values (t, 'dm', b, k) returning id into c; end if;
+    insert into public.chat_members (chat_id, user_id, added_by) values (c, b, b), (c, p.id, b) on conflict do nothing;
+    insert into public.messages (chat_id, user_id, body) values (c, b, txt);
+    n := n + 1;
+  end loop;
+  return json_build_object('ok', true, 'n', n);
+end $$;
+grant execute on function public.day_close(date, text) to authenticated;
+revoke all on function public.day_close(date, text) from public, anon;
+
 -- Privacidad: tras idle_min minutos sin usar la compu, Vitalis se tapa y pide el PIN (por detrás sigue andando);
 -- el chat pide el PIN si hace chat_lock_min minutos que no lo mirás. Los cambia el administrador.
 alter table public.teams add column if not exists idle_min integer not null default 15;

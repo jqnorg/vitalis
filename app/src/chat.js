@@ -486,7 +486,7 @@ V.chat={
     const ppl=chatPeople(c),sub=c.kind==='team'?plural(ppl.length,'persona'):c.kind==='dm'?(quiet(members.find(m=>m.id===dmOther(c)))?'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> avisos silenciados':'Privado'):
       clip(ppl.map(u=>u===me?'vos':first(u)).sort((a,b)=>a==='vos'?1:b==='vos'?-1:a.localeCompare(b)).join(', '),70);
     const hd=`<button type="button" class="ib ch-back" data-ch="back" aria-label="Volver a los chats">←</button>${chatIcon(c)}<div class="ch-ti"><b>${esc(chatName(c))}</b><small>${esc(sub)}</small></div><span class="grow"></span>`+
-      (c.kind==='dm'?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+
+      (c.kind==='dm'&&!isBot(dmOther(c))?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+ // el privado con Vitalis (el cierre del día) no tiene perfil
       (c.kind==='group'?`<button type="button" class="btn sm" data-ch="people">Gente</button>`:'')+
       `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`+
       `<button type="button" class="btn sm" data-ch="lock" title="Bloquear el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Bloquear</button>`;

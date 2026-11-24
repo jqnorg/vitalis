@@ -1201,6 +1201,11 @@ table.rd-map{border-collapse:separate;border-spacing:2px;font-size:12px;width:10
 .ag-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px}
 .ag-s{min-height:54px;border:1.5px solid var(--line);border-radius:12px;background:var(--panel);font:inherit;font-weight:600;font-size:15px;color:var(--fg);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:6px 8px}
 .ag-s small{font-weight:400;font-size:12px;color:var(--dim)}
+.ag-s.best small{color:var(--pri);font-weight:600}
+.dia-l{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.dia-l li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1.5px solid var(--line);border-radius:12px;font-size:15px}
+.dia-l li span{color:var(--dim)}.dia-l li b{text-align:right}.dia-l b.ok{color:var(--ok)}.dia-l b.hot{color:var(--err)}.dia-l b.warn{color:var(--acc)}
+.dia-f{margin:12px 2px 0;font-size:15px;font-weight:500}
 .ag-s:hover{border-color:var(--pri)}
 .ag-s.on{border-color:var(--pri);background:var(--pri-soft);color:var(--pri);box-shadow:inset 0 0 0 1px var(--pri)}
 .ag-when{margin:10px 0 0;font-size:14px;min-height:20px}
@@ -1809,7 +1814,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.46.0';
+const VERSION='1.47.0';
 const EXT_VER='1.16.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -3102,22 +3107,24 @@ const hTxt=h=>h.replace(/^0(\d)/,'$1');
 function workAhead(n){let d=todayS();for(let i=0,k=0;i<n&&k<40;k++){d=addDays(d,1);const w=noTrabajo(d);if(!w||w==='falta')i++}return d} // n días que se trabajan desde hoy
 function agDay(d){return d===addDays(todayS(),1)?'Mañana':AG_DIA[parseYMD(d).getDay()]}
 function agDefault(){return `${workAhead(1)}T${cfg.hora}`}
-function agSlots(){ // los horarios de un toque (los de hoy, solo si todavía estás en horario)
+function agSlots(country){ // los horarios de un toque (los de hoy, solo si todavía estás en horario); con el país, la hora que más deposita (Radar)
   const te=todayS(),L=[],inM=n=>{const d=new Date(Date.now()+n*6e4);d.setSeconds(0,0);const r=d.getMinutes()%5;if(r)d.setMinutes(d.getMinutes()+5-r);return dueStr(d)};
   for(const [l,n] of [['En 1 hora',60],['En 2 horas',120]]){const v=inM(n);if(v.slice(0,10)===te&&v.slice(11)<=AG_END)L.push({k:'m'+n,l,v})}
   if(nowHM()<'14:00')L.push({k:'h16',l:'Hoy 16:00',v:`${te}T16:00`});
   const d1=workAhead(1),d3=workAhead(3),h=cfg.hora;
   L.push({k:'d1',l:`${agDay(d1)} ${hTxt(h)}`,v:`${d1}T${h}`});
   if(h<'15:00')L.push({k:'d1t',l:`${agDay(d1)} 15:00`,v:`${d1}T15:00`});
+  const hb=hourBest(country);
+  if(hb&&hb.h>=9&&hb.h<=17){const hv=String(hb.h).padStart(2,'0')+':00';if(!L.some(x=>x.v===`${d1}T${hv}`))L.splice(L.findIndex(x=>x.k==='d1')+1,0,{k:'d1b',l:`${agDay(d1)} ${hb.h}:00`,v:`${d1}T${hv}`,s:`hora fuerte de ${hb.p}`,b:1});else L.find(x=>x.v===`${d1}T${hv}`).s=`hora fuerte de ${hb.p}`}
   L.push({k:'d3',l:`${agDay(d3)} ${hTxt(h)}`,v:`${d3}T${h}`,s:'en 3 días'});
   return L;
 }
-const agSlotsHTML=()=>agSlots().map(x=>`<button type="button" class="ag-s" data-qk="${x.k}" data-qt="${x.v}">${esc(x.l)}${x.s?`<small>${esc(x.s)}</small>`:''}</button>`).join('');
+const agSlotsHTML=country=>agSlots(country).map(x=>`<button type="button" class="ag-s${x.b?' best':''}" data-qk="${x.k}" data-qt="${x.v}">${esc(x.l)}${x.s?`<small>${esc(x.s)}</small>`:''}</button>`).join('');
 function agFields(p,o={}){ // o.fixed: el ID ya se sabe (viene de un cliente): no se escribe
-  const due=p&&p.due||agDefault(),d=due.slice(0,10),t=due.slice(11,16),kw=p&&p.kw||'',edit=!!(p&&p._id);
+  const due=p&&p.due||agDefault(),d=due.slice(0,10),t=due.slice(11,16),kw=p&&p.kw||'',edit=!!(p&&p._id),pais=p&&p.id?(crmStatusOf(p.id)||{}).country||'':'';
   return (o.fixed?`<input type="hidden" name="pid" value="${esc(p.id)}">`
     :`<label class="fld ag-id"><span>ID del cliente</span><input name="pid" inputmode="numeric" value="${esc(p?p.id:'')}" placeholder="68636"></label>`)+
-    `<div class="ag-q"><span class="ag-l">¿Cuándo lo llamás?</span><div class="ag-slots">${agSlotsHTML()}</div><p class="ag-when"></p></div>
+    `<div class="ag-q"><span class="ag-l">¿Cuándo lo llamás?</span><div class="ag-slots" data-pais="${esc(pais)}">${agSlotsHTML(pais)}</div><p class="ag-when"></p></div>
     <details class="ag-more"${edit?' open':''}><summary>Otro día u hora</summary><div class="frow">
       <label class="fld" style="flex:0 1 160px"><span>Día</span><input type="date" name="pdate" value="${d}" min="${todayS()}"></label>
       <label class="fld" style="flex:0 1 120px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label></div></details>
@@ -3136,8 +3143,9 @@ function bindAgFields(root){
   root.addEventListener('click',e=>{const c=e.target.closest('[data-qt]');if(!c)return;const v=c.dataset.qt;date.value=v.slice(0,10);time.value=v.slice(11,16);root.dataset.qk=c.dataset.qk;root.dataset.qv=v;mark()});
   date.addEventListener('input',mark);time.addEventListener('input',mark);
   if(kw)kw.addEventListener('input',()=>{const b=root.querySelector('.ag-kwv');if(b)b.textContent=kw.value.trim()?' · '+kw.value.trim():''});
-  let last=agSlotsHTML();
-  const slots=()=>{const s=root.querySelector('.ag-slots'),h=agSlotsHTML();if(s&&h!==last){last=s.innerHTML=h;mark()}}; // "En 1 hora" cambia con la hora
+  const paisOfRoot=()=>{const s=root.querySelector('.ag-slots');return s?s.dataset.pais||'':''};
+  let last=agSlotsHTML(paisOfRoot());
+  const slots=()=>{const s=root.querySelector('.ag-slots'),h=agSlotsHTML(paisOfRoot());if(s&&h!==last){last=s.innerHTML=h;mark()}}; // "En 1 hora" cambia con la hora
   mark();
   return {mark,slots};
 }
@@ -3253,6 +3261,7 @@ async function marcar(kind,hv=''){
   if(!await B.saveTurno(nt))return;
   const hi=$('#itHora');if(hi)hi.value='';
   turnoBar(true);toast(msg);
+  if(kind==='salida')cierreModal(); // el cierre del día: tu resumen
 }
 async function deshacer(){
   if(!noRO())return;
@@ -3550,12 +3559,23 @@ function fire(p){
   beep(3);
   sysNotify(`📞 Contactar ${p.id}`,`${p.kw} · ${whenTxt(d)}${late?' (atrasado)':''}`,'ftdc-'+p._id);
 }
+// una agenda vencida sin "Ya lo llamé" vuelve a avisar cada 15 min (AG_RE) durante hora y media (AG_RE_MAX), con la ficha a un toque (pedido del dueño)
+const AG_RE=15*6e4,AG_RE_MAX=90*6e4,agRe={};
+function refire(p,late){
+  toast(`⏰ Sigue sin cerrar: <b>${esc(p.id)}</b>${p.kw?`: ${esc(p.kw)}`:''}<br><span style="font-weight:500">Agenda de las ${esc(p.due.slice(11,16))}, hace ${mins(late)} min. ¿Lo llamaste?</span>`,'alert',
+    {sticky:1,key:'p'+p._id,actions:[{l:'Ya lo llamé',fn:()=>pendHecho(p)},{l:'Ver ficha',fn:()=>openFicha(p.id)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
+  flash();if(extOn())return;beep(2);
+  sysNotify(`📞 Sigue sin cerrar: ${p.id}`,`${p.kw||''} · agenda de las ${p.due.slice(11,16)}, hace ${mins(late)} min`,'ftdc-'+p._id);
+}
 function check(){
   if(!ready)return;
   const now=new Date();
   for(const p of pend){
-    if(p.done||p.notified)continue;
-    const d=parseDue(p.due);if(d<=now){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true}
+    if(p.done)continue;
+    const d=parseDue(p.due);if(d>now)continue;
+    if(!p.notified){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true;continue}
+    const late=now-d;if(late<AG_RE||late>AG_RE_MAX||soldOf(p.id)||isDnc(p.id))continue;
+    const k=p._id,last=agRe[k]||+d;if(now-last>=AG_RE){agRe[k]=+now;refire(p,late)}
   }
   status();syncExt();
 }
@@ -3600,6 +3620,7 @@ function ayuda(){
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Ahora</h4><dl>
     <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer a NA-4: el número son los días en que se lo llamó, no días de calendario; NA-5 queda para repasos). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
+    <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país. En Volver a llamar van primero los de un país que está en su hora fuerte (y lo dice en la fila); al Agendar, aparece un botón con la hora que más deposita su país.</dd>
     <dt>Fuera</dt><dd>Not interested y Low potential (estos se pueden agendar). Do Not Call no aparece nunca y no se puede agendar. Los que ya depositaron salen solos.</dd>
     <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliador y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
@@ -3641,7 +3662,9 @@ function ayuda(){
   <h4>Equipo (team leader)</h4><dl>
     <dt>Target</dt><dd><b>Fijar target</b> (en Equipo o en el inicio): los FTDs que tiene que hacer la mesa en el mes. Lo ve toda la mesa.</dd>
     <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
-    <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
+    <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd>
+    <dt>Agendas vencidas</dt><dd>El Manager avisa cuando alguien tiene una agenda vencida hace más de 30 minutos sin cerrar (agrupadas por agente).</dd>
+    <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, boletos sin pagar, agendas vencidas y perfiles cargados. Los viernes, con el ranking de la semana.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
@@ -3649,7 +3672,8 @@ function ayuda(){
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
   <h4>Turno y agenda</h4><dl>
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
-    <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado.</dd></dl>
+    <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado. Si a los 15 minutos no marcaste "Ya lo llamé", vuelve a avisar (cada 15 min, hasta hora y media) con la ficha a un toque.</dd>
+    <dt>Tu día</dt><dd>Al marcar Salida ves tu resumen: llamadas, hablado, tiempo muerto y franja, FTDs y CR (%) del día, perfiles cargados y agendas.</dd></dl>
   <h4>Extensión de Chrome</h4><dl>
     <dt>Qué hace</dt><dd>Avisos de agenda, botón en el CRM para pasar ventas, registro y aviso de clientes new, y los snippets en cualquier página. Las páginas del CRM con tabla se actualizan solas cada 10 s (si la estás usando, espera).</dd>
     <dt>Actualizar</dt><dd>Bajá el zip nuevo, descomprimilo en la misma carpeta y tocá ↻ en chrome://extensions.</dd>
@@ -5348,7 +5372,7 @@ V.chat={
     const ppl=chatPeople(c),sub=c.kind==='team'?plural(ppl.length,'persona'):c.kind==='dm'?(quiet(members.find(m=>m.id===dmOther(c)))?'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> avisos silenciados':'Privado'):
       clip(ppl.map(u=>u===me?'vos':first(u)).sort((a,b)=>a==='vos'?1:b==='vos'?-1:a.localeCompare(b)).join(', '),70);
     const hd=`<button type="button" class="ib ch-back" data-ch="back" aria-label="Volver a los chats">←</button>${chatIcon(c)}<div class="ch-ti"><b>${esc(chatName(c))}</b><small>${esc(sub)}</small></div><span class="grow"></span>`+
-      (c.kind==='dm'?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+
+      (c.kind==='dm'&&!isBot(dmOther(c))?`<button type="button" class="btn sm" data-prof="${esc(dmOther(c))}">Ver perfil</button>`:'')+ // el privado con Vitalis (el cierre del día) no tiene perfil
       (c.kind==='group'?`<button type="button" class="btn sm" data-ch="people">Gente</button>`:'')+
       `<button type="button" class="btn sm" data-ch="mute" title="${muted(c.id)?'Volver a recibir avisos de este chat':'No recibir avisos de este chat'}">${muted(c.id)?'<svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg> Activar avisos':'<svg class="ic" aria-hidden="true"><use href="#i-mudo"/></svg> Silenciar'}</button>`+
       `<button type="button" class="btn sm" data-ch="lock" title="Bloquear el chat: pide tu PIN para verlo"><svg class="ic" aria-hidden="true"><use href="#i-candado"/></svg> Bloquear</button>`;
@@ -7319,6 +7343,84 @@ document.addEventListener('click',e=>{
   if(a==='ritmo')return ritmoModal(b.dataset.uid||me);
 });
 
+/* ---------- el cierre del día (pedido del dueño, noviembre 2026) ----------
+   Al marcar Salida, el agente ve su resumen (cierreModal: llamadas, hablado, muerto y franja, FTDs y CR (%) del día, perfiles, agendas).
+   A las 17:35 (CIERRE_HM) el Vitalis del team leader o del admin arma el de la mesa (cierreTxt) y lo manda por el chat como Vitalis
+   (day_close: lo guarda en day_closes —uno por día, así no se repite aunque haya varios abiertos— y lo escribe en el privado de
+   cada team leader y admin con Vitalis). Los viernes va con el ranking de la semana. */
+const CIERRE_HM='17:35',CIERRE_MAX='23:30';
+async function profilesHoy(){ // perfiles cargados hoy, por quién (client_profiles.updated_by)
+  const m=new Map();if(!sb)return m;
+  try{const r=await Q(sb.from('client_profiles').select('client_id,updated_by').gte('updated_at',parseYMD(todayS()).toISOString()));
+    for(const x of r){if(!x.updated_by)continue;(m.get(x.updated_by)||m.set(x.updated_by,new Set()).get(x.updated_by)).add(norm(x.client_id))}}catch(e){}
+  return m;
+}
+function diaDe(uid){ // los números del día de alguien
+  const te=todayS(),R=ritmo(uid),cv=convPeriod(te,te,uid),ag=agStats(uid),F=team.filter(f=>f.uid===uid&&f.date===te);
+  const talks=R?new Set(R.segs.filter(s=>s.k==='talk').map(s=>norm(s.id))).size:0;
+  const hechas=agOf(uid).filter(p=>p.done&&p.doneAt&&ymd(new Date(p.doneAt))===te).length;
+  return {R,ftd:F.length,ftdNew:F.filter(f=>!isLate(f)).length,news:cv.leads,cr:cv.leads?cv.ftd/cv.leads:null,talks,venc:ag.venc,hechas};
+}
+function cierreFrase(D,pf){ // una línea, en buena onda
+  const R=D.R;if(!R)return '';
+  const out=[];
+  if(D.ftd)out.push(D.ftd===1?'Cerraste una venta.':`Cerraste ${D.ftd} ventas.`);
+  if(R.n>=R.req)out.push('Llegaste al mínimo de llamadas.');else out.push(`Te faltaron ${R.req-R.n} llamadas para el mínimo.`);
+  if(!R.young&&R.q===3)out.push(`Mucho tiempo muerto (${minsTxt(R.dead)}): mirá en "Ver qué pasó" dónde se fue.`);
+  if(D.talks&&pf<D.talks)out.push(`Faltan ${D.talks-pf} perfiles de los clientes con los que hablaste.`);
+  if(D.venc)out.push(`Tenés ${plural(D.venc,'agenda vencida','agendas vencidas')} sin cerrar.`);
+  return out.join(' ');
+}
+async function cierreModal(){ // "Tu día", al marcar Salida
+  if(!meNeedsDay())return;
+  const D=diaDe(me),R=D.R,P=await profilesHoy(),pf=(P.get(me)||new Set()).size;
+  const li=(k,v,c)=>`<li><span>${k}</span><b class="${c||''}">${v}</b></li>`;
+  modal({title:'Tu día',body:`<ul class="dia-l">
+    ${li('Llamadas',R?`${R.n} de ${R.req}`:'—',R?(R.n>=R.req?'ok':'hot'):'')}
+    ${li('Hablado',R?`${esc(minsTxt(R.talk))} · ${plural(D.talks,'conversación','conversaciones')}`:'—')}
+    ${li('Tiempo muerto',R?`${esc(minsTxt(R.dead))} ${qBadge(R)}`:'—',R?(R.young?'':R.q===3?'hot':R.q===2?'warn':'ok'):'')}
+    ${li('FTDs',`${D.ftd}${D.cr!=null?` <span class="d">· CR (%) del día ${pct(D.cr)}: ${D.ftdNew} de ${plural(D.news,'new')}</span>`:''}`,D.ftd?'ok':'')}
+    ${li('Perfiles cargados',`${pf}${D.talks?` <span class="d">de ${plural(D.talks,'conversación','conversaciones')}</span>`:''}`,D.talks&&pf<D.talks?'warn':pf?'ok':'')}
+    ${li('Agendas',`${D.hechas} hechas${D.venc?` · <span class="hot">${D.venc} vencidas sin cerrar</span>`:''}`)}
+  </ul><p class="dia-f">${esc(cierreFrase(D,pf))}</p>`,
+  actions:[...(R?[{l:'Ver qué pasó',fn:()=>{setTimeout(()=>ritmoModal(me),50)}}]:[]),{l:'Listo',cls:'pri'}]});
+}
+const nombres=L=>L.map(x=>first(x.m.id)).join(', ');
+async function cierreTxt(){ // el resumen de la mesa, en texto plano para el chat
+  const te=todayS(),ym=ymNow(),D=cmData(),P=await profilesHoy(),rows=D.rows.filter(p=>p.tu.k!=='none'||p.ftd||p.pc.n),S=soldIdx();
+  const mes=team.filter(f=>f.date.slice(0,7)===ym).length,T=+targets[ym]||0,hoy=team.filter(f=>f.date===te);
+  const L=[`Cierre del ${AG_DIA[parseYMD(te).getDay()].toLowerCase()} ${dm(te)}`];
+  const porAg=rows.filter(p=>p.ftd).sort((a,b)=>b.ftd-a.ftd).map(p=>`${first(p.m.id)} ${p.ftd}`).join(', ');
+  L.push(`FTDs de hoy: ${hoy.length}${porAg?` (${porAg})`:''} · el mes: ${mes}${T?` de ${T}`:''}`);
+  const ok=rows.filter(p=>p.pc.n>=minCalls()),no=rows.filter(p=>p.pc.n<minCalls());
+  L.push(`Llamadas: ${nf(D.callsN)}${ok.length?` · al mínimo: ${nombres(ok)}`:''}${no.length?` · no llegaron: ${no.map(p=>`${first(p.m.id)} ${p.pc.n}`).join(', ')}`:''}`);
+  const q=n=>rows.filter(p=>p.R&&!p.R.young&&p.R.q===n);
+  if(q(1).length+q(2).length+q(3).length)L.push(`RMO: ${[q(1).length&&`Q1 ${nombres(q(1))}`,q(2).length&&`Q2 ${nombres(q(2))}`,q(3).length&&`Q3 ${q(3).map(p=>`${first(p.m.id)} (${minsTxt(p.R.dead)} muertos)`).join(', ')}`].filter(Boolean).join(' · ')}`);
+  const cv=convPeriod(te,te,null);if(cv.leads)L.push(`CR (%) del día: ${pct(cv.ftd/cv.leads)} (${cv.ftd} de ${plural(cv.leads,'new')})`);
+  let pendN=0;for(const r of crm.rows.values())if(r.grp==='pending'&&!isArch(r.brand)&&!offDesk(r)&&!paidCrm(r)&&!S.has(ckey(r.brand,r.id)))pendN++;
+  const venc=rows.filter(p=>p.venc).map(p=>`${first(p.m.id)} ${p.venc}`).join(', ');
+  L.push(`Boletos sin pagar: ${pendN} · agendas vencidas: ${venc||'ninguna'}`);
+  const pf=rows.map(p=>[p,(P.get(p.m.id)||new Set()).size]),pfN=pf.reduce((a,[,n])=>a+n,0);
+  L.push(`Perfiles cargados hoy: ${pfN}${pf.length?` (${pf.filter(([,n])=>n).map(([p,n])=>`${first(p.m.id)} ${n}`).join(', ')}${pf.some(([,n])=>!n)?`; sin ninguno: ${pf.filter(([,n])=>!n).map(([p])=>first(p.m.id)).join(', ')}`:''})`:''}`);
+  if(parseYMD(te).getDay()===5){ // viernes: el ranking de la semana
+    const w0=weekStart(te),W=new Map();for(const f of team)if(f.date>=w0&&f.date<=te&&!isLeadUid(f.uid))W.set(f.uid,(W.get(f.uid)||0)+1);
+    let C=new Map();try{for(const r of await rmoLoad(w0,te))C.set(r.user_id,(C.get(r.user_id)||0)+(+r.n||0))}catch(e){}
+    const rk=members.filter(m=>m.active&&!isLeadUid(m.id)).map(m=>({m,f:W.get(m.id)||0,c:C.get(m.id)||0})).sort((a,b)=>b.f-a.f||b.c-a.c);
+    if(rk.length)L.push(`Ranking de la semana: ${rk.map((x,i)=>`${i+1}) ${first(x.m.id)} ${plural(x.f,'FTD')}${x.c?`, ${nf(x.c)} llamadas`:''}`).join(' · ')}`);
+  }
+  return L.join('\n');
+}
+let cierreBusy=false;
+async function cierreCheck(){ // a las 17:35 de un día de trabajo, una vez por día (day_closes lo frena si otro ya lo mandó)
+  if(!ready||!sb||readOnly||!isLeader()||cierreBusy)return;
+  const te=todayS(),w=noTrabajo(te);if(w&&w!=='falta')return;
+  const hm=nowHM();if(hm<CIERRE_HM||hm>CIERRE_MAX||local.get('cierre')===te)return;
+  cierreBusy=true;
+  try{const txt=await cierreTxt();const r=await Q(sb.rpc('day_close',{d:te,txt}));local.set('cierre',te);if(r&&!r.dup)toast('Vitalis mandó el cierre del día de la mesa al chat.','ok')}
+  catch(e){}finally{cierreBusy=false}
+}
+setInterval(cierreCheck,6e4);
+
 /* ============================================================
    Campañas: la unidad es afiliador · campaña · país (en todo Vitalis). Información para todos, dentro de Clientes.
    De los registrados en el período (lo que vio la extensión en el CRM): cuántos atienden, cuántos depositaron
@@ -7592,8 +7694,22 @@ function mapCard(){
     <div class="p-tablewrap"><table class="rd-map"><thead><tr><th></th>${hs.map(h=>`<th class="${h===hr?'now':''}">${h}</th>`).join('')}</tr></thead><tbody>
     ${M.map(o=>{const mx=Math.max(...o.h.slice(H0,H1+1))||1,top=o.h.indexOf(Math.max(...o.h));
       return `<tr><th>${esc(o.p)} <span class="d">${o.n}</span></th>${hs.map(h=>{const v=o.h[h]/mx;return `<td class="${h===hr?'now':''}" title="${esc(o.p)} · ${h} h: ${o.h[h]} FTDs (${pct(o.h[h]/o.n)})"><i style="opacity:${v?Math.max(.08,v).toFixed(2):0}"></i>${h===top?'<b>●</b>':''}</td>`}).join('')}</tr>`}).join('')}
-    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país.</p></section>`;
+    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país. La Cola pone primero a los de un país en su hora fuerte, y Agendar sugiere esa hora.</p></section>`;
 }
+
+// la hora de cada país, del mismo mapa: para la Cola (hora fuerte ahora) y para Agendar (la hora que más deposita)
+const HOUR_MIN=20,HOUR_STRONG=.8,HOUR_WEAK=.25;
+const hourBy=perPass(()=>{
+  const m=new Map();
+  for(const f of rdBase().list){const h=rdHour(f),p=rdPais(f);if(h==null||!p)continue;let o=m.get(norm(p));if(!o)m.set(norm(p),o={p,n:0,h:Array(24).fill(0)});o.n++;o.h[h]++}
+  for(const o of m.values()){let top=0;for(let h=1;h<24;h++)if(o.h[h]>o.h[top])top=h;o.top=top;o.max=o.h[top]}
+  return m;
+});
+function hourOf(country){const o=hourBy().get(norm(paisOf(country)));return o&&o.n>=HOUR_MIN&&o.max?o:null}
+// 2 = ahora es su hora fuerte · -1 = ahora casi no deposita · 0 = normal o sin datos
+function hourNow(country,hr=new Date().getHours()){const o=hourOf(country);if(!o)return 0;const v=o.h[hr]/o.max;return v>=HOUR_STRONG?2:v<=HOUR_WEAK?-1:0}
+function hourBest(country){const o=hourOf(country);return o?{p:o.p,h:o.top,sh:o.h[o.top]/o.n}:null} // la mejor hora para agendarlo
+const hourStrongNow=(hr=new Date().getHours())=>[...hourBy().values()].filter(o=>o.n>=HOUR_MIN&&o.max&&o.h[hr]/o.max>=HOUR_STRONG).map(o=>o.p);
 
 /* ---------- 6) días de cobro ---------- */
 const BUCK=[[1,6],[7,13],[14,17],[18,24],[25,31]];
@@ -7806,6 +7922,7 @@ function sgRowWhy(r,k){
   else if(k.today)bits.push(`lo llamaron a las ${hhmm(k.last)} (${esc(rel(new Date(k.last)))})`);
   else bits.push(`sin tocar ${esc(rel(new Date(k.last)))}`);
   if(r.grp==='na'&&naNum(r.status)>=3)bits.push('probá con las tres líneas');
+  if(hourNow(r.country)===2)bits.unshift(`<b>ahora es la hora fuerte de ${esc(paisOf(r.country))}</b>`); // el Radar: a esta hora su país deposita más
   return bits.join(' · ');
 }
 function sgGroup(key,list,head,why,open=true){
@@ -7844,14 +7961,16 @@ function colaPlan(q){
   const two=[...agNow.map(p=>{const r=crmStatusOf(p.id);return {p,r:r?mark(r):null}}),...[...cb].sort((a,b)=>cbRank(a)-cbRank(b)||byRegDesc(a,b)).map(r=>({r}))];
   // 3) NA, Call Again y Hang Up, por el motivo. Un cliente va en un solo lugar: los que tienen agenda abierta los avisa la agenda
   const agIds=new Set(pend.filter(p=>!p.done).map(p=>norm(p.id)));
-  const g3=q.g3.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r)})),by=(a,b)=>(a.k.last||0)-(b.k.last||0); // primero el que hace más que nadie toca (a la par, queda el orden de la mesa: Call Again, Hang Up, NA)
+  const hw=x=>hourNow(x.r.country)===2?0:1; // los de un país en su hora fuerte (Radar) van primero: mismas llamadas, mejor momento
+  const g3=q.g3.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r)})),by=(a,b)=>hw(a)-hw(b)||(a.k.last||0)-(b.k.last||0); // después, el que hace más que nadie toca (a la par, queda el orden de la mesa: Call Again, Hang Up, NA)
   const recent=x=>x.k.today&&x.k.last&&now-x.k.last<=SG_STALE;
   const hotL=g3.filter(x=>x.r.hot&&!recent(x)).sort(by),rest=g3.filter(x=>!(x.r.hot&&!recent(x)));
   const nunca=rest.filter(x=>!x.k.today).sort(by),viejos=rest.filter(x=>x.k.today&&!recent(x)).sort(by),poco=rest.filter(recent).sort(by);
   // 4) Low potential con chance
   const low=q.low.filter(r=>!agIds.has(norm(r.id))).map(mark).map(r=>({r,k:K(r),x:sgLowWhy(r,te)})).filter(o=>o.x)
     .sort((a,b)=>(recent(a)?1:0)-(recent(b)?1:0)||a.x.w-b.x.w||byRegDesc(a.r,b.r));
-  return {now,te,H,K,news,newsL,due,agNow,agLater,cb,two,g3,hotL,nunca,viejos,poco,low,recent};
+  const strong=hourStrongNow(); // países en su hora fuerte ahora
+  return {now,te,H,K,news,newsL,due,agNow,agLater,cb,two,g3,hotL,nunca,viejos,poco,low,recent,strong};
 }
 // el próximo a llamar, en el orden de la Cola, con su porqué en una línea (para la extensión en el CRM)
 function colaNext(q,n=6){
@@ -7862,13 +7981,14 @@ function colaNext(q,n=6){
     else add(r.id,r.name,r.grp==='pending'?'Tiene un boleto sin pagar':'Pidió que lo llamen');
   }
   for(const x of P.hotL)add(x.r.id,x.r.name,'Su campaña está depositando hoy');
-  for(const x of P.nunca)add(x.r.id,x.r.name,`${sgPlain(x.r)} · sin llamar hoy`);
-  for(const x of P.viejos)add(x.r.id,x.r.name,`${sgPlain(x.r)} · sin tocar hace más de 2 h`);
+  const hh=r=>hourNow(r.country)===2?` · hora fuerte de ${paisOf(r.country)}`:'';
+  for(const x of P.nunca)add(x.r.id,x.r.name,`${sgPlain(x.r)} · sin llamar hoy${hh(x.r)}`);
+  for(const x of P.viejos)add(x.r.id,x.r.name,`${sgPlain(x.r)} · sin tocar hace más de 2 h${hh(x.r)}`);
   for(const o of P.low)add(o.r.id,o.r.name,'Low potential: '+o.x.why.replace(/<[^>]+>/g,''));
   return out.slice(0,n);
 }
 function colaSug(q){
-  const P=colaPlan(q),{now,H,K,news,newsL,due,agNow,agLater,cb,two,g3,hotL,nunca,viejos,poco,low,recent}=P;
+  const P=colaPlan(q),{now,H,K,news,newsL,due,agNow,agLater,cb,two,g3,hotL,nunca,viejos,poco,low,recent,strong}=P;
   let html='',step=0;
   const stepH=(t,sub)=>`<div class="sg-step"><span class="sg-sn">${++step}</span><div><h3>${t}</h3><p>${sub}</p></div></div>`;
 
@@ -7896,7 +8016,7 @@ function colaSug(q){
   // 3) NA, Call Again y Hang Up, por el motivo
   if(g3.length){
     const pend3=hotL.length+nunca.length+viejos.length;
-    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para volver a llamar, en orden: primero el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
+    html+=stepH('Volver a llamar: No Answer, Call Again y Hang Up',`${pend3?`${plural(pend3,'cliente')} para volver a llamar, en orden: ${strong.length?`primero los de <b>${esc(strong.join(' y '))}</b> (ahora es su hora fuerte, según el Radar) y después`:'primero'} el que hace más tiempo que nadie toca.`:'Ya los llamaste a todos hace poco.'}${q.many?` Son tantos que van solo los registrados en ${MES[new Date().getMonth()]}.`:''}`)+
       `<section class="card sg-g3">`+
       sgGroup('hot',hotL,`${sgFlame}Su campaña está depositando hoy`,`${H.map(h=>esc(h.txt)+` lleva ${h.n} FTDs hoy`).join(' · ')}: es el mejor momento para esos clientes.`)+
       sgGroup('nunca',nunca,'Sin llamar hoy','Nadie los llamó todavía hoy.')+
@@ -8021,6 +8141,7 @@ async function stationCheck(){
    y las agendas vencidas. Sale todo de lo que Vitalis ya tiene: sin tablas nuevas. */
 const CM_NEW=5*6e4,CM_QUIET=20*6e4; // un New sin llamar a los 5 min · en turno y sin llamar hace 20 min
 const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:m<48*60?`${Math.floor(m/60)} h ${z(m%60)}`:`${Math.round(m/1440)} días`};
+const CM_AG=30*6e4; // una agenda vencida hace más de 30 min sin cerrar: aviso al team leader
 const CM_STUCK=2*36e5; // un cliente en Talking hace más de 2 h quedó colgado: al cortar tiene que salir de Talking (lo dijo el dueño)
 const cmHace=ms=>ms<6e4?'recién':`hace ${cmAgo(ms)}`; // "recién", nunca "hace recién"
 const cmInCall=(R,now)=>!!(R&&R.segs&&R.segs.some(s=>s.k==='talk'&&now-s.b<9e4)); // el sistema ya sabe que está en llamada (conversación abierta)
@@ -8068,6 +8189,9 @@ function cmData(){
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
     if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
+    const vz=agOf(p.m.id).filter(x=>!x.done&&now-parseDue(x.due)>=CM_AG&&!soldOf(x.id)&&!isDnc(x.id)).sort((a,b)=>parseDue(a.due)-parseDue(b.due)); // agendas vencidas sin "Ya lo llamé"
+    if(vz.length===1)al.push({w:2,id:vz[0].id,html:`${nm} tiene la agenda de <b>${esc(vz[0].id)}</b> (${esc(vz[0].due.slice(11,16))}) vencida <b>${cmHace(now-parseDue(vz[0].due))}</b> y sin cerrar`});
+    else if(vz.length)al.push({w:2,html:`<details class="cm-g"><summary>${nm} tiene <b>${vz.length}</b> agendas vencidas sin cerrar, la más vieja <b>${cmHace(now-parseDue(vz[0].due))}</b></summary><ul>${vz.map(x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button> agenda de las ${esc(x.due.slice(11,16))} · ${cmHace(now-parseDue(x.due))}${x.kw?` · ${esc(x.kw)}`:''}</li>`).join('')}</ul></details>`});
     if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
     if(p.tu.k==='in'&&!cmInCall(p.R,now)&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`}); // en llamada no se avisa: el tiempo está justificado
   }

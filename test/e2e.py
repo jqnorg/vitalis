@@ -40,6 +40,7 @@ async def main():
             b = await p.chromium.launch(executable_path='/usr/bin/google-chrome', args=['--headless=new'])
             async def newpage(tag, w=1440, h=920, dark=False):
                 ctx = await b.new_context(viewport={'width': w, 'height': h}, color_scheme='dark' if dark else 'light')
+                await ctx.add_init_script("try{const d=new Date(),z=n=>String(n).padStart(2,'0');localStorage.setItem('vitalis.cierre',JSON.stringify(d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())))}catch(e){}") # el cierre del día no se manda solo durante las pruebas (se prueba a mano)
                 pg = await ctx.new_page()
                 pg.on('pageerror', lambda e: errs.append(tag + ' ' + str(e)))
                 pg.on('console', lambda m: errs.append(tag + ' console ' + m.text) if m.type == 'error' and 'realtime' not in m.text and 'WebSocket' not in m.text and '404' not in m.text else None)
@@ -917,7 +918,7 @@ async def main():
             ok('muertos' in await A.inner_text('#itRitmo') and 'Q3' in await A.inner_text('#itRitmo'), 'el Inicio dice llamadas, tiempo muerto y franja')
             # la historia del RMO: se guarda cada 5 min y se ve en Turnos (lo tuyo) y en Equipo (todos)
             await A.evaluate("rmoLastSig='';rmoSave()"); await A.wait_for_timeout(900)
-            rd = sql("select n, q, open from public.rmo_days r join public.profiles p on p.id=r.user_id where p.name='Joaquín Or' and date=current_date")
+            rd = sql(f"select n, q, open from public.rmo_days r join public.profiles p on p.id=r.user_id where p.name='Joaquín Or' and date='{te}'") # el día de la app (la base de prueba está en UTC)
             ok(rd and rd[0]['n'] == 7 and rd[0]['q'] == 3 and rd[0]['open'], f'el RMO del día queda guardado ({rd})')
             await A.evaluate("rmoAt={};rmoRows={};go('turnos')"); await A.wait_for_timeout(1200)
             ok(await A.locator('#tuTable tr.cur .qb.q3').count() == 1, 'en Turnos, la jornada de hoy muestra su franja RMO')
@@ -1228,6 +1229,58 @@ async def main():
             ok(RG['seg']['n'] == 50 and abs(RG['seg']['d1'] - .6) < 1e-9 and abs(RG['seg']['d7'] - 1) < 1e-9, f'segundas oportunidades: cuándo vuelven los late, en días hábiles ({RG["seg"]})')
             ok(RG['pace']['n'] == 5 and abs(RG['pace']['mid'] - .5) < 1e-9 and RG['proj'] == {'mid': 20, 'lo': 20, 'hi': 20, 'months': 5}, f'pronóstico: aprende de los meses cerrados, sin el actual ni el primero ({RG["pace"]}, {RG["proj"]})')
             ok('5 meses de historia' in RG['pron'], 'y dice de cuántos meses sale')
+
+            # la hora de cada país (Radar → Cola y Agendar): en su hora fuerte, los de ese país van primero; al agendar, la hora que más deposita
+            HR = await A.evaluate('''(()=>{
+              const keep=team,out={},hr=new Date().getHours(),h2=hr===15?14:15,hh=n=>String(n).padStart(2,'0')+':10';
+              const L=[];let i=0;const mk=o=>L.push({uid:me,brand:'Novara Markets',id:'H'+(i++),amount:100,date:'2026-06-05',reg:'2026-06-05 09:00',...o});
+              for(let k=0;k<25;k++){mk({time:hh(hr),country:'Chile'});mk({time:hh(h2),country:'Mexico'})}
+              team=L;pass++;
+              out.now=[hourNow('Chile'),hourNow('Mexico')];out.best=hourBest('Mexico');out.strong=hourStrongNow();
+              const q={g1:[],ag:[],cb:[],low:[],g3:[{id:'X1',name:'De México',country:'Mexico',grp:'hang_up',status:'Hang Up'},{id:'X2',name:'De Chile',country:'Chile',grp:'hang_up',status:'Hang Up'}]};
+              const P=colaPlan(q);out.order=P.nunca.map(x=>x.r.id);out.next=colaNext(q).map(x=>x.why);out.sug=colaSug(q);
+              out.slots=agSlots('Mexico').map(x=>[x.k,x.l,x.s||'']);
+              team=keep;pass++;refresh();
+              return out;
+            })()''')
+            ok(HR['now'] == [2, -1] and HR['strong'] == ['Chile'] and HR['best']['p'] == 'México' and HR['best']['h'] in (14, 15), f'el Radar sabe qué país está en su hora fuerte (y cuál casi no deposita ahora) y la mejor hora de cada uno ({HR["now"]}, {HR["strong"]}, {HR["best"]})')
+            ok(HR['order'] == ['X2', 'X1'] and 'hora fuerte de Chile' in HR['next'][0] and 'hora fuerte' not in HR['next'][1], f'en la Cola, los del país en su hora fuerte van primero y lo dicen ({HR["order"]}, {HR["next"]})')
+            ok('primero los de <b>Chile</b> (ahora es su hora fuerte' in HR['sug'] and 'ahora es la hora fuerte de Chile' in HR['sug'], 'el paso 3 explica el orden')
+            best = [s for s in HR['slots'] if s[0] == 'd1b' or 'hora fuerte' in s[2]]
+            ok(len(best) == 1 and 'hora fuerte de México' in best[0][2], f'al agendar a un mexicano, un botón con la hora fuerte de México ({HR["slots"]})')
+
+            # una agenda vencida vuelve a avisar a los 15 min, con la ficha a un toque
+            await A.evaluate("document.querySelectorAll('#toasts .toast').forEach(t=>t.remove());pend.push({_id:'re1',n:98,id:'500003',kw:'gato',due:dueStr(new Date(Date.now()-16*6e4)),notified:true,done:false});check()")
+            await A.wait_for_timeout(400)
+            t = A.locator('#toasts .toast:has-text("Sigue sin cerrar")')
+            ok(await t.count() == 1 and '500003' in await t.inner_text() and 'gato' in await t.inner_text() and await t.locator('button:has-text("Ver ficha")').count() == 1 and await t.locator('button:has-text("Ya lo llamé")').count() == 1, 'a los 15 min sin "Ya lo llamé", vuelve a avisar con la palabra clave y la ficha a un toque')
+            await A.screenshot(path=OUT / 'y0_agenda_otra_vez.png')
+            await A.evaluate("check()"); await A.wait_for_timeout(200)
+            ok(await A.locator('#toasts .toast:has-text("Sigue sin cerrar")').count() == 1, 'y no se repite hasta los 15 min siguientes')
+            await A.evaluate("pend=pend.filter(p=>p._id!=='re1');document.querySelectorAll('#toasts .toast').forEach(t=>t.remove())")
+            # el Manager avisa las agendas vencidas de cada agente (a los 30 min)
+            uidA = await A.evaluate('me')
+            al = await D.evaluate(f"(()=>{{teamAg.push({{_id:'re2',uid:'{uidA}',id:'500003',kw:'perro',due:dueStr(new Date(Date.now()-40*6e4)),done:false}},{{_id:'re3',uid:'{uidA}',id:'500004',kw:'',due:dueStr(new Date(Date.now()-35*6e4)),done:false}});pass++;go('callman');return cmData().al.map(a=>a.html).join('\\n')}})()")
+            await D.wait_for_timeout(300); await D.screenshot(path=OUT / 'y3_manager_agendas.png')
+            ok('Joaquín Or' in al and '<b>2</b> agendas vencidas sin cerrar' in al and '500003' in al and 'perro' in al, f'el Manager: "tiene 2 agendas vencidas sin cerrar", desplegable con cada una ({al[:300]!r})')
+            await D.evaluate("teamAg=teamAg.filter(p=>!['re2','re3'].includes(p._id))")
+
+            # el cierre del día: al marcar Salida, "Tu día"; a las 17:35, Vitalis le manda el de la mesa al team leader y al admin
+            await A.evaluate("turnos[todayS()]={date:todayS(),in:Date.now()-5*36e5,out:null,breaks:[]};cierreModal()"); await A.wait_for_timeout(900)
+            dia = await A.inner_text('.mbox')
+            ok('Tu día' in dia and 'Llamadas' in dia and 'Tiempo muerto' in dia and 'Perfiles cargados' in dia and 'Agendas' in dia, f'al marcar Salida, el resumen del día ({dia[:200]!r})')
+            await A.screenshot(path=OUT / 'y1_tu_dia.png')
+            await A.evaluate("modals.slice().forEach(m=>m.close())")
+            CT = await D.evaluate('cierreTxt()')
+            ok(CT.startswith('Cierre del ') and 'FTDs de hoy:' in CT and 'Llamadas:' in CT and 'Boletos sin pagar:' in CT and 'Perfiles cargados hoy:' in CT, f'el texto del cierre de la mesa ({CT[:220]!r})')
+            ok(await D.evaluate("cierreTxt().then(txt=>Q(sb.rpc('day_close',{d:todayS(),txt}))).then(r=>r.ok&&!r.dup)") and sql("select count(*)::int c from public.day_closes")[0]['c'] == 1, 'y se guarda una vez por día')
+            await D.evaluate('chatPoll()'); await D.wait_for_timeout(1200)
+            ok(await D.evaluate("chats.some(c=>c.kind==='dm'&&isBot(dmOther(c)))"), 'el team leader tiene un privado con Vitalis')
+            await D.evaluate("go('chat');V.chat.open(chats.find(c=>c.kind==='dm'&&isBot(dmOther(c))).id)"); await D.wait_for_timeout(800)
+            ch = await D.inner_text('#chMsgs')
+            ok('Cierre del' in ch and 'FTDs de hoy' in ch and await D.locator('#v-chat [data-prof]').count() == 0, f'con el cierre adentro, y sin "Ver perfil" ({ch[:120]!r})')
+            await D.screenshot(path=OUT / 'y2_cierre_chat.png')
+            sql("delete from public.day_closes")
 
             # la barra de arriba: Pedir ayuda y el turno (Entrada, Baño, 10 min, 30 min, Salida)
             await A.evaluate("modals.slice().forEach(m=>m.close());document.querySelectorAll('#toasts .toast').forEach(t=>t.remove());go('inicio')"); await A.wait_for_timeout(400)

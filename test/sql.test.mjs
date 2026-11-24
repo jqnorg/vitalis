@@ -1024,6 +1024,31 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("delete from public.messages where user_id = (select id from public.profiles where bot limit 1) and body in ('Mensaje de un agente','Hola desde el admin','A un grupo')");
 }
 
+// ---------- el cierre del día: day_close lo manda Vitalis al privado de cada team leader y admin, una vez por día ----------
+{
+  const bot = (await db.query('select id from public.profiles where bot limit 1')).rows[0].id;
+  R = await rpc(C, "select public.day_close(current_date, 'Cierre del lunes\nFTDs de hoy: 3') j"); // C es team leader
+  ok(!R.error && R.ok && !R.dup && R.n >= 2, `el team leader manda el cierre y Vitalis se lo escribe al team leader y al admin (${JSON.stringify(R)})`);
+  let q = await db.query("select c.id, c.kind, c.dm_key from public.chats c join public.chat_members m on m.chat_id = c.id where m.user_id = $1 and c.kind = 'dm'", [bot]);
+  ok(q.rows.length >= 2 && q.rows.every(x => x.dm_key && x.dm_key.includes(bot)), 'quedan privados con Vitalis');
+  r = await as(C, "select body from public.messages where user_id = $1 and body like 'Cierre del lunes%'", [bot]);
+  ok(!r.error && r.rows.length === 1, 'el team leader lo lee en su privado con Vitalis (uno solo)');
+  r = await as(A, "select body from public.messages where user_id = $1 and body like 'Cierre del lunes%'", [bot]);
+  ok(!r.error && r.rows.length === 1, 'el admin también');
+  r = await as(B, "select body from public.messages where user_id = $1 and body like 'Cierre del lunes%'", [bot]);
+  ok(!r.error && r.rows.length === 0, 'un agente no lo ve');
+  R = await rpc(A, "select public.day_close(current_date, 'Otro cierre') j");
+  ok(!R.error && R.ok && R.dup, 'el segundo del mismo día no se manda (dup)');
+  ok((await db.query("select count(*)::int c from public.messages where body = 'Otro cierre'")).rows[0].c === 0, 'y no quedó nada');
+  r = await as(B, "select public.day_close(current_date, 'De un agente') j");
+  ok(!!r.error && /team leader o el administrador/.test(r.error), `un agente no puede (${r.error})`);
+  R = await rpc(A, "select public.day_close(current_date - 10, 'Viejo') j");
+  ok(!!R.error && /fuera de rango/i.test(R.error), 'una fecha vieja no va');
+  r = await as(B, 'select date from public.day_closes');
+  ok(!r.error && r.rows.length === 1, 'la mesa ve que el cierre de hoy ya se mandó');
+  await db.query("delete from public.messages where user_id = $1 and body like 'Cierre del lunes%'", [bot]);
+}
+
 // ---------- privacidad: cuándo se tapa Vitalis y cuándo el chat pide el PIN ----------
 {
   let q = await as(B, 'select idle_min, chat_lock_min from public.teams');

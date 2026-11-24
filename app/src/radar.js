@@ -147,8 +147,22 @@ function mapCard(){
     <div class="p-tablewrap"><table class="rd-map"><thead><tr><th></th>${hs.map(h=>`<th class="${h===hr?'now':''}">${h}</th>`).join('')}</tr></thead><tbody>
     ${M.map(o=>{const mx=Math.max(...o.h.slice(H0,H1+1))||1,top=o.h.indexOf(Math.max(...o.h));
       return `<tr><th>${esc(o.p)} <span class="d">${o.n}</span></th>${hs.map(h=>{const v=o.h[h]/mx;return `<td class="${h===hr?'now':''}" title="${esc(o.p)} · ${h} h: ${o.h[h]} FTDs (${pct(o.h[h]/o.n)})"><i style="opacity:${v?Math.max(.08,v).toFixed(2):0}"></i>${h===top?'<b>●</b>':''}</td>`}).join('')}</tr>`}).join('')}
-    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país.</p></section>`;
+    </tbody></table></div><p class="p-sub rd-foot">Más oscuro = más depósitos. ● la mejor hora de cada país. La Cola pone primero a los de un país en su hora fuerte, y Agendar sugiere esa hora.</p></section>`;
 }
+
+// la hora de cada país, del mismo mapa: para la Cola (hora fuerte ahora) y para Agendar (la hora que más deposita)
+const HOUR_MIN=20,HOUR_STRONG=.8,HOUR_WEAK=.25;
+const hourBy=perPass(()=>{
+  const m=new Map();
+  for(const f of rdBase().list){const h=rdHour(f),p=rdPais(f);if(h==null||!p)continue;let o=m.get(norm(p));if(!o)m.set(norm(p),o={p,n:0,h:Array(24).fill(0)});o.n++;o.h[h]++}
+  for(const o of m.values()){let top=0;for(let h=1;h<24;h++)if(o.h[h]>o.h[top])top=h;o.top=top;o.max=o.h[top]}
+  return m;
+});
+function hourOf(country){const o=hourBy().get(norm(paisOf(country)));return o&&o.n>=HOUR_MIN&&o.max?o:null}
+// 2 = ahora es su hora fuerte · -1 = ahora casi no deposita · 0 = normal o sin datos
+function hourNow(country,hr=new Date().getHours()){const o=hourOf(country);if(!o)return 0;const v=o.h[hr]/o.max;return v>=HOUR_STRONG?2:v<=HOUR_WEAK?-1:0}
+function hourBest(country){const o=hourOf(country);return o?{p:o.p,h:o.top,sh:o.h[o.top]/o.n}:null} // la mejor hora para agendarlo
+const hourStrongNow=(hr=new Date().getHours())=>[...hourBy().values()].filter(o=>o.n>=HOUR_MIN&&o.max&&o.h[hr]/o.max>=HOUR_STRONG).map(o=>o.p);
 
 /* ---------- 6) días de cobro ---------- */
 const BUCK=[[1,6],[7,13],[14,17],[18,24],[25,31]];

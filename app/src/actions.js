@@ -178,22 +178,24 @@ const hTxt=h=>h.replace(/^0(\d)/,'$1');
 function workAhead(n){let d=todayS();for(let i=0,k=0;i<n&&k<40;k++){d=addDays(d,1);const w=noTrabajo(d);if(!w||w==='falta')i++}return d} // n días que se trabajan desde hoy
 function agDay(d){return d===addDays(todayS(),1)?'Mañana':AG_DIA[parseYMD(d).getDay()]}
 function agDefault(){return `${workAhead(1)}T${cfg.hora}`}
-function agSlots(){ // los horarios de un toque (los de hoy, solo si todavía estás en horario)
+function agSlots(country){ // los horarios de un toque (los de hoy, solo si todavía estás en horario); con el país, la hora que más deposita (Radar)
   const te=todayS(),L=[],inM=n=>{const d=new Date(Date.now()+n*6e4);d.setSeconds(0,0);const r=d.getMinutes()%5;if(r)d.setMinutes(d.getMinutes()+5-r);return dueStr(d)};
   for(const [l,n] of [['En 1 hora',60],['En 2 horas',120]]){const v=inM(n);if(v.slice(0,10)===te&&v.slice(11)<=AG_END)L.push({k:'m'+n,l,v})}
   if(nowHM()<'14:00')L.push({k:'h16',l:'Hoy 16:00',v:`${te}T16:00`});
   const d1=workAhead(1),d3=workAhead(3),h=cfg.hora;
   L.push({k:'d1',l:`${agDay(d1)} ${hTxt(h)}`,v:`${d1}T${h}`});
   if(h<'15:00')L.push({k:'d1t',l:`${agDay(d1)} 15:00`,v:`${d1}T15:00`});
+  const hb=hourBest(country);
+  if(hb&&hb.h>=9&&hb.h<=17){const hv=String(hb.h).padStart(2,'0')+':00';if(!L.some(x=>x.v===`${d1}T${hv}`))L.splice(L.findIndex(x=>x.k==='d1')+1,0,{k:'d1b',l:`${agDay(d1)} ${hb.h}:00`,v:`${d1}T${hv}`,s:`hora fuerte de ${hb.p}`,b:1});else L.find(x=>x.v===`${d1}T${hv}`).s=`hora fuerte de ${hb.p}`}
   L.push({k:'d3',l:`${agDay(d3)} ${hTxt(h)}`,v:`${d3}T${h}`,s:'en 3 días'});
   return L;
 }
-const agSlotsHTML=()=>agSlots().map(x=>`<button type="button" class="ag-s" data-qk="${x.k}" data-qt="${x.v}">${esc(x.l)}${x.s?`<small>${esc(x.s)}</small>`:''}</button>`).join('');
+const agSlotsHTML=country=>agSlots(country).map(x=>`<button type="button" class="ag-s${x.b?' best':''}" data-qk="${x.k}" data-qt="${x.v}">${esc(x.l)}${x.s?`<small>${esc(x.s)}</small>`:''}</button>`).join('');
 function agFields(p,o={}){ // o.fixed: el ID ya se sabe (viene de un cliente): no se escribe
-  const due=p&&p.due||agDefault(),d=due.slice(0,10),t=due.slice(11,16),kw=p&&p.kw||'',edit=!!(p&&p._id);
+  const due=p&&p.due||agDefault(),d=due.slice(0,10),t=due.slice(11,16),kw=p&&p.kw||'',edit=!!(p&&p._id),pais=p&&p.id?(crmStatusOf(p.id)||{}).country||'':'';
   return (o.fixed?`<input type="hidden" name="pid" value="${esc(p.id)}">`
     :`<label class="fld ag-id"><span>ID del cliente</span><input name="pid" inputmode="numeric" value="${esc(p?p.id:'')}" placeholder="68636"></label>`)+
-    `<div class="ag-q"><span class="ag-l">¿Cuándo lo llamás?</span><div class="ag-slots">${agSlotsHTML()}</div><p class="ag-when"></p></div>
+    `<div class="ag-q"><span class="ag-l">¿Cuándo lo llamás?</span><div class="ag-slots" data-pais="${esc(pais)}">${agSlotsHTML(pais)}</div><p class="ag-when"></p></div>
     <details class="ag-more"${edit?' open':''}><summary>Otro día u hora</summary><div class="frow">
       <label class="fld" style="flex:0 1 160px"><span>Día</span><input type="date" name="pdate" value="${d}" min="${todayS()}"></label>
       <label class="fld" style="flex:0 1 120px"><span>Hora</span><input type="time" name="ptime" value="${t}"></label></div></details>
@@ -212,8 +214,9 @@ function bindAgFields(root){
   root.addEventListener('click',e=>{const c=e.target.closest('[data-qt]');if(!c)return;const v=c.dataset.qt;date.value=v.slice(0,10);time.value=v.slice(11,16);root.dataset.qk=c.dataset.qk;root.dataset.qv=v;mark()});
   date.addEventListener('input',mark);time.addEventListener('input',mark);
   if(kw)kw.addEventListener('input',()=>{const b=root.querySelector('.ag-kwv');if(b)b.textContent=kw.value.trim()?' · '+kw.value.trim():''});
-  let last=agSlotsHTML();
-  const slots=()=>{const s=root.querySelector('.ag-slots'),h=agSlotsHTML();if(s&&h!==last){last=s.innerHTML=h;mark()}}; // "En 1 hora" cambia con la hora
+  const paisOfRoot=()=>{const s=root.querySelector('.ag-slots');return s?s.dataset.pais||'':''};
+  let last=agSlotsHTML(paisOfRoot());
+  const slots=()=>{const s=root.querySelector('.ag-slots'),h=agSlotsHTML(paisOfRoot());if(s&&h!==last){last=s.innerHTML=h;mark()}}; // "En 1 hora" cambia con la hora
   mark();
   return {mark,slots};
 }
@@ -329,6 +332,7 @@ async function marcar(kind,hv=''){
   if(!await B.saveTurno(nt))return;
   const hi=$('#itHora');if(hi)hi.value='';
   turnoBar(true);toast(msg);
+  if(kind==='salida')cierreModal(); // el cierre del día: tu resumen
 }
 async function deshacer(){
   if(!noRO())return;
@@ -626,12 +630,23 @@ function fire(p){
   beep(3);
   sysNotify(`📞 Contactar ${p.id}`,`${p.kw} · ${whenTxt(d)}${late?' (atrasado)':''}`,'ftdc-'+p._id);
 }
+// una agenda vencida sin "Ya lo llamé" vuelve a avisar cada 15 min (AG_RE) durante hora y media (AG_RE_MAX), con la ficha a un toque (pedido del dueño)
+const AG_RE=15*6e4,AG_RE_MAX=90*6e4,agRe={};
+function refire(p,late){
+  toast(`⏰ Sigue sin cerrar: <b>${esc(p.id)}</b>${p.kw?`: ${esc(p.kw)}`:''}<br><span style="font-weight:500">Agenda de las ${esc(p.due.slice(11,16))}, hace ${mins(late)} min. ¿Lo llamaste?</span>`,'alert',
+    {sticky:1,key:'p'+p._id,actions:[{l:'Ya lo llamé',fn:()=>pendHecho(p)},{l:'Ver ficha',fn:()=>openFicha(p.id)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
+  flash();if(extOn())return;beep(2);
+  sysNotify(`📞 Sigue sin cerrar: ${p.id}`,`${p.kw||''} · agenda de las ${p.due.slice(11,16)}, hace ${mins(late)} min`,'ftdc-'+p._id);
+}
 function check(){
   if(!ready)return;
   const now=new Date();
   for(const p of pend){
-    if(p.done||p.notified)continue;
-    const d=parseDue(p.due);if(d<=now){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true}
+    if(p.done)continue;
+    const d=parseDue(p.due);if(d>now)continue;
+    if(!p.notified){if(!soldOf(p.id)&&!isDnc(p.id))fire(p);if(!readOnly)B.updPend(p,{notified:true});else p.notified=true;continue}
+    const late=now-d;if(late<AG_RE||late>AG_RE_MAX||soldOf(p.id)||isDnc(p.id))continue;
+    const k=p._id,last=agRe[k]||+d;if(now-last>=AG_RE){agRe[k]=+now;refire(p,late)}
   }
   status();syncExt();
 }
@@ -676,6 +691,7 @@ function ayuda(){
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Ahora</h4><dl>
     <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer a NA-4: el número son los días en que se lo llamó, no días de calendario; NA-5 queda para repasos). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
+    <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país. En Volver a llamar van primero los de un país que está en su hora fuerte (y lo dice en la fila); al Agendar, aparece un botón con la hora que más deposita su país.</dd>
     <dt>Fuera</dt><dd>Not interested y Low potential (estos se pueden agendar). Do Not Call no aparece nunca y no se puede agendar. Los que ya depositaron salen solos.</dd>
     <dt>Ficha</dt><dd>Tocá un ID para ver al cliente, su campaña, afiliador y país con sus números. Cuando entra un new, la ficha se abre sola al volver a Vitalis.</dd></dl>
   <h4>Clientes</h4><dl>
@@ -717,7 +733,9 @@ function ayuda(){
   <h4>Equipo (team leader)</h4><dl>
     <dt>Target</dt><dd><b>Fijar target</b> (en Equipo o en el inicio): los FTDs que tiene que hacer la mesa en el mes. Lo ve toda la mesa.</dd>
     <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
-    <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd></dl>
+    <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd>
+    <dt>Agendas vencidas</dt><dd>El Manager avisa cuando alguien tiene una agenda vencida hace más de 30 minutos sin cerrar (agrupadas por agente).</dd>
+    <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, boletos sin pagar, agendas vencidas y perfiles cargados. Los viernes, con el ranking de la semana.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
@@ -725,7 +743,8 @@ function ayuda(){
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
   <h4>Turno y agenda</h4><dl>
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
-    <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado.</dd></dl>
+    <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado. Si a los 15 minutos no marcaste "Ya lo llamé", vuelve a avisar (cada 15 min, hasta hora y media) con la ficha a un toque.</dd>
+    <dt>Tu día</dt><dd>Al marcar Salida ves tu resumen: llamadas, hablado, tiempo muerto y franja, FTDs y CR (%) del día, perfiles cargados y agendas.</dd></dl>
   <h4>Extensión de Chrome</h4><dl>
     <dt>Qué hace</dt><dd>Avisos de agenda, botón en el CRM para pasar ventas, registro y aviso de clientes new, y los snippets en cualquier página. Las páginas del CRM con tabla se actualizan solas cada 10 s (si la estás usando, espera).</dd>
     <dt>Actualizar</dt><dd>Bajá el zip nuevo, descomprimilo en la misma carpeta y tocá ↻ en chrome://extensions.</dd>
