@@ -1442,7 +1442,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .ritmo{margin:-4px 0 10px;font-size:13.5px;color:var(--dim)}.ritmo b{color:var(--fg)}.ritmo b.hot{color:#be123c}.ritmo b.warn{color:#b45309}
 
 /* el detalle del ritmo: línea de tiempo del día */
-.rt-sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}.rt-sum b{font-size:18px}.rt-sum b.hot{color:#be123c}.rt-sum b.warn{color:#b45309}
+.rt-sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}.rt-sum b{font-size:18px}.rt-sum b.hot{color:#be123c}.rt-sum b.ok,.rt-t b.ok,#itRitmo .ok{color:var(--ok)}.rt-sum b.warn{color:#b45309}
 .rt-tl{position:relative;height:26px;background:var(--line);border-radius:8px;overflow:hidden}
 .rt-tl .rs{position:absolute;top:0;height:100%}.rt-tl .rs.call{background:#00875a}.rt-tl .rs.talk{background:#3b82f6}.rt-tl .rs.br{background:#9aa3ad}.rt-tl .rs.dead{background:#f43f5e;opacity:.85}
 .rt-lg{margin:8px 0 4px}.rt-lg .sw.call{background:#00875a}.rt-lg .sw.talk{background:#3b82f6}.rt-lg .sw.br{background:#9aa3ad}.rt-lg .sw.dead{background:#f43f5e}

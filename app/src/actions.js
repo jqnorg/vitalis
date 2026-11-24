@@ -687,7 +687,7 @@ function ayuda(){
     <dt>Qué es</dt><dd>RMO es la medida del ritmo del día: cuántas llamadas, cuánto tiempo muerto y en qué franja vas. Se ve en el Inicio, en el Manager y en Equipo; "Ver qué pasó" lo abre con el detalle.</dd>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking o quedó con un status de resultado. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
-    <dt>Llamadas de hoy</dt><dd>Se piden 250 (lo fija el team leader). Cada hora hablada descuenta 68: con 2 h 30 habladas se piden 80.</dd>
+    <dt>Lo que se pide por día</dt><dd>Una de dos, sin compensar: <b>250 llamadas</b> (lo fija el team leader) o <b>2 h 30 habladas</b>. Con cualquiera de las dos el día está cumplido.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Ahora</h4><dl>
     <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer a NA-4: el número son los días en que se lo llamó, no días de calendario; NA-5 queda para repasos). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>

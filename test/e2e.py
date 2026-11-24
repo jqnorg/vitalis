@@ -906,8 +906,8 @@ async def main():
             await A.evaluate("""(()=>{const now=Date.now();turnos[todayS()]={date:todayS(),in:now-3*36e5,breaks:[{k:10,s:now-2*36e5,e:now-2*36e5+10*6e4}]};
               calls=[['A','omega',175],['A','gizat',174],['A','voiso',173],['B','omega',150],['C','omega',60],['C','gizat',59],['C','voiso',58]].map(([id,l,m])=>({uid:me,id,brand:'Novara Markets',line:l,at:now-m*6e4}));
               stLog=[{id:'b',grp:'call_again',st:'call again',at:now-120*6e4}];pass++})()""")
-            rt = await A.evaluate("(({n,dead,talk,req,q})=>({n,dead:Math.round(dead/6e4),talk:Math.round(talk/6e4),req,q}))(ritmo(me))")
-            ok(rt['n'] == 7 and 85 <= rt['talk'] <= 91 and rt['req'] < 250, f'la llamada a B fue conversación (cambió de status): ese hueco es hablado y descuenta llamadas requeridas ({rt})')
+            rt = await A.evaluate("(({n,dead,talk,req,q,ok,talkOk})=>({n,dead:Math.round(dead/6e4),talk:Math.round(talk/6e4),req,q,ok,talkOk}))(ritmo(me))")
+            ok(rt['n'] == 7 and 85 <= rt['talk'] <= 91 and rt['req'] == 250 and not rt['ok'] and not rt['talkOk'], f'la llamada a B fue conversación (cambió de status): ese hueco es hablado; las 250 no bajan (se cumple con 250 llamadas o 2 h 30 habladas, sin compensar) ({rt})')
             ok(80 <= rt['dead'] <= 88 and rt['q'] == 3, f'lo demás (sin el descanso marcado ni los cambios de línea) es tiempo muerto, proyectado al día: Q3 ({rt})')
             # un Talking de días antes no es conversación (quedó colgado); uno que empezó con la llamada sí
             rt2 = await A.evaluate("(()=>{crm.byId.set('c',{id:'C',brand:'Novara Markets',status:'Talking',grp:'new',since:new Date(Date.now()-3*864e5).toISOString()});pass++;const r=ritmo(me);return Math.round(r.talk/6e4)})()")
@@ -915,7 +915,7 @@ async def main():
             rt3 = await A.evaluate("(()=>{crm.byId.get('c').since=new Date(Date.now()-57*6e4).toISOString();pass++;const r=ritmo(me);crm.byId.delete('c');pass++;return Math.round(r.talk/6e4)})()")
             ok(rt3 > rt2 + 30, f'si pasó a Talking con la llamada, lo que siguió es charla ({rt3})')
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(600)
-            ok('muertos' in await A.inner_text('#itRitmo') and 'Q3' in await A.inner_text('#itRitmo'), 'el Inicio dice llamadas, tiempo muerto y franja')
+            ok('muertos' in await A.inner_text('#itRitmo') and 'Q3' in await A.inner_text('#itRitmo') and 'hablados de 2 h 30' in await A.inner_text('#itRitmo'), 'el Inicio dice llamadas de 250, hablados de 2 h 30, tiempo muerto y franja')
             # la historia del RMO: se guarda cada 5 min y se ve en Turnos (lo tuyo) y en Equipo (todos)
             await A.evaluate("rmoLastSig='';rmoSave()"); await A.wait_for_timeout(900)
             rd = sql(f"select n, q, open from public.rmo_days r join public.profiles p on p.id=r.user_id where p.name='Joaquín Or' and date='{te}'") # el día de la app (la base de prueba está en UTC)

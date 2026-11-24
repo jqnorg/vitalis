@@ -1455,7 +1455,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 .ritmo{margin:-4px 0 10px;font-size:13.5px;color:var(--dim)}.ritmo b{color:var(--fg)}.ritmo b.hot{color:#be123c}.ritmo b.warn{color:#b45309}
 
 /* el detalle del ritmo: línea de tiempo del día */
-.rt-sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}.rt-sum b{font-size:18px}.rt-sum b.hot{color:#be123c}.rt-sum b.warn{color:#b45309}
+.rt-sum{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:0 0 12px}.rt-sum b{font-size:18px}.rt-sum b.hot{color:#be123c}.rt-sum b.ok,.rt-t b.ok,#itRitmo .ok{color:var(--ok)}.rt-sum b.warn{color:#b45309}
 .rt-tl{position:relative;height:26px;background:var(--line);border-radius:8px;overflow:hidden}
 .rt-tl .rs{position:absolute;top:0;height:100%}.rt-tl .rs.call{background:#00875a}.rt-tl .rs.talk{background:#3b82f6}.rt-tl .rs.br{background:#9aa3ad}.rt-tl .rs.dead{background:#f43f5e;opacity:.85}
 .rt-lg{margin:8px 0 4px}.rt-lg .sw.call{background:#00875a}.rt-lg .sw.talk{background:#3b82f6}.rt-lg .sw.br{background:#9aa3ad}.rt-lg .sw.dead{background:#f43f5e}
@@ -1841,7 +1841,7 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.51.0';
+const VERSION='1.52.0';
 const EXT_VER='1.17.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -3646,7 +3646,7 @@ function ayuda(){
     <dt>Qué es</dt><dd>RMO es la medida del ritmo del día: cuántas llamadas, cuánto tiempo muerto y en qué franja vas. Se ve en el Inicio, en el Manager y en Equipo; "Ver qué pasó" lo abre con el detalle.</dd>
     <dt>Qué se mide</dt><dd>Solo lo que depende de vos: cuando no estás hablando, que marques una llamada tras otra. Hablar no suma ni resta (no depende de vos que atiendan).</dd>
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking o quedó con un status de resultado. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
-    <dt>Llamadas de hoy</dt><dd>Se piden 250 (lo fija el team leader). Cada hora hablada descuenta 68: con 2 h 30 habladas se piden 80.</dd>
+    <dt>Lo que se pide por día</dt><dd>Una de dos, sin compensar: <b>250 llamadas</b> (lo fija el team leader) o <b>2 h 30 habladas</b>. Con cualquiera de las dos el día está cumplido.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Ahora</h4><dl>
     <dt>El orden</dt><dd>1) los new sin depositar, del más nuevo al más viejo; 2) las agendas de hoy y vencidas; 3) Call Again, Hang Up y NA (No Answer a NA-4: el número son los días en que se lo llamó, no días de calendario; NA-5 queda para repasos). Si los del 3 son más que el tope (60, lo cambia el team leader), van solo los registrados en el mes.</dd>
@@ -3708,6 +3708,7 @@ function ayuda(){
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
   <h4>Turno y agenda</h4><dl>
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
+    <dt>Encuestas</dt><dd>Cualquiera arma una en cualquier chat (el botón ◎ o escribiendo <b>/vitalis encuesta ¿Pregunta? | opción | opción</b>, que la manda Vitalis). Elegís si es anónima, si se votan varias opciones y cómo termina: cuando la cerrás, a una hora o cuando votaron todos. El voto se cambia hasta que cierra.</dd>
     <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado. Si a los 15 minutos no marcaste "Ya lo llamé", vuelve a avisar (cada 15 min, hasta hora y media) con la ficha a un toque.</dd>
     <dt>Tu día</dt><dd>Al marcar Salida ves tu resumen: llamadas, hablado, tiempo muerto y franja, FTDs y CR (%) del día, perfiles cargados y agendas.</dd></dl>
   <h4>Extensión de Chrome</h4><dl>
@@ -7331,9 +7332,9 @@ function hoyBand(){ // los clientes en New, como pastilla en la barra (lo pidió
    Low Potential, Not Interested, Do Not Call, Failed, FTD) antes del siguiente intento. Lo hablado es el tiempo en Talking (o hasta ese
    resultado) menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s): el tiempo que costó llamarlo no es charla.
    Lo demás, sin descanso marcado, es tiempo muerto.
-   Requeridas = el mínimo menos lo que no se pudo marcar por hablar (una hora hablada = 68 llamadas). La franja sale del tiempo muerto
-   proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
-const CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
+   El día se cumple con una de dos, sin compensar (lo corrigió el dueño, 24/11/2026): 250 llamadas (teams.min_calls) o 2 h 30 habladas
+   (TALK_MIN). La franja sale del tiempo muerto proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
+const TALK_MIN=150*6e4,CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['call_again','hang_up','callback','pending','low_potential','not_interested','dnc','failed','ftd','invalid'];
 const ritmoMemo={p:-1,m:new Map()};
 function ritmo(uid){
   if(ritmoMemo.p!==pass){ritmoMemo.p=pass;ritmoMemo.m.clear()}
@@ -7370,8 +7371,8 @@ function ritmo(uid){
     for(const [s,e] of brs)seg('br',s,e,{});
     const brTot=brIn(t.in,end),useful=Math.max(1,end-t.in-brTot),full=t.out?useful:Math.max(useful,jorMs()-brTot);
     const proj=t.out?dead:Math.round(dead/useful*full);
-    const req=Math.max(0,Math.round(minCalls()-talk/CALL_S));
-    R={n:L.length,dead,talk,proj,req,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4,segs,in:t.in,end,open:!t.out};
+    const req=minCalls(),ok=L.length>=req||talk>=TALK_MIN; // una de las dos, sin compensar
+    R={n:L.length,dead,talk,proj,req,ok,talkOk:talk>=TALK_MIN,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4,segs,in:t.in,end,open:!t.out};
   }
   ritmoMemo.m.set(uid,R);return R;
 }
@@ -7408,7 +7409,7 @@ const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.flo
 const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;
 function ritmoLine(uid){ // en palabras: "180 llamadas · 25 min muertos · Q1"
   const R=ritmo(uid);if(!R)return '';
-  return `<b class="rmo-t" title="RMO: tu ritmo del día">RMO</b> · <span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}${R.req!==minCalls()?` <span class="d">(hoy se piden ${R.req}: hablaste ${esc(minsTxt(R.talk))})</span>`:` <span class="d">de ${R.req}</span>`}</span> · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;
+  return `<b class="rmo-t" title="RMO: tu ritmo del día">RMO</b> · <span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}<span class="d"> de ${R.req}</span></span> · <span class="rt-t"><b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> <span class="d">hablados de 2 h 30</span></span>${R.ok?' <span class="ok" title="Cumplido: 250 llamadas o 2 h 30 habladas">✓</span>':''} · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;
 }
 // el detalle del día: la línea de tiempo (llamadas, conversaciones, descansos y huecos) y los huecos más largos, para entender qué pasó
 function ritmoModal(uid){
@@ -7420,7 +7421,7 @@ function ritmoModal(uid){
   const talks=R.segs.filter(s=>s.k==='talk').sort((a,b)=>(b.b-b.a)-(a.b-a.a)).slice(0,6);
   const before=(s)=>{const prev=[...R.segs].filter(x=>x.k==='call'&&x.b<=s.a+1000).sort((x,y)=>y.a-x.a)[0];return prev?`después de llamar a <b>${esc(prev.id)}</b> ${esc(name(prev.id))}${prev.n>1?` (${prev.n} líneas)`:''}`:'antes de la primera llamada'};
   modal({wide:true,title:`RMO · ${esc(nm)} · ${qBadge(R,true)}`,body:`
-    <div class="rt-sum"><span><b>${R.n}</b> llamadas <span class="d">de ${R.req}</span></span><span><b>${esc(minsTxt(R.talk))}</b> hablando</span><span><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos${R.open?` <span class="d">(a fin de día serían ${esc(minsTxt(R.proj))})</span>`:''}</span></div>
+    <div class="rt-sum"><span><b>${R.n}</b> llamadas <span class="d">de ${R.req}</span></span><span><b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> hablando <span class="d">de 2 h 30</span></span><span><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos${R.open?` <span class="d">(a fin de día serían ${esc(minsTxt(R.proj))})</span>`:''}</span></div>
     <div class="rt-tl" role="img" aria-label="Línea de tiempo del día">${tl}</div><div class="tll"><span>${hhmm(R.in)}</span><span>${R.open?'ahora':'salida'} ${hhmm(R.end)}</span></div>
     <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
     <h4 class="rt-h">Huecos sin marcar</h4>${holes.length?`<ul class="rt-list">${holes.map(s=>`<li><b>${esc(minsTxt(s.d))}</b> de ${hhmm(s.a)} a ${hhmm(s.b)}, ${before(s)}</li>`).join('')}</ul>`:'<p class="p-sub" style="margin:0">Ninguno de más de 3 minutos.</p>'}
@@ -7435,7 +7436,7 @@ function callsMesaCard(){
   if(callsOk===false)return '';
   const all=sellers(team).filter(m=>!isLeadUid(m.id)).map(m=>({m,pc:dayPace(m.id),P:crm.ok?dayPool(m.id):null})).sort((a,b)=>b.pc.n-a.pc.n||a.m.name.localeCompare(b.m.name));
   const on=all.filter(x=>x.pc.n||(x.P&&x.P.total)),off=all.filter(x=>!(x.pc.n||(x.P&&x.P.total)));
-  const row=({m,pc,P})=>{const R=ritmo(m.id);return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span></td>
+  const row=({m,pc,P})=>{const R=ritmo(m.id);return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span>${R?` <span class="d">· <b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> hablados</span>`:''}</td>
     <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td></tr>`};
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">llamadas, tiempo muerto y franja: Q1 menos de 30 min muertos en el día · Q2 hasta 1 h · Q3 más</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
     ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>Pool llamado hoy</th><th>En New</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
@@ -7477,7 +7478,7 @@ function cierreFrase(D,pf){ // una línea, en buena onda
   const R=D.R;if(!R)return '';
   const out=[];
   if(D.ftd)out.push(D.ftd===1?'Cerraste una venta.':`Cerraste ${D.ftd} ventas.`);
-  if(R.n>=R.req)out.push('Llegaste al mínimo de llamadas.');else out.push(`Te faltaron ${R.req-R.n} llamadas para el mínimo.`);
+  if(R.ok)out.push(R.n>=R.req?'Llegaste a las llamadas del día.':'Cumpliste el día con lo hablado.');else out.push(`Te faltaron ${R.req-R.n} llamadas (o ${esc(minsTxt(TALK_MIN-R.talk))} de charla) para cumplir el día.`);
   if(!R.young&&R.q===3)out.push(`Mucho tiempo muerto (${minsTxt(R.dead)}): mirá en "Ver qué pasó" dónde se fue.`);
   if(D.talks&&pf<D.talks)out.push(`Faltan ${D.talks-pf} perfiles de los clientes con los que hablaste.`);
   if(D.venc)out.push(`Tenés ${plural(D.venc,'agenda vencida','agendas vencidas')} sin cerrar.`);
@@ -7488,8 +7489,8 @@ async function cierreModal(){ // "Tu día", al marcar Salida
   const D=diaDe(me),R=D.R,P=await profilesHoy(),pf=(P.get(me)||new Set()).size;
   const li=(k,v,c)=>`<li><span>${k}</span><b class="${c||''}">${v}</b></li>`;
   modal({title:'Tu día',body:`<ul class="dia-l">
-    ${li('Llamadas',R?`${R.n} de ${R.req}`:'—',R?(R.n>=R.req?'ok':'hot'):'')}
-    ${li('Hablado',R?`${esc(minsTxt(R.talk))} · ${plural(D.talks,'conversación','conversaciones')}`:'—')}
+    ${li('Llamadas',R?`${R.n} de ${R.req}`:'—',R?(R.n>=R.req?'ok':R.ok?'':'hot'):'')}
+    ${li('Hablado',R?`${esc(minsTxt(R.talk))} de 2 h 30 · ${plural(D.talks,'conversación','conversaciones')}`:'—',R?(R.talkOk?'ok':R.ok?'':'hot'):'')}
     ${li('Tiempo muerto',R?`${esc(minsTxt(R.dead))} ${qBadge(R)}`:'—',R?(R.young?'':R.q===3?'hot':R.q===2?'warn':'ok'):'')}
     ${li('FTDs',`${D.ftd}${D.cr!=null?` <span class="d">· CR (%) del día ${pct(D.cr)}: ${D.ftdNew} de ${plural(D.news,'new')}</span>`:''}`,D.ftd?'ok':'')}
     ${li('Perfiles cargados',`${pf}${D.talks?` <span class="d">de ${plural(D.talks,'conversación','conversaciones')}</span>`:''}`,D.talks&&pf<D.talks?'warn':pf?'ok':'')}
@@ -7504,8 +7505,8 @@ async function cierreTxt(){ // el resumen de la mesa, en texto plano para el cha
   const L=[`Cierre del ${AG_DIA[parseYMD(te).getDay()].toLowerCase()} ${dm(te)}`];
   const porAg=rows.filter(p=>p.ftd).sort((a,b)=>b.ftd-a.ftd).map(p=>`${first(p.m.id)} ${p.ftd}`).join(', ');
   L.push(`FTDs de hoy: ${hoy.length}${porAg?` (${porAg})`:''} · el mes: ${mes}${T?` de ${T}`:''}`);
-  const ok=rows.filter(p=>p.pc.n>=minCalls()),no=rows.filter(p=>p.pc.n<minCalls());
-  L.push(`Llamadas: ${nf(D.callsN)}${ok.length?` · al mínimo: ${nombres(ok)}`:''}${no.length?` · no llegaron: ${no.map(p=>`${first(p.m.id)} ${p.pc.n}`).join(', ')}`:''}`);
+  const done=p=>p.pc.n>=minCalls()||(p.R&&p.R.talkOk),ok=rows.filter(done),no=rows.filter(p=>!done(p)); // 250 llamadas o 2 h 30 habladas
+  L.push(`Llamadas: ${nf(D.callsN)}${ok.length?` · cumplieron el día (250 llamadas o 2 h 30 habladas): ${nombres(ok)}`:''}${no.length?` · no llegaron: ${no.map(p=>`${first(p.m.id)} ${p.pc.n} llamadas${p.R?`, ${minsTxt(p.R.talk)} hablados`:''}`).join(', ')}`:''}`);
   const q=n=>rows.filter(p=>p.R&&!p.R.young&&p.R.q===n);
   if(q(1).length+q(2).length+q(3).length)L.push(`RMO: ${[q(1).length&&`Q1 ${nombres(q(1))}`,q(2).length&&`Q2 ${nombres(q(2))}`,q(3).length&&`Q3 ${q(3).map(p=>`${first(p.m.id)} (${minsTxt(p.R.dead)} muertos)`).join(', ')}`].filter(Boolean).join(' · ')}`);
   const cv=convPeriod(te,te,null);if(cv.leads)L.push(`CR (%) del día: ${pct(cv.ftd/cv.leads)} (${cv.ftd} de ${plural(cv.leads,'new')})`);
@@ -8335,7 +8336,7 @@ V.callman={
       <td><span class="${p.tu.cls}">${esc(p.tu.txt)}</span></td>
       <td>${p.newN?sp(p.list.some(x=>x.wait)?'hot b':'b',String(p.newN)):'<span class="d">0</span>'}</td><td>${p.talk?sp('ok b',String(p.talk)):'<span class="d">0</span>'}</td>
       <td>${p.hoy}</td><td>${p.ftd?`<b>${p.ftd}</b>`:'<span class="d">0</span>'}</td><td>${p.hoy?`<b>${p.ftdNew||0}</b><span class="d">/${p.hoy} · ${Math.round(100*(p.ftdNew||0)/p.hoy)}%</span>`:'<span class="d">—</span>'}</td>
-      <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span></td><td>${p.R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(p.m.id)}" title="Ver qué pasó">${esc(minsTxt(p.R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
+      <td><b class="${p.R&&p.pc.n>=p.R.req?'ok':''}">${p.pc.n}</b><span class="d">/${p.R?p.R.req:p.pc.min}</span>${p.R?` <span class="d">· <b class="${p.R.talkOk?'ok':''}">${esc(minsTxt(p.R.talk))}</b> hablados</span>`:''}</td><td>${p.R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(p.m.id)}" title="Ver qué pasó">${esc(minsTxt(p.R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(p.R)}</td>
       <td>${p.last?cmHace(D.now-p.last):'<span class="d">—</span>'}</td>
       <td>${p.venc?sp('hot b',String(p.venc)):'<span class="d">—</span>'}</td></tr>`;
     const act=p=>p.tu.k!=='none'||p.newN||p.talk||p.hoy||p.ftd||p.pc.n||p.venc,on=D.rows.filter(act),off=D.rows.filter(p=>!act(p)); // sin entrada ni nada hoy: en una línea
