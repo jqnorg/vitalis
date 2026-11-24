@@ -658,6 +658,10 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'New', agent: 'Otro Rep' }, { id: '900004', status: 'Talking' }])]);
   r = await as(Dh, "select status, crm_agent, (select count(*)::int from public.crm_status_log where client_id = '900001') l, (select count(*)::int from public.crm_agent_log where client_id = '900001') a from public.crm_clients where client_id = '900001'");
   ok(R.bad === 1 && R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].crm_agent === 'Sofia Arias' && r.rows[0].l === 2 && r.rows[0].a === 0, `un No Answer que "vuelve a New" se ignora entero (ni status, ni agente, ni historial) y se cuenta en bad; Call Again → Talking sí vale (${JSON.stringify(R)}, ${JSON.stringify(r.rows[0])})`);
+  // "los new solo son new una vez" (24/11): un Talking que el CRM vuelve a poner en New sigue en Talking (la fila sí se toma)
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900004', status: 'New', note: 'volvió' }])]);
+  r = await as(Dh, "select status, note, (select count(*)::int from public.crm_status_log where client_id = '900004' and new_status = 'New') l from public.crm_clients where client_id = '900004'");
+  ok(R.bad === 0 && R.changed === 0 && r.rows[0].status === 'Talking' && r.rows[0].note === 'volvió' && r.rows[0].l === 0, `Talking → New: queda en Talking, sin cambio en el historial, y el resto de la fila se toma (${JSON.stringify(r.rows[0])})`);
   await db.query("update public.crm_clients set status = 'Call Again', status_group = 'call_again' where client_id = '900004'");
   await db.query("delete from public.crm_status_log where client_id = '900004' and new_status = 'Talking'");
   // la columna "Status" de registro o de una transacción (Full Registration, Success…) no le cambia el status a nadie

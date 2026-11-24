@@ -1223,7 +1223,11 @@ begin
     if not found and st is null then continue; end if; -- sin su status de venta, se lo anota cuando se lo vea en la lista que lo tiene
     -- "Es imposible que un new vuelva a New" (el dueño, 24/11/2026): si para uno que ya tiene otro status llega "New", la columna
     -- está mal leída (otra columna "Status", o la fila corrida): no se toma nada de esa fila y se cuenta en 'bad' para avisar
-    if found and st is not null and public.crm_key(st) = 'new' and cur.status is not null and public.crm_key(cur.status) <> 'new' then n_bad := n_bad + 1; continue; end if;
+    -- Y "los new solo son new una vez" (el dueño, 24/11/2026): apenas cambió de status una vez (Talking incluido), jamás vuelve a New,
+    -- aunque el CRM lo vuelva a poner ahí: si estaba en Talking se toma la fila pero no el status (sigue en Talking)
+    if found and st is not null and public.crm_key(st) = 'new' and cur.status is not null and public.crm_key(cur.status) <> 'new' then
+      if cur.status_group = 'new' then st := null; else n_bad := n_bad + 1; continue; end if;
+    end if;
     if not found then
       insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_agent, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
