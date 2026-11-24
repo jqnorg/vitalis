@@ -742,6 +742,9 @@ function ayuda(){
     <dt>El embudo</dt><dd>De los registrados en el período: cuántos atendieron, a cuántos se les creó un boleto y cuántos depositaron; abajo, por agente (del primero que lo llamó).</dd>
     <dt>Lead Quality</dt><dd>Por afiliador y campaña: cuántos leads mandan, cuántos atienden, cuántos son inválidos, cuántos depositan y a los cuántos días, y en qué status terminan (en porcentajes).</dd>
     <dt>Director</dt><dd>Un rol para los de arriba: entra con su PIN y ve solo Gerencia, sin clientes, cola ni chat. Lo crea el administrador en Ajustes → Mesa.</dd></dl>
+  <h4>Historial (Inicio → Historial, tecla H)</h4><dl>
+    <dt>Qué es</dt><dd>Todas tus ventas, venta por venta: cuándo, quién, de qué país y campaña, el monto, cuándo se registró y si fue new o late. Mes por mes contra tu target y con el CR (%); dónde vendés (país, afiliador, campaña, hora y día de la semana).</dd>
+    <dt>Tus lates</dt><dd>Cuántos son, cuánto tardan en depositar (al día siguiente, a los 2–3 días…), de qué país y afiliador vienen y el que más tardó. Un late es un cliente que depositó otro día que el del registro.</dd></dl>
   <h4>Sueldo</h4><dl>
     <dt>Cobro</dt><dd>El 5º día hábil del mes (sin domingos, sin feriados ni días que no se trabajan, según tus días de trabajo en Ajustes). Arriba en Sueldo está la cuenta regresiva.</dd>
     <dt>Bonos</dt><dd>No acumulables: cobrás solo el escalón más alto que alcanzaste.</dd>
@@ -811,6 +814,7 @@ document.addEventListener('keydown',e=>{
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}
   if(k==='g'&&isMgmt()){e.preventDefault();go('gerencia');return}
+  if(k==='h'){e.preventDefault();go('historial');return}
   if(k==='a'){e.preventDefault();go('agenda');setTimeout(()=>{const i=$('#agForm [name=pid]');i&&i.focus()},0);return}
   if(e.key==='/'){e.preventDefault();go('ventas');setTimeout(()=>$('#pQ').focus(),0);return}
   if(e.key==='?'){e.preventDefault();ayuda();return}

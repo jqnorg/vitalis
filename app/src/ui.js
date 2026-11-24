@@ -120,13 +120,13 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','ahora','cliente','callman','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','inicio','historial','ahora','cliente','callman','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
 function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.title=curCl?'Cliente actual: '+(curCl.name||curCl.id):''}} // el cliente actual, en el botón del menú
 const GROUPS=[
-  {g:'inicio',views:['inicio','sueldo','turnos'],tabs:['Hoy','Sueldo','Turnos']},
+  {g:'inicio',views:['inicio','sueldo','turnos','historial'],tabs:['Hoy','Sueldo','Turnos','Historial']}, // Historial: todas tus ventas y tus lates, venta por venta
   {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
   {g:'panel',views:['cliente','ahora','agenda'],tabs:['Cliente','Cola','Agenda'],def:'ahora'}, // el Manager del agente (lo pidió el dueño): el cliente actual, la cola y la agenda. El team leader no tiene Cliente
   {g:'tareas',views:['tareas']},

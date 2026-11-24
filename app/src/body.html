@@ -156,6 +156,13 @@
   <section class="card"><div id="agLists"></div></section>
 </section>
 
+<section class="view" id="v-historial" hidden>
+  <div class="vh"><div><h1>Historial</h1><p class="sub" id="hiSub"></p></div><span class="grow"></span>
+    <div class="tools"><label hidden>De quién <select id="hiWho" aria-label="De quién"></select></label><input id="hiQ" type="search" placeholder="Buscar nombre, ID o país" autocomplete="off" aria-label="Buscar"></div></div>
+  <div class="kpis" id="hiKpis"></div>
+  <div id="hiBody"></div>
+</section>
+
 <section class="view" id="v-turnos" hidden>
   <div class="vh"><div><h1>Turnos</h1><p class="sub" id="tuSub"></p></div><span class="grow"></span>
     <div class="tools"><span class="seg" id="tuPer"></span><select id="tuMes" aria-label="Mes"></select><button type="button" class="btn wr" data-act="deshacer" title="Deshacer la última marca de hoy">Deshacer</button><button type="button" class="btn wr" data-act="editHoy" title="Corregir las horas de hoy">Corregir hoy</button><button type="button" class="btn wr" data-act="cargarJornada">Cargar jornada</button></div></div>

@@ -1475,3 +1475,13 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
 
 /* RMO por día (Equipo) */
 .rmo-t td,.rmo-t th{text-align:center}.rmo-t td:first-child,.rmo-t th:first-child{text-align:left}.rmo-t .qb{cursor:help}
+
+/* HISTORIAL: tus ventas y tus lates */
+.hi-bars{display:grid;gap:8px;margin:10px 0 14px}.hi-b{display:grid;grid-template-columns:150px 1fr 90px;gap:10px;align-items:center;font-size:13.5px}.hi-bl{color:var(--dim)}.hi-bn{text-align:right;white-space:nowrap}
+.hi-hours{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;height:90px;align-items:end;margin:8px 0 4px}.hi-hours.dow{grid-template-columns:repeat(7,1fr)}
+.hi-h{display:flex;flex-direction:column;justify-content:flex-end;height:100%;min-width:0;position:relative}.hi-h i{display:block;background:var(--pri);border-radius:4px 4px 0 0;min-height:2px;opacity:.85}.hi-h span{font-size:11px;color:var(--dim);text-align:center;height:14px;margin-top:2px}
+details.hi-m{border-top:1px solid var(--soft);padding:8px 0}details.hi-m>summary{cursor:pointer;padding:6px 0;font-size:15px;list-style:none;display:flex;gap:6px;flex-wrap:wrap;align-items:baseline}details.hi-m>summary::-webkit-details-marker{display:none}details.hi-m>summary::before{content:'▸';color:var(--dim);margin-right:4px}details.hi-m[open]>summary::before{content:'▾'}
+.hi-t tr.hi-day td{background:var(--raised);font-weight:700;white-space:normal;padding:8px 10px}.hi-t tr.late td:first-child{box-shadow:inset 3px 0 0 var(--s2)}
+.lnk{border:0;background:none;padding:0;font:inherit;color:var(--pri);font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:transparent}.lnk:hover{text-decoration-color:currentColor}
+#v-historial .tools input{min-width:220px}
+@media (max-width:720px){.hi-b{grid-template-columns:110px 1fr 70px}#v-historial .tools input{min-width:0}}

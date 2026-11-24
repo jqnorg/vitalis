@@ -1,7 +1,7 @@
 /* ---------- compartir datos en el chat, y avisos del team leader o un administrador ---------- */
 // Cada tarjeta de datos tiene su botón Compartir: al chat va una foto de la tarjeta tal como se ve, con la hora, sin botones ni formularios.
 // El team leader y los administradores la pueden mandar como aviso: a todos los del chat les queda hasta que lo cierren, aunque lo tengan silenciado.
-const SH_VIEWS=new Set(['inicio','sueldo','turnos','ahora','clientes','campanas','ventas','filtros','radar','equipo','cliente','banking']);
+const SH_VIEWS=new Set(['inicio','sueldo','turnos','historial','ahora','clientes','campanas','ventas','filtros','radar','equipo','cliente','banking']);
 const SH_SEL='.card,.hero,.fi-c';
 const SH_HTML=new Set('div span p b i small br h2 h3 h4 h5 ul ol li table thead tbody tfoot tr th td section header footer details summary mark sub sup kbd s u'.split(' '));
 const SH_SVG=new Set('svg g path rect circle ellipse line polyline polygon text tspan use title'.split(' '));
@@ -74,7 +74,7 @@ const shTitle=el=>{
   if(cur==='cliente'&&curCl&&!t.includes(curCl.id))t+=' · '+curCl.id;
   return clip(t,120);
 };
-const VTITLE={inicio:'Inicio',sueldo:'Sueldo',turnos:'Turnos',ahora:'Cola',clientes:'Campañas',ventas:'Ventas',filtros:'Filtros',radar:'Radar',equipo:'Equipo',cliente:'Cliente',banking:'Banking'};
+const VTITLE={inicio:'Inicio',sueldo:'Sueldo',turnos:'Turnos',historial:'Historial',ahora:'Cola',clientes:'Campañas',ventas:'Ventas',filtros:'Filtros',radar:'Radar',equipo:'Equipo',cliente:'Cliente',banking:'Banking'};
 
 // el botón Compartir en cada tarjeta de datos (se pone solo cuando una sección se dibuja)
 function shMark(){

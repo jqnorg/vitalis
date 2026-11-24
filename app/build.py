@@ -9,7 +9,7 @@ logo=re.search(r'<symbol id="logo" viewBox="0 0 48 48">(.*?)</symbol>', body, re
 fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>"+re.sub(r'\s+',' ',logo).replace('"',"'")+"</svg>"
 (D/'logo.svg').write_text(fav_svg.replace("'",'"'))
 fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
-js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','dock.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','ficha.js','hoy.js','campanas.js','radar.js','cola.js','estacion.js','callman.js','gerencia.js','share.js','lock.js','auth.js'])
+js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','dock.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','ficha.js','hoy.js','campanas.js','radar.js','cola.js','estacion.js','callman.js','gerencia.js','historial.js','share.js','lock.js','auth.js'])
 js=js.replace('\nboot();\n','\n')+'\nboot();\n'
 js=js.replace('__EXT_VER__', json.loads((ROOT/'extension'/'manifest.json').read_text())['version'])   # la versión de la extensión que se descarga   # boot() al final, después de auth.js
 cfg=json.loads((ROOT/'app'/'config.json').read_text())

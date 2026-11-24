@@ -88,7 +88,7 @@ async def main():
             ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 9, 'el admin ve 9 botones en la compu: con los dos Manager, Equipo y Gerencia (Ajustes va abajo, junto a tu nombre)')
             ok(await A.evaluate("getComputedStyle(document.querySelector('#navPanel')).animationName.includes('cliGlow')") and (await A.inner_text('#navPanel .nm')).startswith('Manager'), 'el Manager del agente está en el menú, en verde vivo y brillando')
             ok('(agente)' in await A.inner_text('#navPanel .nm'), 'el admin, que tiene los dos, lo ve como "Manager (agente)"')
-            tabs = {'inicio': ['inicio', 'sueldo', 'turnos'], 'panel': ['ahora', 'cliente', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'campanas', 'filtros']}
+            tabs = {'inicio': ['inicio', 'sueldo', 'turnos', 'historial'], 'panel': ['ahora', 'cliente', 'agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking'], 'analisis': ['ventas', 'clientes', 'campanas', 'filtros']}
             i = 0
             for g, vs in tabs.items():
                 await A.click(f'#nav [data-g={g}]'); await A.wait_for_timeout(400)
@@ -99,6 +99,20 @@ async def main():
                     if len(vs) > 1: await A.click(f'#subnav [data-tab={v}]'); await A.wait_for_timeout(400)
                     ok(await A.is_visible(f'#v-{v}'), f'  {g} → {v}')
                     await A.screenshot(path=OUT / f'c{i+1:02d}_{v}.png')
+            # Historial (pedido del dueño): todas las ventas del agente y sus lates, venta por venta
+            await A.keyboard.press('h'); await A.wait_for_timeout(500)
+            ok(await A.is_visible('#v-historial') and await A.evaluate("cur") == 'historial', 'la tecla H abre el Historial')
+            hk = await A.inner_text('#hiKpis'); hb = await A.inner_text('#hiBody')
+            ok('FTDs' in hk and 'Lates' in hk and 'Mejor mes' in hk and 'Racha más larga' in hk, f'Historial: los números de arriba ({hk[:120]!r})')
+            ok('Mes por mes' in hb and 'Tus lates' in hb and 'Dónde vendés' in hb and 'Venta por venta' in hb, 'Historial: mes por mes, tus lates, dónde vendés y venta por venta')
+            ok(await A.locator('#hiBody details.hi-m').count() >= 1 and await A.locator('#hiBody details.hi-m[open] table.pt').count() >= 1, 'el mes actual viene abierto con la tabla')
+            ok(await A.locator('#hiBody tr.hi-day').count() >= 1 and await A.locator('#hiBody .hi-t .lnk').count() >= 1, 'las ventas agrupadas por día, cada cliente lleva a su ficha')
+            ok(await A.locator('#hiBody tr.late').count() >= 1 and 'al día siguiente' in hb or 'a los' in hb, 'los lates marcados y cuánto tardan')
+            ok((await A.locator('#hiWho').count()) == 1 and await A.is_visible('#hiWho'), 'el admin elige a quién mirar')
+            await A.click('#hiBody [data-tipo=late]'); await A.wait_for_timeout(300)
+            ok(await A.locator('#hiBody .hi-t tbody tr:not(.hi-day):not(.late)').count() == 0 and await A.locator('#hiBody tr.late').count() >= 1, 'el filtro Late deja solo los lates')
+            await A.click('#hiBody [data-tipo=""]'); await A.wait_for_timeout(300)
+            await A.screenshot(path=OUT / 'c14b_historial.png', full_page=True)
             await A.click('#nav [data-g=panel]'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-agenda'), 'cada sección vuelve a la última solapa que usaste')
             await A.click('#navAjustes'); await A.wait_for_timeout(300)
