@@ -176,6 +176,13 @@ async function crmLog(id){ // status y rotaciones, en orden
 }
 
 // lo que mandó la extensión: todos los clientes vistos en el CRM
+// "Es imposible que un new vuelva a New" (el dueño, 24/11): si una pestaña del CRM manda clientes que ya tenían otro status como New, es una
+// columna "Status" que no es la de ventas (o la fila corrida): la base no toma nada de esas filas y acá se avisa, una vez por hora
+let badAt=0;
+function badNew(n){
+  if(Date.now()-badAt<36e5)return;badAt=Date.now();
+  toast(`${plural(n,'cliente')} del CRM ${n===1?'llegó':'llegaron'} como <b>New</b> teniendo ya otro status: esa pestaña está leyendo una columna "Status" que no es la de ventas. Vitalis no lo tomó. Revisá en el CRM que la lista muestre <b>Sales Status</b>.`,'warn',{sticky:1,key:'badnew'});
+}
 async function crmSeenFromExt(rows){
   if(!ready||readOnly)return {err:'Vitalis todavía está cargando'};
   // las llamadas (toques en Omega, Gizat, Voiso) van aparte
@@ -190,7 +197,9 @@ async function crmSeenFromExt(rows){
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));
   const keys=batch.map(r=>String(r&&r.k||''));
   if(!list.length)return {keys};
-  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;if(res&&(res.new||res.changed)){crmSoon();mesaPing('crm')}return {keys,added:res&&res.new||0}}
+  try{const res=await Q(sb.rpc('crm_seen',{rows:list}));crm.ok=true;if(res&&(res.new||res.changed)){crmSoon();mesaPing('crm')}
+    if(res&&res.bad)badNew(res.bad); // filas con un status imposible (vuelven a New): la base las ignora, acá se avisa
+    return {keys,added:res&&res.new||0}}
   catch(e){const m=String(e&&(e.message||e.code));if(/crm_seen|PGRST202|42883|crm_clients|does not exist/.test(m)){crm.ok=false;crm.at=Date.now();return {err:'falta actualizar la base'}}return {err:errMsg(e)}}
 }
 

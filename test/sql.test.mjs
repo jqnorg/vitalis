@@ -654,6 +654,12 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   ok(R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].g === 'na' && r.rows[0].camp === 'Google ES' && r.rows[0].reg === '2026-11-19 10:02' && r.rows[0].b && r.rows[0].d, 'otro agente actualiza el status de un cliente que vio otro, sin perder campaña ni registro');
   r = await as(Dh, "select old_status, new_status from public.crm_status_log where client_id = '900001' order by id");
   ok(r.rows.length === 2 && r.rows[1].old_status === 'New' && r.rows[1].new_status === 'No Answer', 'el cambio de status queda en el historial');
+  // "es imposible que un new vuelva a New" (24/11): si para uno que ya tiene otro status llega New, la fila está mal leída y no se toma nada de ella
+  R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'New', agent: 'Otro Rep' }, { id: '900004', status: 'Talking' }])]);
+  r = await as(Dh, "select status, crm_agent, (select count(*)::int from public.crm_status_log where client_id = '900001') l, (select count(*)::int from public.crm_agent_log where client_id = '900001') a from public.crm_clients where client_id = '900001'");
+  ok(R.bad === 1 && R.changed === 1 && r.rows[0].status === 'No Answer' && r.rows[0].crm_agent === 'Sofia Arias' && r.rows[0].l === 2 && r.rows[0].a === 0, `un No Answer que "vuelve a New" se ignora entero (ni status, ni agente, ni historial) y se cuenta en bad; Call Again → Talking sí vale (${JSON.stringify(R)}, ${JSON.stringify(r.rows[0])})`);
+  await db.query("update public.crm_clients set status = 'Call Again', status_group = 'call_again' where client_id = '900004'");
+  await db.query("delete from public.crm_status_log where client_id = '900004' and new_status = 'Talking'");
   // la columna "Status" de registro o de una transacción (Full Registration, Success…) no le cambia el status a nadie
   R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900001', brand: 'Novara Markets', status: 'Full Registration', camp: 'Google ES' }, { id: '900050', brand: 'Novara Markets', status: 'Success' }])]);
   r = await as(Dh, "select (select status from public.crm_clients where client_id = '900001') s, (select count(*)::int from public.crm_clients where client_id = '900050') n, (select count(*)::int from public.crm_status_log where client_id in ('900001','900050')) l");

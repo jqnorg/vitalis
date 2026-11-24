@@ -1188,7 +1188,7 @@ create or replace function public.crm_seen(rows jsonb) returns json
 declare
   t uuid := public.my_team();
   r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; fa text; ag text; hit boolean; cur record;
-  n_new integer := 0; n_chg integer := 0; fresh text[] := '{}';
+  n_new integer := 0; n_chg integer := 0; n_bad integer := 0; fresh text[] := '{}';
 begin
   if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
   if rows is null or jsonb_typeof(rows) <> 'array' then raise exception 'BAD: se esperaba una lista'; end if;
@@ -1217,6 +1217,9 @@ begin
     hit := public.crm_key(st) = 'talking' or (st is not null and g <> 'new') or lc is not null; -- ya lo contactaron
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
     if not found and st is null then continue; end if; -- sin su status de venta, se lo anota cuando se lo vea en la lista que lo tiene
+    -- "Es imposible que un new vuelva a New" (el dueño, 24/11/2026): si para uno que ya tiene otro status llega "New", la columna
+    -- está mal leída (otra columna "Status", o la fila corrida): no se toma nada de esa fila y se cuenta en 'bad' para avisar
+    if found and st is not null and public.crm_key(st) = 'new' and cur.status is not null and public.crm_key(cur.status) <> 'new' then n_bad := n_bad + 1; continue; end if;
     if not found then
       insert into public.crm_clients (team_id, brand, client_id, name, country, reg, status, status_group, crm_agent, camp, aff, last_call, note, ftd_at, desk, first_agent, first_seen_by, last_seen_by)
       values (t, br, cid, public._clip(r->>'name', 120), public._clip(r->>'country', 60), rg, st, g,
@@ -1257,7 +1260,7 @@ begin
       end if;
     end if;
   end loop;
-  return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'fresh', to_json(fresh));
+  return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'bad', n_bad, 'fresh', to_json(fresh));
 end $$;
 
 -- una vez: el status de registro o de transacción que se coló (Full Registration, Success…) y los nombres en español.
@@ -2269,3 +2272,21 @@ drop policy if exists crm_map_read on public.crm_status_map;
 create policy crm_map_read on public.crm_status_map for select to authenticated using (true);
 drop policy if exists snip_read on public.snippets;
 create policy snip_read on public.snippets for select to authenticated using (user_id = (select auth.uid()) or global or (shared and team_id = (select public.my_team())));
+
+-- Una vez (24/11/2026): la mañana del 24 una columna "Status" mal leída mandó a New a clientes que eran FTD, Pending, Call Again, Low
+-- Potential, Not Interested… ("es imposible que un new vuelva a New"). Cada cliente vuelve a su status anterior, se borran esos cambios del
+-- historial y las rotaciones que vinieron en la misma lectura (la fila venía corrida). Re-ejecutable: si no hay nada que arreglar, no toca nada.
+do $$
+declare r record;
+begin
+  for r in select l.* from public.crm_status_log l where public.crm_key(l.new_status) = 'new' and l.old_status is not null and public.crm_key(l.old_status) <> 'new' order by l.seen_at desc loop
+    update public.crm_clients c set status = r.old_status, status_group = public.crm_group(r.old_status, r.team_id),
+      status_since = coalesce((select max(p.seen_at) from public.crm_status_log p where p.team_id = r.team_id and p.brand = r.brand and p.client_id = r.client_id and p.seen_at < r.seen_at), c.status_since)
+      where c.team_id = r.team_id and c.brand = r.brand and c.client_id = r.client_id and public.crm_key(c.status) = 'new';
+    update public.crm_clients c set crm_agent = a.old_agent from public.crm_agent_log a
+      where a.team_id = r.team_id and a.brand = r.brand and a.client_id = r.client_id and a.seen_at between r.seen_at - interval '2 minutes' and r.seen_at + interval '2 minutes'
+        and c.team_id = a.team_id and c.brand = a.brand and c.client_id = a.client_id and lower(c.crm_agent) = lower(a.new_agent);
+    delete from public.crm_agent_log a where a.team_id = r.team_id and a.brand = r.brand and a.client_id = r.client_id and a.seen_at between r.seen_at - interval '2 minutes' and r.seen_at + interval '2 minutes';
+    delete from public.crm_status_log where id = r.id;
+  end loop;
+end $$;

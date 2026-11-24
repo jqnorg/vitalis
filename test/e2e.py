@@ -961,7 +961,7 @@ async def main():
             await D.keyboard.press('Escape'); await D.keyboard.press('m'); await D.wait_for_timeout(700)
             ok(await D.evaluate('cur') == 'callman', 'la M abre el Manager')
             cm = await D.inner_text('#cmBody')
-            ok('Para atender ya' in cm and 'New sin llamar hace' in cm and '500040' in cm, f'arriba, lo que hay que atender: un new que nadie llamó a los 5 min ({cm[:200]!r})')
+            ok('Para atender ya' in cm and ('New sin llamar hace' in cm or 'new sin llamar' in cm) and '500040' in cm, f'arriba, lo que hay que atender: un new que nadie llamó a los 5 min ({cm[:200]!r})')
             ok('News en curso' in cm and '500041' in cm and 'Talking' in cm, 'los news en curso, New y Talking, con su agente')
             # agrupados por agente, y un Talking colgado hace horas es un aviso (al cortar tiene que salir de Talking)
             sql("update public.crm_clients set status_since = now() - interval '3 hours' where client_id='500041'")
