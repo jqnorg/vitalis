@@ -749,6 +749,7 @@ function ayuda(){
     <dt>Líquido</dt><dd>Estimación con valores BPS 2026: jubilatorio 15%, FONASA ${fon}% (3% hasta 2,5 BPC), FRL 0,1% e IRPF por franjas. Sin aguinaldo ni vacacional.</dd></dl>
   <h4>Turno y agenda</h4><dl>
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
+    <dt>Encuestas</dt><dd>Cualquiera arma una en cualquier chat (el botón ◎ o escribiendo <b>/vitalis encuesta ¿Pregunta? | opción | opción</b>, que la manda Vitalis). Elegís si es anónima, si se votan varias opciones y cómo termina: cuando la cerrás, a una hora o cuando votaron todos. El voto se cambia hasta que cierra.</dd>
     <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado. Si a los 15 minutos no marcaste "Ya lo llamé", vuelve a avisar (cada 15 min, hasta hora y media) con la ficha a un toque.</dd>
     <dt>Tu día</dt><dd>Al marcar Salida ves tu resumen: llamadas, hablado, tiempo muerto y franja, FTDs y CR (%) del día, perfiles cargados y agendas.</dd></dl>
   <h4>Extensión de Chrome</h4><dl>

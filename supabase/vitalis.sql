@@ -585,6 +585,10 @@ begin
        where k.id::text = substring(new.body from '^\[card:([0-9a-f-]{36})') and k.chat_id = new.chat_id and k.user_id = new.user_id) then
     raise exception 'CARD: los datos no se subieron, probá de nuevo';
   end if;
+  if new.body like '[poll:%' and not exists (select 1 from public.polls p
+       where p.id::text = substring(new.body from '^\[poll:([0-9a-f-]{36})') and p.chat_id = new.chat_id and p.message_id is null) then
+    raise exception 'POLL: la encuesta no existe'; -- solo la escribe poll_create, recién creada
+  end if;
   if new.aviso and coalesce((select role from public.profiles where id = new.user_id), '') not in ('leader', 'admin') then
     raise exception 'AVISO: los avisos los manda el team leader o un administrador';
   end if;
@@ -2013,7 +2017,7 @@ begin
   if coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'Solo el administrador o el team leader manda mensajes por Vitalis'; end if;
   txt := left(btrim(coalesce(txt, '')), 2000);
   if txt = '' then raise exception 'Escribí el mensaje'; end if;
-  if txt like '[img:%' or txt like '[card:%' then raise exception 'Vitalis manda solo texto'; end if;
+  if txt like '[img:%' or txt like '[card:%' or txt like '[poll:%' then raise exception 'Vitalis manda solo texto'; end if;
   if cid is not null then select id into c from public.chats where id = cid and team_id = t and public.in_chat(id); end if;
   if c is null then select id into c from public.chats where team_id = t and kind = 'team' limit 1; end if; -- por defecto, a toda la mesa
   if c is null then raise exception 'No encontré el chat'; end if;
@@ -2290,3 +2294,122 @@ begin
     delete from public.crm_status_log where id = r.id;
   end loop;
 end $$;
+
+-- ---------- encuestas en el chat (pedido del dueño, 24/11/2026) ----------
+-- Cualquiera arma una encuesta en cualquier chat (botón o "/vitalis encuesta ¿Pregunta? | opción | opción"). El que la arma elige si es
+-- anónima, si se vota una o varias opciones, y cómo termina: cuando él la cierra, a una hora, o cuando votaron todos los del chat.
+-- El mensaje es "[poll:id] pregunta" (como las fotos y las tarjetas); con /vitalis lo escribe Vitalis. Los votos se cambian hasta que cierra.
+create table if not exists public.polls (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null references public.teams(id),
+  chat_id    uuid not null references public.chats(id) on delete cascade,
+  message_id uuid references public.messages(id) on delete set null,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  question   text not null check (length(question) between 1 and 300),
+  options    jsonb not null,
+  anon       boolean not null default false,
+  multi      boolean not null default false,
+  all_vote   boolean not null default false,
+  closes_at  timestamptz,
+  closed_at  timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists polls_chat on public.polls (chat_id, created_at desc);
+create table if not exists public.poll_votes (
+  poll_id uuid not null references public.polls(id) on delete cascade,
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  opt     int not null,
+  at      timestamptz not null default now(),
+  primary key (poll_id, user_id, opt)
+);
+alter table public.polls enable row level security;
+alter table public.poll_votes enable row level security;
+drop policy if exists polls_read on public.polls;
+create policy polls_read on public.polls for select to authenticated using (public.in_chat(chat_id));
+drop policy if exists poll_votes_read on public.poll_votes;
+create policy poll_votes_read on public.poll_votes for select to authenticated using (user_id = (select auth.uid()));
+grant select on public.polls, public.poll_votes to authenticated;
+
+create or replace function public.poll_create(cid uuid, q text, opts text[], anon boolean default false, multi boolean default false, closes_at timestamptz default null, all_vote boolean default false, as_bot boolean default false) returns json
+  language plpgsql security definer set search_path = public, extensions as $$
+declare t uuid := public.my_team(); pid uuid; mid uuid; o text[] := '{}'; x text; au uuid := auth.uid();
+begin
+  if not public.in_chat(cid) then raise exception 'No estás en ese chat'; end if;
+  q := left(btrim(coalesce(q, '')), 300);
+  if q = '' then raise exception 'Q: escribí la pregunta'; end if;
+  foreach x in array coalesce(opts, '{}') loop
+    x := left(btrim(coalesce(x, '')), 80);
+    if x <> '' and not (x = any (o)) then o := o || x; end if;
+  end loop;
+  if array_length(o, 1) is null or array_length(o, 1) < 2 then raise exception 'OPTS: poné al menos 2 opciones distintas'; end if;
+  if array_length(o, 1) > 8 then raise exception 'OPTS: hasta 8 opciones'; end if;
+  if closes_at is not null and closes_at <= now() then raise exception 'CLOSE: la hora de cierre ya pasó'; end if;
+  if (select count(*) from public.polls where user_id = au and created_at > now() - interval '10 minutes') >= 10 then raise exception 'SLOW: muchas encuestas seguidas'; end if;
+  if as_bot then au := public.vitalis_bot(t); end if;
+  insert into public.polls (team_id, chat_id, user_id, question, options, anon, multi, all_vote, closes_at)
+    values (t, cid, auth.uid(), q, to_jsonb(o), coalesce(anon, false), coalesce(multi, false), coalesce(all_vote, false), closes_at) returning id into pid;
+  insert into public.messages (chat_id, user_id, body) values (cid, au, '[poll:' || pid || '] ' || q) returning id into mid;
+  update public.polls set message_id = mid where id = pid;
+  return json_build_object('ok', true, 'id', pid, 'message', mid);
+end $$;
+
+-- los que pueden votar: los del chat (en Toda la mesa, la mesa activa), sin Vitalis ni el director
+create or replace function public.poll_voters(pid uuid) returns setof uuid
+  language sql stable security definer set search_path = public as $$
+  select p.id from public.polls x join public.chats c on c.id = x.chat_id
+    join public.profiles p on p.team_id = c.team_id and p.active and not p.bot and p.role <> 'director'
+      and (c.kind = 'team' or exists (select 1 from public.chat_members m where m.chat_id = c.id and m.user_id = p.id))
+    where x.id = pid $$;
+
+create or replace function public.poll_closed(x public.polls) returns boolean
+  language sql stable as $$ select x.closed_at is not null or (x.closes_at is not null and x.closes_at <= now()) $$;
+
+create or replace function public.poll_vote(pid uuid, opts int[]) returns json
+  language plpgsql security definer set search_path = public as $$
+declare x public.polls; n int; k int; everyone int; voted int;
+begin
+  select * into x from public.polls where id = pid for update;
+  if x.id is null or not public.in_chat(x.chat_id) then raise exception 'No encontré la encuesta'; end if;
+  if public.poll_closed(x) then raise exception 'CLOSED: la encuesta ya cerró'; end if;
+  if coalesce((select role from public.profiles where id = auth.uid()), '') = 'director' then raise exception 'El director no vota'; end if;
+  n := jsonb_array_length(x.options);
+  opts := (select coalesce(array_agg(distinct v order by v), '{}') from unnest(coalesce(opts, '{}')) v where v >= 0 and v < n);
+  if array_length(opts, 1) is null then raise exception 'OPT: elegí una opción'; end if;
+  if not x.multi and array_length(opts, 1) > 1 then raise exception 'OPT: una sola opción'; end if;
+  delete from public.poll_votes where poll_id = pid and user_id = auth.uid();
+  foreach k in array opts loop insert into public.poll_votes (poll_id, user_id, opt) values (pid, auth.uid(), k); end loop;
+  if x.all_vote then -- termina cuando votaron todos los del chat
+    select count(*) into everyone from public.poll_voters(pid);
+    select count(distinct user_id) into voted from public.poll_votes where poll_id = pid;
+    if voted >= everyone then update public.polls set closed_at = now() where id = pid; end if;
+  end if;
+  return json_build_object('ok', true);
+end $$;
+
+create or replace function public.poll_close(pid uuid) returns json
+  language plpgsql security definer set search_path = public as $$
+declare x public.polls;
+begin
+  select * into x from public.polls where id = pid;
+  if x.id is null or not public.in_chat(x.chat_id) then raise exception 'No encontré la encuesta'; end if;
+  if x.user_id <> auth.uid() and coalesce(public.my_role(), '') not in ('admin', 'leader') then raise exception 'La cierra quien la armó, el team leader o un administrador'; end if;
+  update public.polls set closed_at = coalesce(closed_at, now()) where id = pid;
+  return json_build_object('ok', true);
+end $$;
+
+-- las encuestas de un chat con sus resultados: cuántos por opción y, si no es anónima, quiénes; siempre lo que voté yo
+create or replace function public.polls_of(cid uuid) returns json
+  language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(json_build_object(
+    'id', x.id, 'message', x.message_id, 'by', x.user_id, 'q', x.question, 'options', x.options, 'anon', x.anon, 'multi', x.multi,
+    'all_vote', x.all_vote, 'closes_at', x.closes_at, 'closed', public.poll_closed(x), 'closed_at', x.closed_at,
+    'voters', (select count(*) from public.poll_voters(x.id)),
+    'voted', (select count(distinct v.user_id) from public.poll_votes v where v.poll_id = x.id),
+    'counts', (select coalesce(json_agg(c.n order by c.opt), '[]'::json) from (select g.opt, count(v.user_id) n from generate_series(0, jsonb_array_length(x.options) - 1) g(opt)
+                 left join public.poll_votes v on v.poll_id = x.id and v.opt = g.opt group by g.opt) c),
+    'who', case when x.anon then null else (select coalesce(json_agg(json_build_object('opt', v.opt, 'uid', v.user_id)), '[]'::json) from public.poll_votes v where v.poll_id = x.id) end,
+    'mine', (select coalesce(json_agg(v.opt order by v.opt), '[]'::json) from public.poll_votes v where v.poll_id = x.id and v.user_id = auth.uid())
+  ) order by x.created_at), '[]'::json)
+  from public.polls x where x.chat_id = cid and public.in_chat(cid) and x.created_at > now() - interval '60 days' $$;
+grant execute on function public.poll_create(uuid, text, text[], boolean, boolean, timestamptz, boolean, boolean), public.poll_vote(uuid, int[]), public.poll_close(uuid), public.polls_of(uuid) to authenticated;
+revoke all on function public.poll_create(uuid, text, text[], boolean, boolean, timestamptz, boolean, boolean), public.poll_vote(uuid, int[]), public.poll_close(uuid), public.polls_of(uuid), public.poll_voters(uuid), public.poll_closed(public.polls) from public, anon;

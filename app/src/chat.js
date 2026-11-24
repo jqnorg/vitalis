@@ -44,7 +44,9 @@ const msgImg=b=>{const m=String(b||'').match(IMG_RE);return m?{id:m[1],w:+m[2]||
 /* datos compartidos: el mensaje empieza con [card:id] y el título; la foto de la tarjeta va aparte (chat_cards) y se trae al verla */
 const CARD_RE=/^\[card:([0-9a-f-]{36})\][ \t]*([^\n]*)\n?/i;
 const msgCard=b=>{const m=String(b||'').match(CARD_RE);return m?{id:m[1],title:m[2].trim(),rest:String(b).slice(m[0].length).trim()}:null};
-const msgTxt=b=>{const i=msgImg(b);if(i)return '📷 Foto'+(i.rest?' · '+i.rest:'');const k=msgCard(b);return k?'📊 '+(k.title||'Datos')+(k.rest?' · '+k.rest:''):String(b||'')};
+const POLL_RE=/^\[poll:([0-9a-f-]{36})\]\s?/;
+const msgPoll=b=>{const m=String(b||'').match(POLL_RE);return m?{id:m[1],q:String(b).slice(m[0].length).trim()}:null};
+const msgTxt=b=>{const i=msgImg(b);if(i)return '📷 Foto'+(i.rest?' · '+i.rest:'');const k=msgCard(b);if(k)return '📊 '+(k.title||'Datos')+(k.rest?' · '+k.rest:'');const pl=msgPoll(b);return pl?'🗳️ Encuesta: '+pl.q:String(b||'')};
 const cards={}; // id → {html, at} | {err} | {p: promesa}
 let cardQ=new Set(),cardT=null;
 function cardLoad(ids){ // se piden juntas las que faltan
@@ -132,6 +134,50 @@ function msgGone(id){if(!id)return;for(const k in msgs)msgs[k]=msgs[k].filter(m=
 function msgEdit(m){const l=msgs[m.chat];if(!l)return;const x=l.find(y=>y._id===m._id);if(!x||(x.body===m.body&&x.edited===m.edited))return;x.body=m.body;x.edited=m.edited;chatSig='';refresh()}
 // quién leyó: hasta dónde leyó cada uno del chat (chat_reads_of), se trae al abrir el chat y cada 30 s mientras se mira
 let chatReads={},chatReadsAt={},chatEdit=null;
+/* ---------- encuestas (pedido del dueño, 24/11/2026) ----------
+   El mensaje es "[poll:id] pregunta"; los resultados se piden con polls_of al abrir el chat, cada 10 s mientras se mira, al votar y cuando
+   otro vota (mesaPing('poll')). Se arma con el botón del chat o con "/vitalis encuesta ¿Pregunta? | opción | opción" (ahí el mensaje lo escribe Vitalis). */
+let polls={},pollsAt={}; // chat → {id → encuesta}
+async function pollsLoad(cid,force){
+  if(!cid||!sb||!ready)return;if(!force&&Date.now()-(pollsAt[cid]||0)<1e4)return;pollsAt[cid]=Date.now();
+  try{const L=await Q(sb.rpc('polls_of',{cid}));const m={};for(const p of L||[])m[p.id]=p;
+    if(JSON.stringify(m)!==JSON.stringify(polls[cid]||{})){polls[cid]=m;chatSig='';if(cur==='chat'&&chatCur===cid)V.chat.render({})}}catch(e){}
+}
+const pollOf=(cid,id)=>(polls[cid]||{})[id];
+function pollEnd(p){ // cómo termina, en palabras
+  if(p.closed)return `Cerrada${p.closed_at?' '+(ymd(new Date(p.closed_at))===todayS()?'a las '+hhmm(+new Date(p.closed_at)):dm(ymd(new Date(p.closed_at))))+'':''}`;
+  if(p.closes_at){const d=new Date(p.closes_at);return `Cierra ${ymd(d)===todayS()?'hoy a las '+hhmm(+d):'el '+dm(ymd(d))+' a las '+hhmm(+d)}`}
+  if(p.all_vote)return 'Termina cuando voten todos';
+  return 'La cierra quien la armó';
+}
+function pollHTML(cid,p,pl){
+  if(!p){if(Date.now()-(pollsAt[cid]||0)>2000)setTimeout(()=>pollsLoad(cid,true),0);return `<div class="ch-poll wait" data-poll="${esc(pl.id)}"><b class="pq">${esc(pl.q)}</b><span class="d">Trayendo la encuesta…</span></div>`}
+  const tot=p.counts.reduce((a,b)=>a+b,0),mx=Math.max(1,...p.counts),mine=new Set(p.mine),canClose=!p.closed&&(p.by===me||isLeader());
+  const who=i=>p.who?p.who.filter(w=>w.opt===i).map(w=>w.uid===me?'vos':first(w.uid)):[];
+  const opts=p.options.map((o,i)=>{const n=p.counts[i]||0,w=who(i);return `<button type="button" class="po${mine.has(i)?' on':''}" data-pv="${i}" data-pid="${esc(p.id)}"${p.closed?' disabled':''} aria-pressed="${mine.has(i)}">
+    <span class="po-l"><span class="po-k">${mine.has(i)?(p.multi?'☑':'●'):(p.multi?'☐':'○')}</span><span class="po-t">${esc(o)}</span><b class="po-n">${n}${tot?` · ${pct(n/tot)}`:''}</b></span>
+    <i class="po-b"><i style="width:${n/mx*100}%"></i></i>${w.length?`<span class="po-w">${esc(w.join(', '))}</span>`:''}</button>`}).join('');
+  return `<div class="ch-poll${p.closed?' off':''}" data-poll="${esc(p.id)}"><b class="pq">${esc(p.q)}</b><span class="d pk">${p.anon?'Anónima · ':''}${p.multi?'Varias opciones':'Una opción'} · ${pollEnd(p)}</span>
+    <div class="po-l2">${opts}</div>
+    <div class="po-f"><span class="d">${tot?`Votaron ${p.voted} de ${p.voters}`:'Nadie votó todavía'}${mine.size?' · votaste':''}</span>${p.multi&&!p.closed?`<button type="button" class="btn sm pri" data-pvote="${esc(p.id)}">Votar</button>`:''}${canClose?`<button type="button" class="btn sm" data-pclose="${esc(p.id)}">Cerrar encuesta</button>`:''}</div></div>`;
+}
+function pollModal(cid,pre){ // armar una encuesta
+  const q=pre&&pre.q||'',o=pre&&pre.opts||[];
+  modal({title:'Encuesta',body:`<label class="fld"><span>Pregunta</span><input id="plQ" maxlength="300" value="${esc(q)}" placeholder="¿Qué pedimos para el almuerzo?" autofocus></label>
+    <label class="fld" style="margin-top:10px"><span>Opciones, una por línea (2 a 8)</span><textarea id="plO" rows="4" placeholder="Pizza\nEmpanadas">${esc(o.join('\n'))}</textarea></label>
+    <div class="pl-opts"><label class="chk"><input type="checkbox" id="plAnon"> Anónima (no se ve quién votó qué)</label><label class="chk"><input type="checkbox" id="plMulti"> Se pueden elegir varias opciones</label></div>
+    <div class="fld" style="margin-top:10px"><span>Termina</span><div class="seg pl-end"><button type="button" class="on" data-plend="manual">Cuando la cierre</button><button type="button" data-plend="all">Cuando voten todos</button><button type="button" data-plend="at">A una hora</button></div>
+    <input type="datetime-local" id="plAt" hidden style="margin-top:8px"></div><div class="ebox" id="plErr"></div>`,
+    actions:[{l:'Cancelar'},{l:'Mandar la encuesta',cls:'pri',fn:async api=>{
+      const qq=api.q('#plQ').value.trim(),opts=api.q('#plO').value.split(/\n/).map(s=>s.trim()).filter(Boolean),end=(api.q('.pl-end .on')||{}).dataset.plend||'manual';
+      if(!qq){api.q('#plErr').textContent='Escribí la pregunta.';return false}
+      if(opts.length<2){api.q('#plErr').textContent='Poné al menos 2 opciones.';return false}
+      let closes=null;if(end==='at'){const v=api.q('#plAt').value;if(!v||new Date(v)<=new Date()){api.q('#plErr').textContent='Elegí una hora que no haya pasado.';return false}closes=new Date(v).toISOString()}
+      const ok=await B.pollCreate(cid,qq,opts,{anon:api.q('#plAnon').checked,multi:api.q('#plMulti').checked,closes,all:end==='all',bot:!!(pre&&pre.bot)});
+      if(!ok){api.q('#plErr').textContent='No se pudo mandar. Probá de nuevo.';return false}}}]});
+  const seg=$('.mbox .pl-end');if(seg)seg.addEventListener('click',e=>{const b=e.target.closest('[data-plend]');if(!b)return;for(const x of seg.children)x.classList.toggle('on',x===b);$('#plAt').hidden=b.dataset.plend!=='at';if(b.dataset.plend==='at'){const d=new Date(Date.now()+36e5);d.setSeconds(0,0);$('#plAt').value=new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);$('#plAt').focus()}});
+}
+const pollPick={}; // encuesta → opciones marcadas (de varias opciones, antes de Votar)
 async function readsLoad(cid,force){
   if(!cid||!sb||!ready)return;if(!force&&Date.now()-(chatReadsAt[cid]||0)<25e3)return;chatReadsAt[cid]=Date.now();
   try{const rows=await Q(sb.rpc('chat_reads_of',{cid}));const m={};for(const r of rows||[])m[r.user_id]=+new Date(r.read_at);
@@ -206,7 +252,7 @@ async function chatPoll(){
     chats=ch.filter(c=>c.team_id===profile.team_id);chatMem=cm;
     for(const r of rows)msgIn(M2X(r));
     try{const ed=await Q(sb.from('messages').select('*').gte('edited_at',new Date(Date.now()-15*6e4).toISOString()).limit(100));for(const r of ed||[])msgEdit(M2X(r))}catch(e){} // lo editado hace poco
-    if(chatCur)readsLoad(chatCur);
+    if(chatCur){readsLoad(chatCur);pollsLoad(chatCur)}
     if(reactOk)try{ // reacciones de la última semana (por si se perdió alguna en vivo)
       const since7=Date.now()-7*864e5,rx=await Q(sb.from('message_reactions').select('message_id,user_id,emoji').gte('created_at',new Date(since7).toISOString()).limit(3000)),map={};
       for(const r of rx)(map[r.message_id]||(map[r.message_id]=[])).push({uid:r.user_id,e:r.emoji});
@@ -241,6 +287,12 @@ Object.assign(B,{
   async delMsg(id){try{await Q(sb.from('messages').delete().eq('id',id));msgGone(id);return true}catch(e){dbErr(e);return false}},
   async editMsg(id,body){try{const row=await Q(sb.from('messages').update({body}).eq('id',id).select().single());msgEdit(M2X(row));return true}
     catch(e){toast(/EDIT_LATE/.test(String(e&&e.message||''))?'Ya pasó el minuto: no se puede editar.':esc(errMsg(e)),'warn');return false}},
+  async pollCreate(cid,q,opts,o={}){
+    try{await Q(sb.rpc('poll_create',{cid,q,opts,anon:!!o.anon,multi:!!o.multi,closes_at:o.closes||null,all_vote:!!o.all,as_bot:!!o.bot}));await chatPoll();pollsLoad(cid,true);return true}
+    catch(e){toast(esc(errMsg(e)),'err');return false}
+  },
+  async pollVote(cid,pid,opts){try{await Q(sb.rpc('poll_vote',{pid,opts}));delete pollPick[pid];await pollsLoad(cid,true);mesaPing('poll');return true}catch(e){toast(/CLOSED/.test(String(e&&e.message||''))?'La encuesta ya cerró.':esc(errMsg(e)),'warn');pollsLoad(cid,true);return false}},
+  async pollClose(cid,pid){try{await Q(sb.rpc('poll_close',{pid}));await pollsLoad(cid,true);mesaPing('poll');return true}catch(e){toast(esc(errMsg(e)),'err');return false}},
   async chatCreate(nm,people){try{const id=await Q(sb.rpc('chat_create',{nm,people}));await chatPoll();return id}catch(e){toast(esc(errMsg(e)),'err');return null}},
   async chatAdd(cid,people){try{await Q(sb.rpc('chat_add',{cid,people}));await chatPoll();return true}catch(e){toast(esc(errMsg(e)),'err');return false}},
   async chatLeave(cid,uid){
@@ -330,6 +382,7 @@ V.chat={
       if(!e.clipboardData.types.includes('text/plain'))e.preventDefault();
       this.attFile(f)});
     $('#chPic').addEventListener('click',()=>$('#chFile').click());
+    $('#chPoll').addEventListener('click',()=>{if(chatCur)pollModal(chatCur)});
     $('#chFile').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(f)this.attFile(f)});
     $('#chAtt').addEventListener('click',e=>{if(e.target.closest('[data-attx]'))this.att(null)});
     const mn=$('#chMain');
@@ -347,6 +400,11 @@ V.chat={
       if(d){if(await confirmar('Borrar mensaje','¿Lo borro para todos?','borrar',true))B.delMsg(d.dataset.del);return}
       const ed=e.target.closest('[data-edit]');if(ed){const m=msgById(ed.dataset.edit);if(m)this.edit(m);return}
       const sn=e.target.closest('[data-seen]');if(sn){const m=msgById(sn.dataset.seen);if(m)this.seen(m);return}
+      const pv=e.target.closest('[data-pv]');if(pv){const p=pollOf(chatCur,pv.dataset.pid);if(!p||p.closed)return;const k=+pv.dataset.pv;
+        if(!p.multi){B.pollVote(chatCur,p.id,[k]);return}
+        const S=pollPick[p.id]||(pollPick[p.id]=new Set(p.mine));if(S.has(k))S.delete(k);else S.add(k);pv.classList.toggle('on',S.has(k));pv.setAttribute('aria-pressed',S.has(k));pv.querySelector('.po-k').textContent=S.has(k)?'☑':'☐';return}
+      const pvo=e.target.closest('[data-pvote]');if(pvo){const S=pollPick[pvo.dataset.pvote];if(!S||!S.size)return toast('Marcá al menos una opción.','warn');B.pollVote(chatCur,pvo.dataset.pvote,[...S]);return}
+      const pc=e.target.closest('[data-pclose]');if(pc){const pid=pc.dataset.pclose;modal({title:'Cerrar la encuesta',body:'<p>No se vota más. Los resultados quedan a la vista.</p>',actions:[{l:'Cancelar'},{l:'Cerrar encuesta',cls:'pri',fn:()=>{B.pollClose(chatCur,pid)}}]});return}
       const o=e.target.closest('[data-older]');
       if(o){o.disabled=true;const el=$('#chMsgs'),h=el.scrollHeight;await B.olderMsgs(chatCur);chatSig='';this.render({});el.scrollTop=el.scrollHeight-h}
     });
@@ -362,16 +420,24 @@ V.chat={
   open(cid){
     if(chatReply&&chatReply.chat!==cid)this.reply(null);
     if(chatEdit)this.editOff();
-    chatCur=cid;local.set('chatCur',cid);chatSig='';this.render({});readsLoad(cid,true);
+    chatCur=cid;local.set('chatCur',cid);chatSig='';this.render({});readsLoad(cid,true);pollsLoad(cid,true);
     if(chatMore[cid]===undefined&&(msgs[cid]||[]).length<40)B.olderMsgs(cid).then(()=>{chatSig='';if(cur==='chat'&&chatCur===cid)this.render({})});
     setTimeout(()=>{const i=$('#chIn');if(i&&!matchMedia('(pointer:coarse)').matches)i.focus()},0);
   },
   async send(){
     const i=$('#chIn'),v=i.value.trim(),cid=chatCur,att=chatAtt,rep=chatReply&&chatReply.chat===cid?chatReply._id:null;if((!v&&!att)||!cid)return;
-    if(!att&&/^\/vitalis\b/i.test(v)){ // mandar por Vitalis (solo admin / team leader)
+    if(!att&&/^\/vitalis\b/i.test(v)){ // mandar por Vitalis (solo admin / team leader); "/vitalis encuesta …" la arma cualquiera
       const txt=v.replace(/^\/vitalis\b\s*/i,'').trim();
-      if(!isLeader())return toast('El comando /vitalis es solo para administradores y team leaders.','warn');
-      if(!txt)return toast('Escribí el mensaje: <b>/vitalis tu mensaje</b>','warn');
+      const enc=/^encuestas?\b\s*/i.exec(txt);
+      if(enc||!txt&&!isLeader()){ // /vitalis encuesta ¿Pregunta? | opción | opción  (sin opciones, abre el armador)
+        const parts=txt.slice(enc?enc[0].length:0).split('|').map(s=>s.trim()).filter(Boolean),q=parts[0]||'',opts=parts.slice(1);
+        i.value='';chatDrafts[cid]='';growIn(i);this.men(true);
+        if(q&&opts.length>=2){if(!await B.pollCreate(cid,q,opts,{bot:true})){i.value=v;chatDrafts[cid]=v;growIn(i)}}
+        else pollModal(cid,{q,opts,bot:true});
+        return;
+      }
+      if(!isLeader())return toast('El comando /vitalis es solo para administradores y team leaders. Para una encuesta: <b>/vitalis encuesta ¿Pregunta? | opción | opción</b>','warn');
+      if(!txt)return toast('Escribí el mensaje: <b>/vitalis tu mensaje</b>, o <b>/vitalis encuesta ¿Pregunta? | opción | opción</b>','warn');
       i.value='';chatDrafts[cid]='';growIn(i);this.men(true);
       const ok=await B.vitalisSay(cid,txt);
       if(!ok){i.value=v;chatDrafts[cid]=v;growIn(i)}
@@ -506,17 +572,17 @@ V.chat={
       for(const m of l){
         const d=ymd(new Date(m.t));
         if(d!==pd){h+=`<div class="ch-day"><span>${esc(chDay(d))}</span></div>`;pd=d;pu=null}
-        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body),cd=im?null:msgCard(m.body);
+        const mine=m.uid===me,head=m.uid!==pu||m.t-pt>5*6e4,nm=memberName(m.uid),im=msgImg(m.body),cd=im?null:msgCard(m.body),pl=im||cd?null:msgPoll(m.body);
         const rq=m.reply?msgById(m.reply):null,quote=m.reply?`<button type="button" class="ch-q" data-goto="${esc(m.reply)}" title="Ir al mensaje"><b>${rq?esc(rq.uid===me?'Vos':first(rq.uid)):'Mensaje'}</b><span>${rq?esc(clip(msgTxt(rq.body),90)):'más viejo'}</span></button>`:'';
         const RX=reacts[m._id]||[],grp=EMOJIS.map(e=>({e,u:RX.filter(x=>x.e===e).map(x=>x.uid)})).filter(g=>g.u.length);
         const rxs=grp.length?`<div class="ch-rx">${grp.map(g=>`<button type="button" class="rx${g.u.includes(me)?' on':''}" data-rx="${g.e}" data-mid="${esc(m._id)}" title="${esc(g.u.map(u=>u===me?'vos':first(u)).join(', '))}">${g.e}<b>${g.u.length}</b></button>`).join('')}</div>`:'';
-        const canEdit=mine&&Date.now()-m.t<6e4&&!/^\[(?:img|card):/.test(m.body); // solo texto: una imagen o datos compartidos no se editan
+        const canEdit=mine&&Date.now()-m.t<6e4&&!/^\[(?:img|card|poll):/.test(m.body); // solo texto: una imagen, datos compartidos o una encuesta no se editan
         const tools=`<div class="ch-act"><button type="button" data-reply="${esc(m._id)}" title="Responder" aria-label="Responder">↩</button><button type="button" data-rpick="${esc(m._id)}" title="Reaccionar" aria-label="Reaccionar">☺</button><button type="button" data-seen="${esc(m._id)}" title="Quién lo leyó" aria-label="Quién lo leyó">👁</button>${canEdit?`<button type="button" data-edit="${esc(m._id)}" title="Editar (hasta 1 minuto)" aria-label="Editar">✎</button>`:''}${mine?`<button type="button" class="del" data-del="${esc(m._id)}" title="Borrar mensaje" aria-label="Borrar mensaje">✕</button>`:''}</div>`;
         const seenLine=m===lastM&&!isBot(m.uid)?(()=>{const {yes,no}=readersOf(m);if(!yes.length&&!no.length)return '';const nm_=u=>first(u);
           return `<button type="button" class="ch-seen" data-seen="${esc(m._id)}" title="Quién lo leyó">${yes.length?`Leído por ${esc(yes.slice(0,4).map(nm_).join(', '))}${yes.length>4?` y ${yes.length-4} más`:''}`:'Nadie lo leyó todavía'}${yes.length&&no.length?` <span class="d">· faltan ${no.length}</span>`:''}</button>`})():'';
         h+=`<div class="ch-m${mine?' mine':''}${head?' head':''}${m.aviso?' aviso':''}" data-mid="${esc(m._id)}">`+
           (mine?'':head?(isBot(m.uid)?`<span class="avb">${avatar(nm)}</span>`:`<button type="button" class="avb" data-prof="${esc(m.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}</button>`):'<span class="ch-sp"></span>')+
-          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}${cd?' crd':''}">${m.aviso?'<span class="ch-aviso"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Aviso</span>':''}${quote}${cd?`<div class="ch-card${cards[cd.id]&&cards[cd.id].html?'':' wait'}" data-card="${esc(cd.id)}"><div class="chc-b">${cards[cd.id]&&cards[cd.id].html?cards[cd.id].html:'<span class="d">Trayendo los datos…</span>'}</div><div class="chc-f"><b>${esc(cd.title||'Datos')}</b><span class="chc-w">${cards[cd.id]&&cards[cd.id].at?' · datos '+cardWhen(cards[cd.id].at):''}</span></div></div>${cd.rest?`<span class="ch-cap">${fmtBody(cd.rest)}</span>`:''}`:im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${m.edited?'<i class="ch-ed" title="Editado">editado · </i>':''}${hhmm(m.t)}</span></div>${rxs}${seenLine}</div>${tools}</div>`;
+          `<div class="ch-b">${!mine&&head&&c.kind!=='dm'?(isBot(m.uid)?`<span class="ch-who" style="--h:${avHue(nm)}">${esc(nm)}</span>`:`<button type="button" class="ch-who" data-prof="${esc(m.uid)}" style="--h:${avHue(nm)}">${esc(nm)}</button>`):''}<div class="ch-tx${im?' pic':''}${cd||pl?' crd':''}">${m.aviso?'<span class="ch-aviso"><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Aviso</span>':''}${quote}${pl?pollHTML(c.id,pollOf(c.id,pl.id),pl):cd?`<div class="ch-card${cards[cd.id]&&cards[cd.id].html?'':' wait'}" data-card="${esc(cd.id)}"><div class="chc-b">${cards[cd.id]&&cards[cd.id].html?cards[cd.id].html:'<span class="d">Trayendo los datos…</span>'}</div><div class="chc-f"><b>${esc(cd.title||'Datos')}</b><span class="chc-w">${cards[cd.id]&&cards[cd.id].at?' · datos '+cardWhen(cards[cd.id].at):''}</span></div></div>${cd.rest?`<span class="ch-cap">${fmtBody(cd.rest)}</span>`:''}`:im?`<button type="button" class="ch-img${imgs[im.id]&&imgs[im.id].url?'':' wait'}" data-img="${esc(im.id)}" title="Ver la imagen" style="${im.w?`width:min(100%,${Math.min(300,im.w)}px);aspect-ratio:${im.w}/${im.h}`:''}"><img alt="Imagen"${imgs[im.id]&&imgs[im.id].url?` src="${imgs[im.id].url}"`:''}></button>${im.rest?`<span class="ch-cap">${fmtBody(im.rest)}</span>`:''}`:fmtBody(m.body)}<span class="ch-tm">${m.edited?'<i class="ch-ed" title="Editado">editado · </i>':''}${hhmm(m.t)}</span></div>${rxs}${seenLine}</div>${tools}</div>`;
         pu=m.uid;pt=m.t;
       }
       el.innerHTML=h;imgPaint(el);for(const k of el.querySelectorAll('[data-card]'))cardPaint(k);shAvatars(el);

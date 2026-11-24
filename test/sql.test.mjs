@@ -1119,6 +1119,52 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("update public.teams set active = false where id = $1", [T2]);
 }
 
+// ---------- encuestas en el chat ----------
+{
+  const bot = (await db.query('select id from public.profiles where bot limit 1')).rows[0].id;
+  R = await rpc(B, "select public.poll_create($1, '¿Pizza o empanadas?', array['Pizza', ' Empanadas ', 'Pizza', ''], false, false, null, false, false) j", [TC]);
+  ok(!R.error && R.ok && R.id, `cualquiera arma una encuesta en el chat de la mesa (${JSON.stringify(R)})`);
+  const P1 = R.id;
+  r = await db.query('select body, user_id from public.messages where id = $1', [R.message]);
+  ok(r.rows[0].body === `[poll:${P1}] ¿Pizza o empanadas?` && r.rows[0].user_id === B, 'queda como mensaje [poll:id] del que la armó');
+  ok((await db.query('select options from public.polls where id = $1', [P1])).rows[0].options.length === 2, 'las opciones repetidas o vacías no cuentan');
+  r = await as(B, "select public.poll_create($1, 'Una sola', array['Sí'], false, false, null, false, false) j", [TC]); ok(!!r.error && /OPTS/.test(r.error), 'con una sola opción no va');
+  r = await as(B, "select public.poll_create($1, 'Vieja', array['a','b'], false, false, now() - interval '1 hour', false, false) j", [TC]); ok(!!r.error && /CLOSE/.test(r.error), 'una hora de cierre pasada no va');
+  r = await as(X, "select public.poll_create($1, 'De otra mesa', array['a','b']) j", [TC]); ok(!!r.error, 'alguien de otra mesa no arma encuestas acá');
+  R = await rpc(A, 'select public.poll_vote($1, array[0]) j', [P1]); ok(!R.error && R.ok, 'A vota Pizza');
+  R = await rpc(C, 'select public.poll_vote($1, array[1]) j', [P1]); ok(!R.error && R.ok, 'Matias vota Empanadas');
+  r = await as(A, 'select public.poll_vote($1, array[0, 1]) j', [P1]); ok(!!r.error && /una sola/.test(r.error), 'con una opción por persona, dos no van');
+  R = await rpc(A, 'select public.poll_vote($1, array[1]) j', [P1]); ok(!R.error, 'A cambia su voto a Empanadas');
+  R = await rpc(B, 'select public.polls_of($1) j', [TC]);
+  let p = R.find((x) => x.id === P1);
+  ok(p && p.counts.join() === '0,2' && p.voted === 2 && p.voters >= 13 && !p.closed && p.who.length === 2 && p.who.every((w) => w.opt === 1) && p.mine.length === 0, `los resultados: 0 y 2, con nombres, y lo mío (${JSON.stringify(p)})`);
+  r = await as(X, 'select public.polls_of($1) j', [TC]); ok(!r.error && J(r.rows[0].j).length === 0, 'desde otra mesa no se ven');
+  r = await as(B, 'select count(*)::int c from public.poll_votes where poll_id = $1', [P1]); ok(r.rows[0].c === 0, 'los votos ajenos no se leen de la tabla (solo por polls_of)');
+  r = await as(A, 'select public.poll_close($1) j', [P1]); ok(!r.error, 'el admin la cierra');
+  r = await as(C, 'select public.poll_vote($1, array[0]) j', [P1]); ok(!!r.error && /CLOSED/.test(r.error), 'cerrada, no se vota más');
+  // anónima y de varias opciones; en un grupo, termina cuando votaron todos
+  R = await rid(A, 'select public.chat_create($1, $2::uuid[])::text j', ['Encuestados', [B]]);
+  const GP = R;
+  R = await rpc(A, "select public.poll_create($1, '¿Qué días?', array['Lunes', 'Martes', 'Jueves'], true, true, null, true, false) j", [GP]);
+  const P2 = R.id; ok(!R.error && R.ok, 'A arma una anónima, de varias opciones, que termina cuando votan todos');
+  r = await as(M, 'select public.poll_vote($1, array[0]) j', [P2]); ok(!!r.error, 'alguien que no está en el grupo no vota');
+  R = await rpc(A, 'select public.poll_vote($1, array[0, 2]) j', [P2]); ok(!R.error, 'A vota dos opciones');
+  p = (await rpc(B, 'select public.polls_of($1) j', [GP])).find((x) => x.id === P2);
+  ok(p.counts.join() === '1,0,1' && p.who === null && p.voters === 2 && p.voted === 1 && !p.closed, `anónima: números sin nombres, y todavía falta uno (${JSON.stringify(p)})`);
+  R = await rpc(B, 'select public.poll_vote($1, array[1]) j', [P2]);
+  p = (await rpc(B, 'select public.polls_of($1) j', [GP])).find((x) => x.id === P2);
+  ok(p.closed && p.closed_at && p.counts.join() === '1,1,1' && p.mine.join() === '1', 'votó el último: termina sola');
+  r = await as(B, 'select public.poll_close($1) j', [P2]); ok(!!r.error && /quien la arm/.test(r.error), 'un agente no cierra la de otro (solo quien la armó, el team leader o un admin)');
+  // con /vitalis: el mensaje lo escribe Vitalis, la encuesta es del que la pidió
+  R = await rpc(B, "select public.poll_create($1, '¿Mate?', array['Sí', 'No'], false, false, null, false, true) j", [TC]);
+  r = await db.query('select user_id from public.messages where id = $1', [R.message]);
+  ok(!R.error && r.rows[0].user_id === bot && (await db.query('select user_id from public.polls where id = $1', [R.id])).rows[0].user_id === B, 'por /vitalis, el mensaje es de Vitalis y la encuesta de quien la pidió');
+  r = await as(B, "insert into public.messages (chat_id, body) values ($1, '[poll:' || $2 || '] trucha') returning id", [TC, P1]);
+  ok(!!r.error && /POLL/.test(r.error), 'un [poll:] a mano no entra');
+  await db.query('delete from public.polls where id in ($1, $2, $3)', [P1, P2, R.id]);
+  await db.query("delete from public.messages where body like '[poll:%'");
+}
+
 // ---------- privacidad: cuándo se tapa Vitalis y cuándo el chat pide el PIN ----------
 {
   let q = await as(B, 'select idle_min, chat_lock_min from public.teams');
