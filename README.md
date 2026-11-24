@@ -21,6 +21,17 @@ Asistente de ventas de la mesa **Team Matías** · **https://vitalis.joaquin-or2
 3. Commit y push a `main`: Netlify publica `site/` en menos de un minuto.
 4. Si cambió `supabase/vitalis.sql`, aplicarlo en el proyecto de Supabase (con el conector de Supabase o en SQL Editor → Run) justo después del push.
 
+## Varias mesas
+
+Cada mesa entra por su propio dominio: **`vitalis-<nombre corto>.joaquin-or24.workers.dev`** (la mesa de siempre: `vitalis-matias.…`). Todas usan este mismo repo y la misma base: la app saca la mesa del dominio y pide la lista de nombres de esa mesa. Sin dominio propio (`vitalis.joaquin-or24.workers.dev`), Vitalis pregunta de qué mesa sos la primera vez y lo recuerda; `#m=<nombre corto>` también sirve.
+
+Para crear una mesa:
+1. En Vitalis, como dueño: **Gerencia → Mesas → Nueva mesa** (nombre, nombre corto, team leader y agentes; todos entran con PIN 0000).
+2. En Cloudflare: **Workers & Pages → Create → Import a repository**, este repo, nombre del Worker **`vitalis-<nombre corto>`** (el mismo build que el worker `vitalis`: sirve `site/`). Con eso queda `https://vitalis-<nombre corto>.joaquin-or24.workers.dev`. Hasta que exista, la mesa entra por `vitalis.joaquin-or24.workers.dev` eligiéndola en la lista.
+3. La extensión de Chrome ya anda en cualquier `*.joaquin-or24.workers.dev` (desde la 1.17.0).
+
+El dueño (perfil `global`, rol admin) y los directores figuran en la lista de todas las mesas: al entrar por el dominio de una mesa pasan a esa mesa, y desde Gerencia ven todas las mesas comparadas y cambian de una a otra con "Entrar". Compartido entre mesas: Banking, la tabla de status del CRM y los snippets globales; todo lo demás (clientes, ventas, chat, cola, estación, targets) es de cada mesa.
+
 ## Datos
 
 - **Compartido en la mesa:** `sales` y `leads` (todos leen; cada uno edita lo suyo; team leader y admin cargan y corrigen las de cualquiera), `snippets` marcados como compartidos.

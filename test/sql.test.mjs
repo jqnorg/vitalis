@@ -26,7 +26,7 @@ const rpc = async (uid, q, params) => { const r = await as(uid, q, params); retu
 
 // ---------- la lista de la mesa ----------
 ok((await db.query('select count(*)::int c from public.profiles')).rows[0].c === 13, 'la mesa arranca con 13 personas (aunque se corra dos veces)');
-let R = await rpc(null, 'select public.roster() j');
+let R = await rpc(null, "select public.roster('matias') j");
 ok(R && R.team === 'Team Matías' && R.people.length === 13, 'se ve la lista de nombres sin código (una sola mesa)');
 const P = Object.fromEntries(R.people.map((p) => [p.name, p]));
 ok(P['Matias Me'].role === 'leader' && P['Joaquín Or'].role === 'agent' && !R.people.some((p) => p.role === 'admin'), 'Matias es team leader; todavía no hay admin');
@@ -100,7 +100,7 @@ ok(R.ok && (await login('Alfonso Ro', '0000')).ok, 'el admin vuelve el PIN de al
 R = await rpc(B, "select public.add_member('Nuevo Ag', 'agent') j");
 ok(!!R.error, 'un agente no suma gente');
 R = await rpc(A, "select public.add_member('  Nuevo   Ag ', 'agent') j");
-ok(R.ok && (await rpc(null, 'select public.roster() j')).people.some((p) => p.name === 'Nuevo Ag'), 'el admin suma a alguien y aparece en la lista');
+ok(R.ok && (await rpc(null, "select public.roster('matias') j")).people.some((p) => p.name === 'Nuevo Ag'), 'el admin suma a alguien y aparece en la lista');
 R = await rpc(A, "select public.add_member('nuevo ag') j");
 ok(!!R.error && /nombre/.test(R.error), 'no se repiten nombres');
 R = await rpc(null, "select public.add_member('Otro') j");
@@ -347,7 +347,7 @@ ok(r.rows.length === 0, 'B ya no lo lee');
   ok(Array.isArray(R2) && R2[0].id === GP && !R2[0].new && R2[1].new && R2[2].error, 'de a varios: reusa, crea y avisa los nombres inválidos');
   R2 = await rpc(B, "select public.add_formers(array['Otro Mas']) j");
   ok(!!R2.error, 'un agente no crea de a varios');
-  R2 = await rpc(null, 'select public.roster() j');
+  R2 = await rpc(null, "select public.roster('matias') j");
   ok(!R2.people.some((p) => p.id === GP), 'no aparece en la lista para entrar');
   R2 = await rpc(null, `select public.pin_login('${GP}', '0000') j`);
   ok(!!R2.error || !R2.ok, 'y no puede entrar');
@@ -543,7 +543,7 @@ ok(!!r.error, 'un agente no convierte su snippet en global');
 r = await as(A, "update public.snippets set body = 'Hola, soy {yo}' where id = $1 returning id", [GS]);
 ok(!r.error && r.rows.length === 1, 'el admin lo edita');
 r = await as(X, 'select id from public.snippets where id = $1', [GS]);
-ok(r.rows.length === 0, 'alguien de otra mesa no lo ve');
+ok(r.rows.length === 1, 'alguien de otra mesa también lo ve (los globales son de la empresa)');
 
 // ---------- tareas ----------
 const task = (uid, args) => rid(uid, 'select public.task_create($1, $2::text[], $3::text[], $4::date, $5::date, $6, $7, $8::date, $9::uuid[])::text j', args);
@@ -995,7 +995,7 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   r = await as(C, "insert into public.sales (date, client_id, amount, tx) values ($1,'88002',100,'88002') returning id", [hoy]);
   const bm = (await db.query("select m.body, m.chat_id, p.name, p.active, p.login from public.messages m join public.profiles p on p.id = m.user_id where p.bot order by m.created_at desc")).rows;
   ok(!r.error && bm.length === n0 + 1 && bm[0].name === 'Vitalis' && bm[0].chat_id === TC && bm[0].body.includes('Arlette'), `una venta de hoy: Vitalis felicita en el chat de la mesa (${bm[0] && bm[0].body})`);
-  ok(bm[0] && bm[0].active === false && bm[0].login === null && !(await rpc(null, 'select public.roster() j')).people.some((p) => p.name === 'Vitalis'), 'Vitalis no entra ni aparece en la lista de nombres');
+  ok(bm[0] && bm[0].active === false && bm[0].login === null && !(await rpc(null, "select public.roster('matias') j")).people.some((p) => p.name === 'Vitalis'), 'Vitalis no entra ni aparece en la lista de nombres');
   r = await as(C, "insert into public.sales (date, client_id, amount, tx) values ($1,'88003',100,'88003') returning id", [hoy]);
   ok((await db.query("select count(*)::int c from public.profiles where bot")).rows[0].c === 1, 'es uno solo aunque haya más ventas');
   r = await as(A, 'select body from public.messages where chat_id = $1 order by created_at desc limit 1', [TC]);
@@ -1067,6 +1067,52 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await db.query("update public.profiles set active = false where id = $1", [DR]);
 }
 
+// ---------- varias mesas: slug, globales, crear mesa, cambiar de mesa, Gerencia de la empresa, lo compartido ----------
+{
+  ok((await db.query("select slug from public.teams where name = 'Team Matías'")).rows[0].slug === 'matias', 'la mesa de siempre tiene su slug: matias');
+  await db.query("update public.teams set slug = 'otra' where id = $1", [t2]);
+  R = await rpc(null, 'select public.roster(null) j');
+  ok(R && R.teams && R.teams.length === 2 && !R.people, `sin slug y con dos mesas, la lista de mesas para elegir (${JSON.stringify(R)})`);
+  R = await rpc(null, "select public.roster('otra') j");
+  ok(R && R.slug === 'otra' && R.people.some((p) => p.name === 'Xavier Ot') && !R.people.some((p) => p.name === 'Joaquín Or'), 'por slug, la lista de esa mesa');
+  R = await rpc(null, "select public.roster('nada') j");
+  ok(R && R.teams, 'un slug que no existe: a elegir');
+  r = await as(A, "select public.team_create('Mesa Dos', 'dos', 'Lider Dos', array['Ag Uno', 'Ag Dos']) j");
+  ok(!!r.error && /dueño/.test(r.error), `un admin común no crea mesas (${r.error})`);
+  await db.query("update public.profiles set global = true where id = $1", [A]); // el dueño
+  R = await rpc(null, "select public.roster('otra') j");
+  ok(R.people.some((p) => p.name === 'Joaquín Or' && p.global), 'el dueño figura en todas las mesas');
+  R = await rpc(A, "select public.team_create('Mesa Dos', 'Mesa Dós!', 'Lider Dos', array['Ag Uno', ' Ag  Dos ', 'Ag Uno']) j");
+  ok(!R.error && R.ok && R.slug === 'mesa-dos' && R.people === 3, `el dueño crea una mesa con su team leader y sus agentes (${JSON.stringify(R)})`);
+  const T2 = R.id;
+  ok((await db.query("select count(*)::int c from public.chats where team_id = $1 and kind = 'team'", [T2])).rows[0].c === 1, 'con su chat de toda la mesa');
+  ok((await db.query("select role from public.profiles where team_id = $1 and name = 'Lider Dos'", [T2])).rows[0].role === 'leader', 'el team leader con su rol');
+  R = await rpc(A, "select public.team_create('Mesa Dos bis', 'mesa-dos') j");
+  ok(!!R.error && /SLUG_TAKEN/.test(R.error), 'no se repite el nombre corto');
+  R = await rpc(A, 'select public.teams_list() j');
+  ok(R.length === 3 && R.find((t) => t.slug === 'mesa-dos').people === 3 && R.find((t) => t.slug === 'mesa-dos').leader === 'Lider Dos' && R.find((t) => t.slug === 'matias').mine, `el dueño ve las mesas (${R.length})`);
+  r = await as(B, 'select public.teams_list() j'); ok(!r.error && J(r.rows[0].j).length === 0, 'un agente no');
+  // entrar por otra mesa: el dueño pasa a esa mesa; un agente de otra mesa no entra
+  R = await rpc(null, "select public.pin_login($1, '1111', 'mesa-dos') j", [A]);
+  ok(R.ok && (await db.query('select team_id from public.profiles where id = $1', [A])).rows[0].team_id === T2, `el dueño entra por el dominio de otra mesa y pasa a esa mesa (${JSON.stringify(R)})`);
+  r = await as(A, 'select count(*)::int c from public.sales'); ok(r.rows[0].c === 0, 'y ahí ve solo lo de esa mesa');
+  r = await as(A, "select public.add_member('Ag Tres', 'agent') j"); ok(!r.error && (await db.query("select team_id from public.profiles where name = 'Ag Tres'")).rows[0].team_id === T2, 'y la administra (suma gente)');
+  R = await rpc(null, "select public.pin_login($1, '0000', 'mesa-dos') j", [B]);
+  ok(R.ok === false && R.error === 'nouser', 'alguien de otra mesa no entra por un dominio ajeno');
+  R = await rpc(A, "select public.switch_team('matias') j");
+  ok(R.ok && (await db.query('select team_id from public.profiles where id = $1', [A])).rows[0].team_id === (await db.query("select id from public.teams where slug = 'matias'")).rows[0].id, 'vuelve a su mesa con switch_team');
+  r = await as(B, "select public.switch_team('mesa-dos') j"); ok(!!r.error, 'un agente no cambia de mesa');
+  // Gerencia de la empresa
+  R = await rpc(A, 'select public.ger_company(current_date - 60, current_date) j');
+  ok(!R.error && R.teams.length === 3 && R.teams.find((t) => t.slug === 'matias').ftd > 0 && R.teams.every((t) => 'reg' in t && 'affs' in t), `ger_company: cada mesa con sus números (${R.teams.map((t) => t.slug + ':' + t.ftd).join(', ')})`);
+  r = await as(B, 'select public.ger_company(current_date - 60, current_date) j'); ok(!!r.error, 'un agente no la ve');
+  // lo compartido: Banking lo ven todas las mesas
+  r = await as(X, "select name from public.processors where name = 'Kushki'"); ok(!r.error && r.rows.length === 1, 'Banking es de la empresa: otra mesa ve los procesadores');
+  r = await as(X, "insert into public.processors (name) values ('De otra mesa') returning id"); ok(!!r.error || r.rows.length === 0, 'pero un agente de otra mesa no los edita');
+  await db.query("update public.profiles set active = false where team_id = $1", [T2]);
+  await db.query("update public.teams set active = false where id = $1", [T2]);
+}
+
 // ---------- privacidad: cuándo se tapa Vitalis y cuándo el chat pide el PIN ----------
 {
   let q = await as(B, 'select idle_min, chat_lock_min from public.teams');
@@ -1088,7 +1134,7 @@ r = await as(A, 'update public.profiles set active = false where id = $1 returni
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');
 r = await as(B, 'select * from public.sales');
 ok(r.rows.length === 0, 'B dado de baja no ve más las ventas de la mesa');
-ok(!(await rpc(null, 'select public.roster() j')).people.some((p) => p.id === B), 'B dado de baja no aparece en la lista');
+ok(!(await rpc(null, "select public.roster('matias') j")).people.some((p) => p.id === B), 'B dado de baja no aparece en la lista');
 ok((await rpc(null, 'select public.pin_login($1, $2) j', [B, '0000'])).ok === false, 'B dado de baja no puede entrar');
 r = await as(null, 'select * from public.sales');
 ok(!!r.error || r.rows.length === 0, 'sin sesión no se ve nada');

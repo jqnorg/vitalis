@@ -36,6 +36,7 @@ create table if not exists public.pins (
   locked_until timestamptz
 );
 alter table public.pins add column if not exists locks integer not null default 0; -- bloqueos seguidos: cada uno dura el doble
+alter table public.profiles add column if not exists global boolean not null default false; -- figura en todas las mesas (dueño, directores)
 alter table public.profiles add column if not exists crm_name text;          -- cómo figura en el CRM (para la carga del team leader)
 alter table public.profiles add column if not exists quiet_until timestamptz; -- avisos sociales silenciados hasta
 alter table public.pins enable row level security;
@@ -424,6 +425,7 @@ begin
     raise exception 'NAME_TAKEN: ya hay alguien con ese nombre';
   end if;
   uid := public._new_seat(public.my_team(), nm, rl);
+  if rl = 'director' then update public.profiles set global = true where id = uid; end if; -- el director figura en todas las mesas
   return json_build_object('ok', true, 'id', uid);
 end $$;
 
@@ -1159,6 +1161,8 @@ declare k text := public.crm_key(st); g text;
 begin
   if k = '' then return 'otro'; end if;
   select grp into g from public.crm_status_map where team_id = t and status_key = k;
+  if g is not null then return g; end if;
+  select grp into g from public.crm_status_map where status_key = k limit 1; -- la tabla de status es de la empresa: sirve la de cualquier mesa
   if g is not null then return g; end if;
   return case
     -- la tabla de status de la mesa: Talking es el new en llamada; CallBack tiene cita; POTENTIAL NO KYC es el Call Again viejo
@@ -2085,3 +2089,183 @@ begin
 end $$;
 revoke all on function public.set_locks(integer, integer) from public, anon;
 grant execute on function public.set_locks(integer, integer) to authenticated;
+
+-- ============================================================================
+-- Varias mesas (pedido del dueño, noviembre 2026). La base ya separaba todo por team_id; acá va la puerta:
+-- cada mesa tiene un slug (su dominio: vitalis-<slug>.joaquin-or24.workers.dev), la lista de nombres se pide por slug,
+-- y las personas "globales" (el dueño y los directores) figuran en todas las mesas y al entrar por una pasan a ella
+-- (switch_team: su perfil cambia de team_id, así toda la app sigue siendo de una mesa a la vez).
+-- Compartido entre mesas: Banking, la tabla de status del CRM y los snippets globales. Lo demás es de cada mesa.
+-- ============================================================================
+alter table public.teams add column if not exists slug text;
+alter table public.teams add column if not exists active boolean not null default true;
+create unique index if not exists teams_slug on public.teams (slug);
+update public.teams set slug = 'matias' where slug is null and name = 'Team Matías';
+update public.teams set slug = trim(both '-' from regexp_replace(translate(lower(name), 'áéíóúüñ', 'aeiouun'), '[^a-z0-9]+', '-', 'g')) where slug is null;
+create or replace function public.is_global() returns boolean
+  language sql stable security definer set search_path = public as $$ select coalesce((select global from public.profiles where id = auth.uid() and active), false) $$;
+grant execute on function public.is_global() to authenticated;
+drop policy if exists team_read on public.teams;
+create policy team_read on public.teams for select to authenticated using (id = (select public.my_team()) or (select public.is_global()));
+
+-- la lista de nombres de una mesa (por slug). Sin slug y con una sola mesa, esa; con varias, la lista de mesas para elegir.
+create or replace function public.roster(slug text default null) returns json
+  language plpgsql stable security definer set search_path = public as $$
+declare t public.teams; n int;
+begin
+  if slug is not null and slug <> '' then select * into t from public.teams where teams.slug = roster.slug and active; end if;
+  if t.id is null then
+    select count(*) into n from public.teams where active;
+    if n = 1 or slug is null and n = 0 then select * into t from public.teams where active order by created_at limit 1;
+    else return json_build_object('teams', (select coalesce(json_agg(json_build_object('slug', x.slug, 'name', x.name) order by x.name), '[]'::json) from public.teams x where x.active)); end if;
+  end if;
+  if t.id is null then return json_build_object('team', '', 'people', '[]'::json); end if;
+  return json_build_object('team', t.name, 'slug', t.slug, 'people', coalesce((
+    select json_agg(json_build_object('id', p.id, 'name', p.name, 'role', p.role, 'pin_set', p.pin_set, 'global', p.global) order by p.global, p.name)
+      from public.profiles p where (p.team_id = t.id or p.global) and p.active and p.login is not null and not p.bot), '[]'::json));
+end $$;
+drop function if exists public.roster();
+grant execute on function public.roster(text) to anon, authenticated;
+
+-- entrar por una mesa: si la persona es global y la mesa es otra, pasa a esa mesa
+create or replace function public.pin_login(uid uuid, pin text, slug text default null) returns json
+  language plpgsql security definer set search_path = public, extensions as $$
+declare
+  p   record;
+  s   record;
+  sec text;
+  lk  interval;
+  t   uuid;
+begin
+  select pr.id, pr.login, pr.pin_set, pr.global, pr.team_id into p from public.profiles pr where pr.id = uid and pr.active and pr.login is not null;
+  if p.id is null then return json_build_object('ok', false, 'error', 'nouser'); end if;
+  select * into s from public.pins where user_id = uid for update;
+  if s.user_id is null then return json_build_object('ok', false, 'error', 'nouser'); end if;
+  if s.locked_until is not null and s.locked_until > now() then
+    return json_build_object('ok', false, 'error', 'locked', 'minutes', ceil(extract(epoch from s.locked_until - now()) / 60)::int);
+  end if;
+  if pin is null or pin !~ '^[0-9]{4}$' or s.pin_hash <> crypt(pin, s.pin_hash) then
+    if s.fails + 1 >= 5 then
+      lk := least(interval '24 hours', interval '15 minutes' * power(2, least(s.locks, 10)));
+      update public.pins set fails = 0, locks = s.locks + 1, locked_until = now() + lk where user_id = uid;
+      return json_build_object('ok', false, 'error', 'locked', 'minutes', ceil(extract(epoch from lk) / 60)::int);
+    end if;
+    update public.pins set fails = s.fails + 1 where user_id = uid;
+    return json_build_object('ok', false, 'error', 'wrong', 'left', 4 - s.fails);
+  end if;
+  if slug is not null and slug <> '' then
+    select id into t from public.teams where teams.slug = pin_login.slug and active;
+    if t is not null and t <> p.team_id then
+      if not p.global then return json_build_object('ok', false, 'error', 'nouser'); end if; -- es de otra mesa
+      update public.profiles set team_id = t where id = uid;
+    end if;
+  end if;
+  sec := encode(gen_random_bytes(24), 'hex');
+  update public.pins set fails = 0, locks = 0, locked_until = null, secret = sec where user_id = uid;
+  update auth.users set encrypted_password = crypt(sec, gen_salt('bf')), updated_at = now() where id = uid;
+  return json_build_object('ok', true, 'email', p.login, 'password', sec, 'pin_set', p.pin_set);
+end $$;
+drop function if exists public.pin_login(uuid, text);
+grant execute on function public.pin_login(uuid, text, text) to anon, authenticated;
+
+-- las mesas (para los globales): cuántas personas, el team leader y el link
+create or replace function public.teams_list() returns json
+  language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(json_build_object('id', t.id, 'slug', t.slug, 'name', t.name, 'active', t.active,
+    'people', (select count(*) from public.profiles p where p.team_id = t.id and p.active and not p.bot and not p.global),
+    'leader', (select string_agg(p.name, ', ') from public.profiles p where p.team_id = t.id and p.active and p.role = 'leader'),
+    'mine', t.id = public.my_team()) order by t.created_at), '[]'::json)
+  from public.teams t where public.is_global() $$;
+grant execute on function public.teams_list() to authenticated;
+
+-- pasar a otra mesa (solo globales): el perfil cambia de mesa; la app recarga
+create or replace function public.switch_team(slug text) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid;
+begin
+  if not public.is_global() then raise exception 'Solo el dueño o un director cambia de mesa'; end if;
+  select id into t from public.teams where teams.slug = switch_team.slug and active;
+  if t is null then raise exception 'No existe esa mesa'; end if;
+  update public.profiles set team_id = t where id = auth.uid();
+  return json_build_object('ok', true, 'team', t);
+end $$;
+grant execute on function public.switch_team(text) to authenticated;
+
+-- crear una mesa (solo el dueño: global y admin): nombre, slug, su team leader y sus agentes. Todos entran con 0000.
+create or replace function public.team_create(nm text, slug text, leader text default null, agents text[] default '{}') returns json
+  language plpgsql security definer set search_path = public, extensions as $$
+declare t uuid; n text; k int := 0;
+begin
+  if not public.is_global() or coalesce(public.my_role(), '') <> 'admin' then raise exception 'Solo el dueño crea mesas'; end if;
+  nm := regexp_replace(trim(coalesce(nm, '')), '\s+', ' ', 'g');
+  slug := regexp_replace(translate(lower(trim(coalesce(nullif(slug, ''), nm))), 'áéíóúüñ', 'aeiouun'), '[^a-z0-9]+', '-', 'g');
+  slug := trim(both '-' from slug);
+  if nm = '' or length(nm) > 40 then raise exception 'NAME: escribí el nombre de la mesa (hasta 40 letras)'; end if;
+  if slug = '' or length(slug) > 30 then raise exception 'SLUG: el nombre corto tiene que tener letras o números'; end if;
+  if exists (select 1 from public.teams where teams.slug = team_create.slug) then raise exception 'SLUG_TAKEN: ya hay una mesa con ese nombre corto'; end if;
+  insert into public.teams (name, slug, invite_code) values (nm, slug, upper(slug) || '-' || upper(substr(encode(gen_random_bytes(3), 'hex'), 1, 5))) returning id into t;
+  insert into public.chats (team_id, kind, name) values (t, 'team', 'Toda la mesa');
+  if coalesce(trim(leader), '') <> '' then perform public._new_seat(t, regexp_replace(trim(leader), '\s+', ' ', 'g'), 'leader'); k := k + 1; end if;
+  foreach n in array coalesce(agents, '{}') loop
+    n := regexp_replace(trim(coalesce(n, '')), '\s+', ' ', 'g');
+    if n <> '' and length(n) <= 40 and not exists (select 1 from public.profiles where team_id = t and lower(name) = lower(n)) then perform public._new_seat(t, n, 'agent'); k := k + 1; end if;
+  end loop;
+  return json_build_object('ok', true, 'id', t, 'slug', slug, 'people', k);
+end $$;
+grant execute on function public.team_create(text, text, text, text[]) to authenticated;
+revoke all on function public.teams_list(), public.switch_team(text), public.team_create(text, text, text, text[]), public.is_global() from public, anon;
+
+-- Gerencia de todas las mesas (globales y directores): los números de cada mesa en un rango, sin pasar por las políticas de cada una
+create or replace function public.ger_company(d1 date, d2 date) returns json
+  language plpgsql stable security definer set search_path = public as $$
+declare out json;
+begin
+  if not public.is_global() and coalesce(public.my_role(), '') <> 'director' then raise exception 'Solo el dueño o un director'; end if;
+  select json_build_object('from', d1, 'to', d2, 'teams', coalesce((select json_agg(x order by x.name) from (
+    select t.id, t.slug, t.name,
+      (select count(*) from public.sales s where s.team_id = t.id and s.date between d1 and d2) ftd,
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
+         and (left(c.ftd_at, 10) = left(c.reg, 10) or exists (select 1 from public.sales s where s.team_id = t.id and s.brand = c.brand and s.client_id = c.client_id and s.date::text = left(c.reg, 10)))) ftd_new, -- CR (%): de los registrados, los que depositaron el mismo día
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text) reg,
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
+         and (c.status_group in ('callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd') or c.ftd_at is not null)) atend,
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
+         and (c.status_group in ('pending','failed','ftd') or c.ftd_at is not null)) boleto,
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
+         and (c.status_group = 'ftd' or c.ftd_at is not null or exists (select 1 from public.sales s where s.team_id = t.id and s.brand = c.brand and s.client_id = c.client_id))) dep,
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text and c.status_group = 'invalid') inv,
+      (select count(*) from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text and c.status_group in ('na','invalid','dnc')) noat,
+      (select round(avg(r.dead_ms)) from public.rmo_days r where r.team_id = t.id and r.date between d1 and d2) dead,
+      (select count(distinct r.user_id) from public.rmo_days r where r.team_id = t.id and r.date between d1 and d2) rmo_people,
+      (select count(*) from public.profiles p where p.team_id = t.id and p.active and not p.bot and not p.global and p.role in ('agent','admin')) agents,
+      (select coalesce(json_agg(json_build_object('aff', a.aff, 'reg', a.reg, 'dep', a.dep, 'inv', a.inv, 'at', a.at, 'noat', a.noat) order by a.reg desc), '[]'::json) from (
+         select coalesce(nullif(trim(c.aff), ''), 'sin afiliador') aff, count(*) reg,
+           count(*) filter (where c.status_group = 'ftd' or c.ftd_at is not null) dep,
+           count(*) filter (where c.status_group = 'invalid') inv,
+           count(*) filter (where c.status_group in ('callback','call_again','hang_up','low_potential','not_interested','pending','failed','ftd') or c.ftd_at is not null) at,
+           count(*) filter (where c.status_group in ('na','invalid','dnc')) noat
+         from public.crm_clients c where c.team_id = t.id and c.brand <> 'Trade24Seven' and left(c.reg, 10) between d1::text and d2::text
+         group by 1 order by 2 desc limit 12) a) affs
+    from public.teams t where t.active) x), '[]'::json)) into out;
+  return out;
+end $$;
+grant execute on function public.ger_company(date, date) to authenticated;
+revoke all on function public.ger_company(date, date) from public, anon;
+
+-- Compartido entre mesas: Banking (todos lo ven, lo editan admin y team leader de cualquier mesa), la tabla de status y los snippets globales
+do $$
+declare t text;
+begin
+  foreach t in array array['pay_methods','processors','processor_methods','banks','pay_files'] loop
+    execute format('drop policy if exists %I on public.%I', t || '_read', t);
+    execute format('create policy %I on public.%I for select to authenticated using (true)', t || '_read', t);
+    execute format('drop policy if exists %I on public.%I', t || '_write', t);
+    execute format('create policy %I on public.%I for all to authenticated using ((select public.pay_editor())) with check ((select public.pay_editor()))', t || '_write', t);
+  end loop;
+end $$;
+drop policy if exists pay_incidents_read on public.pay_incidents;
+create policy pay_incidents_read on public.pay_incidents for select to authenticated using (true);
+drop policy if exists crm_map_read on public.crm_status_map;
+create policy crm_map_read on public.crm_status_map for select to authenticated using (true);
+drop policy if exists snip_read on public.snippets;
+create policy snip_read on public.snippets for select to authenticated using (user_id = (select auth.uid()) or global or (shared and team_id = (select public.my_team())));

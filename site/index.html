@@ -1213,7 +1213,8 @@ table.rd-map{border-collapse:separate;border-spacing:2px;font-size:12px;width:10
 .emb-l{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.emb-l span{color:var(--dim)}.emb-l b{font-size:18px}
 .emb-b{height:14px;border-radius:99px;background:var(--soft);overflow:hidden}.emb-b i{display:block;height:100%;background:var(--pri);border-radius:99px;transition:width .4s}
 .emb-p{grid-column:2;font-size:12.5px;color:var(--dim);margin-top:-2px}
-.ger-d{margin-top:12px}.ger-d summary{cursor:pointer;font-weight:600;margin-bottom:8px}
+.ger-d{margin-top:12px}.ger-h2{font-size:18px;margin:22px 2px 10px}.ger-co tr.cur td{background:var(--pri-soft)}.ger-co .ib{margin-left:6px}
+#auth .people.mesas .person{justify-content:center}#auth .mesa-nm{margin:-6px 0 12px}.ger-d summary{cursor:pointer;font-weight:600;margin-bottom:8px}
 .lq-t .cb-bar{min-width:160px}.lq-leg{display:flex;flex-wrap:wrap;gap:2px 10px;margin-top:4px;font-size:11.5px;color:var(--dim)}.lq-leg span{display:inline-flex;align-items:center;gap:4px}.lq-leg i{width:8px;height:8px;border-radius:2px;display:inline-block}.lq-leg b{color:var(--fg)}
 .lq-t tr.lq-sub td{background:var(--soft);font-size:13px}.lq-t tr.lq-sub td:first-child{padding-left:26px}
 body.dir #nav [data-g]:not([data-g=gerencia]){display:none}body.dir #v-config .grid2 > .card:nth-of-type(n+3){display:none} /* el director: solo Mi cuenta y Apariencia */body.dir #bar .pill:not(#sLock):not(#sDb){display:none}body.dir .sh-btn{display:none}
@@ -1832,8 +1833,8 @@ svg.ic.sg-fl{width:17px;height:17px;color:var(--acc);flex:none}
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.48.0';
-const EXT_VER='1.16.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.49.0';
+const EXT_VER='1.17.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2126,7 +2127,7 @@ async function bootFetch(hint={}){
   const lead=!!hint.lead,ago=ms=>new Date(Date.now()-ms).toISOString();
   const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl]=await Promise.all([
     Q(sb.from('profiles').select('*').eq('id',me)),
-    Q(sb.from('teams').select('*').limit(1)),
+    Q(sb.from('teams').select('*').limit(20)), // los globales ven todas: se queda con la suya en bootApply
     Q(sb.from('profiles').select('*').order('name')),
     fetchAll('sales','*','date',hint.nSales||0),
     Q(sb.from('agenda').select('*').eq('user_id',me)),
@@ -2149,7 +2150,7 @@ async function bootFetch(hint={}){
     ficFetch(),
     callsFetch(),
   ]);
-  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl};
+  const raw={prof:prof[0]||null,tm:(prof[0]&&tm.find(t=>t.id===prof[0].team_id))||tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl};
   if(raw.prof&&['admin','leader'].includes(raw.prof.role)!==lead)raw.mesa=await mesaFetch(!lead).catch(()=>null); // adiviné mal el rol
   return raw;
 }
@@ -4400,7 +4401,7 @@ V.cuenta={
       if(c){const m=members.find(x=>x.id===c.dataset.crm);if(!m)return;const v=c.value.trim();if(v===(m.crm_name||''))return;
         if(await B.rpc('set_crm_name',{uid:m.id,nm:v})){m.crm_name=v||null;toast(v?`${esc(m.name)} en el CRM: <b>${esc(v)}</b>`:`${esc(m.name)}: sin nombre en el CRM`)}return}
       const s=e.target.closest('[data-role]');if(!s)return;const m=members.find(x=>x.id===s.dataset.role);
-      if(m&&await B.setMember(m.id,{role:s.value}))toast(`${esc(m.name)}: ${roleTxt(s.value).toLowerCase()}`);else this.render()});
+      if(m&&await B.setMember(m.id,{role:s.value,global:s.value==='director'||!!(m.global&&s.value==='admin')}))toast(`${esc(m.name)}: ${roleTxt(s.value).toLowerCase()}`);else this.render()}); // el director figura en todas las mesas
     $('#cfMembers').addEventListener('click',async e=>{const b=e.target.closest('[data-mact]');if(!b)return;const m=members.find(x=>x.id===b.dataset.id);if(!m)return;
       if(b.dataset.mact==='pin'){
         if(!await confirmar('Resetear PIN',`El PIN de <b>${esc(m.name)}</b> vuelve a ser 0000 y la próxima vez que entre crea uno nuevo.`,'Resetear'))return;
@@ -4449,7 +4450,7 @@ function pinModal(){
 }
 function addMemberModal(){
   modal({title:'Sumar a la mesa',body:`<label class="fld"><span>Nombre (como aparece en la lista)</span><input id="amN" maxlength="40" autofocus></label>
-    <label class="fld" style="margin-top:10px"><span>Rol</span><select id="amR"><option value="agent">Agente</option><option value="leader">Team leader</option><option value="admin">Administrador</option></select></label>
+    <label class="fld" style="margin-top:10px"><span>Rol</span><select id="amR"><option value="agent">Agente</option><option value="leader">Team leader</option><option value="admin">Administrador</option><option value="director">Director (ve Gerencia de todas las mesas)</option></select></label>
     <p class="note">Entra con PIN 0000 la primera vez y crea el suyo.</p><div class="ebox" id="amErr"></div>`,
     actions:[{l:'Cancelar'},{l:'Sumar',cls:'pri',fn:async api=>{
       const n=api.q('#amN').value.trim();if(!n){api.q('#amErr').textContent='Escribí el nombre.';return false}
@@ -8364,6 +8365,60 @@ function gerLQ(R,rows){
     <p class="p-sub" style="margin:8px 2px 0">En verde, deposita bastante más que la mesa; en rojo, bastante menos. * pocos leads. Los porcentajes de "dónde terminan" son sobre los leads del afiliador.</p>`
     :'<div class="p-empty">Sin leads en el período.</div>'}</section>`;
 }
+/* ---------- todas las mesas (el dueño y los directores) ---------- */
+const isGlobal=()=>!!profile&&!!profile.global;
+const MESA_URL=slug=>`https://vitalis-${slug}.joaquin-or24.workers.dev`;
+let gerCo={k:'',at:0,data:null},gerTeams=null;
+async function companyLoad(R){ // ger_company: los números de cada mesa en el período (cache de 2 min)
+  const k=R.from+'|'+R.to;if(gerCo.k===k&&Date.now()-gerCo.at<12e4)return gerCo.data;
+  try{gerCo={k,at:Date.now(),data:await Q(sb.rpc('ger_company',{d1:R.from,d2:R.to}))}}catch(e){gerCo={k,at:Date.now(),data:null}}
+  return gerCo.data;
+}
+async function teamsLoad(){try{gerTeams=await Q(sb.rpc('teams_list'))}catch(e){gerTeams=gerTeams||[]}return gerTeams}
+const dPct=(a,b)=>b?pct(a/b):'<span class="d">—</span>';
+function companyCard(R,C){
+  if(!C||!C.teams)return `<section class="card"><div class="card-h"><h3>Todas las mesas</h3></div><div class="p-empty">No se pudo cargar.</div></section>`;
+  const T=C.teams,S=T.reduce((o,t)=>{for(const k of ['ftd','ftd_new','reg','atend','boleto','dep','agents'])o[k]=(o[k]||0)+(+t[k]||0);return o},{});
+  const q=d=>d==null?'<span class="d">—</span>':`<span class="qb q${d<Q_MIN[0]?1:d<Q_MIN[1]?2:3}">Q${d<Q_MIN[0]?1:d<Q_MIN[1]?2:3}</span> <span class="d">${esc(minsTxt(+d))}/día</span>`;
+  const row=t=>`<tr${t.id===profile.team_id?' class="cur"':''}><td><b>${esc(t.name)}</b>${t.id===profile.team_id?' <span class="d">(estás acá)</span>':`<button type="button" class="ib" data-gerin="${esc(t.slug)}" title="Pasar a esta mesa">Entrar</button>`}<div class="d">${plural(+t.agents,'agente')}</div></td>
+    <td class="r"><b>${t.ftd}</b></td><td class="r"><b>${dPct(+t.ftd_new,+t.reg)}</b> <span class="d">${t.ftd_new} de ${t.reg}</span></td><td>${q(t.dead)}</td>
+    <td class="r">${nf(+t.reg)}</td><td class="r">${dPct(+t.atend,+t.reg)}</td><td class="r">${dPct(+t.boleto,+t.reg)}</td><td class="r">${dPct(+t.dep,+t.reg)}</td></tr>`;
+  const lq=new Map();for(const t of T)for(const a of t.affs||[]){const k=norm(a.aff);const o=lq.get(k)||lq.set(k,{aff:a.aff,reg:0,dep:0,inv:0,at:0,noat:0,by:[]}).get(k);for(const f of ['reg','dep','inv','at','noat'])o[f]+=+a[f]||0;o.by.push([t.name,+a.reg,+a.dep])}
+  const L=[...lq.values()].sort((a,b)=>b.reg-a.reg).slice(0,15),avg=S.reg?S.dep/S.reg:0;
+  return `<section class="card ger-co"><div class="card-h"><h3>Todas las mesas</h3><span class="p-sub">${esc(R.l)} · ${esc(R.t)} · mesa contra mesa</span></div>
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th class="r">FTDs</th><th class="r" title="de los registrados en el período, cuántos depositaron el mismo día">CR (%)</th><th title="tiempo muerto promedio por agente y día">RMO</th><th class="r">Leads</th><th class="r">Atendieron</th><th class="r">Boleto</th><th class="r">Depositan</th></tr></thead>
+    <tbody>${T.map(row).join('')}</tbody><tfoot><tr><td><b>La empresa</b> <span class="d">${plural(S.agents,'agente')}</span></td><td class="r"><b>${S.ftd}</b></td><td class="r"><b>${dPct(S.ftd_new,S.reg)}</b></td><td></td><td class="r">${nf(S.reg)}</td><td class="r">${dPct(S.atend,S.reg)}</td><td class="r">${dPct(S.boleto,S.reg)}</td><td class="r">${dPct(S.dep,S.reg)}</td></tr></tfoot></table></div>
+    ${L.length?`<details class="ger-d" data-k="co-lq"><summary>Lead Quality de la empresa <span class="d">(por afiliador, todas las mesas juntas)</span></summary><div class="p-tablewrap"><table class="pt"><thead><tr><th>Afiliador</th><th class="r">Leads</th><th class="r">Atienden</th><th class="r">Inválidos</th><th class="r">Depositan</th><th>Por mesa</th></tr></thead><tbody>
+      ${L.map(a=>`<tr><td><b>${esc(a.aff)}</b></td><td class="r">${a.reg}</td><td class="r">${dPct(a.at,a.at+a.noat)}</td><td class="r">${dPct(a.inv,a.reg)}</td><td class="r"><b class="${a.reg>=POCOS?(a.dep/a.reg>=avg*1.25?'ok':a.dep/a.reg<=avg*.6?'hot':''):''}">${dPct(a.dep,a.reg)}</b></td><td class="d">${a.by.map(([n,r,d])=>`${esc(n)} ${d}/${r}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`;
+}
+function mesasCard(T){ // las mesas (solo el dueño): la lista con su link y "Nueva mesa"
+  if(!T)return '';
+  return `<section class="card ger-mesas"><div class="card-h"><h3>Mesas</h3><span class="p-sub">${plural(T.length,'mesa')} · cada una entra por su propio dominio</span><span class="grow"></span><button type="button" class="btn sm pri" data-act="mesaNueva">Nueva mesa</button></div>
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th>Team leader</th><th class="r">Personas</th><th>Dominio</th><th class="act"></th></tr></thead><tbody>
+    ${T.map(t=>`<tr><td><b>${esc(t.name)}</b>${t.mine?' <span class="d">(estás acá)</span>':''}</td><td>${esc(t.leader||'—')}</td><td class="r">${t.people}</td><td><a href="${MESA_URL(t.slug)}" target="_blank" rel="noopener" class="lnk">${esc(MESA_URL(t.slug).replace('https://',''))}</a></td><td class="act">${t.mine?'':`<button type="button" class="btn sm" data-gerin="${esc(t.slug)}">Entrar</button>`}</td></tr>`).join('')}</tbody></table></div>
+    <p class="p-sub" style="margin:8px 2px 0">Para que el dominio ande, en Cloudflare se crea un Worker llamado <b>vitalis-&lt;nombre corto&gt;</b> con este mismo repo (está en el README). Mientras tanto, la mesa entra por vitalis.joaquin-or24.workers.dev eligiéndola en la lista.</p></section>`;
+}
+function mesaNuevaModal(){
+  modal({title:'Nueva mesa',wide:1,body:`<label class="fld"><span>Nombre de la mesa</span><input id="mnN" maxlength="40" placeholder="Team Sofía" autofocus></label>
+    <label class="fld" style="margin-top:10px"><span>Nombre corto (va en el dominio: vitalis-<b>sofia</b>.joaquin-or24.workers.dev)</span><input id="mnS" maxlength="30" placeholder="sofia"></label>
+    <label class="fld" style="margin-top:10px"><span>Team leader (opcional)</span><input id="mnL" maxlength="40" placeholder="Nombre Apellido"></label>
+    <label class="fld" style="margin-top:10px"><span>Agentes, uno por línea (opcional)</span><textarea id="mnA" rows="5" placeholder="Nombre Ap\nOtro Ap"></textarea></label>
+    <p class="note">Todos entran con PIN 0000 la primera vez. Después podés sumar o sacar gente desde esa mesa, en Ajustes → Mesa.</p><div class="ebox" id="mnErr"></div>`,
+    actions:[{l:'Cancelar'},{l:'Crear la mesa',cls:'pri',fn:async api=>{
+      const nm=api.q('#mnN').value.trim();if(!nm){api.q('#mnErr').textContent='Escribí el nombre de la mesa.';return false}
+      const agents=api.q('#mnA').value.split(/\n/).map(s=>s.trim()).filter(Boolean);
+      const {data,error}=await sb.rpc('team_create',{nm,slug:api.q('#mnS').value.trim(),leader:api.q('#mnL').value.trim()||null,agents});
+      if(error){api.q('#mnErr').textContent=errMsg(error);return false}
+      toast(`Mesa <b>${esc(nm)}</b> creada${data&&data.people?` con ${plural(data.people,'persona')}`:''}. Dominio: ${esc(MESA_URL(data.slug))}`,'ok',{ms:12000});
+      gerTeams=null;gerCo={k:'',at:0,data:null};V.gerencia.render({})}}]});
+  const n=$('#mnN'),s=$('#mnS');if(n&&s)n.addEventListener('input',()=>{if(!s.dataset.touched)s.value=n.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^team\s+/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')});
+  if(s)s.addEventListener('input',()=>{s.dataset.touched='1'});
+}
+async function mesaEntrar(slug){ // pasar a otra mesa: el perfil cambia de mesa y Vitalis arranca de nuevo ahí
+  if(!await B.rpc('switch_team',{slug}))return;
+  local.set('mesa',slug);await snapClear();location.reload();
+}
+
 /* ---------- la sección ---------- */
 function gerHead(R){
   const W=gerWeeks(gerP.ym),cur=gerP.ym===ymNow();
@@ -8374,6 +8429,8 @@ V.gerencia={
   build(){
     const b=$('#gerBody');
     b.addEventListener('click',e=>{const p=e.target.closest('[data-ger]');if(p){gerP.k=p.dataset.ger;this.render({});return}
+      const i=e.target.closest('[data-gerin]');if(i){mesaEntrar(i.dataset.gerin);return}
+      const a=e.target.closest('[data-act=mesaNueva]');if(a){mesaNuevaModal();return}
       const m=e.target.closest('[data-germ]');if(m){gerP.ym=ymStep(gerP.ym,+m.dataset.germ);if(gerP.ym>ymNow())gerP.ym=ymNow();gerP.k='mes';this.render({})}});
     setInterval(()=>{if(ready&&cur==='gerencia'&&!document.hidden)this.render({})},6e4);
   },
@@ -8386,7 +8443,14 @@ V.gerencia={
     const all=cmp.rows||[],rows=all.filter(r=>regIn(r,R.from,R.to)),prev=all.filter(r=>regIn(r,R.prev.from,R.prev.to));
     const rm=(rmoRows[from+'|'+to]||[]),rmR=rm.filter(r=>r.date>=R.from&&r.date<=R.to),rmP=rm.filter(r=>r.date>=R.prev.from&&r.date<=R.prev.to);
     const pron=R.k==='mes'&&gerP.ym===ymNow()?`<section class="card">${pronCard()}</section>`:'';
-    b.innerHTML=gerHead(R)+gerTabla(R,rmR,rmP)+pron+gerEmbudo(R,rows,prev)+gerLQ(R,rows);
+    let top='';
+    if(isGlobal()||isDirector()){ // todas las mesas, comparadas; y las mesas (solo el dueño)
+      const [C,T]=await Promise.all([companyLoad(R),isGlobal()&&isAdmin()?teamsLoad():Promise.resolve(null)]);
+      if(cur!=='gerencia')return;
+      top=companyCard(R,C)+(T?mesasCard(T):'');
+    }
+    const mesa=members.length||teamInfo?`<h2 class="ger-h2">${esc(teamInfo&&teamInfo.name||'Esta mesa')}</h2>`:'';
+    b.innerHTML=gerHead(R)+top+(top?mesa:'')+gerTabla(R,rmR,rmP)+pron+gerEmbudo(R,rows,prev)+gerLQ(R,rows);
     reopen(b,op);
   }
 };
@@ -8658,8 +8722,15 @@ function authErr(e) {
 }
 
 let authPerson = null, roster = null;
+// la mesa de esta entrada: el dominio (vitalis-<mesa>.joaquin-or24.workers.dev), si no #m=<mesa> (queda guardado), si no la elegida la última vez
+function mesaSlug() {
+  const m = /^vitalis-([a-z0-9-]+)\./.exec(location.hostname); if (m) return m[1];
+  const q = /[#&?]m=([a-z0-9-]+)/.exec(location.hash + location.search); if (q) { local.set('mesa', q[1]); return q[1]; }
+  return local.get('mesa', '') || '';
+}
+const mesaFixed = () => /^vitalis-[a-z0-9-]+\./.test(location.hostname); // con dominio propio no se elige
 async function loadRoster() {
-  const { data, error } = await sb.rpc('roster');
+  const { data, error } = await sb.rpc('roster', { slug: mesaSlug() || null });
   if (error) throw error;
   return data;
 }
@@ -8692,7 +8763,7 @@ const AUTH = {
 
   async who(box, msg, fresh) {
     const keep = local.get('roster', null);
-    if (!fresh && keep && keep.people) { // al instante con la última lista; si cambió, se vuelve a dibujar
+    if (!fresh && keep && keep.people && (keep.slug || '') === (mesaSlug() || '')) { // al instante con la última lista; si cambió, se vuelve a dibujar
       roster = keep; AUTH.whoDraw(box, msg);
       loadRoster().then((r) => { local.set('roster', r); if (JSON.stringify(r) !== JSON.stringify(keep) && document.body.contains(box) && box.querySelector('.people')) { roster = r; AUTH.whoDraw(box, msg); } }).catch(() => {});
       return;
@@ -8703,16 +8774,22 @@ const AUTH = {
     AUTH.whoDraw(box, msg);
   },
   whoDraw(box, msg) {
+    if (roster && roster.teams) { // varias mesas y ninguna elegida: ¿de qué mesa sos?
+      box.innerHTML = `<h2>¿De qué mesa sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}<div class="people mesas">${roster.teams.map((t) => `<button type="button" class="person" data-mesa="${esc(t.slug)}"><span class="nm">${esc(t.name)}</span></button>`).join('')}</div>${roster.teams.length ? '' : '<p class="p-empty">Todavía no hay mesas.</p>'}`;
+      box.querySelector('.people').addEventListener('click', (e) => { const b = e.target.closest('[data-mesa]'); if (!b) return; local.set('mesa', b.dataset.mesa); authScreen('who', '', true); });
+      const f = box.querySelector('.person'); if (f) f.focus(); return;
+    }
     const lastU = local.get('lastUser', '');
     const people = (roster && roster.people) || [];
     const ordered = lastU ? [...people].sort((a, b) => (b.id === lastU) - (a.id === lastU)) : people;
-    box.innerHTML = `<h2>¿Quién sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
+    box.innerHTML = `<h2>¿Quién sos?</h2>${roster && roster.team ? `<p class="lead mesa-nm">${esc(roster.team)}${!mesaFixed() ? ' · <button type="button" class="lnk" id="aMesa">Otra mesa</button>' : ''}</p>` : ''}${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
       <div class="people">${ordered.map((p) => `<button type="button" class="person${p.id === lastU ? ' last' : ''}" data-id="${esc(p.id)}">${avatar(p.name)}<span class="nm">${esc(p.name)}${p.role === 'leader' ? '<small>Team leader</small>' : p.role === 'admin' ? '<small>Administrador</small>' : p.role === 'director' ? '<small>Director</small>' : p.id === lastU ? '<small>La última vez</small>' : ''}</span></button>`).join('')}</div>
       ${people.length ? '' : '<p class="p-empty">Todavía no hay nadie en la mesa.</p>'}`;
     box.querySelector('.people').addEventListener('click', (e) => {
       const b = e.target.closest('[data-id]'); if (!b) return;
       authPerson = people.find((p) => p.id === b.dataset.id); authScreen('pin');
     });
+    const am = box.querySelector('#aMesa'); if (am) am.onclick = () => { local.set('mesa', ''); roster = null; authScreen('who', '', true); };
     const lb = box.querySelector('.person.last') || box.querySelector('.person'); if (lb) lb.focus();
   },
 
@@ -8726,7 +8803,7 @@ const AUTH = {
         ui.busy(true);
         try {
           for (let i = 0; i < 2; i++) {
-            const { data, error } = await sb.rpc('pin_login', { uid: p.id, pin });
+            const { data, error } = await sb.rpc('pin_login', { uid: p.id, pin, slug: (roster && roster.slug) || null });
             if (error) throw error;
             if (!data || !data.ok) {
               if (data && data.error === 'locked') return ui.fail(`Demasiados intentos. Probá de nuevo en ${plural(data.minutes, 'minuto')}.`, true);
@@ -8734,7 +8811,7 @@ const AUTH = {
               return ui.fail(data && data.left <= 2 ? `PIN incorrecto. ${data.left === 1 ? 'Te queda 1 intento.' : `Te quedan ${data.left} intentos.`}` : 'PIN incorrecto.');
             }
             const r = await sb.auth.signInWithPassword({ email: data.email, password: data.password });
-            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
+            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); if (p.global) await snapClear(); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; } // un global pudo cambiar de mesa: lo guardado era de la otra
             if (!/invalid login credentials/i.test(r.error.message || '')) throw r.error;
           }
           ui.fail('No se pudo abrir la sesión. Probá de nuevo.');

@@ -41,8 +41,15 @@ function authErr(e) {
 }
 
 let authPerson = null, roster = null;
+// la mesa de esta entrada: el dominio (vitalis-<mesa>.joaquin-or24.workers.dev), si no #m=<mesa> (queda guardado), si no la elegida la última vez
+function mesaSlug() {
+  const m = /^vitalis-([a-z0-9-]+)\./.exec(location.hostname); if (m) return m[1];
+  const q = /[#&?]m=([a-z0-9-]+)/.exec(location.hash + location.search); if (q) { local.set('mesa', q[1]); return q[1]; }
+  return local.get('mesa', '') || '';
+}
+const mesaFixed = () => /^vitalis-[a-z0-9-]+\./.test(location.hostname); // con dominio propio no se elige
 async function loadRoster() {
-  const { data, error } = await sb.rpc('roster');
+  const { data, error } = await sb.rpc('roster', { slug: mesaSlug() || null });
   if (error) throw error;
   return data;
 }
@@ -75,7 +82,7 @@ const AUTH = {
 
   async who(box, msg, fresh) {
     const keep = local.get('roster', null);
-    if (!fresh && keep && keep.people) { // al instante con la última lista; si cambió, se vuelve a dibujar
+    if (!fresh && keep && keep.people && (keep.slug || '') === (mesaSlug() || '')) { // al instante con la última lista; si cambió, se vuelve a dibujar
       roster = keep; AUTH.whoDraw(box, msg);
       loadRoster().then((r) => { local.set('roster', r); if (JSON.stringify(r) !== JSON.stringify(keep) && document.body.contains(box) && box.querySelector('.people')) { roster = r; AUTH.whoDraw(box, msg); } }).catch(() => {});
       return;
@@ -86,16 +93,22 @@ const AUTH = {
     AUTH.whoDraw(box, msg);
   },
   whoDraw(box, msg) {
+    if (roster && roster.teams) { // varias mesas y ninguna elegida: ¿de qué mesa sos?
+      box.innerHTML = `<h2>¿De qué mesa sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}<div class="people mesas">${roster.teams.map((t) => `<button type="button" class="person" data-mesa="${esc(t.slug)}"><span class="nm">${esc(t.name)}</span></button>`).join('')}</div>${roster.teams.length ? '' : '<p class="p-empty">Todavía no hay mesas.</p>'}`;
+      box.querySelector('.people').addEventListener('click', (e) => { const b = e.target.closest('[data-mesa]'); if (!b) return; local.set('mesa', b.dataset.mesa); authScreen('who', '', true); });
+      const f = box.querySelector('.person'); if (f) f.focus(); return;
+    }
     const lastU = local.get('lastUser', '');
     const people = (roster && roster.people) || [];
     const ordered = lastU ? [...people].sort((a, b) => (b.id === lastU) - (a.id === lastU)) : people;
-    box.innerHTML = `<h2>¿Quién sos?</h2>${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
+    box.innerHTML = `<h2>¿Quién sos?</h2>${roster && roster.team ? `<p class="lead mesa-nm">${esc(roster.team)}${!mesaFixed() ? ' · <button type="button" class="lnk" id="aMesa">Otra mesa</button>' : ''}</p>` : ''}${msg ? `<p class="ebox">${esc(msg)}</p>` : ''}
       <div class="people">${ordered.map((p) => `<button type="button" class="person${p.id === lastU ? ' last' : ''}" data-id="${esc(p.id)}">${avatar(p.name)}<span class="nm">${esc(p.name)}${p.role === 'leader' ? '<small>Team leader</small>' : p.role === 'admin' ? '<small>Administrador</small>' : p.role === 'director' ? '<small>Director</small>' : p.id === lastU ? '<small>La última vez</small>' : ''}</span></button>`).join('')}</div>
       ${people.length ? '' : '<p class="p-empty">Todavía no hay nadie en la mesa.</p>'}`;
     box.querySelector('.people').addEventListener('click', (e) => {
       const b = e.target.closest('[data-id]'); if (!b) return;
       authPerson = people.find((p) => p.id === b.dataset.id); authScreen('pin');
     });
+    const am = box.querySelector('#aMesa'); if (am) am.onclick = () => { local.set('mesa', ''); roster = null; authScreen('who', '', true); };
     const lb = box.querySelector('.person.last') || box.querySelector('.person'); if (lb) lb.focus();
   },
 
@@ -109,7 +122,7 @@ const AUTH = {
         ui.busy(true);
         try {
           for (let i = 0; i < 2; i++) {
-            const { data, error } = await sb.rpc('pin_login', { uid: p.id, pin });
+            const { data, error } = await sb.rpc('pin_login', { uid: p.id, pin, slug: (roster && roster.slug) || null });
             if (error) throw error;
             if (!data || !data.ok) {
               if (data && data.error === 'locked') return ui.fail(`Demasiados intentos. Probá de nuevo en ${plural(data.minutes, 'minuto')}.`, true);
@@ -117,7 +130,7 @@ const AUTH = {
               return ui.fail(data && data.left <= 2 ? `PIN incorrecto. ${data.left === 1 ? 'Te queda 1 intento.' : `Te quedan ${data.left} intentos.`}` : 'PIN incorrecto.');
             }
             const r = await sb.auth.signInWithPassword({ email: data.email, password: data.password });
-            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; }
+            if (!r.error) { me = r.data.user.id; local.set('lastUser', p.id); if (p.global) await snapClear(); const c = await bootCached(me); if (!c) authScreen('loading'); connect(c); return; } // un global pudo cambiar de mesa: lo guardado era de la otra
             if (!/invalid login credentials/i.test(r.error.message || '')) throw r.error;
           }
           ui.fail('No se pudo abrir la sesión. Probá de nuevo.');

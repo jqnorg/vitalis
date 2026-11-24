@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.48.0';
+const VERSION='1.49.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -297,7 +297,7 @@ async function bootFetch(hint={}){
   const lead=!!hint.lead,ago=ms=>new Date(Date.now()-ms).toISOString();
   const [prof,tm,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl]=await Promise.all([
     Q(sb.from('profiles').select('*').eq('id',me)),
-    Q(sb.from('teams').select('*').limit(1)),
+    Q(sb.from('teams').select('*').limit(20)), // los globales ven todas: se queda con la suya en bootApply
     Q(sb.from('profiles').select('*').order('name')),
     fetchAll('sales','*','date',hint.nSales||0),
     Q(sb.from('agenda').select('*').eq('user_id',me)),
@@ -320,7 +320,7 @@ async function bootFetch(hint={}){
     ficFetch(),
     callsFetch(),
   ]);
-  const raw={prof:prof[0]||null,tm:tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl};
+  const raw={prof:prof[0]||null,tm:(prof[0]&&tm.find(t=>t.id===prof[0].team_id))||tm[0]||null,mem,sales,ag,adj,sh,st,sn,ld,pg,ch,cm,rd,ms,tk,tp,mesa,av,rx,bkx,fic,cl};
   if(raw.prof&&['admin','leader'].includes(raw.prof.role)!==lead)raw.mesa=await mesaFetch(!lead).catch(()=>null); // adiviné mal el rol
   return raw;
 }

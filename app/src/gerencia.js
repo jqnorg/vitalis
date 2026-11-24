@@ -101,6 +101,60 @@ function gerLQ(R,rows){
     <p class="p-sub" style="margin:8px 2px 0">En verde, deposita bastante más que la mesa; en rojo, bastante menos. * pocos leads. Los porcentajes de "dónde terminan" son sobre los leads del afiliador.</p>`
     :'<div class="p-empty">Sin leads en el período.</div>'}</section>`;
 }
+/* ---------- todas las mesas (el dueño y los directores) ---------- */
+const isGlobal=()=>!!profile&&!!profile.global;
+const MESA_URL=slug=>`https://vitalis-${slug}.joaquin-or24.workers.dev`;
+let gerCo={k:'',at:0,data:null},gerTeams=null;
+async function companyLoad(R){ // ger_company: los números de cada mesa en el período (cache de 2 min)
+  const k=R.from+'|'+R.to;if(gerCo.k===k&&Date.now()-gerCo.at<12e4)return gerCo.data;
+  try{gerCo={k,at:Date.now(),data:await Q(sb.rpc('ger_company',{d1:R.from,d2:R.to}))}}catch(e){gerCo={k,at:Date.now(),data:null}}
+  return gerCo.data;
+}
+async function teamsLoad(){try{gerTeams=await Q(sb.rpc('teams_list'))}catch(e){gerTeams=gerTeams||[]}return gerTeams}
+const dPct=(a,b)=>b?pct(a/b):'<span class="d">—</span>';
+function companyCard(R,C){
+  if(!C||!C.teams)return `<section class="card"><div class="card-h"><h3>Todas las mesas</h3></div><div class="p-empty">No se pudo cargar.</div></section>`;
+  const T=C.teams,S=T.reduce((o,t)=>{for(const k of ['ftd','ftd_new','reg','atend','boleto','dep','agents'])o[k]=(o[k]||0)+(+t[k]||0);return o},{});
+  const q=d=>d==null?'<span class="d">—</span>':`<span class="qb q${d<Q_MIN[0]?1:d<Q_MIN[1]?2:3}">Q${d<Q_MIN[0]?1:d<Q_MIN[1]?2:3}</span> <span class="d">${esc(minsTxt(+d))}/día</span>`;
+  const row=t=>`<tr${t.id===profile.team_id?' class="cur"':''}><td><b>${esc(t.name)}</b>${t.id===profile.team_id?' <span class="d">(estás acá)</span>':`<button type="button" class="ib" data-gerin="${esc(t.slug)}" title="Pasar a esta mesa">Entrar</button>`}<div class="d">${plural(+t.agents,'agente')}</div></td>
+    <td class="r"><b>${t.ftd}</b></td><td class="r"><b>${dPct(+t.ftd_new,+t.reg)}</b> <span class="d">${t.ftd_new} de ${t.reg}</span></td><td>${q(t.dead)}</td>
+    <td class="r">${nf(+t.reg)}</td><td class="r">${dPct(+t.atend,+t.reg)}</td><td class="r">${dPct(+t.boleto,+t.reg)}</td><td class="r">${dPct(+t.dep,+t.reg)}</td></tr>`;
+  const lq=new Map();for(const t of T)for(const a of t.affs||[]){const k=norm(a.aff);const o=lq.get(k)||lq.set(k,{aff:a.aff,reg:0,dep:0,inv:0,at:0,noat:0,by:[]}).get(k);for(const f of ['reg','dep','inv','at','noat'])o[f]+=+a[f]||0;o.by.push([t.name,+a.reg,+a.dep])}
+  const L=[...lq.values()].sort((a,b)=>b.reg-a.reg).slice(0,15),avg=S.reg?S.dep/S.reg:0;
+  return `<section class="card ger-co"><div class="card-h"><h3>Todas las mesas</h3><span class="p-sub">${esc(R.l)} · ${esc(R.t)} · mesa contra mesa</span></div>
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th class="r">FTDs</th><th class="r" title="de los registrados en el período, cuántos depositaron el mismo día">CR (%)</th><th title="tiempo muerto promedio por agente y día">RMO</th><th class="r">Leads</th><th class="r">Atendieron</th><th class="r">Boleto</th><th class="r">Depositan</th></tr></thead>
+    <tbody>${T.map(row).join('')}</tbody><tfoot><tr><td><b>La empresa</b> <span class="d">${plural(S.agents,'agente')}</span></td><td class="r"><b>${S.ftd}</b></td><td class="r"><b>${dPct(S.ftd_new,S.reg)}</b></td><td></td><td class="r">${nf(S.reg)}</td><td class="r">${dPct(S.atend,S.reg)}</td><td class="r">${dPct(S.boleto,S.reg)}</td><td class="r">${dPct(S.dep,S.reg)}</td></tr></tfoot></table></div>
+    ${L.length?`<details class="ger-d" data-k="co-lq"><summary>Lead Quality de la empresa <span class="d">(por afiliador, todas las mesas juntas)</span></summary><div class="p-tablewrap"><table class="pt"><thead><tr><th>Afiliador</th><th class="r">Leads</th><th class="r">Atienden</th><th class="r">Inválidos</th><th class="r">Depositan</th><th>Por mesa</th></tr></thead><tbody>
+      ${L.map(a=>`<tr><td><b>${esc(a.aff)}</b></td><td class="r">${a.reg}</td><td class="r">${dPct(a.at,a.at+a.noat)}</td><td class="r">${dPct(a.inv,a.reg)}</td><td class="r"><b class="${a.reg>=POCOS?(a.dep/a.reg>=avg*1.25?'ok':a.dep/a.reg<=avg*.6?'hot':''):''}">${dPct(a.dep,a.reg)}</b></td><td class="d">${a.by.map(([n,r,d])=>`${esc(n)} ${d}/${r}`).join(' · ')}</td></tr>`).join('')}</tbody></table></div></details>`:''}</section>`;
+}
+function mesasCard(T){ // las mesas (solo el dueño): la lista con su link y "Nueva mesa"
+  if(!T)return '';
+  return `<section class="card ger-mesas"><div class="card-h"><h3>Mesas</h3><span class="p-sub">${plural(T.length,'mesa')} · cada una entra por su propio dominio</span><span class="grow"></span><button type="button" class="btn sm pri" data-act="mesaNueva">Nueva mesa</button></div>
+    <div class="p-tablewrap"><table class="pt"><thead><tr><th>Mesa</th><th>Team leader</th><th class="r">Personas</th><th>Dominio</th><th class="act"></th></tr></thead><tbody>
+    ${T.map(t=>`<tr><td><b>${esc(t.name)}</b>${t.mine?' <span class="d">(estás acá)</span>':''}</td><td>${esc(t.leader||'—')}</td><td class="r">${t.people}</td><td><a href="${MESA_URL(t.slug)}" target="_blank" rel="noopener" class="lnk">${esc(MESA_URL(t.slug).replace('https://',''))}</a></td><td class="act">${t.mine?'':`<button type="button" class="btn sm" data-gerin="${esc(t.slug)}">Entrar</button>`}</td></tr>`).join('')}</tbody></table></div>
+    <p class="p-sub" style="margin:8px 2px 0">Para que el dominio ande, en Cloudflare se crea un Worker llamado <b>vitalis-&lt;nombre corto&gt;</b> con este mismo repo (está en el README). Mientras tanto, la mesa entra por vitalis.joaquin-or24.workers.dev eligiéndola en la lista.</p></section>`;
+}
+function mesaNuevaModal(){
+  modal({title:'Nueva mesa',wide:1,body:`<label class="fld"><span>Nombre de la mesa</span><input id="mnN" maxlength="40" placeholder="Team Sofía" autofocus></label>
+    <label class="fld" style="margin-top:10px"><span>Nombre corto (va en el dominio: vitalis-<b>sofia</b>.joaquin-or24.workers.dev)</span><input id="mnS" maxlength="30" placeholder="sofia"></label>
+    <label class="fld" style="margin-top:10px"><span>Team leader (opcional)</span><input id="mnL" maxlength="40" placeholder="Nombre Apellido"></label>
+    <label class="fld" style="margin-top:10px"><span>Agentes, uno por línea (opcional)</span><textarea id="mnA" rows="5" placeholder="Nombre Ap\nOtro Ap"></textarea></label>
+    <p class="note">Todos entran con PIN 0000 la primera vez. Después podés sumar o sacar gente desde esa mesa, en Ajustes → Mesa.</p><div class="ebox" id="mnErr"></div>`,
+    actions:[{l:'Cancelar'},{l:'Crear la mesa',cls:'pri',fn:async api=>{
+      const nm=api.q('#mnN').value.trim();if(!nm){api.q('#mnErr').textContent='Escribí el nombre de la mesa.';return false}
+      const agents=api.q('#mnA').value.split(/\n/).map(s=>s.trim()).filter(Boolean);
+      const {data,error}=await sb.rpc('team_create',{nm,slug:api.q('#mnS').value.trim(),leader:api.q('#mnL').value.trim()||null,agents});
+      if(error){api.q('#mnErr').textContent=errMsg(error);return false}
+      toast(`Mesa <b>${esc(nm)}</b> creada${data&&data.people?` con ${plural(data.people,'persona')}`:''}. Dominio: ${esc(MESA_URL(data.slug))}`,'ok',{ms:12000});
+      gerTeams=null;gerCo={k:'',at:0,data:null};V.gerencia.render({})}}]});
+  const n=$('#mnN'),s=$('#mnS');if(n&&s)n.addEventListener('input',()=>{if(!s.dataset.touched)s.value=n.value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/^team\s+/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')});
+  if(s)s.addEventListener('input',()=>{s.dataset.touched='1'});
+}
+async function mesaEntrar(slug){ // pasar a otra mesa: el perfil cambia de mesa y Vitalis arranca de nuevo ahí
+  if(!await B.rpc('switch_team',{slug}))return;
+  local.set('mesa',slug);await snapClear();location.reload();
+}
+
 /* ---------- la sección ---------- */
 function gerHead(R){
   const W=gerWeeks(gerP.ym),cur=gerP.ym===ymNow();
@@ -111,6 +165,8 @@ V.gerencia={
   build(){
     const b=$('#gerBody');
     b.addEventListener('click',e=>{const p=e.target.closest('[data-ger]');if(p){gerP.k=p.dataset.ger;this.render({});return}
+      const i=e.target.closest('[data-gerin]');if(i){mesaEntrar(i.dataset.gerin);return}
+      const a=e.target.closest('[data-act=mesaNueva]');if(a){mesaNuevaModal();return}
       const m=e.target.closest('[data-germ]');if(m){gerP.ym=ymStep(gerP.ym,+m.dataset.germ);if(gerP.ym>ymNow())gerP.ym=ymNow();gerP.k='mes';this.render({})}});
     setInterval(()=>{if(ready&&cur==='gerencia'&&!document.hidden)this.render({})},6e4);
   },
@@ -123,7 +179,14 @@ V.gerencia={
     const all=cmp.rows||[],rows=all.filter(r=>regIn(r,R.from,R.to)),prev=all.filter(r=>regIn(r,R.prev.from,R.prev.to));
     const rm=(rmoRows[from+'|'+to]||[]),rmR=rm.filter(r=>r.date>=R.from&&r.date<=R.to),rmP=rm.filter(r=>r.date>=R.prev.from&&r.date<=R.prev.to);
     const pron=R.k==='mes'&&gerP.ym===ymNow()?`<section class="card">${pronCard()}</section>`:'';
-    b.innerHTML=gerHead(R)+gerTabla(R,rmR,rmP)+pron+gerEmbudo(R,rows,prev)+gerLQ(R,rows);
+    let top='';
+    if(isGlobal()||isDirector()){ // todas las mesas, comparadas; y las mesas (solo el dueño)
+      const [C,T]=await Promise.all([companyLoad(R),isGlobal()&&isAdmin()?teamsLoad():Promise.resolve(null)]);
+      if(cur!=='gerencia')return;
+      top=companyCard(R,C)+(T?mesasCard(T):'');
+    }
+    const mesa=members.length||teamInfo?`<h2 class="ger-h2">${esc(teamInfo&&teamInfo.name||'Esta mesa')}</h2>`:'';
+    b.innerHTML=gerHead(R)+top+(top?mesa:'')+gerTabla(R,rmR,rmP)+pron+gerEmbudo(R,rows,prev)+gerLQ(R,rows);
     reopen(b,op);
   }
 };

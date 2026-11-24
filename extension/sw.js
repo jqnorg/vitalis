@@ -896,7 +896,7 @@ chrome.notifications.onButtonClicked.addListener(async (nid, btn) => {
 
 /* ---------- snippets en todo Chrome ---------- */
 // al instalar o actualizar, los pongo en las pestañas que ya estaban abiertas (sin tener que recargarlas)
-const VITALIS_URL = ['https://vitalis.joaquin-or24.workers.dev/*', 'https://vitaliscrm.netlify.app/*']; // la nueva (Cloudflare) y la vieja mientras dure el cambio
+const VITALIS_URL = ['https://vitalis.joaquin-or24.workers.dev/*', 'https://*.joaquin-or24.workers.dev/*', 'https://vitaliscrm.netlify.app/*']; // Cloudflare (y un dominio por mesa: vitalis-<mesa>.joaquin-or24.workers.dev), y la vieja mientras dure el cambio
 chrome.runtime.onInstalled.addListener(async () => {
   snipMenu();
   for (const t of await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] })) {

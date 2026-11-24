@@ -71,7 +71,7 @@ async function renderStation() { // la estación (el Chrome del team leader): cu
 const plural = (n, a, b) => n + ' ' + (n === 1 ? a : b);
 async function renderCrm() { // en un sitio https que no es Vitalis: ofrecer usarlo como CRM
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || !/^https:\/\//.test(tab.url || '') || /vitalis\.joaquin-or24\.workers\.dev|vitaliscrm\.netlify\.app/.test(tab.url)) return;
+  if (!tab || !/^https:\/\//.test(tab.url || '') || /\.joaquin-or24\.workers\.dev|vitaliscrm\.netlify\.app/.test(tab.url)) return;
   const host = new URL(tab.url).hostname, { crmSites = {} } = await chrome.storage.local.get('crmSites');
   const known = /crmnovaramarkets\.com$|crmtrade24seven\.com$/.test(host) || crmSites[host];
   const box = document.getElementById('crmBox'); box.hidden = false;

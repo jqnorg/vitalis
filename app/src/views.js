@@ -633,7 +633,7 @@ V.cuenta={
       if(c){const m=members.find(x=>x.id===c.dataset.crm);if(!m)return;const v=c.value.trim();if(v===(m.crm_name||''))return;
         if(await B.rpc('set_crm_name',{uid:m.id,nm:v})){m.crm_name=v||null;toast(v?`${esc(m.name)} en el CRM: <b>${esc(v)}</b>`:`${esc(m.name)}: sin nombre en el CRM`)}return}
       const s=e.target.closest('[data-role]');if(!s)return;const m=members.find(x=>x.id===s.dataset.role);
-      if(m&&await B.setMember(m.id,{role:s.value}))toast(`${esc(m.name)}: ${roleTxt(s.value).toLowerCase()}`);else this.render()});
+      if(m&&await B.setMember(m.id,{role:s.value,global:s.value==='director'||!!(m.global&&s.value==='admin')}))toast(`${esc(m.name)}: ${roleTxt(s.value).toLowerCase()}`);else this.render()}); // el director figura en todas las mesas
     $('#cfMembers').addEventListener('click',async e=>{const b=e.target.closest('[data-mact]');if(!b)return;const m=members.find(x=>x.id===b.dataset.id);if(!m)return;
       if(b.dataset.mact==='pin'){
         if(!await confirmar('Resetear PIN',`El PIN de <b>${esc(m.name)}</b> vuelve a ser 0000 y la próxima vez que entre crea uno nuevo.`,'Resetear'))return;
@@ -682,7 +682,7 @@ function pinModal(){
 }
 function addMemberModal(){
   modal({title:'Sumar a la mesa',body:`<label class="fld"><span>Nombre (como aparece en la lista)</span><input id="amN" maxlength="40" autofocus></label>
-    <label class="fld" style="margin-top:10px"><span>Rol</span><select id="amR"><option value="agent">Agente</option><option value="leader">Team leader</option><option value="admin">Administrador</option></select></label>
+    <label class="fld" style="margin-top:10px"><span>Rol</span><select id="amR"><option value="agent">Agente</option><option value="leader">Team leader</option><option value="admin">Administrador</option><option value="director">Director (ve Gerencia de todas las mesas)</option></select></label>
     <p class="note">Entra con PIN 0000 la primera vez y crea el suyo.</p><div class="ebox" id="amErr"></div>`,
     actions:[{l:'Cancelar'},{l:'Sumar',cls:'pri',fn:async api=>{
       const n=api.q('#amN').value.trim();if(!n){api.q('#amErr').textContent='Escribí el nombre.';return false}
