@@ -142,8 +142,9 @@ function bkRecom(pais,way){
   if(way==='efectivo')return bkOptions(pais,'efectivo');
   const L=bkOptions(pais,'digital'),b=way==='otro'?null:bk.banks.find(x=>x.id===way);
   if(!b)return L;
-  const rank=o=>{const i=(b.use_pm||[]).findIndex(c=>comboHit(c,o));if(i>=0)return i;const a=(b.avoid_pm||[]).some(c=>comboHit(c,o));return a?2000:1000};
-  return L.map((o,i)=>({o,r:rank(o),i})).sort((a,c)=>(a.o.falla?1:0)-(c.o.falla?1:0)||a.r-c.r||a.i-c.i).map(x=>x.o);
+  const U=b.use_pm||[];if(!U.length)return L; // sin orden armado: se ve todo
+  const rank=o=>U.findIndex(c=>comboHit(c,o));
+  return L.map((o,i)=>({o,r:rank(o),i})).filter(x=>x.r>=0).sort((a,c)=>(a.o.falla?1:0)-(c.o.falla?1:0)||a.r-c.r||a.i-c.i).map(x=>x.o); // lo que el admin no puso como disponible no se ofrece
 }
 const banksIn=pais=>bk.banks.filter(b=>!b.country||b.country===pais).sort((a,b)=>a.name.localeCompare(b.name));
 function bkOptHTML(o){
@@ -177,7 +178,7 @@ V.banking={
       const w=e.target.closest('[data-bkw]');if(w){bkWay=w.dataset.bkw;bkTipo=bkWay==='efectivo'?'efectivo':bkWay?'digital':'';this.render({});return} // paso 2: efectivo o el banco
       const oc=e.target.closest('[data-bko]');if(oc){bkOrdC=oc.dataset.bko;bkOrdB='';this.render({});return} // el orden por banco (admin): país
       const ob=e.target.closest('[data-bkob]');if(ob){bkOrdB=ob.dataset.bkob;this.render({});return} // y banco
-      const mv=e.target.closest('[data-bkmv]');if(mv){bkOrdMove(mv.closest('.bk-ord').dataset.i|0,mv.dataset.bkmv);return}
+      const mv=e.target.closest('[data-bkmv]');if(mv){bkOrdMove(mv.closest('.bk-ord').dataset.i|0,mv.dataset.bkmv,mv.closest('[data-lst]').dataset.lst);return}
       const sv=e.target.closest('[data-bkordsave]');if(sv){bkOrdSave();return}
       const v=e.target.closest('[data-bkimg]');if(v)return bkLightbox(v.dataset.bkimg);
       const mi=e.target.closest('[data-bkmi]');if(mi){bkMiOpen=bkMiOpen===mi.dataset.bkmi?'':mi.dataset.bkmi;this.render({});return} // la ⓘ: abre o cierra la nota del método
@@ -201,15 +202,15 @@ V.banking={
     const bkn=bkPais?banksIn(bkPais):[],bsel=bkWay&&bkWay!=='efectivo'&&bkWay!=='otro'?bk.banks.find(b=>b.id===bkWay):null;
     const opts=bkPais&&bkWay?bkRecom(bkPais,bkWay).map((o,i)=>({...o,n:o.falla?0:i+1})):[];
     const paso=`<section class="card bk-paso"><div class="card-h"><h3>¿Cómo paga el cliente?</h3></div>
-      ${seg('1. País',[['','Todos'],...PAISES.map(p=>[p,p])],k=>k===bkPais,'data-bkp')}
+      ${seg('1. País',PAISES.map(p=>[p,p]),k=>k===bkPais,'data-bkp')}
       ${bkPais?seg('2. ¿Efectivo o con qué banco?',[['efectivo','Efectivo'],...bkn.map(b=>[b.id,b.name]),['otro','Otro banco']],k=>k===bkWay,'data-bkw'):''}
       ${bsel?`<details class="bk-bsteps" data-k="bsteps"><summary>Cómo pagar con ${esc(bsel.name)}</summary>${(bsel.steps||[]).length?`<ol class="bk-steps">${bsel.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:'<p class="dim">Sin pasos cargados.</p>'}${bsel.notes?`<p class="bk-notes">${esc(bsel.notes)}</p>`:''}</details>`:''}
       ${bkPais&&bkWay?`<div class="bk-opts"><span class="bk-sn">${bkWay==='efectivo'?'Efectivo':bsel?'Lo que conviene con '+esc(bsel.name):'Opciones'} en ${esc(bkPais)}${opts.length?' <small class="dim">· primero lo mejor</small>':''}</span>${opts.length?opts.map(bkOptHTML).join(''):`<div class="p-empty" style="padding:8px 0">No hay ${bkWay==='efectivo'?'efectivo':'pago digital'} cargado para ${esc(bkPais)}.</div>`}</div>`:''}</section>`;
-    const fallas=F.length?`<section class="card bk-fallas"><div class="card-h"><h3><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg> Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.fc&&f.fc.length?` <span class="badge bad">${esc(f.fc.join(', '))}</span>`:''}${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
+    const fallas='';const _F=F.length?`<section class="card bk-fallas"><div class="card-h"><h3><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg> Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.fc&&f.fc.length?` <span class="badge bad">${esc(f.fc.join(', '))}</span>`:''}${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
     const procs=bk.procs.filter(p=>p.active!==false&&bkPaisOk(p.countries)&&(hit(procName(p))||pmOf(p.id).some(x=>hit(x.m.name)))&&(!bkTipo||pmOf(p.id).some(x=>kindOk(x.m.kind)))).sort((a,b)=>{const ka=(procParent(a)||a).sort*1000+(a.parent_id?a.sort+1:0),kb=(procParent(b)||b).sort*1000+(b.parent_id?b.sort+1:0);return ka-kb||procName(a).localeCompare(procName(b))});
     const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
       const pf=failCs(p)||(procParent(p)?failCs(procParent(p)):null),pHere=pf!=null&&(!pf.length||(bkPais?pf.includes(bkPais):false)); // con un país elegido, solo cuenta la falla de ese país
-      return `<article class="bk-proc${pHere?' falla':''}${p.parent_id?' ruta':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(procName(p))}</h4>${(()=>{const nf=pmOf(p.id).filter(x=>bkPais?failsIn(x,bkPais):x.status==='falla').length;
+      return `<article class="bk-proc${pHere?' falla':''}${p.parent_id?' ruta':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(procName(p))}</h4>${(()=>{const nf=ms.filter(x=>failsIn(x,bkPais)).length; // solo los métodos de ese país
         return pHere?'<span class="badge bad">Falla</span>':pf&&pf.length&&!bkPais?`<span class="badge bad">Falla en ${esc(isoTxt(pf))}</span>`:nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
         <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
         <div class="bk-ms">${ms.length?ms.map(x=>{const k=p.id+'|'+x.method_id,on=bkMiOpen===k;const ef=effFail(p,x),off=ef!=null&&(!ef.length||(bkPais&&ef.includes(bkPais))),part=ef!=null&&ef.length&&!bkPais;
@@ -221,11 +222,11 @@ V.banking={
     const bRow=b=>`<div class="bk-bank"><div class="bk-bn"><b>${esc(b.name)}</b><span class="dim">${esc(b.country||'Todos los países')}</span></div><div class="bk-chips">${bankChips(b)}</div><span class="grow"></span><button type="button" class="btn sm" data-bka="bank" data-id="${esc(b.id)}">Ver flujo</button>${ed?`<button type="button" class="btn sm" data-bka="bankEd" data-id="${esc(b.id)}">Editar</button>`:''}</div>`;
     const hist=bk.inc.slice(0,30);
     const opened=openKeys(body);
-    body.innerHTML=paso+fallas+
+    body.innerHTML=paso+fallas+(!bkPais?`<section class="card"><div class="p-empty">Elegí el país para ver los procesadores y los bancos.</div></section>`:
       `<section class="card"><div class="card-h"><h3>Procesadores</h3><span class="p-sub">${plural(procs.length,'procesador','procesadores')}${bkTipo?' para '+esc(bkTipo==='digital'?'pago digital':KINDS[bkTipo].toLowerCase()):''}${bkPais?' en '+esc(bkPais):''}</span></div>${procs.length?`<div class="bk-grid">${procs.map(pc).join('')}</div>`:`<div class="p-empty">${bk.procs.length?'Nada con ese filtro.':ed?'Cargá el primer procesador con el botón de arriba.':'Todavía no hay procesadores cargados.'}</div>`}</section>`+
-      `<section class="card"><div class="card-h"><h3>Bancos</h3><span class="p-sub">cómo conviene pagar según el banco del cliente</span></div>${banks.length?banks.map(bRow).join(''):`<div class="p-empty">${bk.banks.length?'Ningún banco con ese filtro.':ed?'Cargá un banco con sus pasos; el orden de lo que conviene se arma en "Orden por banco".':'Todavía no hay bancos cargados.'}</div>`}</section>`+
+      `<section class="card"><div class="card-h"><h3>Bancos</h3><span class="p-sub">cómo conviene pagar según el banco del cliente</span></div>${banks.length?banks.map(bRow).join(''):`<div class="p-empty">${bk.banks.length?'Ningún banco con ese filtro.':ed?'Cargá un banco con sus pasos; el orden de lo que conviene se arma en "Orden por banco".':'Todavía no hay bancos cargados.'}</div>`}</section>`)+
       (ed?bkOrdCard():'')+
-      (hist.length?`<section class="card"><div class="card-h"><h3>Historial</h3><span class="p-sub">fallas y vueltas</span></div><div class="lst">${hist.map(i=>`<div class="li"><span class="t">${esc(whenTxt(new Date(i.created_at)))}</span><span class="n"><b>${esc(incName(i)+enTxt(i.countries))}</b> ${i.kind==='falla'?'<span class="badge bad">falla</span>':'<span class="badge paid">volvió</span>'}${i.note?`<small>${esc(i.note)}</small>`:''}</span><span class="d">${i.created_by?esc(first(i.created_by)):''}</span><span></span><span></span></div>${bkThumbs('incident',i.id)}`).join('')}</div></section>`:'');
+      (hist.length?`<details class="card bk-hist" data-k="bkhist"><summary class="card-h"><h3>Historial</h3><span class="p-sub">fallas y vueltas</span></summary><div class="lst">${hist.map(i=>`<div class="li"><span class="t">${esc(whenTxt(new Date(i.created_at)))}</span><span class="n"><b>${esc(incName(i)+enTxt(i.countries))}</b> ${i.kind==='falla'?'<span class="badge bad">falla</span>':'<span class="badge paid">volvió</span>'}${i.note?`<small>${esc(i.note)}</small>`:''}</span><span class="d">${i.created_by?esc(first(i.created_by)):''}</span><span></span><span></span></div>${bkThumbs('incident',i.id)}`).join('')}</div></details>`:'');
     reopen(body,opened);bkHydrate(body);bkOrdDrag(body);
   },
 };
@@ -378,34 +379,41 @@ function bankView(b){
 // ── Orden por banco (admin y team leader): por país y banco, arrastrar lo que conviene ofrecer
 let bkOrdC='',bkOrdB='',bkOrd=null; // bkOrd: lista ordenada de opciones {p,x} del banco a la vista (null = recién armada del banco)
 const ordKey=o=>o.p.id+'|'+o.x.method_id;
-function bkOrdList(b){ // el orden guardado del banco (use_pm, después el resto, al final avoid_pm) con todas las opciones digitales de su país
-  const L=bkOptions(b.country||bkOrdC,'digital').map(o=>({p:o.p,x:o.x})),rank=o=>{const i=(b.use_pm||[]).findIndex(c=>comboHit(c,{p:o.p,x:o.x}));if(i>=0)return i;return (b.avoid_pm||[]).some(c=>comboHit(c,{p:o.p,x:o.x}))?2000:1000};
-  return L.map((o,i)=>({o,r:rank(o),i})).sort((a,c)=>a.r-c.r||a.i-c.i).map(x=>x.o);
+function bkOrdList(b){ // disponibles con el banco (use_pm, en orden) y no disponibles (todo lo demás digital de su país)
+  const L=bkOptions(b.country||bkOrdC,'digital').map(o=>({p:o.p,x:o.x})),rank=o=>(b.use_pm||[]).findIndex(c=>comboHit(c,{p:o.p,x:o.x}));
+  const R=L.map((o,i)=>({o,r:rank(o),i}));
+  return {l:R.filter(x=>x.r>=0).sort((a,c)=>a.r-c.r||a.i-c.i).map(x=>x.o),n:R.filter(x=>x.r<0).map(x=>x.o)};
 }
 function bkOrdCard(){
   const cs=PAISES,bs=bkOrdC?banksIn(bkOrdC):[],b=bkOrdB?bk.banks.find(x=>x.id===bkOrdB):null;
-  if(b&&(!bkOrd||bkOrd.b!==b.id))bkOrd={b:b.id,l:bkOrdList(b),dirty:false};
+  if(b&&(!bkOrd||bkOrd.b!==b.id))bkOrd={b:b.id,...bkOrdList(b),dirty:false};
   const seg=(items,on,attr)=>`<div class="seg" role="group">${items.map(([k,l])=>`<button type="button" ${attr}="${esc(k)}" class="${on(k)?'on':''}">${esc(l)}</button>`).join('')}</div>`;
   return `<section class="card bk-ordc"><div class="card-h"><h3>Orden por banco</h3><span class="p-sub">lo que le ofrecés a un cliente de cada banco, de mejor a peor: arrastrá para cambiarlo</span></div>
     <div class="bk-step"><span class="bk-sn">País</span>${seg(cs.map(c=>[c,c]),k=>k===bkOrdC,'data-bko')}</div>
     ${bkOrdC?`<div class="bk-step"><span class="bk-sn">Banco</span>${bs.length?seg(bs.map(x=>[x.id,x.name]),k=>k===bkOrdB,'data-bkob'):`<span class="dim">No hay bancos de ${esc(bkOrdC)}: cargá uno en Bancos.</span>`}</div>`:''}
-    ${b?`<ol class="bk-ordl" id="bkOrdL">${bkOrd.l.length?bkOrd.l.map((o,i)=>`<li class="bk-ord${bkFails(o.p.id,o.x.method_id,b.country||bkOrdC)?' falla':''}" draggable="true" data-i="${i}"><span class="bk-grip" aria-hidden="true">⋮⋮</span><span class="bk-on">${i+1}</span>${bkIcon(o.p.id)}<span class="grow"><b>${esc(o.x.m.name)}</b> con ${esc(procName(o.p))}${o.x.m.kind?` <small class="dim">· ${esc(KINDS[o.x.m.kind]||o.x.m.kind)}</small>`:''}</span><button type="button" class="ib" data-bkmv="up" title="Subir"${i?'':' disabled'}>▲</button><button type="button" class="ib" data-bkmv="down" title="Bajar"${i<bkOrd.l.length-1?'':' disabled'}>▼</button></li>`).join(''):`<li class="dim">No hay pago digital cargado para ${esc(b.country||bkOrdC)}.</li>`}</ol>
+    ${b?`<div class="bk-ord2">
+      <div class="bk-ordb"><h4>Disponibles con ${esc(b.name)} <small class="dim">· de mejor a peor</small></h4><ol class="bk-ordl" id="bkOrdL" data-lst="l">${bkOrd.l.length?bkOrd.l.map((o,i)=>`<li class="bk-ord${bkFails(o.p.id,o.x.method_id,b.country||bkOrdC)?' falla':''}" draggable="true" data-i="${i}"><span class="bk-grip" aria-hidden="true">⋮⋮</span><span class="bk-on">${i+1}</span>${bkIcon(o.p.id)}<span class="grow"><b>${esc(o.x.m.name)}</b> con ${esc(procName(o.p))}${o.x.m.kind?` <small class="dim">· ${esc(KINDS[o.x.m.kind]||o.x.m.kind)}</small>`:''}</span><button type="button" class="ib" data-bkmv="up" title="Subir"${i?'':' disabled'}>▲</button><button type="button" class="ib" data-bkmv="down" title="Bajar"${i<bkOrd.l.length-1?'':' disabled'}>▼</button><button type="button" class="ib" data-bkmv="out" title="No disponible">✕</button></li>`).join(''):`<li class="dim bk-ordv">Arrastrá acá (o tocá +) lo que anda con ${esc(b.name)}. Si no hay nada, el agente ve todo.</li>`}</ol></div>
+      <div class="bk-ordb"><h4>No disponibles <small class="dim">· el agente no los ve</small></h4><ol class="bk-ordl no" id="bkOrdN" data-lst="n">${bkOrd.n.length?bkOrd.n.map((o,i)=>`<li class="bk-ord" draggable="true" data-i="${i}"><span class="bk-grip" aria-hidden="true">⋮⋮</span>${bkIcon(o.p.id)}<span class="grow"><b>${esc(o.x.m.name)}</b> con ${esc(procName(o.p))}${o.x.m.kind?` <small class="dim">· ${esc(KINDS[o.x.m.kind]||o.x.m.kind)}</small>`:''}</span><button type="button" class="ib" data-bkmv="in" title="Disponible">+</button></li>`).join(''):`<li class="dim bk-ordv">${bkOrd.l.length?'Todo lo digital de '+esc(b.country||bkOrdC)+' está disponible.':'No hay pago digital cargado para '+esc(b.country||bkOrdC)+'.'}</li>`}</ol></div></div>
       <div class="bk-row"><button type="button" class="btn pri" data-bkordsave${bkOrd.dirty?'':' disabled'}>Guardar orden</button><span class="dim">${bkOrd.dirty?'Hay cambios sin guardar.':'Así lo ve la mesa.'}</span></div>`:''}</section>`;
 }
-function bkOrdMove(i,dir){
-  if(!bkOrd)return;const l=bkOrd.l,j=dir==='up'?i-1:dir==='down'?i+1:dir|0;if(j<0||j>=l.length||j===i)return;
-  const [o]=l.splice(i,1);l.splice(j,0,o);bkOrd.dirty=true;refresh();
+function bkOrdMove(i,dir,from){ // from: 'l' disponibles · 'n' no disponibles; dir: up · down · in · out · 'l:<j>' / 'n:<j>' (soltado en esa posición)
+  if(!bkOrd)return;const L=bkOrd.l,N=bkOrd.n;from=from||'l';
+  if(dir==='in'){const [o]=N.splice(i,1);if(!o)return;L.push(o)}
+  else if(dir==='out'){const [o]=L.splice(i,1);if(!o)return;N.push(o)}
+  else if(dir==='up'||dir==='down'){if(from!=='l')return;const j=dir==='up'?i-1:i+1;if(j<0||j>=L.length)return;const [o]=L.splice(i,1);L.splice(j,0,o)}
+  else{const m=/^([ln]):(\d+)$/.exec(dir);if(!m)return;const to=m[1],j=+m[2],src=from==='l'?L:N,dst=to==='l'?L:N;if(src===dst&&j===i)return;const [o]=src.splice(i,1);if(!o)return;dst.splice(Math.min(j,dst.length),0,o)}
+  bkOrd.dirty=true;refresh();
 }
-function bkOrdDrag(root){ // arrastrar con el mouse o el dedo (HTML5 drag) en la lista del orden
-  const L=root.querySelector('#bkOrdL');if(!L||L._drag)return;L._drag=1;let from=-1;
-  L.addEventListener('dragstart',e=>{const li=e.target.closest('.bk-ord');if(!li)return;from=li.dataset.i|0;li.classList.add('drag');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',String(from))}catch(_){}});
-  L.addEventListener('dragover',e=>{const li=e.target.closest('.bk-ord');if(!li||from<0)return;e.preventDefault();L.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));li.classList.add('over')});
-  L.addEventListener('dragleave',e=>{const li=e.target.closest('.bk-ord');if(li)li.classList.remove('over')});
-  L.addEventListener('drop',e=>{const li=e.target.closest('.bk-ord');if(!li||from<0)return;e.preventDefault();const to=li.dataset.i|0,f=from;from=-1;bkOrdMove(f,String(to))});
-  L.addEventListener('dragend',()=>{from=-1;L.querySelectorAll('.drag,.over').forEach(x=>x.classList.remove('drag','over'))});
+function bkOrdDrag(root){ // arrastrar (HTML5 drag) entre las dos listas del orden y adentro de cada una
+  const W=root.querySelector('.bk-ord2');if(!W||W._drag)return;W._drag=1;let from=null;
+  W.addEventListener('dragstart',e=>{const li=e.target.closest('.bk-ord');if(!li)return;from={i:li.dataset.i|0,l:li.closest('[data-lst]').dataset.lst};li.classList.add('drag');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain','x')}catch(_){}});
+  W.addEventListener('dragover',e=>{const ol=e.target.closest('[data-lst]');if(!ol||!from)return;e.preventDefault();W.querySelectorAll('.over').forEach(x=>x.classList.remove('over'));(e.target.closest('.bk-ord')||ol).classList.add('over')});
+  W.addEventListener('dragleave',e=>{const t=e.target.closest('.bk-ord,[data-lst]');if(t)t.classList.remove('over')});
+  W.addEventListener('drop',e=>{const ol=e.target.closest('[data-lst]');if(!ol||!from)return;e.preventDefault();const li=e.target.closest('.bk-ord'),to=ol.dataset.lst,j=li?li.dataset.i|0:(to==='l'?bkOrd.l:bkOrd.n).length,f=from;from=null;bkOrdMove(f.i,to+':'+j,f.l)});
+  W.addEventListener('dragend',()=>{from=null;W.querySelectorAll('.drag,.over').forEach(x=>x.classList.remove('drag','over'))});
 }
 async function bkOrdSave(){
   if(!bkOrd||!bkEd())return;const b=bk.banks.find(x=>x.id===bkOrd.b);if(!b)return;
-  const use_pm=bkOrd.l.map(o=>({p:o.p.id,m:o.x.method_id})).slice(0,120);
-  if(await bkSave(sb.from('banks').update({use_pm,avoid_pm:[],updated_at:new Date().toISOString(),updated_by:me}).eq('id',b.id))){bkOrd.dirty=false;toast(`Orden de <b>${esc(b.name)}</b> guardado.`)}
+  const use_pm=bkOrd.l.map(o=>({p:o.p.id,m:o.x.method_id})).slice(0,120),avoid_pm=bkOrd.n.map(o=>({p:o.p.id,m:o.x.method_id})).slice(0,120); // avoid_pm = no disponibles (solo registro)
+  if(await bkSave(sb.from('banks').update({use_pm,avoid_pm,updated_at:new Date().toISOString(),updated_by:me}).eq('id',b.id))){bkOrd.dirty=false;toast(`Orden de <b>${esc(b.name)}</b> guardado.`)}
 }
