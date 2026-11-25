@@ -696,6 +696,10 @@ function ayuda(){
   <h4>Banking</h4><dl>
     <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
     <dt>Bancos</dt><dd>Cómo conviene pagar según el banco del cliente: pasos, qué usar y qué evitar (por ejemplo, Falabella Chile: no transferencia). Lo cargan el administrador y el team leader, con fotos.</dd></dl>
+  <h4>Knowledgebase</h4><dl>
+    <dt>Guías</dt><dd>Cómo se hace cada cosa, por tema, con capturas paso a paso, qué decir y qué no, videos y una pregunta para ver si quedó claro. Buscá arriba. Al final de cada guía, "Lo leí" y si te sirvió.</dd>
+    <dt>Tus primeros días</dt><dd>Las guías numeradas para el que entra: aparecen arriba hasta que las leíste todas.</dd>
+    <dt>Escribir</dt><dd>El administrador y el team leader; el administrador puede dar permiso a alguien más en Ajustes → Mesa. Un artículo puede ser para todas las mesas.</dd></dl>
   <h4>Snippets</h4><dl>
     <dt>Usarlos</dt><dd>Escribí /atajo en cualquier campo de cualquier página de Chrome (con la extensión) y se reemplaza por el texto. Si otro atajo empieza igual, se completa al tocar espacio o Tab.</dd>
     <dt>Clic derecho</dt><dd>Si en alguna página el /atajo no anda: clic derecho en el campo → <b>Snippets de Vitalis</b> → el que quieras.</dd>
@@ -759,7 +763,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>6</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Manager, Tareas, Chat, Banking, Análisis; 0 Ajustes)</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>7</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Manager, Tareas, Chat, Banking, Knowledgebase, Análisis; 0 Ajustes)</dd><dt><kbd>K</kbd></dt><dd>Knowledgebase</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -804,6 +808,7 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
+  if(k==='k'){e.preventDefault();go('kb');return}
   if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}

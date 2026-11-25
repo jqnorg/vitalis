@@ -1193,6 +1193,59 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await rpc(A, 'select public.set_locks(15, 10) j');
 }
 
+// ---------- Knowledgebase: quién escribe, quién lee, la ruta del nuevo ----------
+{
+  let r = await as(B, "insert into public.kb_articles (topic, title, blocks, published) values ('crm', 'x', '[]', true) returning id");
+  ok(!!r.error || r.rows.length === 0, 'un agente no escribe en el Knowledgebase');
+  r = await as(M, "insert into public.kb_articles (topic, title, summary, blocks, published, ruta) values ('crm', 'Cómo abrir el CRM', 'Lo básico', '[{\"t\":\"text\",\"md\":\"Hola **mundo**\"}]', true, 1) returning id");
+  ok(!r.error && r.rows.length === 1, 'el team leader publica un artículo');
+  const K1 = r.rows[0].id;
+  r = await as(M, "insert into public.kb_articles (topic, title, blocks, published) values ('crm', 'Borrador', '[]', false) returning id");
+  const KD = r.rows[0].id;
+  r = await as(B, 'select id, title from public.kb_articles order by title');
+  ok(r.rows.length === 1 && r.rows[0].id === K1, 'el agente ve lo publicado de su mesa, no el borrador');
+  r = await as(M, 'select id from public.kb_articles');
+  ok(r.rows.length === 2, 'el que escribe ve también los borradores');
+  r = await as(B, 'update public.profiles set kb_editor = true where id = $1 returning id', [B]);
+  ok(!r.error && r.rows.length === 1, '(un perfil se edita a sí mismo…)');
+  r = await as(B, 'select public.kb_editor() e');
+  ok(r.rows[0].e === true, 'con kb_editor, el agente puede escribir');
+  r = await as(B, "insert into public.kb_articles (topic, title, blocks, published) values ('vitalis', 'De un agente', '[]', true) returning id");
+  ok(!r.error && r.rows.length === 1, 'y publica');
+  await as(A, 'update public.profiles set kb_editor = false where id = $1', [B]);
+  r = await as(B, "insert into public.kb_articles (topic, title, blocks, published) values ('vitalis', 'Otro', '[]', true) returning id");
+  ok(!!r.error || r.rows.length === 0, 'el admin le saca el permiso y no escribe más');
+  r = await as(B, 'insert into public.kb_files (article_id, mime, data) values ($1, $2, $3) returning id', [K1, 'image/webp', 'AAAA']);
+  ok(!!r.error || r.rows.length === 0, 'tampoco sube fotos');
+  r = await as(M, 'insert into public.kb_files (article_id, mime, data) values ($1, $2, $3) returning id', [K1, 'image/webp', 'AAAA']);
+  ok(!r.error && r.rows.length === 1, 'el team leader sube una foto al artículo');
+  r = await as(B, 'select id from public.kb_files');
+  ok(r.rows.length === 1, 'la mesa la ve');
+  r = await as(B, 'insert into public.kb_reads (user_id, article_id) values ($1, $2) returning read_at', [B, K1]);
+  ok(!r.error && r.rows.length === 1, 'B marca "Lo leí"');
+  r = await as(C, 'insert into public.kb_reads (user_id, article_id) values ($1, $2) returning read_at', [B, K1]);
+  ok(!!r.error || r.rows.length === 0, 'nadie marca por otro');
+  const AG2 = (await db.query("select id from public.profiles where role = 'agent' and active and team_id = (select team_id from public.profiles where id = $1) and id <> $1 limit 1", [B])).rows[0].id;
+  r = await as(AG2, 'select * from public.kb_reads');
+  ok(r.rows.length === 0, 'un agente no ve lo que leyeron los demás');
+  r = await as(M, 'select user_id from public.kb_reads');
+  ok(r.rows.length === 1 && r.rows[0].user_id === B, 'el team leader ve quién va por dónde');
+  r = await as(B, 'insert into public.kb_votes (user_id, article_id, ok) values ($1, $2, false) returning ok', [B, K1]);
+  ok(!r.error, 'B dice que no le quedó claro');
+  const st = await rpc(M, 'select public.kb_stats() j');
+  ok(Array.isArray(st) && st.find((x) => x.id === K1).no === 1 && st.find((x) => x.id === K1).reads === 1, 'el team leader ve las cuentas por artículo');
+  ok((await rpc(B, 'select public.kb_stats() j')).length === 0, 'el agente no');
+  // global: lo ven las otras mesas
+  r = await as(A, "insert into public.kb_articles (topic, title, blocks, published, global) values ('reglas', 'Para todas las mesas', '[]', true, true) returning id");
+  const KG = r.rows[0].id;
+  const L2 = (await db.query("select id from public.profiles where name = 'Lider Dos'")).rows[0].id;
+  r = await as(L2, 'select id from public.kb_articles');
+  ok(r.rows.length === 1 && r.rows[0].id === KG, 'la otra mesa ve solo el artículo global');
+  r = await as(L2, 'update public.kb_articles set title = $1 where id = $2 returning id', ['x', KG]);
+  ok(!!r.error || r.rows.length === 0, 'pero no lo edita');
+  await as(M, 'delete from public.kb_articles where id = $1', [KD]);
+}
+
 // ---------- baja ----------
 r = await as(A, 'update public.profiles set active = false where id = $1 returning active', [B]);
 ok(!r.error && r.rows[0].active === false, 'A da de baja a B');

@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.59.0';
+const VERSION='1.60.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -359,7 +359,7 @@ async function catchUp(force){
   if(catching)return catching;
   if(!force&&(Date.now()-lastCatch<4e3||apiCooling()))return; // la API está mal: espero a que afloje el freno
   lastCatch=Date.now();tcAuto();
-  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),campReqPoll(),callsFetch().then(x=>{if(x){const n=calls.length;callsApply(x);if(calls.length!==n)refresh()}})]).catch(()=>{}).finally(()=>{catching=null});
+  catching=Promise.all([socialPoll(),chatPoll(),taskPoll(),snipPoll(),mesaPoll(),avPoll(),crmLoad(),bkLoad(),kbLoad().then(kbNewbieCheck),campReqPoll(),callsFetch().then(x=>{if(x){const n=calls.length;callsApply(x);if(calls.length!==n)refresh()}})]).catch(()=>{}).finally(()=>{catching=null});
   return catching;
 }
 // con el tiempo real andando todo llega solo: ponerse al día es solo una red de seguridad (cada 5 min, o al volver después de un rato).

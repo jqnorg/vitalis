@@ -120,7 +120,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','historial','cliente','callman','banking','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','inicio','historial','cliente','callman','banking','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -132,6 +132,7 @@ const GROUPS=[
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking']},
+  {g:'kb',views:['kb']}, // Knowledgebase: guías para el agente (pedido del dueño, 25/11/2026)
   {g:'analisis',views:['ventas','clientes','campanas','filtros','radar'],tabs:['Ventas','Clientes','Campañas','Filtros','Radar']}, // Clientes: solo team leader y admin
   {g:'equipo',views:['equipo']},
   {g:'gerencia',views:['gerencia']}, // los de arriba: team leader, admin y el rol director (que solo ve esto)
@@ -143,7 +144,7 @@ function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLea
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
 function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Hoy
-const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
+const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';

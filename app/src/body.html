@@ -33,6 +33,7 @@
     <symbol id="i-mudo" viewBox="0 0 24 24"><path d="M6.500 16.500V11a5.500 5.500 0 0 1 9-4.200M17.500 11v5.500l1.500 2H8M10.500 20.500a1.800 1.800 0 0 0 3 0M4 4l16 16"/></symbol>
     <symbol id="i-campana" viewBox="0 0 24 24"><path d="M6.500 16.500V11a5.500 5.500 0 0 1 11 0v5.500l1.500 2H5zM10.500 20.500a1.800 1.800 0 0 0 3 0"/></symbol>
     <symbol id="i-diana" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><circle cx="12" cy="12" r="4.500"/><path d="M12 12v.100"/></symbol>
+    <symbol id="i-kb" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13.5a1.5 1.5 0 0 0-1.5-1.5H4zM20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13.5a1.5 1.5 0 0 1 1.5-1.5H20z"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   </defs>
 </svg>
@@ -46,7 +47,8 @@
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
     <button type="button" data-g="banking" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>5</kbd></button>
-    <button type="button" data-g="analisis" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Análisis</span><kbd>6</kbd></button>
+    <button type="button" data-g="kb" data-v="kb" title="Knowledgebase: las guías de la mesa (6)"><svg><use href="#i-kb"/></svg><span class="nm">Knowledgebase</span><span class="nb hot" id="nbKb"></span><kbd>6</kbd></button>
+    <button type="button" data-g="analisis" data-v="ventas"><svg><use href="#i-ventas"/></svg><span class="nm">Análisis</span><kbd>7</kbd></button>
     <button type="button" data-g="ajustes" data-v="config" class="mob-only"><svg><use href="#i-config"/></svg><span class="nm">Ajustes</span></button>
     <button type="button" data-g="equipo" data-v="equipo" id="navEquipo" hidden><svg><use href="#i-equipo"/></svg><span class="nm">Equipo</span><kbd>E</kbd></button>
     <button type="button" data-g="gerencia" data-v="gerencia" id="navGer" hidden title="Gerencia: la mesa para los de arriba (G)"><svg><use href="#i-ventas"/></svg><span class="nm">Gerencia</span><kbd>G</kbd></button>
@@ -201,6 +203,12 @@
   <div class="vh"><div><h1>Banking</h1><p class="sub">Qué procesadores andan y cómo conviene pagar según el banco del cliente.</p></div><span class="grow"></span>
     <div class="tools"><input id="bkQ" type="search" placeholder="Buscar banco, procesador o método" autocomplete="off" aria-label="Buscar"><span id="bkTools" class="tools"></span></div></div>
   <div id="bkBody"></div>
+</section>
+
+<section class="view" id="v-kb" hidden>
+  <div class="vh"><div><h1>Knowledgebase</h1><p class="sub">Las guías de la mesa: cómo se hace cada cosa, paso a paso.</p></div><span class="grow"></span>
+    <div class="tools"><input id="kbQ" type="search" placeholder="Buscar una guía" autocomplete="off" aria-label="Buscar"><span id="kbTools" class="tools"></span></div></div>
+  <div id="kbBody"></div>
 </section>
 
 <section class="view" id="v-snippets" hidden>

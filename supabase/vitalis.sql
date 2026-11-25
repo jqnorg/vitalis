@@ -2618,3 +2618,87 @@ create or replace function public.pay_report(pid uuid, mid uuid, falla boolean, 
   select public.pay_report_many(pid, case when mid is null then '{}'::uuid[] else array[mid] end, falla, note, cs) $$;
 revoke all on function public.pay_report_many(uuid, uuid[], boolean, text, text[]) from public, anon;
 grant execute on function public.pay_report_many(uuid, uuid[], boolean, text, text[]) to authenticated;
+
+-- ---------- Knowledgebase (pedido del dueño, 25/11/2026): guías para el agente, formato blog, muy visual ----------
+-- Artículos por tema con bloques (texto, paso a paso con galería, decir / no decir, video por link, checklist, pregunta).
+-- Escriben admin y team leader, y quien el admin marque (profiles.kb_editor). Lo lee la mesa; un artículo global lo ven todas las mesas.
+-- "Ruta del nuevo": los artículos con `ruta` (orden) forman los primeros pasos del agente nuevo; cada uno marca "Lo leí" (kb_reads).
+alter table public.profiles add column if not exists kb_editor boolean not null default false;
+create or replace function public.kb_editor() returns boolean language sql stable security definer set search_path = public
+  as $$ select coalesce(public.my_role(), '') in ('admin', 'leader') or exists (select 1 from public.profiles p where p.id = auth.uid() and p.kb_editor and p.active) $$;
+grant execute on function public.kb_editor() to authenticated;
+revoke all on function public.kb_editor() from public, anon;
+
+create table if not exists public.kb_articles (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  global     boolean not null default false,
+  topic      text not null default 'vitalis' check (length(topic) <= 40),
+  title      text not null check (length(title) between 1 and 120),
+  summary    text check (length(summary) <= 300),
+  blocks     jsonb not null default '[]' check (jsonb_typeof(blocks) = 'array' and jsonb_array_length(blocks) <= 60 and pg_column_size(blocks) <= 400000),
+  published  boolean not null default false,
+  ruta       integer check (ruta is null or ruta between 1 and 99),
+  sort       integer not null default 0,
+  created_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+create index if not exists kb_articles_team on public.kb_articles (team_id, published, topic);
+create table if not exists public.kb_files (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  article_id uuid not null references public.kb_articles(id) on delete cascade,
+  mime       text not null check (mime in ('image/webp', 'image/jpeg', 'image/png')),
+  data       text not null check (length(data) <= 1400000),
+  w          integer, h integer,
+  created_by uuid default auth.uid() references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists kb_files_art on public.kb_files (article_id);
+create table if not exists public.kb_reads (
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  article_id uuid not null references public.kb_articles(id) on delete cascade,
+  read_at    timestamptz not null default now(),
+  primary key (user_id, article_id)
+);
+create table if not exists public.kb_votes (
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  article_id uuid not null references public.kb_articles(id) on delete cascade,
+  ok         boolean not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, article_id)
+);
+alter table public.kb_articles enable row level security;
+alter table public.kb_files    enable row level security;
+alter table public.kb_reads    enable row level security;
+alter table public.kb_votes    enable row level security;
+-- lee: lo publicado de la mesa o global; el que escribe ve también los borradores de su mesa. Escribe: el editor, en su mesa.
+drop policy if exists kb_art_read on public.kb_articles;
+create policy kb_art_read on public.kb_articles for select to authenticated
+  using ((published and (global or team_id = (select public.my_team()))) or (team_id = (select public.my_team()) and (select public.kb_editor())));
+drop policy if exists kb_art_write on public.kb_articles;
+create policy kb_art_write on public.kb_articles for all to authenticated
+  using (team_id = (select public.my_team()) and (select public.kb_editor())) with check (team_id = (select public.my_team()) and (select public.kb_editor()));
+drop policy if exists kb_files_read on public.kb_files;
+create policy kb_files_read on public.kb_files for select to authenticated
+  using (exists (select 1 from public.kb_articles a where a.id = article_id)); -- la misma visibilidad que el artículo
+drop policy if exists kb_files_write on public.kb_files;
+create policy kb_files_write on public.kb_files for all to authenticated
+  using (team_id = (select public.my_team()) and (select public.kb_editor())) with check (team_id = (select public.my_team()) and (select public.kb_editor()));
+drop policy if exists kb_reads_own on public.kb_reads;
+create policy kb_reads_own on public.kb_reads for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists kb_reads_lead on public.kb_reads;
+create policy kb_reads_lead on public.kb_reads for select to authenticated using ((select public.kb_editor()) and public.in_my_team(user_id)); -- quién va por dónde
+drop policy if exists kb_votes_own on public.kb_votes;
+create policy kb_votes_own on public.kb_votes for all to authenticated using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+drop policy if exists kb_votes_read on public.kb_votes;
+create policy kb_votes_read on public.kb_votes for select to authenticated using (exists (select 1 from public.kb_articles a where a.id = article_id and a.team_id = (select public.my_team())));
+-- la cuenta de "me sirvió / no me quedó claro" por artículo (sin quién)
+create or replace function public.kb_stats() returns json language sql stable security definer set search_path = public as $$
+  select coalesce(json_agg(json_build_object('id', a.id, 'ok', (select count(*) from public.kb_votes v where v.article_id = a.id and v.ok), 'no', (select count(*) from public.kb_votes v where v.article_id = a.id and not v.ok),
+    'reads', (select count(*) from public.kb_reads r where r.article_id = a.id))), '[]'::json)
+  from public.kb_articles a where a.team_id = public.my_team() and public.kb_editor() $$;
+grant execute on function public.kb_stats() to authenticated;
+revoke all on function public.kb_stats() from public, anon;
