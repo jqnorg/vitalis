@@ -23,7 +23,6 @@ function ftdForm(f){
     ${seller?`<label class="fld full"><span>Vendedor</span><select name="uid">${sellerOpts(seller)}</select></label>`:''}
     <label class="fld"><span>Marca</span><input name="brand" list="dlB" value="${v('brand')}"></label>
     <label class="fld"><span>ID <i>*</i></span><input name="id" value="${v('id')}" autofocus></label>
-    <label class="fld full"><span>Full Name <i>*</i></span><input name="name" value="${v('name')}"></label>
     <label class="fld"><span>Country</span><input name="country" list="dlC" value="${v('country')}"></label>
     <label class="fld"><span>Amount USD <i>*</i></span><input name="amount" inputmode="decimal" value="${f?esc(String(f.amount).replace('.',',')):''}"></label>
     <label class="fld"><span>Affiliate</span><input name="aff" list="dlA" value="${v('aff')}"></label>
@@ -37,10 +36,9 @@ function ftdForm(f){
   let dupOk='';
   const read=api=>{
     const g=n=>api.q(`[name=${n}]`).value.trim();
-    const rec={brand:g('brand'),id:g('id'),name:g('name'),country:g('country'),aff:g('aff'),camp:g('camp'),date:g('date'),time:g('time'),tx:g('tx')||undefined};
+    const rec={brand:g('brand'),id:g('id'),name:'',country:g('country'),aff:g('aff'),camp:g('camp'),date:g('date'),time:g('time'),tx:g('tx')||undefined};
     const amt=parseAmount(g('amount'));
     if(!rec.id)return {err:'Falta el ID.',k:'id'};
-    if(!rec.name)return {err:'Falta el nombre.',k:'name'};
     if(isNaN(amt))return {err:'Monto inválido.',k:'amount'};
     if(!/^\d{4}-\d{2}-\d{2}$/.test(rec.date))return {err:'Fecha inválida.',k:'date'};
     if(rec.date>todayS())return {err:'La fecha del FTD no puede ser futura.',k:'date'};
@@ -64,7 +62,7 @@ function ftdForm(f){
     if(isNew){if(!await commitNew(rec))return false}
     else{if(rec.uid&&rec.uid!==f.uid)rec.n=nextNFor(rec.uid);if(!await B.updFtd(f,rec))return false;toast(`Venta #${rec.n||f.n} actualizada: <b>${esc(rec.id)}</b> ${esc(rec.name)}${rec.uid&&rec.uid!==me?' de '+esc(memberName(rec.uid)):''}`)}
     if(again){ // seguir cargando: limpia lo propio de la venta, mantiene marca/país/afiliador/campaña
-      for(const n of ['id','name','amount','tx'])api.q(`[name=${n}]`).value='';
+      for(const n of ['id','amount','tx'])api.q(`[name=${n}]`).value='';
       api.q('[name=time]').value=nowHM();api.q('[name=regD]').value=api.q('[name=date]').value;api.q('[name=regT]').value='';
       api.q('#fDup').hidden=true;dupOk='';tipo(api);api.q('[name=id]').focus();return false;
     }
@@ -608,11 +606,11 @@ function agendarModal(id,kw){
 function clienteModal(){
   if(!noRO())return;
   modal({title:'Registrar cliente new',body:`<div class="fgrid"><label class="fld"><span>ID <i>*</i></span><input id="ncI" autofocus></label><label class="fld"><span>Día</span><input type="date" id="ncD" max="${todayS()}" value="${todayS()}"></label>
-    <label class="fld full"><span>Nombre</span><input id="ncN"></label><label class="fld"><span>País</span><input id="ncP"></label></div><div class="ebox" id="ncE"></div>`,
+    <label class="fld"><span>País</span><input id="ncP"></label></div><div class="ebox" id="ncE"></div>`,
     actions:[{l:'Cancelar'},{l:'Registrar',cls:'pri',fn:async api=>{
       const id=api.q('#ncI').value.trim(),d=api.q('#ncD').value||todayS();if(!id){api.q('#ncE').textContent='Falta el ID.';return false}
       const ya=leads.find(l=>norm(l.id)===norm(id));if(ya){api.q('#ncE').textContent=`Ya está registrado (${ya.uid===me?'lo anotaste vos':'lo anotó '+memberName(ya.uid)} el ${dm(ya.date)}).`;return false}
-      const n=await B.addLeads([{id,name:api.q('#ncN').value.trim(),country:api.q('#ncP').value.trim(),date:d}],'manual');
+      const n=await B.addLeads([{id,name:'',country:api.q('#ncP').value.trim(),date:d}],'manual');
       if(n===false)return false;if(!n){api.q('#ncE').textContent='Ya estaba registrado en la mesa.';return false}
       toast(`Cliente <b>${esc(id)}</b> registrado.`);
     }}]});

@@ -165,7 +165,7 @@ async def main():
             await C.goto('https://crmnovaramarkets.com/clients'); await C.wait_for_timeout(3500)
             await C.screenshot(path=OUT / 'x2_crm.png')
             rows = sql("select client_id, name, source, (select name from public.profiles where id=user_id) who from public.leads order by client_id")
-            ok([(r['client_id'], r['name']) for r in rows] == [('555001', 'Lucía Pérez'), ('555002', 'Jorge Díaz')] and all(r['who'] == 'Sofía Ar' and r['source'] == 'crm' for r in rows), f'los 2 clientes en new llegaron al registro con su nombre ({rows})')
+            ok([(r['client_id'], r['name']) for r in rows] == [('555001', None), ('555002', None)] and all(r['who'] == 'Sofía Ar' and r['source'] == 'crm' for r in rows), f'los 2 clientes en new llegaron al registro, sin nombre ({rows})')
             await C.reload(); await C.wait_for_timeout(2500)
             ok(sql("select count(*)::int c from public.leads")[0]['c'] == 2, 'recargar el CRM no los duplica')
             q = await sw.evaluate("chrome.storage.local.get('leadQ')")
@@ -201,7 +201,7 @@ async def main():
             # el cliente abierto en el CRM (su ficha) queda como "cliente actual" en Vitalis
             Cu = await ctx.new_page(); await Cu.goto('https://ant-crm.crmnovaramarkets.com/user/712345?authToken=x'); await Cu.wait_for_timeout(2500)
             cur = await A2.evaluate("curCl&&[curCl.id,curCl.name,curCl.src]")
-            ok(cur == ['712345', 'Fabio Prueba', 'crm'], f'el cliente abierto en el CRM es el cliente actual de Vitalis ({cur})')
+            ok(cur == ['712345', '', 'crm'], f'el cliente abierto en el CRM es el cliente actual de Vitalis ({cur})')
             await Cu.wait_for_function("(document.getElementById('vitalis-dock')||{shadowRoot:{textContent:''}}).shadowRoot.textContent.includes('712345')", timeout=6000)
             ok(True, 'y en el CRM, la mini ficha de Vitalis lo muestra')
             await Cu.close()
@@ -209,7 +209,7 @@ async def main():
             await Nv.bring_to_front()
             await Nv.evaluate("()=>{const d=document.createElement('div');d.id='drw';d.innerHTML='<div class=hd><div><span class=dot></span> Ana Panel</div><div class=sub>ID <span>70370</span><i class=ic></i></div></div><p>Server: Stock</p>';document.body.appendChild(d)}"); await Nv.wait_for_timeout(2500)
             cur = await A2.evaluate("curCl&&[curCl.id,curCl.name]")
-            ok(cur == ['70370', 'Ana Panel'], f'también la ficha abierta como panel arriba de la lista del CRM ({cur})')
+            ok(cur == ['70370', ''], f'también la ficha abierta como panel arriba de la lista del CRM ({cur})')
             # cada toque en Omega, Gizat o Voiso es una llamada a ese cliente (el interno después del guión no se guarda)
             await Nv.evaluate("()=>{const d=document.getElementById('drw');d.insertAdjacentHTML('beforeend','<div class=btns><button class=vb>☎ Omega - 9944418</button><button class=vb>☎ Gizat - 1371</button><button class=vb>☎ Voiso LATAM - 3262</button><a href=\"#\">+57312547XXXX</a></div>')}")
             await A2.evaluate("setCurrent('555002','Otro','lista')"); await A2.wait_for_timeout(300)
@@ -228,7 +228,7 @@ async def main():
               const old=document.createElement('div');old.id='oldDrw';old.style.cssText='position:fixed;top:0;left:100%;width:320px';old.innerHTML=__mk('60001','Vieja Ficha');document.body.prepend(old);
               const d=document.createElement('div');d.id='fic';d.innerHTML=__mk('68636','Lucio Diaz');document.body.prepend(d)}"""); await Nv.wait_for_timeout(1800)
             cur = await A2.evaluate("curCl&&[curCl.id,curCl.name,curCl.src]")
-            ok(cur == ['68636', 'Lucio Diaz', 'crm'], f'la ficha a la vista del CRM es el cliente actual, aunque la dirección haya quedado vieja y haya otra ficha escondida ({cur})')
+            ok(cur == ['68636', '', 'crm'], f'la ficha a la vista del CRM es el cliente actual, aunque la dirección haya quedado vieja y haya otra ficha escondida ({cur})')
             ok(await A2.evaluate("cur") == 'cliente' and await A2.locator('#nbCli').inner_text() == '68636', 'Vitalis pasa solo a la sección Cliente, con el ID en el menú')
             await Nv.wait_for_function("(document.getElementById('vitalis-dock')||{shadowRoot:{textContent:''}}).shadowRoot.textContent.includes('68636')", timeout=6000)
             ok(True, 'y la mini ficha del CRM lo muestra')
@@ -236,7 +236,7 @@ async def main():
             await Nv.evaluate("document.getElementById('fic').innerHTML=__mk('68700','Marta Gomez')")
             await A2.wait_for_function("curCl&&curCl.id==='68700'", timeout=4000)
             dt = await Nv.evaluate("performance.now()") - t0
-            ok(await A2.evaluate("[curCl.name,cur,document.getElementById('nbCli').textContent]") == ['Marta Gomez', 'cliente', '68700'], 'al abrir otro cliente en el CRM, Vitalis cambia solo, sin refrescar')
+            ok(await A2.evaluate("[curCl.id,cur,document.getElementById('nbCli').textContent]") == ['68700', 'cliente', '68700'], 'al abrir otro cliente en el CRM, Vitalis cambia solo, sin refrescar')
             ok(dt < 2500, f'enseguida ({dt:.0f} ms)')
             # la mini ficha de Vitalis en el CRM (abajo a la izquierda): el cliente actual en corto, el siguiente de la Cola y el turno
             await Nv.locator('#vitalis-dock #pill').click(); await Nv.wait_for_timeout(200)
@@ -249,7 +249,7 @@ async def main():
             await A2.evaluate("Promise.all([kwLoad(true),bkLoad(true),crmLoad(true)]).then(()=>{fichaCache.clear();dockSync()})"); await Nv.wait_for_timeout(2500)
             DKT = "(document.getElementById('vitalis-dock')||{shadowRoot:{textContent:''}}).shadowRoot.textContent"
             t = await Nv.evaluate(DKT)
-            ok('68700' in t and 'Marta Gomez' in t and 'Montevideo' in t and 'New: llamalo ya' in t and 'Dijo que cobra el viernes' in t, f'la mini ficha muestra al cliente: status en palabras simples, palabra clave y comentarios de la mesa ({t[:200]!r})')
+            ok('68700' in t and 'Marta Gomez' not in t and 'Montevideo' in t and 'New: llamalo ya' in t and 'Dijo que cobra el viernes' in t, f'la mini ficha muestra al cliente: status en palabras simples, palabra clave y comentarios de la mesa ({t[:200]!r})')
             ok('Perfil del cliente' in t and 'Falta: edad, ocupación, objetivo' in t and await Nv.locator('#vitalis-dock #pfE').is_visible(), 'al perfil le falta todo: el formulario arranca abierto')
             ok(not await Nv.locator('#vitalis-dock #payb').is_visible(), 'cómo depositar arranca plegado')
             await Nv.locator('#vitalis-dock #pay summary').click(); await Nv.locator('#vitalis-dock [data-pt=efectivo]').click(); await Nv.wait_for_timeout(200)
@@ -324,13 +324,13 @@ async def main():
             await Nv.wait_for_timeout(5000)
             ok(await A2.evaluate("curCl&&curCl.id") == '70759', f'la ficha del CRM real (adentro de un componente con shadow DOM, en un cajón que entra de costado): la toma ({await A2.evaluate("curCl&&curCl.id")})')
             ok('70759' in await Nv.evaluate(DKT), 'y la mini ficha muestra a ese cliente')
-            ok(await A2.evaluate("curCl&&curCl.name") == 'María Del Carmen Soto Ramos', f'con el nombre, sin el ícono ni la sangría ({await A2.evaluate("curCl&&curCl.name")!r})')
+            ok(await A2.evaluate("curCl&&curCl.name") == '', f'sin el nombre (no se guardan nombres de clientes) ({await A2.evaluate("curCl&&curCl.name")!r})')
             await Nv.locator('#drw2 client-card button >> nth=0').click(); await Nv.wait_for_timeout(2500)
             ok(sql("select count(*)::int n from public.calls where client_id='70759' and line='omega'")[0]['n'] == 1, 'el toque en Omega adentro de la ficha cuenta la llamada')
             # pasar al cliente siguiente con las flechas del cajón: cambia solo lo de adentro del componente
             await Nv.evaluate('''()=>{const sr=document.querySelector('#drw2 client-card').shadowRoot;sr.querySelector('.user-id').textContent=' ID 70760 ';sr.querySelector('.user-name').textContent='Pedro Siguiente'}''')
             await A2.wait_for_function("curCl&&curCl.id==='70760'", timeout=4000)
-            ok(await A2.evaluate("curCl.name") == 'Pedro Siguiente', 'al pasar al cliente siguiente adentro del cajón, cambia enseguida')
+            ok(await A2.evaluate("curCl.id") == '70760', 'al pasar al cliente siguiente adentro del cajón, cambia enseguida')
             # el historial de llamadas de la ficha: una tabla con "Omega" en una celda no es un botón para llamar
             await Nv.evaluate('''()=>{const g=document.createElement('div');g.id='hist';g.setAttribute('role','grid');g.innerHTML='<div role=row><div role=gridcell class=ag-cell><span class=ag-cell-value>Omega</span></div><div role=gridcell class=ag-cell><span class=ag-cell-value>00:01:10</span></div></div>';document.getElementById('drw2').appendChild(g)}''')
             await Nv.click('#hist .ag-cell-value >> text=Omega'); await Nv.wait_for_timeout(2500)
@@ -342,7 +342,7 @@ async def main():
             ok(True, 'el ID en una tabla de datos de la ficha')
             await Nv.evaluate("document.getElementById('fic').innerHTML='<style>.uidb::before{content:\"ID \"}</style><div class=hd><b>Pedro Prueba</b><div class=uidb>68902</div></div><div class=calls><button>Gizat - 1371</button></div>'")
             await A2.wait_for_function("curCl&&curCl.id==='68902'", timeout=4000)
-            ok(await A2.evaluate("curCl.name") == 'Pedro Prueba', 'y el "ID" puesto por el estilo, con su nombre')
+            ok(await A2.evaluate("curCl.id") == '68902', 'y el "ID" puesto por el estilo')
             # se cierra la ficha: no vuelve a la vieja escondida ni al de la dirección vieja
             await Nv.evaluate("document.getElementById('fic').remove()"); await Nv.wait_for_timeout(2200)
             ok(await A2.evaluate("curCl.id") == '68902', f'al cerrar la ficha queda el último (no la vieja escondida ni el de la dirección vieja) ({await A2.evaluate("curCl.id")})')
@@ -391,7 +391,7 @@ async def main():
             await C.wait_for_timeout(3500)
             await A2.evaluate("document.hasFocus=()=>true;dispatchEvent(new Event('focus'))"); await A2.wait_for_timeout(3000)
             fi = await A2.inner_text('#v-cliente') if await A2.is_visible('#v-cliente') else ''
-            ok('entró un new' in fi and 'Rita Nueva' in fi and 'Chile' in fi, f'al volver a Vitalis, el new está en la sección Cliente ({fi[:120]!r})')
+            ok('entró un new' in fi and 'Rita Nueva' not in fi and 'Chile' in fi, f'al volver a Vitalis, el new está en la sección Cliente ({fi[:120]!r})')
             await A2.screenshot(path=OUT / 'x11_ficha_new.png')
             await A2.keyboard.press('Escape'); await A2.wait_for_timeout(300)
             await A2.evaluate("(()=>{const h=document.getElementById('ftd-agenda-overlay');if(h)h.remove()})()")
@@ -548,7 +548,7 @@ async def main():
             # tres tandas de clientes a la vez (una lista grande, o dos pestañas): no se pisan en la cola
             await sw.evaluate("Promise.all([0,1,2].map(b=>crmSeen(Array.from({length:120},(_,i)=>({id:String(661000+b*1000+i),brand:'Novara Markets',name:'Tanda '+b,status:'New',reg:'2026-11-18 10:00'})))))")
             await F.wait_for_timeout(4000)
-            ok(sql("select count(*)::int c from public.crm_clients where name like 'Tanda %'")[0]['c'] == 360, 'tres tandas de clientes al mismo tiempo llegan enteras (360)')
+            ok(sql("select count(*)::int c from public.crm_clients where client_id between '661000' and '663999' and name is null")[0]['c'] == 360, 'tres tandas de clientes al mismo tiempo llegan enteras (360)')
 
             # una sola pestaña del CRM se actualiza: la que elegís; mientras exista, ninguna otra la reemplaza (para un agente)
             asAgent = "chrome.storage.local.get('desk').then(s=>chrome.storage.local.set({desk:{...(s.desk||{}),role:'agent'}}))"

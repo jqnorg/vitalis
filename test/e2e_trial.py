@@ -96,6 +96,7 @@ async def main():
             # "Actualizar esta pestaña": la lista se refresca sola y avisa de un new nuevo
             await pnl.locator('#wbtn').click(); await C.wait_for_timeout(500)
             ok('se actualiza sola' in await pnl.locator('#wst').inner_text(), 'la pestaña de news se actualiza sola')
+            ok((await sw.evaluate("(async()=>{const w=Object.values((await chrome.storage.local.get('watches')).watches||{})[0];return w?(await chrome.tabs.get(w.tabId)).pinned:null})()")) is True, 'y queda fijada (el agente no la cierra por error)')
             NUEVO = ['661009', 'Nuevo Trial', 'Peru', 'New', 'Pepe Rep', '97275', 'Finvera AI', f'{HOY} 10:00']
             await ctx.route('https://crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=lista(ROWS + [NUEVO])))
             await C.evaluate("()=>{const tr=document.createElement('tr');tr.innerHTML='<td>661009</td><td>Nuevo Trial</td><td>Peru</td><td>New</td><td>Pepe Rep</td><td>97275</td><td>Finvera AI</td><td>%s 10:00</td>';document.querySelector('tbody').appendChild(tr)}" % HOY)

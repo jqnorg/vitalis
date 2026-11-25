@@ -137,7 +137,7 @@
     let reg = r ? r.date + (r.time ? ' ' + r.time : '') : dt.date;
     if (reg.slice(0, 10) > dt.date) reg = dt.date;
     const b = g('brand');
-    return { date: dt.date, time: dt.time, id, name: g('name'), country: g('country'), aff: g('aff'), camp: g('camp'), amount, tx: g('tx'), reg, brand: b ? brandOf(b) : brand, agent: g('agent') };
+    return { date: dt.date, time: dt.time, id, name: '', country: g('country'), aff: g('aff'), camp: g('camp'), amount, tx: g('tx'), reg, brand: b ? brandOf(b) : brand, agent: g('agent') };
   }
   let agentHead = '';
   function salesOf(t) {
@@ -303,7 +303,7 @@
   let lastLeads = '';
   function reportLeads(list) {
     if (!list || !list.length || trial) return;
-    const rows = list.filter((c) => c.id || c.name).map((c) => ({ id: c.id, name: c.name, country: c.country, reg: c.reg }));
+    const rows = list.filter((c) => c.id || c.name).map((c) => ({ id: c.id, name: '', country: c.country, reg: c.reg }));
     const sig = rows.map((c) => c.id || c.name).join('|');
     if (sig === lastLeads) return;
     lastLeads = sig;
@@ -323,7 +323,7 @@
       const k = norm(c.brand) + '|' + norm(c.id), sig = [c.status, c.reg, c.agent, c.camp, c.aff, c.name, c.country, c.call, c.note, c.ftd, c.desk].join('|');
       if ((sentSig.get(k) === sig && now - (sentAt.get(k) || 0) < HEART) || flying.get(k) === sig) continue;
       flying.set(k, sig);
-      rows.push({ k, sig, row: { id: c.id, brand: c.brand, name: c.name, country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note, ftd: c.ftd, desk: c.desk } });
+      rows.push({ k, sig, row: { id: c.id, brand: c.brand, name: '', country: c.country, status: c.status, reg: c.reg, agent: c.agent, camp: c.camp, aff: c.aff, call: c.call, note: c.note, ftd: c.ftd, desk: c.desk } });
     }
     for (let i = 0; i < rows.length; i += 300) {
       const part = rows.slice(i, i + 300);
@@ -478,7 +478,7 @@
     // ventas
     const looksFtd = !trial && !sales && /bank|transaction/i.test(location.hash + location.pathname) && /transaction id/i.test(document.body ? document.body.innerText : '');
     ui.diag = looksFtd;
-    if (trial) head.push(trial.joined ? `Prueba · ${trial.desk} · ${trial.name}` : 'Prueba: entrá con tu código en el ícono de la extensión');
+    if (trial) head.push(trial.joined ? trial.desk : 'Entrá con tu código (ícono de Vitalis)');
     $('sSales').hidden = !sales && !looksFtd;
     if (looksFtd) { head.push('no encuentro la tabla de FTDs'); $('go').disabled = false; $('go').textContent = 'Copiar diagnóstico'; $('ids').textContent = ''; }
     else if (sales) {
@@ -611,6 +611,7 @@
     .pst{margin:5px 0 0;font-size:12.5px;color:#4b5563}.pst:empty{display:none}.pst b{color:#0f1720}
     .pf .row{margin-top:10px}
     .tr #cmt,.tr #cmt+.row,.tr #pay,.tr .lb.cm,.tr #pmsg,.tr #cmsg{display:none}
+    .tr .box{width:380px;max-height:min(72vh,720px)}.tr{font-size:15px}.tr .kv{font-size:15px;padding:7px 0}.tr .lb{font-size:13px;margin:12px 0 6px}.tr .cid b{font-size:22px}.tr .nm{font-size:15px;color:#6b7684}.tr .note{font-size:14px}.tr .op{font-size:14.5px}.tr .opn{font-size:14px}.tr .go{font-size:15px;padding:10px 12px}.tr .lnk{font-size:14px}.tr #nx .kv{font-size:15px}
     :focus-visible{outline:2px solid #00875a;outline-offset:2px}`;
   if (TOP) {
     chrome.storage.local.get('dockMin').then((x) => { dMin = !!x.dockMin; dockDraw(); }).catch(() => {});
@@ -621,13 +622,9 @@
   let dCamp = { id: '', open: false };
   function dockTrialHTML(c) {
     if (!c) return `<p class="note">Abrí un cliente en el CRM (o tocá Omega/Gizat/Voiso) y acá te muestro su campaña.</p>`;
-    const stTxt = c.status ? escH(c.status) : '<i>no lo vi en una lista de news</i>';
     const camps = c.camps, mine = camps ? camps.find((x) => x.mine) : null, others = camps ? camps.filter((x) => !x.mine) : [];
     const ed = dCamp.id === c.id && dCamp.open;
-    let h = `<div class="cid"><b>${escH(c.id)}</b>${c.name ? `<span class="nm">${escH(c.name)}</span>` : ''}</div>
-      <div class="meta">${[c.country ? escH(c.country) : '', c.agent ? 'de ' + escH(c.agent) : ''].filter(Boolean).join(' · ') || '&nbsp;'}</div>
-      <div class="kv"><span>Status</span><b>${stTxt}</b></div>
-      ${c.reg ? `<div class="kv"><span>Registro</span><b>${escH(c.reg)}</b></div>` : ''}
+    let h = `<div class="cid"><b>${escH(c.id)}</b>${c.country ? `<span class="nm">${escH(c.country)}</span>` : ''}</div>
       <span class="lb">Campaña</span>`;
     if (!c.aff && !c.camp) h += `<p class="note">No sé de qué campaña es: cuando aparezca en tu lista de news lo aprendo.</p>`;
     else {
@@ -642,7 +639,7 @@
     }
     return h;
   }
-  const dockStatsHTML = (s) => (!s ? '' : `<span class="lb">Tus news de hoy</span><div class="kv"><span>Te llegaron</span><b>${s.news}</b></div><div class="kv"><span>Llamados</span><b>${s.called} de ${s.news}</b></div><div class="kv"><span>Llamadas</span><b>${s.calls}</b></div><div class="kv"><span>Al new en</span><b>${s.med == null ? '<i>—</i>' : (Math.round(s.med) + ' min') + (s.slow ? ` <i>· ${s.slow} pasaron de 5</i>` : '')}</b></div>`);
+  const dockStatsHTML = (s) => (!s ? '' : `<span class="lb">Tus news de hoy</span><div class="kv"><span>Te llegaron</span><b>${s.news}</b></div><div class="kv"><span>Llamados</span><b>${s.called} de ${s.news}</b></div><div class="kv"><span>Al new en</span><b>${s.med == null ? '<i>—</i>' : (Math.round(s.med) + ' min') + (s.slow ? ` <i>· ${s.slow} pasaron de 5</i>` : '')}</b></div><span class="lb">Llamadas de hoy</span><div class="kv"><span>Llamadas</span><b>${s.calls}</b></div>`);
   function dockTrialDraw(cl) {
     const $ = dk.$;
     $('dk').classList.add('tr'); $('cl').hidden = false; $('prof').hidden = true;
@@ -1039,7 +1036,7 @@
     if (watched || !id) return;
     if (!force && id === curSent && (curName || !name)) return; // ya lo mandé (salvo que recién aparezca el nombre)
     curName = name || (id === curSent ? curName : ''); curSent = id;
-    send({ type: 'crm-current', id, name: name || '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
+    send({ type: 'crm-current', id, name: '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
   }
   function diagCur() { // solo la forma de la ficha (etiquetas, clases y textos tapados): ningún dato del cliente
     const S = scanCur(), b = S.lines.find((x) => x.v >= 2) || S.ids.find((x) => onTop(x.el) >= 2)

@@ -157,7 +157,7 @@ function fichaModal(uid,tab='mes'){
     }else if(t==='clientes'){
       const C=leads.filter(l=>leadOwner(l)===uid&&l.date.slice(0,7)===ym).sort((a,b)=>a.date<b.date?1:-1),hoy=C.filter(l=>l.date===te).length,cv=convPeriod(te,te,uid);
       el.innerHTML=`<p class="p-sub">${plural(C.length,'cliente new','clientes new')} este mes · ${hoy} hoy${cv.rate!=null?` · conversión de hoy ${pct(cv.rate)}`:''}</p>`+
-        (C.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>Nombre</th><th>País</th></tr></thead><tbody>${C.slice(0,80).map(l=>`<tr><td>${dm(l.date)}</td><td><b>${esc(l.id)}</b></td><td>${esc(l.name)}</td><td>${esc(l.country)}</td></tr>`).join('')}</tbody></table>`:'<div class="p-empty">Sin clientes new este mes.</div>');
+        (C.length?`<table class="pt"><thead><tr><th>Día</th><th>ID</th><th>País</th></tr></thead><tbody>${C.slice(0,80).map(l=>`<tr><td>${dm(l.date)}</td><td><b>${esc(l.id)}</b></td><td>${esc(l.country)}</td></tr>`).join('')}</tbody></table>`:'<div class="p-empty">Sin clientes new este mes.</div>');
     }else if(t==='tareas'){
       const rows=taskPeople.filter(p=>p.user_id===uid).map(p=>({p,t:taskOf(p.task_id)})).filter(x=>x.t).sort((a,b)=>(!!a.p.done_at-!!b.p.done_at)||b.t.t-a.t.t);
       el.innerHTML=rows.length?`<div class="fi-list">${rows.slice(0,40).map(({p,t})=>`<div class="fi-it"><span class="wh">${esc(tkWhen(t.at))}</span><b>${esc(clip(taskTxt(t),90))}</b>${p.done_at?`<span class="badge">hecha ${esc(tkWhen(p.done_at))}</span>`:`<span class="badge bad">pendiente</span>`}</div>`).join('')}</div>`:'<div class="p-empty">No tiene tareas.</div>';
@@ -220,7 +220,7 @@ function hoyMesaCard(){
   const show=hoyAll?L:L.slice(0,12);
   return head+`<div class="hv">${show.map(f=>{const nm=memberName(f.uid),mine=f.uid===me;
     return `<div class="hv-r${mine?' mine':''}"><span class="t">${esc(f.time||'—')}</span><button type="button" class="who-cell lnkp" data-prof="${esc(f.uid)}" title="Ver el perfil de ${esc(nm)}">${avatar(nm)}<span>${esc(mine?'Vos':nm.split(/\s+/)[0])}</span></button>
-      <span class="n" title="${esc(f.name)}${f.camp?' · '+esc(f.camp):''}"><b>${esc(f.id)}</b> ${esc(f.name)}<small>${esc(f.country)}${f.camp?' · '+esc(f.camp):''}</small></span><span class="m">${esc(money(f.amount))}</span><span class="b">${tipoBadge(f)}</span></div>`}).join('')}</div>`+
+      <span class="n" title="${f.camp?esc(f.camp):''}"><b>${esc(f.id)}</b><small>${esc(f.country)}${f.camp?' · '+esc(f.camp):''}</small></span><span class="m">${esc(money(f.amount))}</span><span class="b">${tipoBadge(f)}</span></div>`}).join('')}</div>`+
     (L.length>12?`<button type="button" class="btn sm hv-more" data-act="hoyMas">${hoyAll?'Ver menos':`Ver las ${L.length}`}</button>`:'');
 }
 

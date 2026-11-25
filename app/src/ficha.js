@@ -16,7 +16,7 @@ async function fichaData(id,force){
   const country=r&&r.country||ld&&ld.country||f&&f.country||'',aff=String(r&&r.aff||f&&f.aff||''),camp=r&&r.camp||f&&f.camp||'',pais=paisOf(country);
   if(bk.ok==null)await bkLoad(true);
   const [cs,camps,coms,reqs,prof]=await Promise.all([comboStats(aff,camp,country),aff?campsFor(aff,pais,camp):[],commentsOf(id),aff&&bkEd()?reqsFor(aff,pais):[],profileOf(id)]);
-  const d={id,r,log,ld,f,name:r&&r.name||ld&&ld.name||f&&f.name||'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs,prof,kw:clientKw(id)};
+  const d={id,r,log,ld,f,name:'',country,pais,aff,camp:camN(camp),cs,camps,coms,reqs,prof,kw:clientKw(id)};
   fichaCache.set(id,{at:Date.now(),d});
   return d;
 }
@@ -40,7 +40,7 @@ function fichaHTML(d){
   const {id,r,f}=d,ra=r?regAt(r):null,tz=cliTime(d.country),ags=[...pend,...teamAg].filter(p=>norm(p.id)===norm(id)&&!p.done);
   const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
   return `<div class="fi" data-fid="${esc(id)}">
-    <div class="fi-h"><div><div class="fi-nm">${esc(d.name||'Sin nombre')}</div><div class="fi-meta">${esc(id)}${d.pais?' · '+esc(d.pais):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
+    <div class="fi-h"><div><div class="fi-nm">${esc(id)}</div><div class="fi-meta">${d.pais?esc(d.pais):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
       <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}</div></div>
     <div class="fi-cols"><div class="fi-col fi-main">${fiProfHTML(d)}${fiComsHTML(d)}</div>
       <div class="fi-col">
@@ -375,7 +375,7 @@ function cuTopHTML(){
   return `<div class="cu-bar">${curCl?`<span class="cu-src"><span class="cu-dot ${esc(curCl.src||'')}"></span>Cliente actual · ${cuSrc(curCl)} · ${esc(rel(new Date(curCl.at)))}</span>`:'<span class="cu-src">Cliente actual</span>'}
     <span class="grow"></span>
     ${curCl?`<button type="button" class="btn sm pri" data-cu="ag">Agendar</button><button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
-    <details class="cu-more" data-k="cu-more"${curCl?'':' open'}><summary>Otro cliente</summary><div class="cu-rec"><form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>${h.length?`<span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b>${x.name?' '+esc(clip(x.name,22)):''}</button>`).join('')}`:''}</div></details>`;
+    <details class="cu-more" data-k="cu-more"${curCl?'':' open'}><summary>Otro cliente</summary><div class="cu-rec"><form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>${h.length?`<span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button>`).join('')}`:''}</div></details>`;
 }
 async function cuRender(force){
   const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;

@@ -25,7 +25,7 @@ async function dockData(){
   if(locked)return {locked:1};
   const {t,b}=turnoState(),h=turnos[todayS()];
   const tu=!t?{st:h&&h.out?'out':'none'}:b?{st:'br',k:b.k||0,s:b.s}:{st:'in'};
-  let next=[];if(crm.ok)try{next=newsOf(me).filter(inNew).slice(0,6).map(r=>({id:r.id,name:r.name,why:'En New: llamalo ya'}))}catch(e){}
+  let next=[];if(crm.ok)try{next=newsOf(me).filter(inNew).slice(0,6).map(r=>({id:r.id,name:'',why:'En New: llamalo ya'}))}catch(e){}
   let cl=null;
   if(curCl&&curCl.id){
     const c=fichaCache.get(curCl.id),d=c?c.d:await fichaData(curCl.id).catch(()=>null);

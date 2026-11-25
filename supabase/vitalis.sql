@@ -2536,3 +2536,16 @@ grant execute on function public.trial_desks_list() to authenticated;
 -- las de la extensión: con la clave pública (el código es la llave)
 grant execute on function public.trial_join(text, text, text, text), public.trial_seen(text, text, jsonb), public.trial_board(text), public.trial_camp(text, text, text, text, text), public.trial_camp_set(text, text, text, text, text, text, text), public.trial_invite() to anon, authenticated;
 revoke all on function public._trial_desk(text) from public, anon;
+
+-- ---------- sin nombres de clientes (el dueño, 25/11/2026: "saquemos el nombre de los clientes en todo Vitalis") ----------
+-- La extensión y la app ya no los mandan; por si algo viejo los manda, la base los descarta siempre. Lo guardado se borró una vez (update … set name = null).
+create or replace function public.strip_client_name() returns trigger language plpgsql set search_path = '' as $$
+begin new.name := null; return new; end $$;
+drop trigger if exists sales_no_name on public.sales;
+create trigger sales_no_name before insert or update of name on public.sales for each row execute function public.strip_client_name();
+drop trigger if exists leads_no_name on public.leads;
+create trigger leads_no_name before insert or update of name on public.leads for each row execute function public.strip_client_name();
+drop trigger if exists crm_clients_no_name on public.crm_clients;
+create trigger crm_clients_no_name before insert or update of name on public.crm_clients for each row execute function public.strip_client_name();
+drop trigger if exists trial_news_no_name on public.trial_news;
+create trigger trial_news_no_name before insert or update of name on public.trial_news for each row execute function public.strip_client_name();

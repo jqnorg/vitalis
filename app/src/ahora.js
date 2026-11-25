@@ -10,7 +10,7 @@ const CRM_FULL=10*6e4; // la carga entera, cada 10 min; en el medio, solo lo que
 const ckey=(b,id)=>norm(b||DEF_BRAND)+'|'+norm(id);
 // dejó de ser new: desapareció de la lista de news, o se lo vio con otro status (cuál, no se guarda: solo importa que ya no es new)
 const gone=r=>!!r.left_new_at&&r.status_group==='new';
-const C2X=r=>({brand:r.brand,id:r.client_id,name:r.name||'',country:r.country||'',reg:r.reg||'',status:gone(r)?'Dejó de ser new':r.status||'',grp:gone(r)?'gone':r.status_group||'otro',agent:r.crm_agent||'',
+const C2X=r=>({brand:r.brand,id:r.client_id,name:'',country:r.country||'',reg:r.reg||'',status:gone(r)?'Dejó de ser new':r.status||'',grp:gone(r)?'gone':r.status_group||'otro',agent:r.crm_agent||'',
   camp:r.camp||'',aff:r.aff||'',call:r.last_call||'',note:r.note||'',ftd:r.ftd_at||'',desk:r.desk||'',firstAgent:r.first_agent||'',first:r.first_seen,firstBy:r.first_seen_by,last:r.last_seen,since:r.status_since,left:r.left_new_at||''});
 const crmAll=()=>[...crm.rows.values()];
 const regDay=r=>r.reg?r.reg.slice(0,10):(r.first?ymd(new Date(r.first)):'');
@@ -182,7 +182,7 @@ async function crmSeenFromExt(rows){
   if(callR.length===rows.slice(0,500).length)return {keys:callR.map(r=>String(r.k||''))};
   if(crm.ok===false&&Date.now()-crm.at<5*6e4)return {err:'falta actualizar la base'};
   const s=v=>String(v??'').replace(/\s+/g,' ').trim(),batch=rows.slice(0,500);
-  const list=batch.filter(r=>r&&!r.ln&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:s(r.name).slice(0,120),country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
+  const list=batch.filter(r=>r&&!r.ln&&s(r.id)).map(r=>({id:s(r.id).slice(0,60),brand:s(r.brand).slice(0,40),name:null,country:s(r.country).slice(0,60),status:s(r.status).slice(0,60),
     reg:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.reg||'')?r.reg:'',agent:s(r.agent).slice(0,80),camp:s(r.camp).slice(0,120),aff:s(r.aff).slice(0,60),
     call:/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(r.call||'')?r.call:'',note:s(r.note).slice(0,200),
     ftd:/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2})?$/.test(r.ftd||'')?r.ftd:'',desk:s(r.desk).slice(0,80),...(r.gone?{gone:1}:{})}));

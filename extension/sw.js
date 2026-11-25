@@ -56,7 +56,7 @@ async function trialDeliver() {
     const part = crmQ.slice(0, 500);
     await lock('tcl', async () => { // lo que sé de cada cliente visto (campaña, afiliador, país): para la ficha
       const all = await sess.get('trialCl', {});
-      for (const r of part) if (!r.ln && r.id) all[r.id] = { name: r.name, country: r.country, aff: r.aff, camp: r.camp, agent: r.agent, status: r.status, reg: r.reg, at: Date.now() };
+      for (const r of part) if (!r.ln && r.id) all[r.id] = { name: '', country: r.country, aff: r.aff, camp: r.camp, agent: r.agent, status: r.status, reg: r.reg, at: Date.now() };
       const ks = Object.keys(all); if (ks.length > 4000) for (const k of ks.sort((a, b) => all[a].at - all[b].at).slice(0, ks.length - 4000)) delete all[k];
       await sess.set('trialCl', all);
     });
@@ -490,7 +490,7 @@ async function watchStart0(tab) {
   const old = all[tab.id];
   all[tab.id] = { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null };
   await chrome.storage.local.set({ watches: all });
-  try { await chrome.tabs.update(tab.id, { autoDiscardable: false }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria
+  try { await chrome.tabs.update(tab.id, { autoDiscardable: false, ...((await trialCfg()) ? { pinned: true } : {}) }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria; en la prueba, fijada (el agente no la cierra ni la pierde por error)
   return { ok: true };
 }
 async function watchGo() { const w = Object.values(await allW())[0]; if (!w) return; try { const t = await chrome.tabs.get(w.tabId); await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); } catch (e) {} }
@@ -500,7 +500,7 @@ async function watchPrune() { // de la versión anterior (todas las pestañas): 
   await chrome.storage.local.set({ watches: { [keep.tabId]: keep } });
 }
 watchPrune();
-async function watchStop(tabId) { await setW(tabId, null); if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); await chrome.alarms.clear('crm-watch'); } }
+async function watchStop(tabId) { await setW(tabId, null); if (await trialCfg()) { try { await chrome.tabs.update(tabId, { pinned: false }); } catch (e) {} } if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); await chrome.alarms.clear('crm-watch'); } }
 async function tickOne(w) {
   let tab = null; try { tab = await chrome.tabs.get(w.tabId); } catch (e) {}
   if (!tab || !(await isCrmUrl(tab.url))) return watchStop(w.tabId); // se cerró o se fue del CRM

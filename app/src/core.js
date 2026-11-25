@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.55.0';
+const VERSION='1.56.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -116,14 +116,14 @@ let botU=null;const isBot=uid=>!!botU&&uid===botU.id;
 function setMembers(list){botU=list.find(m=>m.bot)||null;members=list.filter(m=>!m.bot)}
 let mesaCh=null,crmPingAt=0;function mesaPing(ev){try{if(mesaCh)mesaCh.send({type:'broadcast',event:ev,payload:{}})}catch(e){}}
 const memberName=uid=>{if(isBot(uid))return botU.name;const m=members.find(x=>x.id===uid);return m?m.name:'—'};
-const S2F=r=>({_id:r.id,uid:r.user_id,n:r.n,date:r.date,time:r.time||'',id:r.client_id,country:r.country||'',name:r.name||'',aff:r.aff||'',camp:r.camp??'',
+const S2F=r=>({_id:r.id,uid:r.user_id,n:r.n,date:r.date,time:r.time||'',id:r.client_id,country:r.country||'',name:'',aff:r.aff||'',camp:r.camp??'',
   amount:+r.amount,tx:r.tx||undefined,reg:r.reg||r.date,brand:r.brand||''});
-const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),country:f.country||null,name:f.name||null,aff:f.aff||null,camp:f.camp??null,
+const F2S=f=>({n:f.n??null,date:f.date,time:f.time||null,client_id:String(f.id),country:f.country||null,name:null,aff:f.aff||null,camp:f.camp??null,
   amount:+f.amount,tx:f.tx||null,reg:f.reg||null,brand:f.brand||DEF_BRAND,...(f.uid?{user_id:f.uid}:{})}); // el team leader carga a nombre de otro
 const A2P=r=>({_id:r.id,n:r.n,id:r.client_id,kw:r.kw||'',due:r.due,notified:!!r.notified,done:!!r.done,doneAt:r.done_at||null});
 const P2A=p=>({n:p.n??null,client_id:String(p.id),kw:p.kw||'',due:p.due,notified:!!p.notified,done:!!p.done,done_at:p.doneAt||null});
 const N2S=r=>({_id:r.id,uid:r.user_id,shortcut:r.shortcut,title:r.title||'',body:r.body||'',shared:!!r.shared,global:!!r.global,updated:r.updated_at});
-const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:r.name||'',country:r.country||'',date:r.date,source:r.source});
+const L2C=r=>({_id:r.id,uid:r.user_id,id:r.client_id,name:'',country:r.country||'',date:r.date,source:r.source});
 const G2P=r=>({_id:r.id,from:r.from_id,to:r.to_id||null,kind:r.kind,body:r.body||'',reply:r.reply||null,by:r.reply_by||null,at:r.created_at,rat:r.replied_at||null});
 const M2X=r=>({_id:r.id,chat:r.chat_id,uid:r.user_id,body:r.body||'',reply:r.reply_to||null,aviso:!!r.aviso,at:r.created_at,t:+new Date(r.created_at),edited:r.edited_at||null});
 const quiet=(m=profile)=>!!(m&&m.quiet_until&&new Date(m.quiet_until)>new Date()); // avisos sociales silenciados
@@ -152,7 +152,10 @@ function apiDown(e){
 }
 function apiBad(){apiFail=Math.min(apiFail+1,8);const base=Math.min(90e3,1500*2**apiFail);apiCoolUntil=Date.now()+Math.round(base*(0.7+Math.random()*0.6))}
 const apiCooling=()=>Date.now()<apiCoolUntil;
-async function Q(p){try{const r=await p;if(r.error)throw r.error;apiFail=0;apiCoolUntil=0;return r.data}catch(e){if(apiDown(e))apiBad();throw e}}
+// Si el token venció justo antes de que el cliente lo renueve (pasa con la pestaña en segundo plano: el 401 de "no tenés permiso"), se renueva y se repite una vez
+const jwtOld=e=>!!e&&(e.code==='PGRST301'||e.code==='PGRST303'||/jwt expired|JWT expired/i.test(String(e.message||'')));
+let jwtRefreshing=null;
+async function Q(p){try{let r=await p;if(r.error&&jwtOld(r.error)&&sb){try{await(jwtRefreshing||(jwtRefreshing=sb.auth.refreshSession().finally(()=>{jwtRefreshing=null})))}catch(e){}r=await p}if(r.error)throw r.error;apiFail=0;apiCoolUntil=0;return r.data}catch(e){if(apiDown(e))apiBad();throw e}}
 async function QO(p){try{return await Q(p)}catch(e){return []}} // opcional: si la tabla todavía no está en la base, sigo sin eso
 async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, pero distingo "no está" (null) de "vacío"
 
@@ -258,7 +261,7 @@ const B={ // todas las escrituras pasan por acá
     try{await Q(sb.from('snippets').delete().eq('id',sn._id));snippets=snippets.filter(x=>x._id!==sn._id);refresh();return true}catch(e){dbErr(e);return false}
   },
   async addLeads(rows,source='crm'){ // clientes new; los que ya estaban en la mesa se ignoran
-    const te=todayS(),body=rows.map(r=>({client_id:String(r.id).slice(0,60),name:r.name?String(r.name).slice(0,120):null,country:r.country?String(r.country).slice(0,60):null,date:r.date||te,source}));
+    const te=todayS(),body=rows.map(r=>({client_id:String(r.id).slice(0,60),name:null,country:r.country?String(r.country).slice(0,60):null,date:r.date||te,source}));
     try{const out=await Q(sb.from('leads').upsert(body,{onConflict:'team_id,client_id',ignoreDuplicates:true}).select());
       for(const r of out){const l=L2C(r);leads=leads.filter(x=>x._id!==l._id);leads.push(l)}refresh();return out.length}
     catch(e){dbErr(e);return false}
@@ -722,7 +725,7 @@ function csvText(bom=true){
   const sep=cfg.sep;
   const q=v=>{v=String(v??'');return (v.includes(sep)||/["\r\n]/.test(v))?'"'+v.replace(/"/g,'""')+'"':v};
   const amt=a=>sep===';'?String(a).replace('.',','):String(a);
-  const rows=[...ftds].sort(byDate).map(f=>[f.date,f.time||'',f.id,f.country,f.name,f.aff,f.camp,amt(f.amount),f.tx||'',f.reg||'',isLate(f)?'late':'new',f.brand||'']);
+  const rows=[...ftds].sort(byDate).map(f=>[f.date,f.time||'',f.id,f.country,f.aff,f.camp,amt(f.amount),f.tx||'',f.reg||'',isLate(f)?'late':'new',f.brand||'']);
   return (bom?'﻿':'')+[CSV_H,...rows].map(r=>r.map(q).join(sep)).join('\r\n')+'\r\n';
 }
 function parseCSV(text){

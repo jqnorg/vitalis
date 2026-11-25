@@ -159,7 +159,7 @@ async def main():
             await A.click('#pClear'); await A.wait_for_timeout(300)
             # clientes: manual + conversión
             await A.evaluate("go('clientes')"); await A.wait_for_timeout(300)
-            await A.click('[data-act=nuevoCliente]'); await A.fill('#ncI', '99001'); await A.fill('#ncN', 'Ana Prueba'); await A.click('.mbox .mf .pri'); await A.wait_for_timeout(800)
+            await A.click('[data-act=nuevoCliente]'); await A.fill('#ncI', '99001'); await A.click('.mbox .mf .pri'); await A.wait_for_timeout(800)
             ok(sql("select count(*)::int c from public.leads where client_id='99001' and source='manual'")[0]['c'] == 1, 'cliente cargado a mano')
             # snippet nuevo
             await A.evaluate("go('snippets')"); await A.wait_for_timeout(300)
@@ -782,7 +782,7 @@ async def main():
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
             await A.evaluate("window.postMessage({type:'ftd-agenda-cmd',v:1,cmd:'nuevo',k:'500002'},location.origin)"); await A.wait_for_timeout(2200)
             fi = await A.inner_text('#v-cliente') if await A.is_visible('#v-cliente') else ''
-            ok(await A.evaluate('cur') == 'cliente' and 'entró un new' in fi and 'Nueva Dos' in fi and 'GG-UY' in fi and 'Perú' in fi, f'cuando entra un new, Vitalis pasa a la sección Cliente, con su campaña ({fi[:160]!r})')
+            ok(await A.evaluate('cur') == 'cliente' and 'entró un new' in fi and '500002' in fi and 'Nueva Dos' not in fi and 'GG-UY' in fi and 'Perú' in fi, f'cuando entra un new, Vitalis pasa a la sección Cliente, con su campaña ({fi[:160]!r})')
             ok('New: llamalo ya' in fi and 'Depósito' in fi and 'Comentarios' in fi, 'dice que está en New, con el depósito y los comentarios')
             ok('Perfil del cliente' in fi and 'faltan datos' in fi, 'la ficha pide el perfil que exige la gerencia (edad, ocupación, objetivo)')
             await A.screenshot(path=OUT / 'q2_ficha_new.png')
@@ -1083,11 +1083,11 @@ async def main():
             ok(await A.locator('#v-cliente [data-fa=campReqs]').count() == 1, 'y en la ficha ve el pedido para resolverlo')
             await A.click('#cuTop .cu-more summary'); await A.wait_for_timeout(200)  # "Abrir por ID" y los recientes van plegados en "Otro cliente"
             await A.fill('#cuTop [data-cu=find] input', '500002'); await A.press('#cuTop [data-cu=find] input', 'Enter'); await A.wait_for_timeout(1500)
-            ok('Nueva Dos' in await A.inner_text('#cuBody') and '500001' in await A.inner_text('#cuTop .cu-rec'), 'se abre otro por ID y el anterior queda en Recientes')
+            ok('500002' in await A.inner_text('#cuBody .fi-h') and '500001' in await A.inner_text('#cuTop .cu-rec'), 'se abre otro por ID y el anterior queda en Recientes')
             await A.click('#cuTop [data-cu=rec][data-id="500001"]'); await A.wait_for_timeout(1500)
-            ok('Nueva Uno' in await A.inner_text('#cuBody'), 'y vuelve con un toque')
+            ok('500001' in await A.inner_text('#cuBody .fi-h'), 'y vuelve con un toque')
             await A.evaluate("go('agenda');openFicha('500008')"); await A.wait_for_timeout(1500)
-            ok(await A.evaluate('cur') == 'cliente' and 'De Sofía' in await A.inner_text('#cuBody'), 'desde cualquier lista, la ficha se abre en la sección Cliente')
+            ok(await A.evaluate('cur') == 'cliente' and '500008' in await A.inner_text('#cuBody .fi-h'), 'desde cualquier lista, la ficha se abre en la sección Cliente')
             await E.close()
 
             M = await newpage('M', 390, 844)
