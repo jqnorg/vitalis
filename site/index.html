@@ -1516,7 +1516,8 @@ details.hi-m{border-top:1px solid var(--soft);padding:8px 0}details.hi-m>summary
 .bk-ord.falla{border-color:var(--v-err,#c0392b);background:color-mix(in srgb,var(--v-err,#c0392b) 6%,var(--panel))}
 .bk-ord .bk-grip{color:var(--dim);letter-spacing:-3px;font-size:14px}.bk-ord .bk-on{min-width:24px;height:24px;border-radius:999px;background:var(--soft);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:12px}
 .bk-ord .ib[disabled]{opacity:.3;cursor:default}.bk-ord .grow{flex:1}
-.bk-proc.ruta h4::before{content:'↳ ';color:var(--dim)}
+.bk-sub{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--soft)}.bk-sub.falla{border-color:var(--v-err,#c0392b)}
+.bk-sub-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}.bk-sub-h h5{margin:0;font-size:13.5px}.bk-sub .bk-act{margin-top:6px}.bk-sub .bk-act .btn{padding:3px 9px;font-size:12px}
 #brMs.off{opacity:.55}
 .bk-ord2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:8px 0}@media(max-width:900px){.bk-ord2{grid-template-columns:1fr}}
 .bk-ordb h4{margin:0 0 6px;font-size:13px}.bk-ordl.no .bk-ord{background:var(--soft);cursor:grab}.bk-ordl{min-height:48px;border-radius:12px}.bk-ordl.over{outline:2px dashed var(--v-ok,#00875a);outline-offset:2px}
@@ -1916,7 +1917,7 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.60.0';
+const VERSION='1.61.0';
 const EXT_VER='1.23.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -6608,17 +6609,24 @@ V.banking={
       ${bsel?`<details class="bk-bsteps" data-k="bsteps"><summary>Cómo pagar con ${esc(bsel.name)}</summary>${(bsel.steps||[]).length?`<ol class="bk-steps">${bsel.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:'<p class="dim">Sin pasos cargados.</p>'}${bsel.notes?`<p class="bk-notes">${esc(bsel.notes)}</p>`:''}</details>`:''}
       ${bkPais&&bkWay?`<div class="bk-opts"><span class="bk-sn">${bkWay==='efectivo'?'Efectivo':bsel?'Lo que conviene con '+esc(bsel.name):'Opciones'} en ${esc(bkPais)}${opts.length?' <small class="dim">· primero lo mejor</small>':''}</span>${opts.length?opts.map(bkOptHTML).join(''):`<div class="p-empty" style="padding:8px 0">No hay ${bkWay==='efectivo'?'efectivo':'pago digital'} cargado para ${esc(bkPais)}.</div>`}</div>`:''}</section>`;
     const fallas='';const _F=F.length?`<section class="card bk-fallas"><div class="card-h"><h3><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg> Fallando ahora</h3><span class="p-sub">no lo ofrezcas hasta que vuelva</span></div>${F.map(f=>`<div class="bk-f"><b>${esc(bkName(f.pid,f.mid))}</b>${f.fc&&f.fc.length?` <span class="badge bad">${esc(f.fc.join(', '))}</span>`:''}${f.mid?'':' <span class="badge bad">todo el procesador</span>'}${f.note?`<span class="bk-fn">${esc(f.note)}</span>`:''}<span class="dim">${f.at?esc(rel(new Date(f.at))):''}${f.by?' · '+esc(first(f.by)):''}</span><span class="grow"></span>${ed?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(f.pid)}" data-m="${esc(f.mid||'')}">Volvió a andar</button>`:''}</div>`).join('')}</section>`:'';
-    const procs=bk.procs.filter(p=>p.active!==false&&bkPaisOk(p.countries)&&(hit(procName(p))||pmOf(p.id).some(x=>hit(x.m.name)))&&(!bkTipo||pmOf(p.id).some(x=>kindOk(x.m.kind)))).sort((a,b)=>{const ka=(procParent(a)||a).sort*1000+(a.parent_id?a.sort+1:0),kb=(procParent(b)||b).sort*1000+(b.parent_id?b.sort+1:0);return ka-kb||procName(a).localeCompare(procName(b))});
-    const pc=p=>{const ms=pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
-      const pf=failCs(p)||(procParent(p)?failCs(procParent(p)):null),pHere=pf!=null&&(!pf.length||(bkPais?pf.includes(bkPais):false)); // con un país elegido, solo cuenta la falla de ese país
-      return `<article class="bk-proc${pHere?' falla':''}${p.parent_id?' ruta':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(procName(p))}</h4>${(()=>{const nf=ms.filter(x=>failsIn(x,bkPais)).length; // solo los métodos de ese país
-        return pHere?'<span class="badge bad">Falla</span>':pf&&pf.length&&!bkPais?`<span class="badge bad">Falla en ${esc(isoTxt(pf))}</span>`:nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'})()}</div>
-        <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
-        <div class="bk-ms">${ms.length?ms.map(x=>{const k=p.id+'|'+x.method_id,on=bkMiOpen===k;const ef=effFail(p,x),off=ef!=null&&(!ef.length||(bkPais&&ef.includes(bkPais))),part=ef!=null&&ef.length&&!bkPais;
+    const fam=p=>[p,...bk.procs.filter(r=>r.parent_id===p.id)]; // el procesador con sus rutas
+    const procs=bk.procs.filter(p=>!p.parent_id&&p.active!==false&&bkPaisOk(p.countries)&&fam(p).some(q=>hit(procName(q))||pmOf(q.id).some(x=>hit(x.m.name)))&&(!bkTipo||fam(p).some(q=>pmOf(q.id).some(x=>kindOk(x.m.kind))))).sort((a,b)=>a.sort-b.sort||a.name.localeCompare(b.name));
+    const msHTML=(p,ms)=>`<div class="bk-ms">${ms.length?ms.map(x=>{const k=p.id+'|'+x.method_id,on=bkMiOpen===k;const ef=effFail(p,x),off=ef!=null&&(!ef.length||(bkPais&&ef.includes(bkPais))),part=ef!=null&&ef.length&&!bkPais;
           return `<span class="bk-m ${off?'falla':'ok'}${on?' open':''}" title="${esc((KINDS[x.m.kind]||'Sin tipo')+(ef!=null?' · Falla'+enTxt(ef)+(x.status_note?': '+x.status_note:''):x.countries&&x.countries.length?' · solo en '+x.countries.join(', '):''))}">${esc(x.m.name)}${!bkPais&&x.countries&&x.countries.length?` <small>${esc(isoTxt(x.countries))}</small>`:''}${part?` <small class="bk-fc">⚠ ${esc(isoTxt(ef))}</small>`:''}${x.note?`<button type="button" class="bk-mi" data-bkmi="${esc(k)}" aria-expanded="${on}" aria-label="${on?'Cerrar':'Ver'} la nota de ${esc(x.m.name)}"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg></button>`:''}</span>`}).join(''):'<span class="dim">Sin métodos cargados</span>'}</div>
-        ${(x=>x&&x.note?`<div class="bk-mnote"><div class="bk-mnh"><b>${esc(x.m.name)}</b><span class="dim">${esc(procName(p))}</span><span class="grow"></span><button type="button" class="ib" data-bkmi="${esc(p.id+'|'+x.method_id)}" aria-label="Cerrar la nota">✕</button></div><p>${esc(x.note)}</p></div>`:'')(ms.find(x=>bkMiOpen===p.id+'|'+x.method_id))}
+        ${(x=>x&&x.note?`<div class="bk-mnote"><div class="bk-mnh"><b>${esc(x.m.name)}</b><span class="dim">${esc(procName(p))}</span><span class="grow"></span><button type="button" class="ib" data-bkmi="${esc(p.id+'|'+x.method_id)}" aria-label="Cerrar la nota">✕</button></div><p>${esc(x.note)}</p></div>`:'')(ms.find(x=>bkMiOpen===p.id+'|'+x.method_id))}`;
+    const msOf=p=>pmOf(p.id).filter(x=>bkPaisOk(x.countries&&x.countries.length?x.countries:p.countries)&&kindOk(x.m.kind));
+    const badge=(p,ms)=>{const pf=failCs(p)||(procParent(p)?failCs(procParent(p)):null),pHere=pf!=null&&(!pf.length||(bkPais?pf.includes(bkPais):false)),nf=ms.filter(x=>failsIn(x,bkPais)).length; // con un país elegido, solo cuenta la falla de ese país y los métodos de ese país
+      return {pHere,html:pHere?'<span class="badge bad">Falla</span>':pf&&pf.length&&!bkPais?`<span class="badge bad">Falla en ${esc(isoTxt(pf))}</span>`:nf?`<span class="badge bad">${nf===1?'Falla un método':nf+' métodos fallan'}</span>`:'<span class="badge paid">Anda</span>'}};
+    const acts=p=>ed?`<div class="bk-act"><button type="button" class="btn sm" data-bka="falla" data-id="${esc(p.id)}">Reportar falla</button>${failCs(p)!=null||pmOf(p.id).some(x=>failCs(x)!=null)?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(p.id)}">Volvió a andar</button>`:''}<button type="button" class="btn sm" data-bka="edit" data-id="${esc(p.id)}">Editar</button></div>`:'';
+    // los subprocesadores (rutas: PayPros → Método Bank, Método Cash) van como cajitas adentro del procesador, cada una con los métodos que se le asignaron
+    const sub=r=>{const ms=msOf(r),b=badge(r,ms);return `<section class="bk-sub${b.pHere?' falla':''}" data-sub="${esc(r.id)}"><div class="bk-sub-h"><h5>${esc(r.name)}</h5>${b.html}${r.countries&&r.countries.length?`<span class="dim">${esc(isoTxt(r.countries))}</span>`:''}</div>${msHTML(r,ms)}${r.notes?`<p class="bk-notes">${esc(r.notes)}</p>`:''}${acts(r)}</section>`};
+    const pc=p=>{const ms=msOf(p),b=badge(p,ms),subs=bk.procs.filter(r=>r.parent_id===p.id&&r.active!==false&&bkPaisOk(r.countries)).sort((a,c)=>a.sort-c.sort||a.name.localeCompare(c.name));
+      return `<article class="bk-proc${b.pHere?' falla':''}${subs.length?' con-sub':''}"><div class="bk-ph-h">${bkIcon(p.id)}<h4>${esc(p.name)}</h4>${b.html}</div>
+        <div class="dim bk-cs">${esc(paisesTxt(p.countries))}</div>
+        ${ms.length||!subs.length?msHTML(p,ms):''}
+        ${subs.map(sub).join('')}
         ${p.notes?`<p class="bk-notes">${esc(p.notes)}</p>`:''}${bkMini(p.id)}
-        ${ed?`<div class="bk-act"><button type="button" class="btn sm" data-bka="falla" data-id="${esc(p.id)}">Reportar falla</button>${failCs(p)!=null||pmOf(p.id).some(x=>failCs(x)!=null)?`<button type="button" class="btn sm" data-bka="vuelve" data-id="${esc(p.id)}">Volvió a andar</button>`:''}<button type="button" class="btn sm" data-bka="edit" data-id="${esc(p.id)}">Editar</button></div>`:''}</article>`};
+        ${acts(p)}</article>`};
     const banks=bk.banks.filter(b=>(!bkPais||!b.country||b.country===bkPais)&&(hit(b.name)||hit(b.country)));
     const bRow=b=>`<div class="bk-bank"><div class="bk-bn"><b>${esc(b.name)}</b><span class="dim">${esc(b.country||'Todos los países')}</span></div><div class="bk-chips">${bankChips(b)}</div><span class="grow"></span><button type="button" class="btn sm" data-bka="bank" data-id="${esc(b.id)}">Ver flujo</button>${ed?`<button type="button" class="btn sm" data-bka="bankEd" data-id="${esc(b.id)}">Editar</button>`:''}</div>`;
     const hist=bk.inc.slice(0,30);
