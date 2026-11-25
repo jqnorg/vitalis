@@ -173,7 +173,7 @@ function kbRowHTML(a){const st=kb.stats.find(s=>s.id===a.id);return `<button typ
   ${!a.published?'<span class="badge">Borrador</span>':kb.reads.has(a.id)?'<span class="badge paid">Leído</span>':''}${a.global?'<span class="badge" title="Lo ven todas las mesas">Global</span>':''}${a.ruta!=null?`<span class="badge" title="Ruta del nuevo">Paso ${a.ruta}</span>`:''}${kbEd()&&st?`<span class="dim kb-st" title="Me sirvió / no me quedó claro · leído">${st.ok}👍 ${st.no}👎 · ${st.reads}</span>`:''}<span class="dim">${kbMins(a)} min</span></button>`}
 function kbCatHTML(c){
   const L=kbArtsIn(c.id);
-  return `<section class="kb-wrap">${kbCrumbs([[c.name,'cat',c.id]])}<div class="kb-cat-h"><span class="kb-ci">${kbIcon(c.icon)}</span><div><h2>${esc(c.name)}</h2>${c.descr?`<p class="dim">${esc(c.descr)}</p>`:''}</div><span class="grow"></span>${kbEd()?`<button type="button" class="btn sm" data-kba="cat" data-id="${esc(c.id)}">Editar categoría</button>`:''}</div>
+  return `<section class="kb-wrap"><div class="kb-topb"><button type="button" class="btn sm" data-kbgo="home">‹ Volver</button>${kbCrumbs([[c.name,'cat',c.id]])}</div><div class="kb-cat-h"><span class="kb-ci">${kbIcon(c.icon)}</span><div><h2>${esc(c.name)}</h2>${c.descr?`<p class="dim">${esc(c.descr)}</p>`:''}</div><span class="grow"></span>${kbEd()?`<button type="button" class="btn sm" data-kba="cat" data-id="${esc(c.id)}">Editar categoría</button>`:''}</div>
     <div class="kb-list">${L.length?L.map(kbRowHTML).join(''):`<div class="p-empty">${kbEd()?'Todavía no hay artículos acá: escribí uno con "+ Artículo".':'Todavía no hay artículos acá.'}</div>`}</div></section>`;
 }
 function kbSearchHTML(){
@@ -187,7 +187,7 @@ function kbArtHTML(a){
   const html=kbRender(a),tmp=document.createElement('template');tmp.innerHTML=html;const toc=[...tmp.content.querySelectorAll('h2[id],h3[id]')].map(h=>`<button type="button" class="${h.localName}" data-kbtoc="${h.id}">${esc(h.textContent)}</button>`).join('');
   return `<div class="kb-page">
     <aside class="kb-side"><h4>${c?esc(c.name):'Sin categoría'}</h4><div class="kb-sidel">${sib.map(x=>`<button type="button" class="${x.id===a.id?'on':''}" data-kbgo="art" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join('')}</div></aside>
-    <article class="kb-art card">${kbCrumbs(c?[[c.name,'cat',c.id],[a.title]]:[[a.title]])}
+    <article class="kb-art card"><div class="kb-topb"><button type="button" class="btn sm" data-kbgo="${c?'cat':'home'}" data-id="${esc(c?c.id:'')}">‹ Volver</button>${kbCrumbs(c?[[c.name,'cat',c.id],[a.title]]:[[a.title]])}</div>
       <h1 class="kb-h">${esc(a.title)}</h1>${a.summary?`<p class="kb-sum">${esc(a.summary)}</p>`:''}
       <div class="kb-meta">${who?`<span class="who-cell">${avatar(memberName(who))}${esc(memberName(who))}</span>`:''}<span class="dim">${kbMins(a)} min de lectura · actualizado ${esc(rel(new Date(a.updated_at)))}</span>${a.ruta!=null?`<span class="badge">Paso ${a.ruta} de tus primeros días</span>`:''}${a.published?'':'<span class="badge">Borrador</span>'}${a.global?'<span class="badge">Todas las mesas</span>':''}<span class="grow"></span>${ed?`<button type="button" class="btn sm" data-kba="edit" data-id="${esc(a.id)}">Editar</button>`:''}</div>
       <div class="kb-body">${html||'<p class="dim">Este artículo todavía no tiene contenido.</p>'}</div>

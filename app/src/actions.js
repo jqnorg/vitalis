@@ -790,7 +790,8 @@ const ACT={
     else toast('Así suenan los avisos. '+sp('hot','La extensión de Chrome no está conectada.'))},
 };
 document.addEventListener('click',e=>{
-  const v=e.target.closest('#nav [data-g]');if(v){goGroup(v.dataset.g);return}
+  const v=e.target.closest('#nav [data-g]');if(v){if(v.dataset.g==='kb'&&cur==='kb'&&kbMode!=='edit'){kbGo('home');return} // el botón del menú vuelve a la portada del Knowledgebase
+    goGroup(v.dataset.g);return}
   const tb=e.target.closest('#subnav [data-tab]');if(tb){go(tb.dataset.tab);return}
   const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);return}
   const a=e.target.closest('[data-act]');if(a&&ACT[a.dataset.act]){e.preventDefault();primeAudio();ACT[a.dataset.act](a)}
@@ -808,7 +809,7 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
-  if(k==='k'){e.preventDefault();go('kb');return}
+  if(k==='k'){e.preventDefault();if(cur==='kb'&&kbMode!=='edit')kbGo('home');else go('kb');return}
   if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}

@@ -1532,6 +1532,7 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
 .kb-cat{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;border:1.5px solid var(--line);background:var(--panel);border-radius:16px;padding:18px;cursor:pointer;color:var(--fg);font:inherit;min-height:140px}.kb-cat:hover{border-color:var(--v-ok,#00875a);box-shadow:0 6px 18px rgba(0,0,0,.06)}.kb-cat b{font-size:16px}.kb-cat small{color:var(--dim);margin-top:auto}
 .kb-ci{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:12px;background:color-mix(in srgb,var(--v-ok,#00875a) 10%,var(--panel));color:var(--v-ok,#00875a);flex:none}.kb-ci .ic{width:24px;height:24px}
 .kb-cat-h{display:flex;align-items:center;gap:14px;margin:10px 0 14px}.kb-cat-h h2{margin:0;font-family:var(--display);font-size:26px}.kb-cat-h p{margin:2px 0 0}
+.kb-topb{display:flex;align-items:center;gap:14px;margin:0 0 12px;flex-wrap:wrap}.kb-topb .kb-crumbs{margin:0}
 .kb-crumbs{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dim);margin:0 0 12px;flex-wrap:wrap}.kb-crumbs .lnk{color:var(--v-ok,#00875a);font-weight:700}.kb-crumbs .cur{color:var(--fg)}
 .kb-list{display:grid;gap:8px}.kb-rh{margin:0 0 10px;font-size:15px}
 .kb-row{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 14px;cursor:pointer;color:var(--fg);font:inherit}.kb-row:hover{border-color:var(--dim)}.kb-row.draft{opacity:.7;border-style:dashed}
@@ -1948,7 +1949,7 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.62.0';
+const VERSION='1.62.1';
 const EXT_VER='1.23.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -3873,7 +3874,8 @@ const ACT={
     else toast('Así suenan los avisos. '+sp('hot','La extensión de Chrome no está conectada.'))},
 };
 document.addEventListener('click',e=>{
-  const v=e.target.closest('#nav [data-g]');if(v){goGroup(v.dataset.g);return}
+  const v=e.target.closest('#nav [data-g]');if(v){if(v.dataset.g==='kb'&&cur==='kb'&&kbMode!=='edit'){kbGo('home');return} // el botón del menú vuelve a la portada del Knowledgebase
+    goGroup(v.dataset.g);return}
   const tb=e.target.closest('#subnav [data-tab]');if(tb){go(tb.dataset.tab);return}
   const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go);return}
   const a=e.target.closest('[data-act]');if(a&&ACT[a.dataset.act]){e.preventDefault();primeAudio();ACT[a.dataset.act](a)}
@@ -3891,7 +3893,7 @@ document.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase();
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
-  if(k==='k'){e.preventDefault();go('kb');return}
+  if(k==='k'){e.preventDefault();if(cur==='kb'&&kbMode!=='edit')kbGo('home');else go('kb');return}
   if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
@@ -7044,7 +7046,7 @@ function kbRowHTML(a){const st=kb.stats.find(s=>s.id===a.id);return `<button typ
   ${!a.published?'<span class="badge">Borrador</span>':kb.reads.has(a.id)?'<span class="badge paid">Leído</span>':''}${a.global?'<span class="badge" title="Lo ven todas las mesas">Global</span>':''}${a.ruta!=null?`<span class="badge" title="Ruta del nuevo">Paso ${a.ruta}</span>`:''}${kbEd()&&st?`<span class="dim kb-st" title="Me sirvió / no me quedó claro · leído">${st.ok}👍 ${st.no}👎 · ${st.reads}</span>`:''}<span class="dim">${kbMins(a)} min</span></button>`}
 function kbCatHTML(c){
   const L=kbArtsIn(c.id);
-  return `<section class="kb-wrap">${kbCrumbs([[c.name,'cat',c.id]])}<div class="kb-cat-h"><span class="kb-ci">${kbIcon(c.icon)}</span><div><h2>${esc(c.name)}</h2>${c.descr?`<p class="dim">${esc(c.descr)}</p>`:''}</div><span class="grow"></span>${kbEd()?`<button type="button" class="btn sm" data-kba="cat" data-id="${esc(c.id)}">Editar categoría</button>`:''}</div>
+  return `<section class="kb-wrap"><div class="kb-topb"><button type="button" class="btn sm" data-kbgo="home">‹ Volver</button>${kbCrumbs([[c.name,'cat',c.id]])}</div><div class="kb-cat-h"><span class="kb-ci">${kbIcon(c.icon)}</span><div><h2>${esc(c.name)}</h2>${c.descr?`<p class="dim">${esc(c.descr)}</p>`:''}</div><span class="grow"></span>${kbEd()?`<button type="button" class="btn sm" data-kba="cat" data-id="${esc(c.id)}">Editar categoría</button>`:''}</div>
     <div class="kb-list">${L.length?L.map(kbRowHTML).join(''):`<div class="p-empty">${kbEd()?'Todavía no hay artículos acá: escribí uno con "+ Artículo".':'Todavía no hay artículos acá.'}</div>`}</div></section>`;
 }
 function kbSearchHTML(){
@@ -7058,7 +7060,7 @@ function kbArtHTML(a){
   const html=kbRender(a),tmp=document.createElement('template');tmp.innerHTML=html;const toc=[...tmp.content.querySelectorAll('h2[id],h3[id]')].map(h=>`<button type="button" class="${h.localName}" data-kbtoc="${h.id}">${esc(h.textContent)}</button>`).join('');
   return `<div class="kb-page">
     <aside class="kb-side"><h4>${c?esc(c.name):'Sin categoría'}</h4><div class="kb-sidel">${sib.map(x=>`<button type="button" class="${x.id===a.id?'on':''}" data-kbgo="art" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join('')}</div></aside>
-    <article class="kb-art card">${kbCrumbs(c?[[c.name,'cat',c.id],[a.title]]:[[a.title]])}
+    <article class="kb-art card"><div class="kb-topb"><button type="button" class="btn sm" data-kbgo="${c?'cat':'home'}" data-id="${esc(c?c.id:'')}">‹ Volver</button>${kbCrumbs(c?[[c.name,'cat',c.id],[a.title]]:[[a.title]])}</div>
       <h1 class="kb-h">${esc(a.title)}</h1>${a.summary?`<p class="kb-sum">${esc(a.summary)}</p>`:''}
       <div class="kb-meta">${who?`<span class="who-cell">${avatar(memberName(who))}${esc(memberName(who))}</span>`:''}<span class="dim">${kbMins(a)} min de lectura · actualizado ${esc(rel(new Date(a.updated_at)))}</span>${a.ruta!=null?`<span class="badge">Paso ${a.ruta} de tus primeros días</span>`:''}${a.published?'':'<span class="badge">Borrador</span>'}${a.global?'<span class="badge">Todas las mesas</span>':''}<span class="grow"></span>${ed?`<button type="button" class="btn sm" data-kba="edit" data-id="${esc(a.id)}">Editar</button>`:''}</div>
       <div class="kb-body">${html||'<p class="dim">Este artículo todavía no tiene contenido.</p>'}</div>
