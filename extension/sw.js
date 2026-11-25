@@ -571,7 +571,7 @@ const CHAT_MS = 8000; // un mensaje del chat se va solo; todo lo demás queda ha
 async function alertCard(info, tone, sysTitle, sysMsg) {
   await liveSet((l) => [...l.filter((x) => x.k !== info.k), info]);
   if (tone) await playSound(tone);
-  await showNow(!!info.exp || !!(await trialCfg())); // por un mensaje del chat no abro una ventanita; en la prueba nunca (queda la notificación del sistema y la tarjeta espera a la próxima pestaña)
+  await showNow(!!info.exp); // por un mensaje del chat no abro una ventanita; por un new sí, si la pestaña activa es de Chrome (pestaña nueva, Configuración…) y no se puede dibujar ahí: tiene que llegar sí o sí
   if (info.exp) setTimeout(() => liveSet((l) => l.filter((x) => !(x.k === info.k && x.exp === info.exp))), info.exp - Date.now() + 300);
   if (sysTitle) await createN('n|' + Date.now() + '|' + info.k, { type: 'basic', iconUrl: 'icons/128.png', title: sysTitle, message: sysMsg || '', priority: 2, requireInteraction: true, buttons: [{ title: 'Ver en el CRM' }] });
 }

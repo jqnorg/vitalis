@@ -100,7 +100,6 @@ async def main():
             # en la prueba, la pestaña de news también manda el cliente abierto (el agente abre la ficha desde ahí)
             await C.evaluate("()=>{document.querySelector('#drw .sub span').textContent='661002';document.querySelector('#drw .hd div').textContent='Jorge'}"); await C.wait_for_timeout(3500)
             ok('661002' in await C.evaluate(DK) and (await sw.evaluate("sess.get('trialCur',null)") or {}).get('id') == '661002', 'al abrir otro cliente en la pestaña que se actualiza sola, la mini ficha cambia')
-            ok(await sw.evaluate("sess.get('win',null)") is None, 'y nunca abre la ventanita de aviso (la tarjeta espera a la próxima pestaña)')
             NUEVO = ['661009', 'Nuevo Trial', 'Peru', 'New', 'Pepe Rep', '97275', 'Finvera AI', f'{HOY} 10:00']
             await ctx.route('https://crmnovaramarkets.com/**', lambda r: r.fulfill(status=200, content_type='text/html', body=lista(ROWS + [NUEVO])))
             await C.evaluate("()=>{const tr=document.createElement('tr');tr.innerHTML='<td>661009</td><td>Nuevo Trial</td><td>Peru</td><td>New</td><td>Pepe Rep</td><td>97275</td><td>Finvera AI</td><td>%s 10:00</td>';document.querySelector('tbody').appendChild(tr)}" % HOY)
