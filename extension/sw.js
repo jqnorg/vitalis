@@ -71,7 +71,7 @@ async function trialDeliver() {
 async function trialFresh(fresh) { // un new mío que vio otra pestaña (la del team leader): avisar como si lo hubiera visto yo
   const now = Date.now(), shown = new Set((await liveNow()).map((x) => x.k));
   for (const c of fresh.filter((c) => !shown.has('crm:id:' + c.id)).slice(0, 5)) {
-    await alertCard({ k: 'crm:id:' + c.id, kind: 'crm', title: 'Cliente new: llamalo ya', id: c.id, kw: c.name || '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente new: ${c.id}`, [c.name, c.country].filter(Boolean).join(' · '));
+    await alertCard({ k: 'crm:id:' + c.id, kind: 'crm', title: 'Cliente new: llamalo ya', id: c.id, kw: '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente new: ${c.id}`, [c.country].filter(Boolean).join(' · '));
   }
 }
 // el tablero de la mesa (cada 30 s): el team leader recibe aviso por cada New sin llamar a los 5 min; el agente ve su siguiente new y sus números
@@ -561,8 +561,8 @@ async function crmClients(tabId, m) {
   if (!(await trialCfg())) for (const c of fresh.slice(0, 10)) if (c.id) await sendCmd({ cmd: 'nuevo', k: String(c.id).slice(0, 60), at: now }); // en Vitalis se abre la ficha
   const shown = new Set((await liveNow()).map((x) => x.k)); // Vitalis ya avisó por la estación: no repito tarjeta ni sonido
   for (const c of fresh.filter((c) => !shown.has('crm:' + c.key)).slice(0, 5)) {
-    await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || c.name, kw: c.id ? c.name : '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
-      btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente nuevo: ${c.id || c.name}`, [c.name, c.country].filter(Boolean).join(' · '));
+    await alertCard({ k: 'crm:' + c.key, kind: 'crm', title: 'Cliente nuevo en el CRM', id: c.id || '', kw: '', meta: [c.country, 'entró ' + hm(now)].filter(Boolean).join(' · '),
+      btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `Cliente nuevo: ${c.id || ''}`, [c.country].filter(Boolean).join(' · '));
   }
   if (fresh.length > 5) await alertCard({ k: 'crm:mas' + now, kind: 'crm', title: 'Clientes nuevos en el CRM', id: `+${fresh.length - 5} más`, kw: 'Hay más clientes en new.', meta: hm(now), btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, null);
   return { watched: true, fresh: fresh.length };
@@ -571,7 +571,7 @@ const CHAT_MS = 8000; // un mensaje del chat se va solo; todo lo demás queda ha
 async function alertCard(info, tone, sysTitle, sysMsg) {
   await liveSet((l) => [...l.filter((x) => x.k !== info.k), info]);
   if (tone) await playSound(tone);
-  await showNow(!!info.exp); // por un mensaje del chat no abro una ventanita
+  await showNow(!!info.exp || !!(await trialCfg())); // por un mensaje del chat no abro una ventanita; en la prueba nunca (queda la notificación del sistema y la tarjeta espera a la próxima pestaña)
   if (info.exp) setTimeout(() => liveSet((l) => l.filter((x) => !(x.k === info.k && x.exp === info.exp))), info.exp - Date.now() + 300);
   if (sysTitle) await createN('n|' + Date.now() + '|' + info.k, { type: 'basic', iconUrl: 'icons/128.png', title: sysTitle, message: sysMsg || '', priority: 2, requireInteraction: true, buttons: [{ title: 'Ver en el CRM' }] });
 }
@@ -814,7 +814,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }
-  if (msg.type === 'crm-current' && msg.id && sender.tab && (watchedTab(sender.tab.id) || stationOf(sender.tab.id))) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news y las de la estación no cuentan (copias viejas de crm.js)
+  if (msg.type === 'crm-current' && msg.id && sender.tab && (stationOf(sender.tab.id) || (watchedTab(sender.tab.id) && !TRIAL))) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news y las de la estación no cuentan (copias viejas de crm.js); en la prueba la de news sí (el agente abre la ficha desde ahí)
   if (msg.type === 'station-set' && sender.tab) { stationSet(sender.tab, String(msg.view || '')).then(reply).catch((e) => reply({ err: String(e && e.message || e) })); return true; }
   if (msg.type === 'station-scan' && sender.tab) { stScan(sender.tab.id, msg, sender.tab.url).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'station-off') { stationOff().then(reply).catch(() => reply(null)); return true; }
