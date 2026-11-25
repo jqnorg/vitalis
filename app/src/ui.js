@@ -187,7 +187,7 @@ function status(){
   else $('#sMes').innerHTML=`<b>${s.n}</b> FTDs en ${esc(MES[now.getMonth()])}`+(s.next?` <span class="dim">faltan ${s.next[0]-s.n} para ${s.next[1]} USD</span>`:s.n?' <span class="dim">bono máximo</span>':'');
   if(!tlView()&&utOf(me))$('#sMes').insertAdjacentHTML('beforeend',` <span class="dim">· target ${utOf(me)}</span>`);
   const P=sueldoPesos(s);
-  $('#sLiq').innerHTML=P&&P.total!=null?`Líquido ≈ <b>${esc(pesos(P.total))}</b>${tcViejo()?' <span class="hot">dólar viejo</span>':''}`:`Líquido <span class="hot">cargá el dólar</span>`;
+  liqDraw(P); // el líquido va escondido hasta que se toca el ojo
   const open=pend.filter(p=>!p.done),venc=open.filter(p=>parseDue(p.due)<=now).length,hoy=open.filter(p=>p.due.slice(0,10)===te).length;
   $('#sPend').innerHTML=`Agenda <b>${hoy}</b>`+(venc?` <span class="hot b">${plural(venc,'vencido')}</span>`:'');
   $('#nbAg').textContent=venc||'';
@@ -200,7 +200,7 @@ function status(){
   cliBadge();
   {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
    const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
-  {const f=typeof bkFallas==='function'&&bk.ok?bkFallas().length:0;$('#nbBk').textContent=f?'⚠ '+f:''}
+  // sin marca en Banking: siempre hay algo fallando y molestaba a la vista (lo pidió el dueño); las fallas viven en Banking
   $('#sAyuda').hidden=!profile||profile.role==='leader';
   $('#sTask').hidden=!tk.length;$('#sTask').innerHTML=`Tareas <b>${tk.length}</b>`+(tkv?` <span class="hot b">${plural(tkv,'vencida')}</span>`:'');
   document.title=(so+ch+tk.length?`(${so+ch+tk.length}) `:'')+'Vitalis';
@@ -225,3 +225,12 @@ function turnoBar(force){
   if(b){const left=b.s+b.k*6e4-now;live.innerHTML=left>=0?`<b>${mmss(left)}</b>`:`<b class="hot">+${mmss(-left)}</b>`}
   else{const rest=t.in+jorMs()-now;live.innerHTML=`<b>${durS(now-t.in)}</b> <span class="dim">${rest>0?'salís '+hhmm(t.in+jorMs()):''}</span>${rest>0?'':` <span class="hot">+${durS(-rest)}</span>`}`}
 }
+
+// el líquido del mes en la barra: escondido por defecto, el ojo lo muestra (queda en `local` liqShow)
+let liqLast=null;
+function liqDraw(P){
+  if(P!==undefined)liqLast=P;const P2=liqLast,show=local.get('liqShow',false)===true,v=$('#sLiq .liq-v'),eye=$('#sLiqEye');if(!v)return;
+  v.innerHTML=!show?'Líquido <span class="dim">••••</span>':P2&&P2.total!=null?`Líquido ≈ <b>${esc(pesos(P2.total))}</b>${tcViejo()?' <span class="hot">dólar viejo</span>':''}`:`Líquido <span class="hot">cargá el dólar</span>`;
+  if(eye){eye.innerHTML=`<svg class="ic"><use href="#i-${show?'ojo-off':'ojo'}"/></svg>`;eye.title=show?'Ocultar el líquido':'Mostrar el líquido'}
+}
+document.addEventListener('click',e=>{const b=e.target.closest('#sLiqEye');if(!b)return;e.stopPropagation();local.set('liqShow',local.get('liqShow',false)!==true);liqDraw()});

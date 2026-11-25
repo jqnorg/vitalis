@@ -2549,3 +2549,72 @@ drop trigger if exists crm_clients_no_name on public.crm_clients;
 create trigger crm_clients_no_name before insert or update of name on public.crm_clients for each row execute function public.strip_client_name();
 drop trigger if exists trial_news_no_name on public.trial_news;
 create trigger trial_news_no_name before insert or update of name on public.trial_news for each row execute function public.strip_client_name();
+
+-- ---------- Banking 2 (pedidos del encargado de Banking, 25/11/2026) ----------
+-- Rutas dentro de un procesador (PayPros → Cash y Bank): un procesador con parent_id es una ruta del padre; una falla del padre tapa a sus rutas.
+alter table public.processors add column if not exists parent_id uuid references public.processors(id) on delete cascade;
+-- El mismo nombre de método puede existir con otro tipo (Banco Popular en efectivo y Banco Popular digital).
+alter table public.pay_methods drop constraint if exists pay_methods_team_id_name_key;
+create unique index if not exists pay_methods_uniq on public.pay_methods (team_id, lower(btrim(name)), coalesce(kind, ''));
+-- El orden recomendado por banco es la lista entera de opciones (procesador · método) arrastrada por el admin; "mejor no usar" se fue: esos van últimos.
+alter table public.banks drop constraint if exists banks_use_pm_check;
+alter table public.banks add constraint banks_use_pm_check check (jsonb_typeof(use_pm) = 'array' and jsonb_array_length(use_pm) <= 120);
+-- Una falla (o vuelta) de varios métodos a la vez: un solo aviso, con la lista
+alter table public.pay_incidents add column if not exists method_ids uuid[] not null default '{}';
+
+create or replace function public._pay_set(pid uuid, mid uuid, falla boolean, n text, c text[]) returns text[]
+  language plpgsql security definer set search_path = public as $$
+declare st text; fc text[]; scope text[]; nf text[]; nst text;
+begin
+  if mid is null then
+    select status, fail_countries, countries into st, fc, scope from public.processors where id = pid;
+  else
+    select pm.status, pm.fail_countries, case when cardinality(pm.countries) > 0 then pm.countries else p.countries end into st, fc, scope
+      from public.processor_methods pm join public.processors p on p.id = pm.processor_id where pm.processor_id = pid and pm.method_id = mid;
+    if not found then raise exception 'METODO: ese procesador no tiene ese método'; end if;
+  end if;
+  if cardinality(scope) = 0 then scope := array['Colombia','México','Chile','Panamá','Guatemala','Costa Rica','Perú']; end if;
+  if falla then
+    nst := 'falla';
+    if cardinality(c) = 0 or (st = 'falla' and cardinality(fc) = 0) then nf := '{}';
+    elsif st = 'falla' then nf := (select array_agg(distinct x order by x) from unnest(fc || c) x);
+    else nf := c; end if;
+    if cardinality(nf) > 0 and scope <@ nf then nf := '{}'; end if;
+  elsif cardinality(c) = 0 or st <> 'falla' then
+    nst := 'ok'; nf := '{}';
+  else
+    nf := (select coalesce(array_agg(x order by x), '{}') from unnest(case when cardinality(fc) = 0 then scope else fc end) x where x <> all (c));
+    nst := case when cardinality(nf) = 0 then 'ok' else 'falla' end;
+  end if;
+  if mid is null then
+    update public.processors set status = nst, fail_countries = nf, status_note = case when falla then case when st = 'falla' then coalesce(n, status_note) else n end when nst = 'falla' then status_note end,
+      status_at = now(), status_by = auth.uid(), updated_at = now() where id = pid;
+  else
+    update public.processor_methods set status = nst, fail_countries = nf, status_note = case when falla then case when st = 'falla' then coalesce(n, status_note) else n end when nst = 'falla' then status_note end,
+      status_at = now(), status_by = auth.uid() where processor_id = pid and method_id = mid;
+  end if;
+  return nf;
+end $$;
+revoke all on function public._pay_set(uuid, uuid, boolean, text, text[]) from public, anon, authenticated;
+
+-- varios métodos a la vez (mids vacío = todo el procesador); pay_report(pid, mid, …) sigue andando igual
+create or replace function public.pay_report_many(pid uuid, mids uuid[], falla boolean, note text default null, cs text[] default null) returns json
+  language plpgsql security definer set search_path = public as $$
+declare
+  t uuid := public.my_team(); n text := nullif(left(btrim(coalesce(note, '')), 1000), ''); iid uuid; m uuid; nf text[];
+  c text[] := coalesce((select array_agg(distinct btrim(x) order by btrim(x)) from unnest(coalesce(cs, '{}')) x where btrim(x) <> ''), '{}');
+  ms uuid[] := coalesce((select array_agg(distinct x) from unnest(coalesce(mids, '{}')) x), '{}');
+begin
+  if not public.pay_editor() then raise exception 'Solo el administrador o el team leader'; end if;
+  if not exists (select 1 from public.processors where id = pid and team_id = t) then raise exception 'PROC: no existe ese procesador'; end if;
+  if cardinality(ms) = 0 then nf := public._pay_set(pid, null, falla, n, c);
+  else foreach m in array ms loop nf := public._pay_set(pid, m, falla, n, c); end loop; end if;
+  insert into public.pay_incidents (team_id, processor_id, method_id, method_ids, kind, note, countries, created_by)
+  values (t, pid, case when cardinality(ms) = 1 then ms[1] end, ms, case when falla then 'falla' else 'vuelve' end, n, c, auth.uid()) returning id into iid;
+  return json_build_object('ok', true, 'id', iid, 'fail_countries', nf);
+end $$;
+create or replace function public.pay_report(pid uuid, mid uuid, falla boolean, note text default null, cs text[] default null) returns json
+  language sql security definer set search_path = public as $$
+  select public.pay_report_many(pid, case when mid is null then '{}'::uuid[] else array[mid] end, falla, note, cs) $$;
+revoke all on function public.pay_report_many(uuid, uuid[], boolean, text, text[]) from public, anon;
+grant execute on function public.pay_report_many(uuid, uuid[], boolean, text, text[]) to authenticated;

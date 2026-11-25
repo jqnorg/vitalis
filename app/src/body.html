@@ -24,6 +24,8 @@
     <symbol id="i-salir" viewBox="0 0 24 24"><path d="M14 4h3.5A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5H14M10 16.5 5.5 12 10 7.5M5.5 12H15"/></symbol>
     <symbol id="i-ahora" viewBox="0 0 24 24"><path d="M7.2 3.5h2.6l1.4 3.9-1.9 1.4a10.6 10.6 0 0 0 5.9 5.9l1.4-1.9 3.9 1.4v2.6a2.2 2.2 0 0 1-2.2 2.2A15.3 15.3 0 0 1 5 5.7a2.2 2.2 0 0 1 2.2-2.2z"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.500V4M8 7.800 12 4l4 3.800M5.500 12.500v5.800A1.700 1.700 0 0 0 7.200 20h9.600a1.700 1.700 0 0 0 1.700-1.700v-5.800"/></symbol>
+    <symbol id="i-ojo" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-ojo-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6A3 3 0 0 0 13.4 13.4M6.5 6.6C4 8.3 2 12 2 12s3.5 6 10 6c1.8 0 3.4-.4 4.8-1.1M9.9 6.2A10.6 10.6 0 0 1 12 6c6.5 0 10 6 10 6s-1 1.8-2.9 3.5"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.100"/></symbol>
     <symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 4 21 19.500H3z"/><path d="M12 10v4.500M12 17v.100"/></symbol>
     <symbol id="i-racha" viewBox="0 0 24 24"><path d="M12 3c.5 3.500 5 5.500 5 10.500a5 5 0 0 1-10 0c0-1.800.8-3 1.800-4 .3 1.700 1.200 2.500 2.200 2.500C11 9 10.500 6 12 3z"/></symbol>
@@ -64,7 +66,7 @@
 <header id="bar">
   <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
-  <button type="button" class="pill" id="sLiq" data-go="sueldo" title="Líquido estimado del mes"></button>
+  <span class="pill liq" id="sLiq"><button type="button" class="liq-v" data-go="sueldo" title="Líquido estimado del mes"></button><button type="button" class="liq-eye" id="sLiqEye" title="Mostrar u ocultar el líquido" aria-label="Mostrar u ocultar el líquido"><svg class="ic"><use href="#i-ojo"/></svg></button></span>
   <button type="button" class="pill new wr" id="sNew" data-go="cliente" title="Clientes en New: llamalos ya" hidden></button>
   <button type="button" class="pill ayuda wr" id="sAyuda" data-act="ayuda" title="Le avisa al team leader y a los administradores" hidden><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Pedir ayuda</button>
   <div class="pill turno" id="sTurno"></div>

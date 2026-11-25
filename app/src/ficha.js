@@ -212,7 +212,7 @@ function fichaWire(root,getD,rerender){
   for(const ev of ['input','change'])root.addEventListener(ev,e=>{const box=e.target.closest('#fiPf');if(box)profDraw(s=>box.querySelector(s))});
   root.addEventListener('click',async e=>{
     const b=e.target.closest('[data-fa]');if(!b)return;const a=b.dataset.fa,d=getD();if(!d)return;
-    if(a==='banking'){bkPais=b.dataset.pais||'';bkTipo='';closeAllModals();go('banking');return}
+    if(a==='banking'){bkPais=b.dataset.pais||'';bkTipo='';bkWay='';closeAllModals();go('banking');return}
     if(a==='bankview')return bankView(bk.banks.find(x=>x.id===b.dataset.id));
     if(a==='campAdd'||a==='campEdit')return campModal(d,b.dataset.c,a==='campEdit',rerender);
     if(a==='campReq')return campReqModal(d,b.dataset.c);
