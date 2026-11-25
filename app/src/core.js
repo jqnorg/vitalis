@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.56.0';
+const VERSION='1.57.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -153,9 +153,13 @@ function apiDown(e){
 function apiBad(){apiFail=Math.min(apiFail+1,8);const base=Math.min(90e3,1500*2**apiFail);apiCoolUntil=Date.now()+Math.round(base*(0.7+Math.random()*0.6))}
 const apiCooling=()=>Date.now()<apiCoolUntil;
 // Si el token venció justo antes de que el cliente lo renueve (pasa con la pestaña en segundo plano: el 401 de "no tenés permiso"), se renueva y se repite una vez
-const jwtOld=e=>!!e&&(e.code==='PGRST301'||e.code==='PGRST303'||/jwt expired|JWT expired/i.test(String(e.message||'')));
+const jwtOld=e=>!!e&&(e.code==='PGRST301'||e.code==='PGRST303'||e.status===401||/jwt expired|JWT expired|invalid jwt|session_not_found/i.test(String(e.message||'')));
+// Con la pestaña escondida mucho rato Chrome congela los relojes y el token vence sin renovarse (se veía como "no tenés permiso" al escribir en el chat o agendar):
+// cada vez que la extensión despierta la pestaña, y al volver a verla, se revisa la sesión (getSession renueva sola si venció)
+let sessChk=0;
+async function sessionFresh(){if(!sb||!me||Date.now()-sessChk<20000)return;sessChk=Date.now();try{const {data}=await sb.auth.getSession();if(data&&data.session&&data.session.expires_at*1000-Date.now()<120000)await sb.auth.refreshSession()}catch(e){}}
 let jwtRefreshing=null;
-async function Q(p){try{let r=await p;if(r.error&&jwtOld(r.error)&&sb){try{await(jwtRefreshing||(jwtRefreshing=sb.auth.refreshSession().finally(()=>{jwtRefreshing=null})))}catch(e){}r=await p}if(r.error)throw r.error;apiFail=0;apiCoolUntil=0;return r.data}catch(e){if(apiDown(e))apiBad();throw e}}
+async function Q(p){try{let r=await p;if(r.error&&(r.status===401||jwtOld(r.error))&&sb){try{await(jwtRefreshing||(jwtRefreshing=sb.auth.refreshSession().finally(()=>{jwtRefreshing=null})))}catch(e){}r=await p}if(r.error)throw r.error;apiFail=0;apiCoolUntil=0;return r.data}catch(e){if(apiDown(e))apiBad();throw e}}
 async function QO(p){try{return await Q(p)}catch(e){return []}} // opcional: si la tabla todavía no está en la base, sigo sin eso
 async function QN(p){try{return await Q(p)}catch(e){return null}} // opcional, pero distingo "no está" (null) de "vacío"
 
@@ -365,7 +369,7 @@ const needCatch=()=>!rtOk?Date.now()-lastCatch>(document.hidden?60e3:10e3):Date.
 setInterval(()=>{if(!ready||apiCooling())return;if(needCatch())catchUp();else if(!document.hidden&&Date.now()-crm.at>45e3)crmLoad();else newPoll()},5e3); // newPoll: los new de la estación, liviano
 addEventListener('online',()=>catchUp(true));
 addEventListener('focus',()=>{if(ready&&needCatch())catchUp()});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){hidAt=Date.now();return}sessionFresh();if(ready&&(!rtOk||Date.now()-hidAt>2*6e4||needCatch()))catchUp(true);else if(ready&&Date.now()-crm.at>45e3)crmLoad()});
 function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde otro dispositivo
   if(chan)sb.removeChannel(chan);
   // canal de la mesa, solo para avisarse "cambió algo del CRM" (sin datos): así un new cuenta para todos apenas alguien lo ve, sin esperar los 45 s

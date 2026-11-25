@@ -560,7 +560,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-tr'&&d.v===1){const src=e.source;dockTr(d.txt).catch(()=>({why:'no'})).then(r=>{try{src.postMessage({type:'ftd-agenda-tr-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // traducir el comentario de la mini ficha
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
-  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){extIdle(d.idle);newPoll();dockSync(true);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
+  if(d&&d.type==='ftd-agenda-tick'&&d.v===1){sessionFresh();extIdle(d.idle);newPoll();dockSync(true);if(Date.now()-extBeat>6e4){extSig='';syncExt()}if(needCatch())catchUp();return} // la extensión despierta a la pestaña: le confirmo que sigo (así sé que está) y me pongo al día solo si hace falta
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='done'){ // "✔ hecho" tocado en el aviso de Chrome
     const p=pend.find(x=>x._id===d.k);
     if(p&&!p.done&&!readOnly)B.updPend(p,{done:true,doneAt:new Date().toISOString()}).then(ok=>{if(ok){clearAlert(p);toast(`✔ #${p.n} · <b>${esc(p.id)}</b> · ${esc(p.kw)} → hecho (desde el aviso)`)}});
