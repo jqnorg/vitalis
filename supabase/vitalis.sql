@@ -2702,3 +2702,26 @@ create or replace function public.kb_stats() returns json language sql stable se
   from public.kb_articles a where a.team_id = public.my_team() and public.kb_editor() $$;
 grant execute on function public.kb_stats() to authenticated;
 revoke all on function public.kb_stats() from public, anon;
+
+-- Knowledgebase al estilo LiveChat (25/11/2026): categorías propias (nombre + ícono) y el artículo escrito como documento (HTML limpio en `body`)
+create table if not exists public.kb_categories (
+  id         uuid primary key default gen_random_uuid(),
+  team_id    uuid not null default public.my_team() references public.teams(id),
+  global     boolean not null default false,
+  name       text not null check (length(name) between 1 and 60),
+  icon       text not null default 'book' check (length(icon) <= 20),
+  descr      text check (length(descr) <= 200),
+  sort       integer not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.kb_categories enable row level security;
+drop policy if exists kb_cat_read on public.kb_categories;
+create policy kb_cat_read on public.kb_categories for select to authenticated using (global or team_id = (select public.my_team()));
+drop policy if exists kb_cat_write on public.kb_categories;
+create policy kb_cat_write on public.kb_categories for all to authenticated
+  using (team_id = (select public.my_team()) and (select public.kb_editor())) with check (team_id = (select public.my_team()) and (select public.kb_editor()));
+alter table public.kb_articles add column if not exists category_id uuid references public.kb_categories(id) on delete set null;
+alter table public.kb_articles add column if not exists body text not null default '';
+alter table public.kb_articles drop constraint if exists kb_articles_body_check;
+alter table public.kb_articles add constraint kb_articles_body_check check (length(body) <= 400000);
+create index if not exists kb_articles_cat on public.kb_articles (category_id);

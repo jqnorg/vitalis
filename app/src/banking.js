@@ -257,6 +257,7 @@ function procModal(p){
     <div class="fld"><span>Países <small class="dim">(sin marcar: todos)</small></span>${paisChecks(p&&p.countries,'bpC')}</div>
     <div class="fld"><span>Métodos de este procesador</span><div class="bk-paises" id="bpM">${bk.methods.map(m=>`<label class="chk"><input type="checkbox" value="${esc(m.id)}"${have.has(m.id)?' checked':''}>${esc(m.name)}</label>`).join('')||'<span class="dim">No hay métodos: agregá uno abajo.</span>'}</div>
       <div class="bk-row"><input id="bpNew" maxlength="60" placeholder="Método nuevo (ej.: Transferencia, Tarjeta, Boleto)">${kindSel('','bpNewK')}<button type="button" class="btn sm" id="bpAdd">Agregar</button></div></div>
+    <div class="fld" id="bpMoveF" hidden><span>Métodos que ya están en el procesador: marcá los que <b>pasan a esta ruta</b> <small class="dim">(se sacan del procesador y vienen con sus países y notas)</small></span><div class="bk-paises" id="bpMove"></div></div>
     <div class="fld"><span>Cada método: en qué países está <small class="dim">(sin marcar: en todos los del procesador)</small> y su nota</span><div id="bpMC"></div></div>
     <label class="fld"><span>Notas <small class="dim">(cómo se usa, límites, horarios…)</small></span><textarea id="bpNo" rows="4" maxlength="4000">${esc(p&&p.notes||'')}</textarea></label>
     ${bkPhotoField('processor',p&&p.id)}<div class="ebox" id="bpE"></div>`,
@@ -275,7 +276,12 @@ function procModal(p){
           <textarea class="bk-mnin" data-mnote="${esc(m.id)}" rows="2" maxlength="1000" placeholder="Nota de ${esc(m.name)} (opcional): cómo se usa, qué le pide al cliente…" aria-label="Nota de ${esc(m.name)}">${esc(mn[m.id]||'')}</textarea></div>`).join(''):'<span class="dim">Marcá los métodos de arriba.</span>';
       };
       api._drawMC=drawMC;drawMC();
-      api.box.addEventListener('change',e=>{if(e.target.closest('#bpM')||e.target.name==='bpC')drawMC()});
+      // los métodos del padre que pueden pasar a la ruta (los que la ruta todavía no tiene)
+      const drawMove=()=>{const sel=api.q('#bpP'),pid=sel?sel.value:'',f=api.q('#bpMoveF');if(!pid){f.hidden=true;return}
+        const mine=new Set([...api.q('#bpM').querySelectorAll('input:checked')].map(i=>i.value)),L=pmOf(pid).filter(x=>!mine.has(x.method_id));
+        f.hidden=!L.length;api.q('#bpMove').innerHTML=L.map(x=>`<label class="chk"><input type="checkbox" name="bpMv" value="${esc(x.method_id)}">${esc(x.m.name)}${x.countries&&x.countries.length?` <small class="dim">${esc(isoTxt(x.countries))}</small>`:''}</label>`).join('')};
+      drawMove();
+      api.box.addEventListener('change',e=>{if(e.target.closest('#bpM')||e.target.name==='bpC')drawMC();if(e.target.id==='bpP'||e.target.closest('#bpM'))drawMove()});
       api.q('#bpAdd').onclick=async()=>{const n=api.q('#bpNew').value.trim();if(!n)return;
         const r=await bkSave(sb.from('pay_methods').insert({name:n.slice(0,60),kind:api.q('#bpNewK').value||kindGuess(n),sort:bk.methods.length}).select('*'));if(!r)return;api.q('#bpNewK').value='';
         const m=r[0];api.q('#bpNew').value='';const box=api.q('#bpM');if(box.querySelector('.dim'))box.innerHTML='';
@@ -299,6 +305,11 @@ function procModal(p){
         for(const id of [...want].filter(id=>have.has(id))){const now=bk.pm.find(x=>x.processor_id===savedId&&x.method_id===id),cs=csOf(id);
           if(now&&(JSON.stringify(now.countries||[])!==JSON.stringify(cs)||(now.note||null)!==noteOf(id))&&!await bkSave(sb.from('processor_methods').update({countries:cs,note:noteOf(id)}).eq('processor_id',savedId).eq('method_id',id)))return false}
         if(del.length&&!await bkSave(sb.from('processor_methods').delete().eq('processor_id',savedId).in('method_id',del)))return false;
+        // los métodos del padre que pasan a la ruta: se copian con sus países, nota y estado, y se sacan del padre
+        const mv=[...api.box.querySelectorAll('[name=bpMv]:checked')].map(i=>i.value),pp=row.parent_id;
+        if(mv.length&&pp){const src=bk.pm.filter(x=>x.processor_id===pp&&mv.includes(x.method_id)&&!want.has(x.method_id));
+          if(src.length&&!await bkSave(sb.from('processor_methods').insert(src.map(x=>({processor_id:savedId,method_id:x.method_id,countries:x.countries||[],note:x.note||null,status:x.status||'ok',status_note:x.status_note||null,fail_countries:x.fail_countries||[]})))))return false;
+          if(!await bkSave(sb.from('processor_methods').delete().eq('processor_id',pp).in('method_id',mv)))return false}
         await api._up();await bkLoad(true);toast(p?'Procesador guardado.':`Procesador <b>${esc(name)}</b> cargado.`);
       }}]});
 }

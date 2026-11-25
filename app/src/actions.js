@@ -801,7 +801,7 @@ document.addEventListener('keydown',e=>{
   primeAudio();
   if(padUp())return;
   if(modals.length)return;
-  const tg=e.target,typing=tg&&tg.matches&&tg.matches('input,select,textarea');
+  const tg=e.target,typing=tg&&((tg.matches&&tg.matches('input,select,textarea'))||tg.isContentEditable); // también lo que se escribe en el editor del Knowledgebase
   if(e.key==='Escape'){if(typing)tg.blur();hideTip();return}
   if(typing||e.ctrlKey||e.metaKey||e.altKey||!ready)return;
   if(NAVKEYS[e.key]){e.preventDefault();goGroup(NAVKEYS[e.key]);return} // los números siguen el orden del menú
