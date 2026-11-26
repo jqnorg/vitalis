@@ -556,7 +556,6 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir')){dockCmd(d);return} // desde la mini ficha del CRM
-  if(d&&d.type==='ftd-agenda-prof'&&d.v===1){const src=e.source;dockProf(d).catch(()=>({err:'No pude guardarlo.'})).then(r=>{try{src.postMessage({type:'ftd-agenda-prof-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // el perfil completado en la mini ficha
   if(d&&d.type==='ftd-agenda-tr'&&d.v===1){const src=e.source;dockTr(d.txt).catch(()=>({why:'no'})).then(r=>{try{src.postMessage({type:'ftd-agenda-tr-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // traducir el comentario de la mini ficha
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
@@ -687,7 +686,7 @@ function ayuda(){
     <dt>Lo que se pide por día</dt><dd>Una de dos, sin compensar: <b>250 llamadas</b> (lo fija el team leader) o <b>2 h 30 habladas</b>. Con cualquiera de las dos el día está cumplido.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
   <h4>Cliente (tu Manager)</h4><dl>
-    <dt>El que tenés abierto</dt><dd>La ficha del cliente que abrís en el CRM, o del último new que entró: su campaña con sus números, el depósito (qué ofrecerle según Banking), el perfil que pide la gerencia, los comentarios de la mesa y la palabra clave. Cuando entra un new, la ficha se abre sola.</dd>
+    <dt>El que tenés abierto</dt><dd>La ficha del cliente que abrís en el CRM, o del último new que entró: su campaña con sus números, el depósito (qué ofrecerle según Banking), los comentarios de la mesa y la palabra clave. Cuando entra un new, la ficha se abre sola.</dd>
     <dt>En New</dt><dd>La pastilla roja de la barra cuenta los tuyos que están en New: llamalos ya. Se va cuando dejan de ser New.</dd>
     <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país: al Agendar, aparece un botón con la hora que más deposita el país del cliente.</dd></dl>
   <h4>Clientes</h4><dl>
@@ -736,7 +735,7 @@ function ayuda(){
     <dt>Por agente</dt><dd>En Equipo → <b>Por agente</b> (o tocando la columna Target): el target de cada uno. <b>Repartir el de la mesa</b> lo divide parejo. Cada uno ve el suyo en el inicio; los demás no.</dd>
     <dt>Ficha</dt><dd>De cada uno: el mes (FTDs, sin detalle, conversión, faltas), su agenda de clientes, turnos, clientes new y tareas. El sueldo no aparece.</dd>
     <dt>Agendas vencidas</dt><dd>El Manager avisa cuando alguien tiene una agenda vencida hace más de 30 minutos sin cerrar (agrupadas por agente).</dd>
-    <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, velocidad al new, agendas vencidas y perfiles cargados. Los viernes, con el ranking de la semana.</dd></dl>
+    <dt>Cierre del día</dt><dd>A las 17:35 Vitalis le manda al team leader y al administrador, en su privado, el resumen de la mesa: FTDs, llamadas contra el mínimo, RMO, CR (%) del día, velocidad al new y agendas vencidas. Los viernes, con el ranking de la semana.</dd></dl>
   <h4>Gerencia (team leader, admin y director)</h4><dl>
     <dt>Qué es</dt><dd>La mesa en números para los de arriba, por período: Hoy, cada semana del mes y el mes (y los meses anteriores). Cada número lleva una flecha contra el período anterior.</dd>
     <dt>La mesa, por agente</dt><dd>FTDs, CR (%) y RMO de cada uno y de la mesa.</dd>
@@ -755,7 +754,7 @@ function ayuda(){
     <dt>Jornada</dt><dd>${dur(jorMs())} desde la entrada. Los descansos cuentan como trabajados.</dd>
     <dt>Encuestas</dt><dd>Cualquiera arma una en cualquier chat (el botón ◎ o escribiendo <b>/vitalis encuesta ¿Pregunta? | opción | opción</b>, que la manda Vitalis). Elegís si es anónima, si se votan varias opciones y cómo termina: cuando la cerrás, a una hora o cuando votaron todos. El voto se cambia hasta que cierra.</dd>
     <dt>Avisos</dt><dd>Tarjeta, sonido y destello acá. Con la extensión, también en la pestaña que estés y con Vitalis cerrado. Si a los 15 minutos no marcaste "Ya lo llamé", vuelve a avisar (cada 15 min, hasta hora y media) con la ficha a un toque.</dd>
-    <dt>Tu día</dt><dd>Al marcar Salida ves tu resumen: llamadas, hablado, tiempo muerto y franja, FTDs y CR (%) del día, perfiles cargados y agendas.</dd></dl>
+    <dt>Tu día</dt><dd>Al marcar Salida ves tu resumen: llamadas, hablado, tiempo muerto y franja, FTDs y CR (%) del día y agendas.</dd></dl>
   <h4>Extensión de Chrome</h4><dl>
     <dt>Qué hace</dt><dd>Avisos de agenda, botón en el CRM para pasar ventas, registro y aviso de clientes new, y los snippets en cualquier página. Las páginas del CRM con tabla se actualizan solas cada 10 s (si la estás usando, espera).</dd>
     <dt>Actualizar</dt><dd>Bajá el zip nuevo, descomprimilo en la misma carpeta y tocá ↻ en chrome://extensions.</dd>

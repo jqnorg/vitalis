@@ -204,50 +204,42 @@ document.addEventListener('click',e=>{
 });
 
 /* ---------- el cierre del día (pedido del dueño, noviembre 2026) ----------
-   Al marcar Salida, el agente ve su resumen (cierreModal: llamadas, hablado, muerto y franja, FTDs y CR (%) del día, perfiles, agendas).
+   Al marcar Salida, el agente ve su resumen (cierreModal: llamadas, hablado, muerto y franja, FTDs y CR (%) del día, agendas).
    A las 17:35 (CIERRE_HM) el Vitalis del team leader o del admin arma el de la mesa (cierreTxt) y lo manda por el chat como Vitalis
    (day_close: lo guarda en day_closes —uno por día, así no se repite aunque haya varios abiertos— y lo escribe en el privado de
    cada team leader y admin con Vitalis). Los viernes va con el ranking de la semana. */
 const CIERRE_HM='17:35',CIERRE_MAX='23:30';
-async function profilesHoy(){ // perfiles cargados hoy, por quién (client_profiles.updated_by)
-  const m=new Map();if(!sb)return m;
-  try{const r=await Q(sb.from('client_profiles').select('client_id,updated_by').gte('updated_at',parseYMD(todayS()).toISOString()));
-    for(const x of r){if(!x.updated_by)continue;(m.get(x.updated_by)||m.set(x.updated_by,new Set()).get(x.updated_by)).add(norm(x.client_id))}}catch(e){}
-  return m;
-}
 function diaDe(uid){ // los números del día de alguien
   const te=todayS(),R=ritmo(uid),cv=convPeriod(te,te,uid),ag=agStats(uid),F=team.filter(f=>f.uid===uid&&f.date===te);
   const talks=R?new Set(R.segs.filter(s=>s.k==='talk').map(s=>norm(s.id))).size:0;
   const hechas=agOf(uid).filter(p=>p.done&&p.doneAt&&ymd(new Date(p.doneAt))===te).length;
   return {R,ftd:F.length,ftdNew:F.filter(f=>!isLate(f)).length,news:cv.leads,cr:cv.leads?cv.ftd/cv.leads:null,talks,venc:ag.venc,hechas};
 }
-function cierreFrase(D,pf){ // una línea, en buena onda
+function cierreFrase(D){ // una línea, en buena onda
   const R=D.R;if(!R)return '';
   const out=[];
   if(D.ftd)out.push(D.ftd===1?'Cerraste una venta.':`Cerraste ${D.ftd} ventas.`);
   if(R.ok)out.push(R.n>=R.req?'Llegaste a las llamadas del día.':'Cumpliste el día con lo hablado.');else out.push(`Te faltaron ${R.req-R.n} llamadas (o ${esc(minsTxt(TALK_MIN-R.talk))} de charla) para cumplir el día.`);
   if(!R.young&&R.q===3)out.push(`Mucho tiempo muerto (${minsTxt(R.dead)}): mirá en "Ver qué pasó" dónde se fue.`);
-  if(D.talks&&pf<D.talks)out.push(`Faltan ${D.talks-pf} perfiles de los clientes con los que hablaste.`);
   if(D.venc)out.push(`Tenés ${plural(D.venc,'agenda vencida','agendas vencidas')} sin cerrar.`);
   return out.join(' ');
 }
 async function cierreModal(){ // "Tu día", al marcar Salida
   if(!meNeedsDay())return;
-  const D=diaDe(me),R=D.R,P=await profilesHoy(),pf=(P.get(me)||new Set()).size;
+  const D=diaDe(me),R=D.R;
   const li=(k,v,c)=>`<li><span>${k}</span><b class="${c||''}">${v}</b></li>`;
   modal({title:'Tu día',body:`<ul class="dia-l">
     ${li('Llamadas',R?`${R.n} de ${R.req}`:'—',R?(R.n>=R.req?'ok':R.ok?'':'hot'):'')}
     ${li('Hablado',R?`${esc(minsTxt(R.talk))} de 2 h 30 · ${plural(D.talks,'conversación','conversaciones')}`:'—',R?(R.talkOk?'ok':R.ok?'':'hot'):'')}
     ${li('Tiempo muerto',R?`${esc(minsTxt(R.dead))} ${qBadge(R)}`:'—',R?(R.young?'':R.q===3?'hot':R.q===2?'warn':'ok'):'')}
     ${li('FTDs',`${D.ftd}${D.cr!=null?` <span class="d">· CR (%) del día ${pct(D.cr)}: ${D.ftdNew} de ${plural(D.news,'new')}</span>`:''}`,D.ftd?'ok':'')}
-    ${li('Perfiles cargados',`${pf}${D.talks?` <span class="d">de ${plural(D.talks,'conversación','conversaciones')}</span>`:''}`,D.talks&&pf<D.talks?'warn':pf?'ok':'')}
     ${li('Agendas',`${D.hechas} hechas${D.venc?` · <span class="hot">${D.venc} vencidas sin cerrar</span>`:''}`)}
-  </ul><p class="dia-f">${esc(cierreFrase(D,pf))}</p>`,
+  </ul><p class="dia-f">${esc(cierreFrase(D))}</p>`,
   actions:[...(R?[{l:'Ver qué pasó',fn:()=>{setTimeout(()=>ritmoModal(me),50)}}]:[]),{l:'Listo',cls:'pri'}]});
 }
 const nombres=L=>L.map(x=>first(x.m.id)).join(', ');
 async function cierreTxt(){ // el resumen de la mesa, en texto plano para el chat
-  const te=todayS(),ym=ymNow(),D=cmData(),P=await profilesHoy(),rows=D.rows.filter(p=>p.tu.k!=='none'||p.ftd||p.pc.n);
+  const te=todayS(),ym=ymNow(),D=cmData(),rows=D.rows.filter(p=>p.tu.k!=='none'||p.ftd||p.pc.n);
   const mes=team.filter(f=>f.date.slice(0,7)===ym).length,T=+targets[ym]||0,hoy=team.filter(f=>f.date===te);
   const L=[`Cierre del ${AG_DIA[parseYMD(te).getDay()].toLowerCase()} ${dm(te)}`];
   const porAg=rows.filter(p=>p.ftd).sort((a,b)=>b.ftd-a.ftd).map(p=>`${first(p.m.id)} ${p.ftd}`).join(', ');
@@ -260,8 +252,6 @@ async function cierreTxt(){ // el resumen de la mesa, en texto plano para el cha
   const sp2=newSpeedOf(null,te,te);if(sp2.n)L.push(`Velocidad al new: ${minTxt2(sp2.med)} del registro a la primera llamada (mediana de ${plural(sp2.n,'new')}${sp2.slow?`; ${sp2.slow} tardaron más de 5 min`:''})`);
   const venc=rows.filter(p=>p.venc).map(p=>`${first(p.m.id)} ${p.venc}`).join(', ');
   L.push(`Agendas vencidas: ${venc||'ninguna'}`);
-  const pf=rows.map(p=>[p,(P.get(p.m.id)||new Set()).size]),pfN=pf.reduce((a,[,n])=>a+n,0);
-  L.push(`Perfiles cargados hoy: ${pfN}${pf.length?` (${pf.filter(([,n])=>n).map(([p,n])=>`${first(p.m.id)} ${n}`).join(', ')}${pf.some(([,n])=>!n)?`; sin ninguno: ${pf.filter(([,n])=>!n).map(([p])=>first(p.m.id)).join(', ')}`:''})`:''}`);
   if(parseYMD(te).getDay()===5){ // viernes: el ranking de la semana
     const w0=weekStart(te),W=new Map();for(const f of team)if(f.date>=w0&&f.date<=te&&!isLeadUid(f.uid))W.set(f.uid,(W.get(f.uid)||0)+1);
     let C=new Map();try{for(const r of await rmoLoad(w0,te))C.set(r.user_id,(C.get(r.user_id)||0)+(+r.n||0))}catch(e){}

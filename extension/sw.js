@@ -738,10 +738,6 @@ async function dockTr(txt) { // el comentario, al inglés con el traductor de la
   return { why: 'cerrado' };
 }
 
-async function dockProf(id, p) { // el perfil que se completó en la mini ficha: lo guarda Vitalis (si está abierto)
-  for (const t of await vitalisTabs()) { try { const r = await withTimeout(chrome.tabs.sendMessage(t.id, { type: 'prof', id, p }), 16000); if (r && !r.noPanel) return r; } catch (e) {} }
-  return { err: 'cerrado' };
-}
 
 async function sendCmd(cmd) { // "hecho" desde el aviso: se lo paso a Vitalis si está abierto; si no, queda en cola
   const tabs = await vitalisTabs();
@@ -796,7 +792,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     if (a === 'abrir') { openPanel().then(() => reply({ ok: true }), () => reply({ ok: false })); return true; }
     return false;
   }
-  if (msg.type === 'dock-prof' && msg.id && msg.p && typeof msg.p === 'object') { dockProf(String(msg.id).slice(0, 60), msg.p).then(reply, () => reply({ err: 'cerrado' })); return true; }
   if (msg.type === 'dock-tr' && typeof msg.txt === 'string') { dockTr(msg.txt.slice(0, 4000)).then(reply, () => reply({ why: 'no' })); return true; }
   if (msg.type === 'whoami') { Promise.all([trialCfg(), trialMe()]).then(([T, me]) => reply({ tabId: sender.tab ? sender.tab.id : null, trial: T ? { role: T.role, joined: !!me, name: me ? me.name : '', desk: me ? me.desk : '', code: me ? me.code : '' } : null })); return true; }
   if (msg.type === 'trial-get') { Promise.all([trialCfg(), trialMe(), sess.get('trialBoard', null)]).then(([T, me, board]) => reply({ trial: T ? { role: T.role } : null, me, board })); return true; }

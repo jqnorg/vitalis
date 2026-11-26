@@ -250,7 +250,6 @@ async def main():
             DKT = "(document.getElementById('vitalis-dock')||{shadowRoot:{textContent:''}}).shadowRoot.textContent"
             t = await Nv.evaluate(DKT)
             ok('68700' in t and 'Marta Gomez' not in t and 'Montevideo' in t and 'New: llamalo ya' in t and 'Dijo que cobra el viernes' in t, f'la mini ficha muestra al cliente: status en palabras simples, palabra clave y comentarios de la mesa ({t[:200]!r})')
-            ok('Perfil del cliente' in t and 'Falta: edad, ocupación, objetivo' in t and await Nv.locator('#vitalis-dock #pfE').is_visible(), 'al perfil le falta todo: el formulario arranca abierto')
             ok(not await Nv.locator('#vitalis-dock #payb').is_visible(), 'cómo depositar arranca plegado')
             await Nv.locator('#vitalis-dock #pay summary').click(); await Nv.locator('#vitalis-dock [data-pt=efectivo]').click(); await Nv.wait_for_timeout(200)
             ok('OXXO con PagoMX' in await Nv.locator('#vitalis-dock #payb').inner_text() and 'cualquier OXXO' in await Nv.locator('#vitalis-dock #payb').inner_text(), 'se despliega y lleva el camino del depósito con el país del cliente')
@@ -279,27 +278,6 @@ async def main():
             ok('Copiado en inglés' in await Nv.locator('#vitalis-dock #cmsg').inner_text(), 'y muestra lo que copió')
             await Nv.locator('#vitalis-dock [data-cp]').click(); await Nv.wait_for_timeout(400)
             ok(await Nv.evaluate("navigator.clipboard.readText()") == '555004', 'Copiar ID copia el del siguiente')
-            # el perfil se completa en la mini ficha: lo guarda Vitalis y se copia solo en inglés
-            await Nv.locator('#vitalis-dock #pfE').fill('41')
-            await A2.evaluate("dockSig='';dockSync()"); await Nv.wait_for_timeout(900)
-            ok(await Nv.locator('#vitalis-dock #pfE').input_value() == '41', 'lo que se escribe en el perfil no se pierde cuando Vitalis manda algo nuevo')
-            await Nv.locator('#vitalis-dock #pfO').fill('Comerciante')
-            await Nv.locator('#vitalis-dock #pfG').fill('Ahorrar para la casa')
-            await Nv.locator('#vitalis-dock #pfR').select_option('no_money')
-            ok('Low Potential' in await Nv.locator('#vitalis-dock #pfSt').inner_text(), 'al elegir cómo terminó, dice qué status poner en el CRM')
-            await Nv.evaluate("(()=>{const r=document.getElementById('vitalis-dock').shadowRoot;r.querySelector('.bd').scrollTop=0})()")
-            await Nv.screenshot(path=OUT / 'x3e_mini_ficha_perfil.png')
-            await Nv.locator('#vitalis-dock [data-pf=copy]').click()
-            try: await Nv.wait_for_function("(m=>m&&/copiado|No pude|traductor/i.test(m.textContent))(document.getElementById('vitalis-dock').shadowRoot.getElementById('pmsg'))", timeout=15000)
-            except Exception: pass
-            r = sql("select edad, ocupacion, objetivo, outcome, (select name from public.profiles where id=updated_by) who from public.client_profiles where client_id='68700'")
-            ok(r and r[0]['edad'] == 41 and r[0]['ocupacion'] == 'Comerciante' and r[0]['objetivo'] == 'Ahorrar para la casa' and r[0]['outcome'] == 'no_money' and r[0]['who'] == await A2.evaluate("profile.name"), f'"Guardar y copiar": queda guardado en Vitalis a nombre del agente ({r})')
-            clip = await Nv.evaluate("navigator.clipboard.readText().catch(e=>'ERR '+e)")
-            ok(clip == '[EN] Cliente de 41 años, se desempeña como comerciante. [EN] Manifiesta que su objetivo es ahorrar para la casa. The client was encouraged and offered several payment methods, but does not have the funds at this time. Pending a better opportunity.',
-               f'y copia solo el inglés, con lo escrito traducido ({clip!r}, {await Nv.locator("#vitalis-dock #pmsg").inner_text()!r})')
-            await Nv.wait_for_timeout(1200)
-            ok(not await Nv.locator('#vitalis-dock #pfE').is_visible() and 'completo' in await Nv.locator('#vitalis-dock #pfs').inner_text() and 'Guardado y copiado' in await Nv.locator('#vitalis-dock #pmsg').inner_text(), 'completo: se pliega y lo dice')
-            ok(await A2.evaluate("profFalta((fichaCache.get('68700')||{d:{}}).d.prof).length===0"), 'y la ficha de Vitalis lo tiene completo')
             # se minimiza (en todas las pestañas) y lo escrito no se pierde
             await Nv.locator('#vitalis-dock #dmin').click(); await Nv.wait_for_timeout(300)
             ok(await Nv.locator('#vitalis-dock #pill').is_visible() and not await Nv.locator('#vitalis-dock #box').is_visible() and '68700' in await Nv.locator('#vitalis-dock #pill').inner_text(), 'se minimiza a una pastilla con el cliente')

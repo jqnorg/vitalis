@@ -862,23 +862,6 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   await rpc(M, 'select public.set_min_calls(250) j');
 }
 
-// ---------- perfil del cliente (lo que exige la gerencia: edad, ocupación, objetivo…) ----------
-{
-  let q = await as(B, "insert into public.client_profiles (client_id, objetivo) values ('70380', 'x') returning 1");
-  ok(!!q.error, 'nadie escribe directo en client_profiles');
-  q = await as(B, "select public.prof_save('70380', 'Novara Markets', $1::jsonb) r", [JSON.stringify({ edad: 40, ocupacion: 'chofer', objetivo: 'ahorro', outcome: 'no_money', motivo: 'se le ofreció transferencia' })]);
-  ok(!q.error && q.rows[0].r === 'ok', 'prof_save guarda el perfil');
-  q = await as(Dh, "select edad, ocupacion, outcome from public.client_profiles where client_id = '70380'");
-  ok(q.rows.length === 1 && q.rows[0].edad === 40 && q.rows[0].outcome === 'no_money', 'la mesa ve el perfil (con cómo terminó la llamada)');
-  await as(B, "select public.prof_save('70380', 'Novara Markets', $1::jsonb)", [JSON.stringify({ edad: 41, ocupacion: 'chofer', objetivo: 'ahorro' })]);
-  q = await as(B, "select count(*)::int n, max(edad) e from public.client_profiles where client_id = '70380'");
-  ok(q.rows[0].n === 1 && q.rows[0].e === 41, 'prof_save pisa el mismo perfil (uno por cliente)');
-  q = await as(X, 'select * from public.client_profiles');
-  ok(q.rows.length === 0, 'otra mesa no ve el perfil');
-  q = await as(B, "update public.client_profiles set edad = 99 where client_id = '70380' returning 1");
-  ok(!!q.error || q.rows.length === 0, 'nadie edita el perfil directo (solo por prof_save)');
-}
-
 // ---------- palabra clave de confidencialidad del cliente ----------
 {
   let q = await as(B, "insert into public.client_keywords (client_id, kw) values ('70390','azul') returning 1");

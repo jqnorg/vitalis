@@ -552,7 +552,6 @@
   function retire() { try { obs.disconnect(); } catch (e) {} if (ui) { ui.h.remove(); ui = null; } if (dk) { dk.h.remove(); dk = null; } clearInterval(dTimer); }
   /* ================= la mini ficha de Vitalis (abajo a la izquierda) ================= */
   // El cliente actual en corto, el siguiente new y el turno: lo manda Vitalis y acá no se escribe nada en el CRM.
-  // Si al perfil del cliente le falta algo, el formulario arranca abierto: se completa acá y lo guarda Vitalis (se copia en inglés).
   // Se minimiza (queda una pastilla, en todas las pestañas). El comentario se escribe acá y se copia solo en inglés.
   const TOP = (() => { try { return window.top === window; } catch (e) { return false; } })();
   let dock = null, dk = null, dMin = false, dPayOpen = false, dPay = { id: '', t: '', all: false }, dSkip = 0, dDrafts = {}, dTimer = null, dTicks = 0, dDraftT = null, trObj = null;
@@ -601,7 +600,6 @@
     .pill{display:none;align-items:center;gap:8px;background:#fff;border:1.5px solid #00b36b;border-radius:999px;padding:7px 13px 7px 9px;box-shadow:0 8px 24px rgba(16,24,40,.16);cursor:pointer;font-weight:600;font-size:12.5px;color:#0f1720}
     .pill .mk{width:18px;height:18px}.pill .plus{color:#6b7684;font-weight:700;font-size:15px;line-height:1}.pill.stp{border-color:#f43f5e}
     .min .pill{display:inline-flex}.min .box{display:none}
-    #prof{margin-top:10px}#prof.need{border-color:#f59e0b;border-top-width:4px}#prof summary{flex-wrap:wrap}
     .bdg{font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid}.bdg.w{background:#fffbeb;color:#92400e;border-color:#f59e0b}.bdg.ok{background:#ecfdf5;color:#047857;border-color:#00b36b}
     .pf label{display:block;color:#4b5563;font-size:12px;font-weight:700;margin:8px 0 3px}.pf label i{color:#be123c;font-style:normal}.pf label .o{color:#6b7684;font-weight:500}
     .pf input[type=text],.pf input[type=number],.pf select{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 9px;color:#0f1720;background:#fff;height:36px}
@@ -610,7 +608,7 @@
     .two{display:flex;gap:8px}.two>div:first-child{width:70px;flex:none}.two>div:last-child{flex:1;min-width:0}
     .pst{margin:5px 0 0;font-size:12.5px;color:#4b5563}.pst:empty{display:none}.pst b{color:#0f1720}
     .pf .row{margin-top:10px}
-    .tr #cmt,.tr #cmt+.row,.tr #pay,.tr .lb.cm,.tr #pmsg,.tr #cmsg{display:none}
+    .tr #cmt,.tr #cmt+.row,.tr #pay,.tr .lb.cm,.tr #cmsg{display:none}
     .tr .box{width:380px;max-height:min(72vh,720px)}.tr{font-size:15px}.tr .kv{font-size:15px;padding:7px 0}.tr .lb{font-size:13px;margin:12px 0 6px}.tr .cid b{font-size:22px}.tr .nm{font-size:15px;color:#6b7684}.tr .note{font-size:14px}.tr .op{font-size:14.5px}.tr .opn{font-size:14px}.tr .go{font-size:15px;padding:10px 12px}.tr .lnk{font-size:14px}.tr #nx .kv{font-size:15px}
     :focus-visible{outline:2px solid #00875a;outline-offset:2px}`;
   if (TOP) {
@@ -642,10 +640,10 @@
   const dockStatsHTML = (s) => (!s ? '' : `<span class="lb">Tus news de hoy</span><div class="kv"><span>Te llegaron</span><b>${s.news}</b></div><div class="kv"><span>Llamados</span><b>${s.called} de ${s.news}</b></div><div class="kv"><span>Al new en</span><b>${s.med == null ? '<i>—</i>' : (Math.round(s.med) + ' min') + (s.slow ? ` <i>· ${s.slow} pasaron de 5</i>` : '')}</b></div><span class="lb">Llamadas de hoy</span><div class="kv"><span>Llamadas</span><b>${s.calls}</b></div>`);
   function dockTrialDraw(cl) {
     const $ = dk.$;
-    $('dk').classList.add('tr'); $('cl').hidden = false; $('prof').hidden = true;
+    $('dk').classList.add('tr'); $('cl').hidden = false;
     const a = dk.root.activeElement, keep = !!(a && (a.id === 'cmin' || a.id === 'cad'));
     if (!keep) $('clh').innerHTML = dockTrialHTML(cl) + dockStatsHTML(dock.stats);
-    $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('pff').innerHTML = '';
+    $('clc').innerHTML = ''; $('payb').innerHTML = '';
     if (dk.clId !== (cl ? cl.id : '')) { dk.clId = cl ? cl.id : ''; dCamp = { id: '', open: false }; }
   }
   async function dockCampSave() {
@@ -667,7 +665,6 @@
       <div class="box" id="box"><div class="h">${SEAL}<span class="tag">vitalis</span><span class="t" id="ht"></span><button class="x" id="dmin" title="Minimizar" aria-label="Minimizar">–</button></div>
         <div class="bd"><div id="info"></div>
           <div id="cl"><div id="clh"></div>
-            <details id="prof" hidden><summary>Perfil del cliente <span id="pfs"></span></summary><div id="pff" class="pf"></div></details><div class="msg" id="pmsg"></div>
             <span class="lb cm">Comentario para el CRM</span><textarea id="cmt" rows="3" maxlength="2000" placeholder="Escribilo en español: se copia en inglés" aria-label="Comentario para el CRM"></textarea>
             <div class="row"><button class="go" id="cpen">Copiar en inglés</button><button class="lnk" id="cclr" style="margin:0">Borrar</button></div><div class="msg" id="cmsg"></div>
             <details id="pay"><summary>Depósito <span id="payp"></span></summary><div id="payb"></div></details>
@@ -684,10 +681,9 @@
       dDrafts[c.id] = $('cmt').value; $('cmsg').textContent = '';
       clearTimeout(dDraftT); dDraftT = setTimeout(() => send({ type: 'dock-draft', id: c.id, txt: $('cmt').value }), 600);
     });
-    for (const ev of ['input', 'change']) $('pff').addEventListener(ev, pfInput);
     root.addEventListener('click', (e) => dockClick(e));
     document.documentElement.appendChild(h);
-    return { h, root, $, clId: '', pfId: '', pfSig: '', pfDirty: false, pfT: null };
+    return { h, root, $, clId: '' };
   }
   function dockMin(v) { dMin = v; try { chrome.storage.local.set({ dockMin: v }); } catch (e) {} dockDraw(); }
   function dockDraw() {
@@ -703,12 +699,11 @@
       : old ? `<p class="note warn">Vitalis no contesta desde hace ${Math.round((now - dock.at) / 6e4)} min: esto puede estar viejo.</p><button class="go alt" data-a="abrir">Abrir Vitalis</button>` : '';
     if (dock.trial) { $('ht').textContent = dock.me ? `${dock.me.desk} · ${dock.me.name}` : ''; $('info').innerHTML = ''; dockTrialDraw(cl); dockNext(cl, false); $('tu').innerHTML = ''; return; }
     $('cl').hidden = !cl;
-    if (!cl && dk.clId) { dk.clId = ''; dk.pfId = ''; $('clh').innerHTML = ''; $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('pff').innerHTML = ''; $('pmsg').textContent = ''; $('cmt').value = ''; $('cmsg').textContent = ''; } // tapado o sin cliente: nada del cliente queda en la página
+    if (!cl && dk.clId) { dk.clId = ''; $('clh').innerHTML = ''; $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('cmt').value = ''; $('cmsg').textContent = ''; } // tapado o sin cliente: nada del cliente queda en la página
     if (cl) {
       $('clh').innerHTML = dockClHTML(cl); $('clc').innerHTML = dockComsHTML(cl);
       if (dk.clId !== cl.id) { dk.clId = cl.id; $('cmt').value = dDrafts[cl.id] || ''; $('cmsg').textContent = ''; dPayOpen = false; }
       $('pay').open = dPayOpen;
-      dockPf(cl);
       dockPay(cl);
     }
     dockNext(cl, lk);
@@ -723,76 +718,11 @@
       <div class="kv"><span>Status</span><b>${c.st ? escH(c.st) : '<i>todavía no se vio en el CRM</i>'}</b></div>
       <div class="kv"><span>Palabra clave</span><b>${c.kw ? escH(c.kw) : '<i>sin asignar</i>'}</b></div>
       ${c.ag && c.ag.length ? `<div class="kv"><span>Agenda</span><b>${escH(c.ag.join(', '))}</b></div>` : ''}
-      ${c.falta && c.falta.length && !Array.isArray(c.po) ? `<div class="falta">Falta en el perfil: ${escH(c.falta.join(', '))}</div>` : ''}
 `;
   }
   const dockComsHTML = (c) => `${c.coms && c.coms.length ? `<span class="lb">Comentarios de la mesa</span><div class="coms">${c.coms.map((x) => `<p><b>${escH(x.w)}</b> <i>${escH(x.t)}</i><br>${escH(x.x)}</p>`).join('')}</div>` : ''}
       <button class="lnk" data-a="ver">Ver la ficha en Vitalis</button>
       <p class="note" style="margin-top:8px">¿No es el que tenés abierto en el CRM? <button class="lnk" data-diag style="margin:0">Copiar diagnóstico</button></p>`;
-  // el perfil del cliente (lo que pide la gerencia): si le falta algo arranca abierto. Lo escrito no se pierde con los refrescos ni al cambiar de cliente
-  function dockPf(c) {
-    const $ = dk.$, on = Array.isArray(c.po); // Vitalis viejo: solo la línea de lo que falta
-    $('prof').hidden = !on; if (!on) return;
-    const fal = c.falta || [], sig = JSON.stringify(c.prof || null), nw = dk.pfId !== c.id, a = dk.root.activeElement;
-    $('pfs').innerHTML = fal.length ? `<span class="bdg w">Falta: ${escH(fal.join(', '))}</span>` : '<span class="bdg ok">completo</span>';
-    $('prof').classList.toggle('need', !!fal.length);
-    if (!nw && (dk.pfDirty || dk.pfSig === sig || (a && $('pff').contains(a)))) return;
-    let v = c.prof || {}; dk.pfDirty = false;
-    if (nw) { $('pmsg').textContent = ''; const dr = dDrafts['pf:' + c.id]; if (dr) try { v = JSON.parse(dr); dk.pfDirty = true; } catch (e) {} }
-    dk.pfId = c.id; dk.pfSig = sig;
-    $('pff').innerHTML = pfFormHTML(v, c.po); pfDraw(c.po);
-    if (nw) $('prof').open = !!fal.length || dk.pfDirty;
-  }
-  function pfFormHTML(v, po) {
-    const a = (x) => escH(x == null ? '' : String(x));
-    return `<div class="two"><div><label for="pfE">Edad <i>*</i></label><input id="pfE" type="number" min="16" max="110" inputmode="numeric" value="${a(v.edad)}" placeholder="34"></div>
-      <div><label for="pfO">Ocupación <i>*</i></label><input id="pfO" type="text" maxlength="120" value="${a(v.ocupacion)}" placeholder="taxista, comerciante…"></div></div>
-      <label class="ck"><input type="checkbox" id="pfD"${v.desocupado ? ' checked' : ''}> Está desocupado</label>
-      <div id="pfDw"><label for="pfDd">¿Hace cuánto?</label><input id="pfDd" type="text" maxlength="60" value="${a(v.desocupado_desde)}" placeholder="6 meses"></div>
-      <label for="pfG">Objetivo <i>*</i></label><input id="pfG" type="text" maxlength="200" value="${a(v.objetivo)}" placeholder="un ingreso extra">
-      <label for="pfA">¿Qué vio en el anuncio?</label><input id="pfA" type="text" maxlength="300" value="${a(v.anuncio)}" placeholder="inversión con IA">
-      <label class="ck"><input type="checkbox" id="pfM"${v.vio_min === true ? ' checked' : ''}> Vio el monto mínimo</label>
-      <label for="pfR">¿Cómo terminó la llamada?</label><select id="pfR"><option value="">Elegí cómo terminó…</option>${po.map(([k, l]) => `<option value="${escH(k)}"${v.outcome === k ? ' selected' : ''}>${escH(l)}</option>`).join('')}</select>
-      <p class="pst" id="pfSt"></p>
-      <label for="pfMo">Detalle <span class="o">(opcional)</span></label><textarea id="pfMo" rows="2" maxlength="400" placeholder="quiere consultarlo con la esposa">${escH(v.motivo || '')}</textarea>
-      <div class="row"><button class="go" data-pf="copy">Guardar y copiar en inglés</button><button class="go alt sm" data-pf="save">Guardar</button></div>`;
-  }
-  function pfDraw(po) { // ¿hace cuánto? solo si está desocupado; el status que va en el CRM según cómo terminó
-    const $ = dk.$; if (!$('pfD')) return;
-    $('pfDw').hidden = !$('pfD').checked;
-    const o = (po || []).find((x) => x[0] === $('pfR').value);
-    $('pfSt').innerHTML = o && o[2] ? `Status en el CRM: <b>${escH(o[2])}</b>` : '';
-  }
-  function pfRead() {
-    const q = dk.$, e = q('pfE').value.trim();
-    return { edad: e === '' ? null : Math.round(+e), ocupacion: q('pfO').value.trim(), desocupado: q('pfD').checked, desocupado_desde: q('pfDd').value.trim(), objetivo: q('pfG').value.trim(),
-      anuncio: q('pfA').value.trim(), vio_min: q('pfM').checked ? true : null, outcome: q('pfR').value || null, motivo: q('pfMo').value.trim() };
-  }
-  function pfInput() {
-    const c = dock && !dock.locked && dock.cl; if (!c || !dk || !dk.$('pfE')) return;
-    dk.pfDirty = true; pfDraw(c.po); pmsg('', '');
-    const k = 'pf:' + c.id; dDrafts[k] = JSON.stringify(pfRead());
-    clearTimeout(dk.pfT); dk.pfT = setTimeout(() => send({ type: 'dock-draft', id: k, txt: dDrafts[k] }), 600);
-  }
-  async function pfSave(b, cl) {
-    const v = pfRead(), cp = b.dataset.pf === 'copy', bs = [...dk.root.querySelectorAll('[data-pf]')], lab = b.textContent;
-    if (v.edad != null && (!Number.isFinite(v.edad) || v.edad < 16 || v.edad > 110)) { pmsg('err', 'La edad tiene que estar entre 16 y 110.'); dk.$('pfE').focus(); return; }
-    for (const x of bs) x.disabled = true; b.textContent = 'Guardando…';
-    const r = await send({ type: 'dock-prof', id: cl.id, p: v });
-    for (const x of bs) x.disabled = false; b.textContent = lab;
-    if (!r || !r.ok) { pmsg('err', r && r.err && r.err !== 'cerrado' && r.err !== 'no' ? escH(r.err) : 'No pude guardarlo: abrí Vitalis y probá de nuevo.'); return; }
-    dk.pfDirty = false; delete dDrafts['pf:' + cl.id]; send({ type: 'dock-draft', id: 'pf:' + cl.id, txt: '' }); b.blur();
-    const full = v.edad != null && !!(v.ocupacion || v.desocupado) && !!v.objetivo;
-    if (full) dk.$('prof').open = false;
-    if (!cp || !(r.parts || []).length) { pmsg('ok', full ? 'Perfil guardado.' : 'Guardado. Todavía falta lo marcado con *.'); return; }
-    b.disabled = true; b.textContent = 'Traduciendo…';
-    const en = []; let why = '';
-    for (const x of r.parts) { if (!x.free) { en.push(x.en); continue; } const t = await dockEn(x.es); if (!t.en) { why = t.why || 'no'; break; } en.push(t.en); }
-    b.disabled = false; b.textContent = lab;
-    if (why) { pmsg('warn', 'Perfil guardado. ' + (why === 'bajando' ? 'Chrome está bajando el traductor: tocá "Guardar y copiar" de nuevo en un minuto.' : why === 'cerrado' ? 'No pude traducirlo: abrí Vitalis y probá de nuevo.' : 'Este Chrome no tiene el traductor: no copié nada.')); return; }
-    const txt = en.join(' '), ok = await dockCopy(txt);
-    pmsg(ok ? 'ok' : 'err', (ok ? 'Guardado y copiado en inglés. Pegalo en el CRM:' : 'Guardado, pero no pude copiarlo: tocá de nuevo.') + `<div class="en">${escH(txt)}</div>`);
-  }
   // el camino del depósito, como en la ficha de Vitalis: ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle
   function dockPay(c) {
     const P = c.pay, $ = dk.$;
@@ -851,7 +781,6 @@
     return { why: (r && r.why) || 'no' };
   }
   const cmsg = (cls, html) => { if (!dk) return; const m = dk.$('cmsg'); m.className = 'msg ' + cls; m.innerHTML = html; };
-  const pmsg = (cls, html) => { if (!dk) return; const m = dk.$('pmsg'); m.className = 'msg ' + cls; m.innerHTML = html; };
   async function dockClick(e) {
     const b = e.target.closest('button,#pill'); if (!b || !dk) return;
     const cl = dock && !dock.locked ? dock.cl : null;
@@ -871,7 +800,6 @@
     if (b.dataset.cp) { const ok = await dockCopy(b.dataset.cp); b.textContent = ok ? 'Copiado' : 'No pude'; setTimeout(() => { if (b.isConnected) b.textContent = 'Copiar ID'; }, 1800); return; }
     if (b.hasAttribute('data-diag')) { reportCurrent(true); const ok = await dockCopy(diagCur()); b.textContent = ok ? 'Copiado: mandáselo a quien mantiene Vitalis' : 'No pude copiar'; return; }
     if (b.hasAttribute('data-skip')) { dSkip++; dockNext(cl, !!(dock && dock.locked)); return; }
-    if (b.dataset.pf && cl) return pfSave(b, cl);
     if (b.dataset.pt && cl) { dPay.t = b.dataset.pt; dPay.all = false; dockPay(cl); return; }
     if (b.hasAttribute('data-pall') && cl) { dPay.all = true; dockPay(cl); return; }
     if (b.id === 'cclr' && cl) { dk.$('cmt').value = ''; dDrafts[cl.id] = ''; send({ type: 'dock-draft', id: cl.id, txt: '' }); cmsg('', ''); dk.$('cmt').focus(); return; }

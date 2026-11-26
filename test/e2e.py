@@ -737,10 +737,12 @@ async def main():
 
             # ---------- clientes del CRM: solo news y FTDs (nuevo rumbo, 24/11/2026); la ficha del new, la agenda conectada ----------
             te = await A.evaluate('todayS()'); ym = te[:7]; pym = await A.evaluate("ymStep(ymNow(),-1)")
+            # 500002 se registra 'hoy 10:20' o, si todavía es más temprano, una hora atrás (la primera llamada tiene que ser después del registro)
+            h10 = min('10:20', await A.evaluate("(()=>{const d=new Date(Date.now()-36e5);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')})()"))
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
             res = await A.evaluate(f'''()=>crmSeenFromExt([
               {{id:'500001',brand:'Novara Markets',name:'Nueva Uno',country:'Chile',status:'New',reg:'{te} 09:10',agent:'Joaquín Or',camp:'FB-01',aff:'12',k:'a'}},
-              {{id:'500002',brand:'Novara Markets',name:'Nueva Dos',country:'Peru',status:'New',reg:'{te} 10:20',agent:'Joaquín Or',camp:'GG-UY',k:'b'}},
+              {{id:'500002',brand:'Novara Markets',name:'Nueva Dos',country:'Peru',status:'New',reg:'{te} {h10}',agent:'Joaquín Or',camp:'GG-UY',k:'b'}},
               {{id:'500003',name:'Vuelve',country:'Peru',status:'Call Again',reg:'{te} 08:00',agent:'Joaquín Or',k:'c'}},
               {{id:'500004',name:'No contesta',country:'Mexico',status:'NA-3',reg:'{ym}-02 12:00',agent:'Joaquín Or',k:'d'}},
               {{id:'500006',name:'No llamar',country:'Peru',status:'Do Not Call',reg:'{te} 07:00',agent:'Joaquín Or',k:'f'}},
@@ -786,30 +788,7 @@ async def main():
             fi = await A.inner_text('#v-cliente') if await A.is_visible('#v-cliente') else ''
             ok(await A.evaluate('cur') == 'cliente' and 'entró un new' in fi and '500002' in fi and 'Nueva Dos' not in fi and 'GG-UY' in fi and 'Perú' in fi, f'cuando entra un new, Vitalis pasa a la sección Cliente, con su campaña ({fi[:160]!r})')
             ok('New: llamalo ya' in fi and 'Depósito' in fi and 'Comentarios' in fi, 'dice que está en New, con el depósito y los comentarios')
-            ok('Perfil del cliente' in fi and 'faltan datos' in fi, 'la ficha pide el perfil que exige la gerencia (edad, ocupación, objetivo)')
             await A.screenshot(path=OUT / 'q2_ficha_new.png')
-            # el armador de comentario, adentro de la tarjeta (sin modal): se completan los campos y arma el comentario estándar para el CRM
-            ok(await A.locator('.fi-prof #fiPf #pfE').count() == 1 and await A.locator('.mbox').count() == 0, 'con el perfil incompleto, el formulario está a la vista en la tarjeta')
-            await A.fill('.fi-prof #pfE', '29'); await A.fill('.fi-prof #pfO', 'comerciante'); await A.fill('.fi-prof #pfG', 'ahorrar')
-            await A.select_option('.fi-prof #pfR', 'no_money'); await A.fill('.fi-prof #pfMo', 'se le ofreció efectivo y transferencia')
-            ok('Low Potential' in await A.inner_text('.fi-prof #pfSt') and '29 años' in await A.inner_text('.fi-prof #pfPrev'), 'el armador sugiere el status para el CRM y muestra el comentario mientras se completa')
-            await A.click('.fi-prof [data-fa=profSave]'); await A.wait_for_timeout(1000)
-            prof = await A.inner_text('.fi-prof')
-            ok(await A.locator('.fi-prof #fiPf').count() == 0 and 'Editar perfil' in prof, 'guardado y completo, la tarjeta se pliega al resumen con "Editar perfil"')
-            await A.click('.fi-prof [data-fa=profEdit]'); await A.wait_for_timeout(400)
-            ok(await A.locator('.fi-prof #fiPf #pfE').count() == 1 and await A.input_value('.fi-prof #pfE') == '29', 'Editar vuelve a abrir el formulario adentro, con lo guardado')
-            await A.click('.fi-prof [data-fa=profCancel]'); await A.wait_for_timeout(400)
-            prof = await A.inner_text('.fi-prof')
-            ok('completo' in prof and '29 años' in prof and 'ahorrar' in prof and 'no dispone del dinero' in prof and 'Se le insistió' in prof and 'Low Potential' in prof, f'armador: guarda el perfil, arma el comentario justificado y sugiere el status ({prof[:200]!r})')
-            crm_txt = await A.evaluate("profCrm(document.querySelector('#cuBody')&&fichaCache.get('500002').d.prof)")
-            ok(crm_txt.startswith('29-year-old client') and 'does not have the funds' in crm_txt and '\n\nCliente de 29 años' in crm_txt, f'al CRM va en inglés con la traducción al español debajo ({crm_txt[:120]!r})')
-            ok(sql("select edad, outcome from public.client_profiles where client_id='500002'")[0]['edad'] == 29, 'el perfil queda guardado, uno por cliente')
-            # al CRM, lo escrito por el agente va traducido con el traductor de Chrome (acá, uno de mentira)
-            r = await A.evaluate("window.Translator={availability:async()=>'available',create:async()=>({translate:async s=>'[EN] '+s})};trP=null;trCache.clear();profCrmEn(fichaCache.get('500002').d.prof)")
-            ok(r['ok'] and r['txt'].startswith('[EN] Cliente de 29 años, se desempeña como comerciante.') and '[EN] Manifiesta que su objetivo es ahorrar.' in r['txt'] and 'does not have the funds' in r['txt'] and '[EN] Detalle: se le ofreció efectivo y transferencia.' in r['txt'], f'lo que escribió el agente va traducido oración por oración; lo fijo, con el inglés de siempre ({r["txt"][:200]!r})')
-            r = await A.evaluate("delete window.Translator;trP=null;trCache.clear();profCrmEn(fichaCache.get('500002').d.prof)")
-            ok(not r['ok'] and r['txt'].startswith('29-year-old client, works as comerciante.'), 'sin traductor en Chrome, queda como antes y se avisa')
-            await A.screenshot(path=OUT / 'q2b_perfil.png')
             await A.keyboard.press('Escape'); await A.wait_for_timeout(300)
             # agenda conectada: el que ya depositó se marca y no suena
             sql(f"insert into public.agenda (user_id,client_id,kw,due) select id,'70001','ver si deposita','{te}T23:58' from public.profiles where name='Joaquín Or'")
@@ -1315,11 +1294,11 @@ async def main():
             # el cierre del día: al marcar Salida, "Tu día"; a las 17:35, Vitalis le manda el de la mesa al team leader y al admin
             await A.evaluate("turnos[todayS()]={date:todayS(),in:Date.now()-5*36e5,out:null,breaks:[]};cierreModal()"); await A.wait_for_timeout(900)
             dia = await A.inner_text('.mbox')
-            ok('Tu día' in dia and 'Llamadas' in dia and 'Tiempo muerto' in dia and 'Perfiles cargados' in dia and 'Agendas' in dia, f'al marcar Salida, el resumen del día ({dia[:200]!r})')
+            ok('Tu día' in dia and 'Llamadas' in dia and 'Tiempo muerto' in dia and 'Agendas' in dia, f'al marcar Salida, el resumen del día ({dia[:200]!r})')
             await A.screenshot(path=OUT / 'y1_tu_dia.png')
             await A.evaluate("modals.slice().forEach(m=>m.close())")
             CT = await D.evaluate('cierreTxt()')
-            ok(CT.startswith('Cierre del ') and 'FTDs de hoy:' in CT and 'Llamadas:' in CT and 'Agendas vencidas:' in CT and 'Perfiles cargados hoy:' in CT, f'el texto del cierre de la mesa ({CT[:220]!r})')
+            ok(CT.startswith('Cierre del ') and 'FTDs de hoy:' in CT and 'Llamadas:' in CT and 'Agendas vencidas:' in CT, f'el texto del cierre de la mesa ({CT[:220]!r})')
             ok(await D.evaluate("cierreTxt().then(txt=>Q(sb.rpc('day_close',{d:todayS(),txt}))).then(r=>r.ok&&!r.dup)") and sql("select count(*)::int c from public.day_closes")[0]['c'] == 1, 'y se guarda una vez por día')
             await D.evaluate('chatPoll()'); await D.wait_for_timeout(1200)
             ok(await D.evaluate("chats.some(c=>c.kind==='dm'&&isBot(dmOther(c)))"), 'el team leader tiene un privado con Vitalis')
