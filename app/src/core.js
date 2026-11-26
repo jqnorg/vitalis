@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.62.1';
+const VERSION='1.63.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -558,6 +558,27 @@ function sueldoPesos(s){ // null si falta el dólar y hay dólares que van en el
   if(cfg.comRecibo){const usd=s.usd+ex.usd;if(usd>0&&!(tc>0))return null;const L=liquido(fijo+usd*tc+ex.uyu);return {...L,tc,ex,fijo,usdAparte:0,uyuAparte:0,total:L.neto}}
   const L=liquido(fijo),usdA=s.usd+ex.usd;
   return {...L,tc,ex,fijo,usdAparte:usdA,uyuAparte:ex.uyu,total:usdA>0?(tc>0?L.neto+usdA*tc+ex.uyu:null):L.neto+ex.uyu};
+}
+/* aguinaldo (Uruguay, lo pidió el dueño el 25/11/2026): la suma de lo nominal del semestre dividido 12, en dos medios:
+   junio (diciembre a mayo) y diciembre (junio a noviembre). Entra lo que va en el recibo: el fijo menos las faltas, los premios en pesos
+   y, si las comisiones van en el recibo, las comisiones y premios en dólares al dólar de hoy. Lo que se cobra aparte no entra. */
+function aguiPeriodo(d=new Date()){
+  const m=d.getMonth(),y=d.getFullYear();
+  if(m>=5&&m<=10)return {pago:'diciembre',pagoYm:`${y}-12`,meses:[6,7,8,9,10,11].map(k=>`${y}-${z(k)}`)};
+  const ye=m===11?y+1:y;return {pago:'junio',pagoYm:`${ye}-06`,meses:[`${ye-1}-12`,...[1,2,3,4,5].map(k=>`${ye}-${z(k)}`)]};
+}
+function nominalMes(ym){
+  const s=calc(ym),ex=extrasMes(ym),fijo=Math.max(0,(+cfg.base||0)-ex.desc),tc=+cfg.tc||0,usd=cfg.comRecibo?s.usd+ex.usd:0;
+  return {ym,fijo,usd,uyu:ex.uyu,n:fijo+ex.uyu+(tc>0?usd*tc:0),sinTc:usd>0&&!(tc>0),ftd:s.n};
+}
+function aguinaldo(){
+  const P=aguiPeriodo(),now=ymNow(),desde=cfg.ingreso||'';
+  const rows=P.meses.map(ym=>({...nominalMes(ym),futuro:ym>now,antes:!!desde&&ym<desde}));
+  const hechos=rows.filter(r=>!r.futuro&&!r.antes),sum=hechos.reduce((a,r)=>a+r.n,0),prom=hechos.length?sum/hechos.length:0;
+  const fut=rows.filter(r=>r.futuro).length,proy=sum+fut*prom;
+  // la retención: el aguinaldo se suma al recibo del mes en que se paga (aportes e IRPF sobre el total); lo que se estima es la diferencia
+  const base=nominalMes(now).n,liq=N=>N>0?liquido(base+N).neto-liquido(base).neto:0;
+  return {...P,rows,sum,nominal:sum/12,neto:liq(sum/12),proy:proy/12,proyNeto:liq(proy/12),hechos:hechos.length,fut,sinTc:rows.some(r=>!r.futuro&&!r.antes&&r.sinTc)};
 }
 function faltaErr(d){ // por qué no se puede cargar una falta ese día (o null)
   if(!d)return 'Elegí la fecha de la falta.';

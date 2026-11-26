@@ -361,6 +361,7 @@ function cobroCard(){
 }
 V.sueldo={
   build(){
+    $('#suAgui').addEventListener('change',async e=>{if(e.target.id!=='suIng')return;cfg={...cfg,ingreso:e.target.value||null};if(await B.saveCfg())toast(e.target.value?`Aguinaldo desde ${esc(mLong(e.target.value))}.`:'Aguinaldo del semestre entero.')});
     $('#suEx').addEventListener('click',e=>{
       const t=e.target;
       if(t.closest('#suPrAdd')){const c=$('#suPrC').value.trim(),m=parseNum($('#suPrM').value),cur=$('#suPrU').value;
@@ -426,6 +427,15 @@ V.sueldo={
       (P.tc>0&&cfg.comRecibo?rw('≈ en dólares',`${money(Math.round(P.neto/P.tc))} USD`):'')+
       (P.usdAparte?rw(EX.usd?'+ Comisiones y premios aparte':'+ Comisiones aparte',`${money(P.usdAparte)} USD`):'')+(P.uyuAparte?rw('+ Premios aparte',`${pesos(P.uyuAparte)} UYU`):'')+
       (P.usdAparte||P.uyuAparte?(P.total!=null?rw('≈ Total en mano',`${pesos(P.total)} UYU`,'tot hl'):''):'')+`</div>`;
+    // aguinaldo
+    {const A=aguinaldo(),mesN=ym=>MES[+ym.slice(5,7)-1];
+      $('#suAguiSub').textContent=`se cobra en ${A.pago} · ${mesN(A.meses[0])} a ${mesN(A.meses[5])}`;
+      $('#suAgui').innerHTML=`<table class="pt"><thead><tr><th>Mes</th><th class="r">FTDs</th><th class="r">Nominal en el recibo</th></tr></thead><tbody>${A.rows.map(r=>`<tr class="${r.futuro||r.antes?'dim':''}"><td>${esc(mLong(r.ym))}</td><td class="r">${r.antes?'—':r.futuro?'':r.ftd}</td><td class="r">${r.antes?'todavía no trabajabas':r.futuro?'todavía no':pesos(r.n)+(r.sinTc?' <span class="hot">+ USD sin dólar</span>':'')}</td></tr>`).join('')}</tbody></table>
+        <div class="rows" style="margin-top:10px">${rw(`Nominal de ${plural(A.hechos,'mes','meses')}`,pesos(A.sum))}${rw('Aguinaldo hasta ahora (÷ 12)',`${pesos(A.nominal)} UYU`,'tot hl')}${A.neto>0?rw('Líquido ≈',`${pesos(A.neto)} UYU`,'tot hl big'):''}
+        ${A.fut&&A.hechos?rw(`Si seguís así hasta ${mesN(A.meses[5])}`,`${pesos(A.proy)} UYU · líquido ≈ ${pesos(A.proyNeto)}`):''}</div>
+        <div class="frow wr" style="margin-top:10px"><label class="fld"><span>Trabajás desde</span><select id="suIng"${readOnly?' disabled':''}><option value="">Antes de ${esc(mesN(A.meses[0]))}</option>${A.meses.map(ym=>`<option value="${ym}"${cfg.ingreso===ym?' selected':''}>${esc(mLong(ym))}</option>`).join('')}</select></label></div>
+        <div class="note">Estimación: el aguinaldo es la suma de lo nominal del semestre dividido 12. Entra el fijo menos las faltas, los premios en pesos${cfg.comRecibo?' y las comisiones (van en el recibo, al dólar de hoy)':'; las comisiones van aparte, así que no entran'}. La retención se calcula como si se sumara al recibo de este mes.</div>`;
+    }
     // bonos
     $('#suBonoSub').textContent=s.next?`Faltan ${s.next[0]-s.n} para ${s.next[1]} USD`:s.n?'Bono máximo 🧉':'';
     const T=tiers();

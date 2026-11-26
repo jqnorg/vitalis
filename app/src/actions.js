@@ -696,6 +696,7 @@ function ayuda(){
   <h4>Banking</h4><dl>
     <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
     <dt>Bancos</dt><dd>Cómo conviene pagar según el banco del cliente: pasos, qué usar y qué evitar (por ejemplo, Falabella Chile: no transferencia). Lo cargan el administrador y el team leader, con fotos.</dd></dl>
+  <h4>Aguinaldo</h4><dl><dt>Cuánto</dt><dd>La suma de lo nominal del semestre dividido 12: en junio (diciembre a mayo) y en diciembre (junio a noviembre). Entra el fijo menos las faltas, los premios en pesos y, si las comisiones van en el recibo, también las comisiones. Es una estimación; "Trabajás desde" descuenta los meses que todavía no estabas.</dd></dl>
   <h4>Knowledgebase</h4><dl>
     <dt>Guías</dt><dd>Cómo se hace cada cosa, por tema, con capturas paso a paso, qué decir y qué no, videos y una pregunta para ver si quedó claro. Buscá arriba. Al final de cada guía, "Lo leí" y si te sirvió.</dd>
     <dt>Tus primeros días</dt><dd>Las guías numeradas para el que entra: aparecen arriba hasta que las leíste todas.</dd>
