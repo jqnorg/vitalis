@@ -721,7 +721,6 @@
 `;
   }
   const dockComsHTML = (c) => `${c.coms && c.coms.length ? `<span class="lb">Comentarios de la mesa</span><div class="coms">${c.coms.map((x) => `<p><b>${escH(x.w)}</b> <i>${escH(x.t)}</i><br>${escH(x.x)}</p>`).join('')}</div>` : ''}
-      <button class="lnk" data-a="ver">Ver la ficha en Vitalis</button>
       <p class="note" style="margin-top:8px">¿No es el que tenés abierto en el CRM? <button class="lnk" data-diag style="margin:0">Copiar diagnóstico</button></p>`;
   // el camino del depósito, como en la ficha de Vitalis: ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle
   function dockPay(c) {

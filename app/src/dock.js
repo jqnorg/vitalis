@@ -47,7 +47,6 @@ async function dockSync(beat){
 function dockCmd(d){
   if(!ready)return;
   if(d.cmd==='turno'){const k=String(d.k||'');if(['bano','d10','d30','vuelta'].includes(k))marcar(k);return}
-  if(d.cmd==='ir'&&d.k==='cliente'){go('cliente');return}
 }
 // el comentario para el CRM: lo traduce el traductor de Chrome de esta pestaña (si en la del CRM no anda)
 async function dockTr(txt){

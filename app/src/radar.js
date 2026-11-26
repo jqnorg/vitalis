@@ -83,7 +83,7 @@ function hotNotify(){ // un aviso por campaña y por día, cuando llega a 2 y te
   const fresh=H.filter(h=>!seen.k.includes(h.k));if(!fresh.length)return;
   const mine=hotMine(newsOf(me));
   for(const h of fresh){seen.k.push(h.k);const x=mine.find(y=>y.k===h.k);
-    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'new')} de esa campaña sin depositar: ${x.cl.slice(0,4).map(r=>`<b>${esc(r.id)}</b>`).join(', ')}${x.cl.length>4?'…':''}.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Ver',fn:()=>openFicha(x.cl[0].id)}]})}
+    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'new')} de esa campaña sin depositar: ${x.cl.slice(0,4).map(r=>`<b>${esc(r.id)}</b>`).join(', ')}${x.cl.length>4?'…':''}.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Copiar ID',fn:()=>openFicha(x.cl[0].id)}]})}
   local.set('hot',seen);
 }
 

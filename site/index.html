@@ -1667,7 +1667,7 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-g="callman" data-v="callman" id="navCm" class="nv-cli" hidden title="Manager (M)"><svg><use href="#i-cm"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbCm"></span><kbd>M</kbd></button>
-    <button type="button" data-g="panel" data-v="cliente" id="navPanel" class="nv-cli" title="Manager: tu cliente y tu agenda (2)"><svg><use href="#i-cliente"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
+    <button type="button" data-g="agenda" data-v="agenda" id="navAgenda" title="Agenda (2)"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
     <button type="button" data-g="banking" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>5</kbd></button>
@@ -1693,7 +1693,7 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
   <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
   <span class="pill liq" id="sLiq"><button type="button" class="liq-v" data-go="sueldo" title="Líquido estimado del mes"></button><button type="button" class="liq-eye" id="sLiqEye" title="Mostrar u ocultar el líquido" aria-label="Mostrar u ocultar el líquido"><svg class="ic"><use href="#i-ojo"/></svg></button></span>
-  <button type="button" class="pill new wr" id="sNew" data-go="cliente" title="Clientes en New: llamalos ya" hidden></button>
+  <button type="button" class="pill new wr" id="sNew" data-go="agenda" title="Clientes en New: llamalos ya" hidden></button>
   <button type="button" class="pill ayuda wr" id="sAyuda" data-act="ayuda" title="Le avisa al team leader y a los administradores" hidden><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Pedir ayuda</button>
   <div class="pill turno" id="sTurno"></div>
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
@@ -1812,11 +1812,6 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
     <div class="frow" style="align-items:center;gap:14px"><input type="range" id="siR" min="0" max="50" step="1" style="flex:1;min-width:180px" aria-label="FTDs"><span class="step"><button type="button" id="siMinus" aria-label="menos">−</button><input type="number" id="siN" min="0" max="999" aria-label="FTDs"><button type="button" id="siPlus" aria-label="más">+</button></span><span class="chips" id="siChips"></span></div>
     <div class="grid2" style="margin:14px 0 0"><div id="siOut"></div><div id="siTbl"></div></div>
   </section>
-</section>
-
-<section class="view" id="v-cliente" hidden>
-  <div id="cuTop" class="cu-top"></div>
-  <div id="cuBody"></div>
 </section>
 
 <section class="view" id="v-callman" hidden>
@@ -1989,8 +1984,8 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.65.0';
-const EXT_VER='1.24.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const VERSION='1.66.0';
+const EXT_VER='1.25.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -2951,7 +2946,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','historial','cliente','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','inicio','historial','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -2959,7 +2954,7 @@ function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.
 const GROUPS=[
   {g:'inicio',views:['inicio','sueldo','turnos','historial'],tabs:['Hoy','Sueldo','Turnos','Historial']}, // Historial: todas tus ventas y tus lates, venta por venta
   {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
-  {g:'panel',views:['cliente','agenda'],tabs:['Cliente','Agenda'],def:'cliente'}, // el Manager del agente (lo pidió el dueño): el cliente actual y la agenda (sin cola: solo news y FTDs, el dueño, 24/11/2026). El team leader no tiene Cliente
+  {g:'agenda',views:['agenda']}, // Agenda con botón propio (el dueño, 26/11/2026: se fue el "Manager (agente)" y la sección Cliente)
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking','bkprocs','bkbancos'],tabs:['¿Cómo paga el cliente?','Procesadores','Bancos'],def:'banking'}, // Banking 3: la del agente, las cajas y los bancos
@@ -2971,25 +2966,24 @@ const GROUPS=[
 ];
 // lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
 function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navGer').hidden=!isMgmt();document.body.classList.toggle('dir',isDirector());$('#navCm').classList.toggle('nv-cli',tlView());
-  const p=$('#navPanel');p.classList.toggle('nv-cli',!tlView());p.querySelector('.nm').innerHTML=tlView()?'Panel':isLeader()?'Manager<small class="ag"> (agente)</small>':'Manager';p.title=tlView()?'Panel: la agenda (2)':'Manager: tu cliente y tu agenda (2)'}
+}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
 function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Hoy
-const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
+const NAVKEYS={1:'inicio',2:'agenda',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';
   if(isDirector()&&v!=='gerencia'&&v!=='config')v='gerencia'; // el director solo ve Gerencia (y sus Ajustes)
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
-  if(v==='cliente'&&tlView())v='agenda'; // el team leader no tiene clientes
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
   const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
-  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader())&&(x!=='cliente'||!tlView()));sn.hidden=tabs.length<2;
-  sn.innerHTML=tabs.length<2?'':tabs.map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}${x==='cliente'&&curCl?` <b class="tab-id">${esc(curCl.id)}</b>`:''}</button>`).join('');
+  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader()));sn.hidden=tabs.length<2;
+  sn.innerHTML=tabs.length<2?'':tabs.map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
@@ -3028,9 +3022,9 @@ function status(){
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const n=newsOf(tlView()||isLeadUid(me)?null:me).filter(inNew).length;$('#nbAh').textContent=n||''}
   if(isLeader())cmBadge(); // Manager: lo que hay que atender ya
-  // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
+  // una sola marca por sección, y solo si hay algo que hacer: Agenda = agendas vencidas; Chat = no leídos + pedidos para vos
   cliBadge();
-  {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
+  {$('#nbPanel').textContent=venc||'';$('#nbPanel').title=venc?plural(venc,'agenda vencida','agendas vencidas'):'';
    const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
   // sin marca en Banking: siempre hay algo fallando y molestaba a la vista (lo pidió el dueño); las fallas viven en Banking
   $('#sAyuda').hidden=!profile||profile.role==='leader';
@@ -3116,7 +3110,6 @@ async function dockSync(beat){
 function dockCmd(d){
   if(!ready)return;
   if(d.cmd==='turno'){const k=String(d.k||'');if(['bano','d10','d30','vuelta'].includes(k))marcar(k);return}
-  if(d.cmd==='ir'&&d.k==='cliente'){go('cliente');return}
 }
 // el comentario para el CRM: lo traduce el traductor de Chrome de esta pestaña (si en la del CRM no anda)
 async function dockTr(txt){
@@ -3756,7 +3749,7 @@ function fire(p){
 const AG_RE=15*6e4,AG_RE_MAX=90*6e4,agRe={};
 function refire(p,late){
   toast(`⏰ Sigue sin cerrar: <b>${esc(p.id)}</b>${p.kw?`: ${esc(p.kw)}`:''}<br><span style="font-weight:500">Agenda de las ${esc(p.due.slice(11,16))}, hace ${mins(late)} min. ¿Lo llamaste?</span>`,'alert',
-    {sticky:1,key:'p'+p._id,actions:[{l:'Ya lo llamé',fn:()=>pendHecho(p)},{l:'Ver ficha',fn:()=>openFicha(p.id)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
+    {sticky:1,key:'p'+p._id,actions:[{l:'Ya lo llamé',fn:()=>pendHecho(p)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
   flash();if(extOn())return;beep(2);
   sysNotify(`📞 Sigue sin cerrar: ${p.id}`,`${p.kw||''} · agenda de las ${p.due.slice(11,16)}, hace ${mins(late)} min`,'ftdc-'+p._id);
 }
@@ -3812,8 +3805,8 @@ function ayuda(){
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
     <dt>Lo que se pide por día</dt><dd>Una de dos, sin compensar: <b>250 llamadas</b> (lo fija el team leader) o <b>2 h 30 habladas</b>. Con cualquiera de las dos el día está cumplido.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
-  <h4>Cliente (tu Manager)</h4><dl>
-    <dt>El que tenés abierto</dt><dd>La ficha del cliente que abrís en el CRM, o del último new que entró: su campaña con sus números, el depósito (qué ofrecerle según Banking), los comentarios de la mesa y la palabra clave. Cuando entra un new, la ficha se abre sola.</dd>
+  <h4>Tus news</h4><dl>
+    <dt>Cuando entra un new</dt><dd>Te avisa con el ID (y, con la extensión, con una tarjeta y sonido). En el CRM, la mini ficha te muestra su campaña, qué ofrecerle para depositar (según Banking) y los comentarios de la mesa.</dd>
     <dt>En New</dt><dd>La pastilla roja de la barra cuenta los tuyos que están en New: llamalos ya. Se va cuando dejan de ser New.</dd>
     <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país: al Agendar, aparece un botón con la hora que más deposita el país del cliente.</dd></dl>
   <h4>Clientes</h4><dl>
@@ -3891,7 +3884,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>7</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Manager, Tareas, Chat, Banking, Knowledgebase, Análisis; 0 Ajustes)</dd><dt><kbd>K</kbd></dt><dd>Knowledgebase</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>7</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Agenda, Tareas, Chat, Banking, Knowledgebase, Análisis; 0 Ajustes)</dd><dt><kbd>K</kbd></dt><dd>Knowledgebase</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -3938,7 +3931,6 @@ document.addEventListener('keydown',e=>{
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
   if(k==='k'){e.preventDefault();if(cur==='kb'&&kbMode!=='edit')kbGo('home');else go('kb');return}
-  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
@@ -6324,7 +6316,7 @@ async function crmLoad(force){
 }
 let crmSnapAt=0;
 const tsMax=(L,k)=>{let m=0;for(const r of L){const t=Date.parse(r[k]);if(t>m)m=t}return m};
-const CRM_VIEWS=['inicio','clientes','campanas','equipo','agenda','cliente','callman','gerencia'];
+const CRM_VIEWS=['inicio','clientes','campanas','equipo','agenda','callman','gerencia'];
 function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
   crm.seenMs=tsMax(rows,'last_seen');crm.rotMs=Math.max(tsMax(rot||[],'seen_at'),parseYMD(todayS()).getTime());
@@ -6386,7 +6378,7 @@ function newCheck(){
   out.sort((a,b)=>new Date(b.first)-new Date(a.first));
   for(const x of out)newMark(x.id);
   const away=pageAway();
-  fichaNew(out[0].id); // pasa adelante en Cliente (o aviso con "Ver" si estás escribiendo)
+  fichaNew(out[0].id); // aviso con el ID (y queda como cliente actual para la mini ficha)
   if(out.length>1)toast(`Entraron ${out.length} news: ${out.slice(0,4).map(x=>`<b>${esc(x.id)}</b>`).join(', ')}${out.length>4?'…':''}`,'imp',{key:'news',actions:[{l:'Ver',fn:()=>go('cliente')}]});
   if(away)for(const x of out.slice(0,3))extSocial({k:'crm:id:'+x.id,v:x.id,lvl:'imp',title:'Cliente nuevo en el CRM',id:x.id,kw:x.name||'',meta:[paisOf(x.country),'entró '+hhmm(+new Date(x.first))].filter(Boolean).join(' · '),btns:[['crm','Ver en el CRM',1],['close','Ok']]});
   else beep(1);
@@ -6398,7 +6390,7 @@ async function newPoll(){
   try{
     const rows=await Q(sb.from('crm_clients').select('*').neq('brand',ARCH).eq('status_group','new').gte('first_seen',new Date(Date.now()-NEW_FRESH).toISOString()).limit(200));
     let n=0;for(const r of rows){const x=C2X(r),k=ckey(x.brand,x.id);if(!crm.rows.has(k))n++;crm.rows.set(k,x);if(!crm.byId.has(norm(x.id)))crm.byId.set(norm(x.id),x)}
-    newCheck();if(n&&['inicio','cliente','callman'].includes(cur))refresh();
+    newCheck();if(n&&['inicio','callman'].includes(cur))refresh();
   }catch(e){}finally{newBusy=false}
 }
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}
@@ -7292,10 +7284,9 @@ async function kbEditClose(){ // cancelar: si se creó el borrador solo para sub
 }
 
 /* ---------- la ficha del cliente y el "cliente actual" ----------
-   El cliente actual es el que tenés abierto en el CRM (la extensión lo manda), el último new que entró o el que abriste
-   desde una lista. Va en su propia sección (Cliente, tecla L), del tamaño de cualquier otra: solo quedan el menú y la barra.
-   La ficha: el cliente, el depósito (el camino de Banking, con su país), las campañas de su afiliador en su país y los comentarios. */
-let curCl=local.get('curCl',null),cuHist=local.get('cuHist',[]),ficOk=null,cuGen=0,cuAt=0;
+   El cliente actual es el que tenés abierto en el CRM (la extensión lo manda) o el último new que entró: alimenta la mini ficha del CRM.
+   La sección Cliente se fue el 26/11/2026 (lo decidió el dueño); quedan los datos (fichaData) y los editores de campaña. */
+let curCl=local.get('curCl',null),ficOk=null;
 const fichaCache=new Map(); // id → {at, d}
 const paisOf=c=>{const k=norm(c).trim();return PAISES.find(p=>norm(p)===k)||String(c||'').trim()};
 
@@ -7327,69 +7318,6 @@ async function campsFor(aff,pais,mine){
   return [...names.values()].map(c=>({camp:c,info:byK.get(norm(c))||null,mine:mine&&norm(c)===norm(mine)})).sort((a,b)=>(b.mine?1:0)-(a.mine?1:0)||(b.info?1:0)-(a.info?1:0)||a.camp.localeCompare(b.camp));
 }
 
-/* ---------- la ficha ---------- */
-function fichaHTML(d){
-  const {id,r,f}=d,ra=r?regAt(r):null,tz=cliTime(d.country),ags=[...pend,...teamAg].filter(p=>norm(p.id)===norm(id)&&!p.done);
-  const rw2=(k,v)=>v?`<div class="fi-r"><span>${k}</span><b>${v}</b></div>`:'';
-  return `<div class="fi" data-fid="${esc(id)}">
-    <div class="fi-h"><div><div class="fi-nm">${esc(id)}</div><div class="fi-meta">${d.pais?esc(d.pais):''}${tz?` · son las ${tz} para el cliente`:''}${ra?` · se registró ${esc(rel(ra))}`:''}</div></div>
-      <div class="fi-b">${r?stBadge(r):''}${f?`<span class="badge paid">Depositó ${esc(f.date===todayS()?'hoy':dm(f.date))}${f.uid!==me?' con '+esc(first(f.uid)):''}</span>`:r&&paidCrm(r)?`<span class="badge paid">FTD en el CRM${r.ftd?' · '+esc(r.ftd.slice(0,10)===todayS()?'hoy':dm(r.ftd.slice(0,10))):''}</span>`:''}</div></div>
-    <div class="fi-cols"><div class="fi-col fi-main">${comboHTML(d)}${fiComsHTML(d)}</div>
-      <div class="fi-col">
-      <div class="fi-c"><h4>Cliente</h4>
-        ${rw2('En el CRM',r?esc(sgPlain(r)||'—'):'<span class="d">todavía no se vio en el CRM</span>')}
-        <div class="fi-r fi-kw"><span>Palabra clave</span><b>${d.kw?esc(d.kw):'<span class="d">sin asignar</span>'} <button type="button" class="lnk" data-fa="kwEdit">${d.kw?'editar':'agregar'}</button></b></div>
-        ${rw2('Último contacto',r&&callAt(r)?esc(whenTxt(callAt(r))):'')}${rw2('Última nota',r&&r.note?esc(r.note):'')}
-        ${rw2('Registro',ra?esc(whenTxt(ra)):'')}${rw2('Agente en el CRM',r&&r.agent?esc(r.agent):'')}${rw2('Lo llamó primero',r&&r.firstAgent&&norm(r.firstAgent)!==norm(r.agent)?esc(r.firstAgent)+' <span class="d">(la conversión es suya)</span>':'')}
-        ${f?rw2('Depósito',`${money(f.amount)} USD · ${isLate(f)?'late':'new'}${demora(f)?' · a '+esc(demora(f))+' del registro':''}`):''}
-        ${ags.length?rw2('Agenda',ags.map(p=>esc(whenTxt(parseDue(p.due)))).join(', ')):''}
-        ${d.log.length>1?`<div class="fi-log"><span class="p-sub">Historial</span>${d.log.map(x=>`<span>${x.new_agent?`Rotó a ${esc(x.new_agent)}${x.old_agent?` <span class="d">(era de ${esc(x.old_agent)})</span>`:''}`:esc(x.new_status||'')} <span class="d">${esc(whenTxt(new Date(x.seen_at)))}</span></span>`).join('')}</div>`:''}
-      </div>
-      ${fiPayHTML(d)}</div>
-    </div></div>`;
-}
-// Depósito: el camino, con el país del cliente (no se pregunta): ¿efectivo o digital? → ¿tarjeta o transferencia? → qué ofrecerle (lo que anda primero)
-let fiPayT={id:'',t:'',bank:'',all:false};
-const FI_OPTS=6; // las primeras que andan; el resto, con "Ver todas"
-function fiPayHTML(d){
-  const pais=PAISES.includes(d.pais)?d.pais:'',H=`<h4>Depósito${pais?` <span class="fi-v">${esc(pais)}</span>`:''}</h4>`;
-  if(!bk.ok)return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0">Banking todavía no cargó.</p></div>`;
-  if(!pais)return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0">${d.country?`${esc(d.country)} no está entre los países de la mesa.`:'No sé de qué país es.'}</p></div>`;
-  if(fiPayT.id!==String(d.id))fiPayT={id:String(d.id),t:'',bank:'',all:false}; // otro cliente: el camino arranca de cero
-  const KS=['efectivo','transferencia','tarjeta'],has=k=>bkOptions(pais,k).some(o=>!o.falla);
-  if(!KS.some(k=>bkOptions(pais,k).length))return `<div class="fi-c fi-pay">${H}<p class="p-sub" style="margin:0 0 6px">Todavía no hay métodos cargados para ${esc(pais)}.${bkEd()?' Cargalos en Banking para que el resto de la mesa los tenga.':' Pedíselo a tu team leader para poder ofrecerle cómo pagar.'}</p></div>`;
-  const t=fiPayT.t,dig=['digital','transferencia','tarjeta'].includes(t),fin=KS.includes(t);
-  const seg=(lab,items,on)=>`<div class="fi-step"><span class="fi-pl">${lab}</span><div class="seg" role="group" aria-label="${esc(lab)}">${items.map(([k,l,ok])=>`<button type="button" data-fpt="${k}" class="${on(k)?'on':''}"${ok?'':' title="No hay nada que ande ahora"'}>${esc(l)}${ok?'':' <span class="dim">(no hay)</span>'}</button>`).join('')}</div></div>`;
-  let h=seg('1. ¿Paga en efectivo o digital?',[['efectivo','Efectivo',has('efectivo')],['digital','Digital',has('transferencia')||has('tarjeta')]],k=>k==='digital'?dig:t===k);
-  if(dig)h+=seg('2. ¿Con tarjeta o transferencia?',[['tarjeta','Tarjeta',has('tarjeta')],['transferencia','Transferencia',has('transferencia')]],k=>t===k);
-  if(fin){
-    const L=bkOptions(pais,t),ok=L.filter(o=>!o.falla),bad=L.filter(o=>o.falla),show=fiPayT.all?ok:ok.slice(0,FI_OPTS);
-    h+=`<div class="fi-opts"><span class="fi-pl">${dig?'3':'2'}. Ofrecele ${esc(KINDS[t].toLowerCase())}:</span>
-      ${ok.length?show.map(bkOptHTML).join('')+(ok.length>show.length?`<button type="button" class="lnk" data-fpall>Ver las ${ok.length} que andan</button>`:''):`<p class="p-sub" style="margin:0">Ahora no anda ningún${t==='tarjeta'?'a tarjeta':t==='efectivo'?' efectivo':'a transferencia'} en ${esc(pais)}. Probá con otra forma de pago.</p>`}
-      ${bad.length?`<p class="fi-bad"><b>No ofrecer ahora (fallan):</b> ${bad.map(o=>esc(o.m.name+' · '+procName(o.p))).join(', ')}</p>`:''}</div>`;
-  }
-  const banks=bk.banks.filter(b=>!b.country||b.country===pais),bk1=banks.find(b=>b.id===fiPayT.bank);
-  return `<div class="fi-c fi-pay">${H}${h}
-    ${banks.length?`<label class="fi-pk"><span class="fi-pl">¿Sabés su banco? (opcional)</span><select data-fbank><option value="">Elegí el banco del cliente</option>${banks.map(b=>`<option value="${esc(b.id)}"${b.id===fiPayT.bank?' selected':''}>${esc(b.name)}</option>`).join('')}</select></label><div class="fi-bflow">${bk1?fiBankFlow(bk1):''}</div>`:''}
-    <button type="button" class="lnk" data-fa="banking" data-pais="${esc(pais)}">Ver todo en Banking</button></div>`;
-}
-function fiBankFlow(b){
-  if(!b)return '';
-  return `${(b.use_pm||[]).length?`<div class="bk-chips" style="margin:6px 0">${bankChips(b)}</div>`:''}${(b.steps||[]).length?`<ol class="bk-steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}${b.notes?`<p class="bk-notes">${esc(b.notes)}</p>`:''}${(bkFilesOf('bank',b.id)||[]).length?`<button type="button" class="lnk" data-fa="bankview" data-id="${esc(b.id)}">Ver fotos</button>`:''}`;
-}
-// las campañas del afiliador en el país: monto mínimo y qué ve la persona en el anuncio
-function fiCampsHTML(d){ // el anuncio de la campaña del cliente (y las otras del afiliador en una línea): va adentro de la tarjeta Campaña
-  if(!d.aff)return '';
-  const ed=bkEd(),nReq=c=>d.reqs.filter(q=>norm(q.camp)===norm(c)).length;
-  const row=c=>{const i=c.info,n=nReq(c.camp);
-    return `<div class="fi-camp${c.mine?' mine':''}"><div class="fi-ch"><b>${esc(c.camp)}</b>${c.mine?'<span class="badge paid">la del cliente</span>':''}<span class="grow"></span>
-      ${i?(ed?`<button type="button" class="lnk" data-fa="campEdit" data-c="${esc(c.camp)}">Editar</button>`:`<button type="button" class="lnk" data-fa="campReq" data-c="${esc(c.camp)}">Pedir un cambio</button>`):`<button type="button" class="btn sm" data-fa="campAdd" data-c="${esc(c.camp)}">Agregar</button>`}</div>
-      ${i?`<div class="fi-r"><span>Monto mínimo</span><b>${esc(i.min_amount||'—')}</b></div>${i.ad_text?`<p class="fi-ad">${esc(i.ad_text)}</p>`:''}`:'<p class="p-sub" style="margin:2px 0 0">Todavía no sabemos el monto mínimo ni qué ve en el anuncio. Si lo sabés, agregalo.</p>'}
-      ${ed&&n?`<button type="button" class="lnk hot" data-fa="campReqs" data-c="${esc(c.camp)}">${plural(n,'pedido de cambio','pedidos de cambio')}</button>`:''}</div>`};
-  // para cargar datos solo aparece la campaña del cliente; las otras sin datos van en una línea
-  const show=d.camps.filter(c=>c.info||c.mine),rest=d.camps.filter(c=>!c.info&&!c.mine);
-  return `<div class="fi-camps"><span class="p-sub">El anuncio</span>${show.map(row).join('')}${rest.length?`<p class="p-sub fi-crest">Otras de ${esc(d.aff)}${d.pais?' en '+esc(d.pais):''}: ${rest.map(c=>esc(c.camp)).join(', ')}</p>`:''}</div>`;
-}
 // el traductor de Chrome (corre en la computadora: no manda nada afuera). La primera vez baja el idioma: hay que llamarlo con un toque
 let trP=null,trState='';const trCache=new Map(),TR_O={sourceLanguage:'es',targetLanguage:'en'}; // trState: '' · bajando · listo · no
 function trOpen(){
@@ -7408,47 +7336,11 @@ async function trEn(s,t){ // t: el traductor ya abierto
   return null;
 }
 const trWhy=()=>trState==='bajando'?'Chrome está bajando el traductor: lo que escribiste quedó en español. Probá de nuevo en un minuto.':'Este Chrome no tiene el traductor: lo que escribiste queda en español (hay que actualizar Chrome).';
-function fiComsHTML(d){
-  return `<div class="fi-c fi-coms"><h4>Comentarios</h4>
-    <div class="fi-cadd"><textarea data-fcom rows="2" maxlength="1000" placeholder="Algo para recordar de este cliente (lo ve la mesa)"></textarea><button type="button" class="btn sm pri" data-fa="comAdd">Comentar</button></div>
-    ${d.coms.length?`<div class="fi-cl">${d.coms.map(c=>`<div class="fi-cm"><div class="fi-cmh"><b>${esc(first(c.created_by))}</b><span class="d">${esc(rel(new Date(c.created_at)))}</span><span class="grow"></span>${c.created_by===me||bkEd()?`<button type="button" class="ib" data-fa="comDel" data-id="${esc(c.id)}" title="Borrar">✕</button>`:''}</div><p>${esc(c.body)}</p></div>`).join('')}</div>`:'<p class="p-sub" style="margin:4px 0 0">Sin comentarios todavía.</p>'}</div>`;
-}
-// los botones de la ficha (en el modal y en el panel)
-function fichaWire(root,getD,rerender){
-  root.addEventListener('change',e=>{const s=e.target.closest('[data-fbank]');if(!s)return;fiPayT.bank=s.value;const box=s.closest('.fi-pay').querySelector('.fi-bflow');box.innerHTML=fiBankFlow(bk.banks.find(b=>b.id===s.value))});
-  root.addEventListener('click',e=>{ // el camino del depósito
-    const pt=e.target.closest('[data-fpt]'),pa=e.target.closest('[data-fpall]');if(!pt&&!pa)return;const d=getD(),box=e.target.closest('.fi-pay');if(!d||!box)return;
-    if(pt){const v=pt.dataset.fpt;fiPayT.t=v==='digital'&&['tarjeta','transferencia'].includes(fiPayT.t)?fiPayT.t:v;fiPayT.all=false}else fiPayT.all=true;
-    box.outerHTML=fiPayHTML(d);
-  });
-  root.addEventListener('click',async e=>{
-    const b=e.target.closest('[data-fa]');if(!b)return;const a=b.dataset.fa,d=getD();if(!d)return;
-    if(a==='banking'){bkPais=b.dataset.pais||'';bkTipo='';bkWay='';closeAllModals();go('banking');return}
-    if(a==='bankview')return bankView(bk.banks.find(x=>x.id===b.dataset.id));
-    if(a==='campAdd'||a==='campEdit')return campModal(d,b.dataset.c,a==='campEdit',rerender);
-    if(a==='campReq')return campReqModal(d,b.dataset.c);
-    if(a==='campReqs')return campReqsModal(d,b.dataset.c,rerender);
-    if(a==='comAdd'){const t=root.querySelector('[data-fcom]'),body=t.value.trim();if(!body)return t.focus();b.disabled=true;
-      try{await Q(sb.from('client_comments').insert({client_id:String(d.id),brand:d.r&&d.r.brand||DEF_BRAND,body:body.slice(0,1000)}));t.value='';await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}finally{b.disabled=false}return}
-    if(a==='kwEdit')return kwModal(d,rerender);
-    if(a==='comDel'){if(!await confirmar('Borrar comentario','¿Borrar este comentario?','borrar',true))return;try{await Q(sb.from('client_comments').delete().eq('id',b.dataset.id));await rerender(true)}catch(err){toast(esc(errMsg(err)),'err')}return}
-  });
-}
 const closeAllModals=()=>modals.slice().forEach(m=>m.close());
 async function setClientKw(id,brand,kw){
   const r=await Q(sb.rpc('client_kw_set',{p_client:String(id),p_brand:brand||clientBrand(id),p_kw:kw||''}));
   const k=norm(id);if(r&&r.kw)ckw[k]={kw:r.kw,brand:brand||clientBrand(id)};else delete ckw[k];
   return r;
-}
-function kwModal(d,rerender){
-  const cur=d.kw||'';
-  modal({title:`Palabra clave de ${esc(d.name||d.id)}`,
-    body:`<p class="mp">La palabra de confidencialidad que acordaste con el cliente para verificarlo en las próximas llamadas.</p>
-      <label class="fld"><span>Palabra clave</span><input id="kwIn" maxlength="80" value="${esc(cur)}" placeholder="Ej.: montevideo" autocomplete="off"></label><div class="ebox" id="kwErr"></div>`,
-    onOpen:api=>{const i=api.q('#kwIn');i.focus();i.select()},
-    actions:[...(cur?[{l:'Borrar',cls:'danger',fn:async api=>{try{await setClientKw(d.id,d.r&&d.r.brand,'');await rerender(true);toast('Palabra clave borrada.')}catch(e){api.q('#kwErr').textContent=errMsg(e);return false}}}]:[]),
-      {l:'Cancelar'},
-      {l:'Guardar',cls:'pri',fn:async api=>{const v=api.q('#kwIn').value.trim();if(v===cur)return;try{await setClientKw(d.id,d.r&&d.r.brand,v);await rerender(true);toast(v?'Palabra clave guardada.':'Palabra clave borrada.')}catch(e){api.q('#kwErr').textContent=errMsg(e);return false}}}]});
 }
 function campModal(d,camp,edit,rerender){
   const i=(d.camps.find(c=>norm(c.camp)===norm(camp))||{}).info;
@@ -7486,68 +7378,17 @@ async function campReqPoll(quiet){
   }catch(e){}
 }
 
-/* ---------- la sección Cliente ---------- */
-// desde cualquier lista: la ficha se abre en la sección Cliente
-function openFicha(id){id=String(id||'').trim();if(!id)return;closeAllModals();setCurrent(id,'','lista');go('cliente')}
-function setCurrent(id,name,src){
+/* ---------- el cliente actual (sin sección Cliente desde el 26/11/2026: el dueño sacó la ficha; el depósito y la campaña viven en la mini ficha del CRM) ---------- */
+// desde cualquier lista: tocar el ID lo copia
+async function openFicha(id){id=String(id||'').trim();if(!id)return;try{await navigator.clipboard.writeText(id);toast(`<b>${esc(id)}</b> copiado.`,'ok')}catch(e){toast(`ID <b>${esc(id)}</b>`,'info')}}
+function setCurrent(id,name,src){ // el cliente que tenés abierto en el CRM o el último new: para la mini ficha
   id=String(id||'').trim();if(!id)return;
   const same=curCl&&curCl.id===id;
-  curCl={id,name:name||(same&&curCl.name)||'',src,at:Date.now()};local.set('curCl',curCl);
-  cuHist=[{id,name:curCl.name},...cuHist.filter(h=>h.id!==id)].slice(0,6);local.set('cuHist',cuHist);cliBadge();dockSoon();
-  if(src!=='lista'&&!same)cuShow(src);
-  else if(cur==='cliente')cuRender(!same);
+  curCl={id,name:name||(same&&curCl.name)||'',src,at:Date.now()};local.set('curCl',curCl);cliBadge();dockSoon();
+  if(src==='new'&&!same&&ready&&!isLeadUid(me))toast(`Entró un new: <b>${esc(id)}</b>. Llamalo ya.`,'imp',{sticky:1,key:'ficha',actions:[{l:'Copiar ID',fn:()=>openFicha(id)}]});
 }
-// un cliente nuevo del CRM o un new: la sección Cliente pasa adelante (salvo para el team leader, o si estás escribiendo en Vitalis)
-let lastKey=0;
-document.addEventListener('keydown',()=>{lastKey=Date.now()},true);
-function cuShow(src){
-  if(!ready)return;
-  const t=src==='new'?`Entró un new: <b>${esc(curCl.id)}</b>`:`Cliente actual: <b>${esc(curCl.id)}</b>${curCl.name?' '+esc(clip(curCl.name,30)):''}`;
-  if(isLeadUid(me)||modals.length||Date.now()-lastKey<4000){if(cur==='cliente')cuRender(true);toast(t,src==='new'?'imp':'info',{key:'ficha',actions:[{l:'Ver',fn:()=>go('cliente')}]});return}
-  closeToast('ficha');if(src==='new')toast(t,'imp',{key:'ficha'});
-  if(cur==='cliente')cuRender(true);else go('cliente');
-}
-const cuSrc=c=>c.src==='crm'?'abierto en el CRM':c.src==='new'?'entró un new':'abierto desde Vitalis';
-function cuTopHTML(){
-  const h=cuHist.filter(x=>!curCl||x.id!==curCl.id);
-  return `<div class="cu-bar">${curCl?`<span class="cu-src"><span class="cu-dot ${esc(curCl.src||'')}"></span>Cliente actual · ${cuSrc(curCl)} · ${esc(rel(new Date(curCl.at)))}</span>`:'<span class="cu-src">Cliente actual</span>'}
-    <span class="grow"></span>
-    ${curCl?`<button type="button" class="btn sm pri" data-cu="ag">Agendar</button><button type="button" class="btn sm" data-cu="copy">Copiar ID</button><button type="button" class="ib" data-cu="re" title="Actualizar" aria-label="Actualizar">↻</button>`:''}</div>
-    <details class="cu-more" data-k="cu-more"${curCl?'':' open'}><summary>Otro cliente</summary><div class="cu-rec"><form class="cu-find" data-cu="find"><input name="q" type="search" inputmode="numeric" placeholder="Abrir por ID" aria-label="Abrir un cliente por ID" autocomplete="off"></form>${h.length?`<span class="p-sub">Recientes</span>${h.map(x=>`<button type="button" class="chip" data-cu="rec" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button>`).join('')}`:''}</div></details>`;
-}
-async function cuRender(force){
-  const top=$('#cuTop'),body=$('#cuBody');if(!top||!ready)return;
-  if(!top.contains(document.activeElement)||force){const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)} // sin pisar el ID que estás escribiendo ni plegar "Otro cliente"
-  if(!curCl){delete body.dataset.fid;body.innerHTML=`<div class="cu-empty"><svg><use href="#i-cliente"/></svg><h2>Abrí un cliente en el CRM</h2><p>Aparece acá con la campaña, el depósito y los comentarios. Cuando entra un new, también.</p></div>`;return}
-  const id=curCl.id;
-  // con la misma ficha a la vista, los refrescos de la app no la vuelven a dibujar (así no se pierde lo que estás escribiendo)
-  if(!force&&body.dataset.fid===id&&Date.now()-cuAt<30e3)return;
-  const gen=++cuGen;
-  if(body.dataset.fid!==id)body.innerHTML='<div class="p-empty">Cargando la ficha…</div>';
-  const d=await fichaData(id,force);if(gen!==cuGen||!curCl||curCl.id!==id)return;
-  const ta=body.querySelector('[data-fcom]'),txt=ta&&body.dataset.fid===id?ta.value:'',foc=ta&&document.activeElement===ta,bs=body.querySelector('[data-fbank]'),bv=bs&&body.dataset.fid===id?bs.value:'';
-  const opened=body.dataset.fid===id?openKeys(body):new Set();
-  body.dataset.fid=id;cuAt=Date.now();body.innerHTML=fichaHTML(d);reopen(body,opened);bkHydrate(body);
-  const t2=body.querySelector('[data-fcom]');if(t2&&txt){t2.value=txt;if(foc)t2.focus()}
-  const b2=body.querySelector('[data-fbank]');if(b2&&bv){b2.value=bv;b2.dispatchEvent(new Event('change',{bubbles:true}))}
-  if(d.name&&!curCl.name){curCl.name=d.name;local.set('curCl',curCl);cuHist=cuHist.map(h=>h.id===id?{id,name:d.name}:h);local.set('cuHist',cuHist);const ok=openKeys(top);top.innerHTML=cuTopHTML();reopen(top,ok)}
-}
-V.cliente={
-  build(){
-    const getD=()=>curCl&&(fichaCache.get(curCl.id)||{}).d;
-    fichaWire($('#cuBody'),getD,force=>cuRender(force===undefined?true:force));
-    $('#cuTop').addEventListener('submit',e=>{const f=e.target.closest('[data-cu=find]');if(!f)return;e.preventDefault();const q=f.q.value.replace(/\D/g,'');if(q)setCurrent(q,'','lista')});
-    $('#cuTop').addEventListener('click',async e=>{const b=e.target.closest('[data-cu]');if(!b||b.tagName==='FORM')return;const a=b.dataset.cu;
-      if(a==='re')return cuRender(true);
-      if(a==='rec'){const h=cuHist.find(x=>x.id===b.dataset.id);return setCurrent(b.dataset.id,h&&h.name||'','lista')}
-      if(!curCl)return;
-      if(a==='copy'){try{await navigator.clipboard.writeText(curCl.id);toast(`<b>${esc(curCl.id)}</b> copiado.`)}catch(err){toast('No pude copiar.','err')}return}
-      if(a==='ag')return agendarCliente(curCl.id);});
-  },
-  render(o){cuRender(!!o.force)}
-};
 // en vivo: comentarios y campañas del cliente que tenés abierto
-function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);if(cur==='cliente')cuRender(true);dockSoon()}
+function fichaLive(){if(!curCl)return;fichaCache.delete(curCl.id);dockSoon()}
 const ficFetch=()=>QN(sb.from('client_comments').select('id').limit(1)).then(r=>!!r);
 async function ficInit(){ficOk=await ficFetch()}
 
@@ -7944,7 +7785,7 @@ function campDetail(k,from,to,perTxt){
     ${g.rows.length?`<h4 class="cmp-h">Sus news</h4><div class="p-tablewrap"><table class="pt"><thead><tr><th>Cliente</th><th>Quedó</th><th>Registro</th><th>Agente</th></tr></thead><tbody>${g.rows.sort((a,b)=>(regAt(b)||0)-(regAt(a)||0)).slice(0,150).map(r=>`<tr><td><button type="button" class="lnkp" data-cmo="${esc(r.id)}"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td><td class="d">${esc(r.reg||'')}</td><td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td></tr>`).join('')}</tbody></table></div>`:''}`;
   modal({title:esc(g.camp||'Sin campaña'),wide:true,body:body(),
     onOpen:api=>api.box.addEventListener('click',e=>{
-      const o=e.target.closest('[data-cmo]');if(o){api.close();openFicha(o.dataset.cmo);return}
+      const o=e.target.closest('[data-cmo]');if(o){openFicha(o.dataset.cmo);return} // copia el ID
       const a=e.target.closest('[data-cma]');if(!a)return;
       const after=async()=>{await campLoad(from,to,true);api.close();campDetail(k,from,to,perTxt)};
       if(a.dataset.cma==='req')return campReqModal(d,g.camp);
@@ -8037,7 +7878,7 @@ function hotNotify(){ // un aviso por campaña y por día, cuando llega a 2 y te
   const fresh=H.filter(h=>!seen.k.includes(h.k));if(!fresh.length)return;
   const mine=hotMine(newsOf(me));
   for(const h of fresh){seen.k.push(h.k);const x=mine.find(y=>y.k===h.k);
-    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'new')} de esa campaña sin depositar: ${x.cl.slice(0,4).map(r=>`<b>${esc(r.id)}</b>`).join(', ')}${x.cl.length>4?'…':''}.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Ver',fn:()=>openFicha(x.cl[0].id)}]})}
+    if(x)toast(`<b>Campaña caliente</b>: ${esc(h.txt)} lleva ${h.n} FTDs hoy. Tenés ${plural(x.cl.length,'new')} de esa campaña sin depositar: ${x.cl.slice(0,4).map(r=>`<b>${esc(r.id)}</b>`).join(', ')}${x.cl.length>4?'…':''}.`,'imp',{ms:15000,key:'hot'+h.k,actions:[{l:'Copiar ID',fn:()=>openFicha(x.cl[0].id)}]})}
   local.set('hot',seen);
 }
 
@@ -8739,7 +8580,7 @@ V.historial={
 /* ---------- compartir datos en el chat, y avisos del team leader o un administrador ---------- */
 // Cada tarjeta de datos tiene su botón Compartir: al chat va una foto de la tarjeta tal como se ve, con la hora, sin botones ni formularios.
 // El team leader y los administradores la pueden mandar como aviso: a todos los del chat les queda hasta que lo cierren, aunque lo tengan silenciado.
-const SH_VIEWS=new Set(['inicio','sueldo','turnos','historial','clientes','campanas','ventas','filtros','radar','equipo','cliente','banking','bkprocs','bkbancos','kb']);
+const SH_VIEWS=new Set(['inicio','sueldo','turnos','historial','clientes','campanas','ventas','filtros','radar','equipo','banking','bkprocs','bkbancos','kb']);
 const SH_SEL='.card,.hero,.fi-c';
 const SH_HTML=new Set('div span p b i small br h2 h3 h4 h5 ul ol li table thead tbody tfoot tr th td section header footer details summary mark sub sup kbd s u'.split(' '));
 const SH_SVG=new Set('svg g path rect circle ellipse line polyline polygon text tspan use title'.split(' '));
@@ -8809,7 +8650,6 @@ const shTitle=el=>{
   const h=el.querySelector(':scope > .card-h h3,:scope > .card-h h2');
   let t=(h&&h.textContent)||el.getAttribute('aria-label')||((el.querySelector('h3,h4,h2')||{}).textContent)||(VTITLE[cur]||'Datos');
   t=String(t).replace(/\s+/g,' ').trim();
-  if(cur==='cliente'&&curCl&&!t.includes(curCl.id))t+=' · '+curCl.id;
   return clip(t,120);
 };
 const VTITLE={inicio:'Inicio',sueldo:'Sueldo',turnos:'Turnos',historial:'Historial',clientes:'Campañas',ventas:'Ventas',filtros:'Filtros',radar:'Radar',equipo:'Equipo',cliente:'Cliente',banking:'Banking'};
@@ -8942,7 +8782,7 @@ function chatGate(o){ // true: el chat está cerrado y pide el PIN (se muestra e
   L.innerHTML=`<div class="abox"><div class="lk-box"></div></div>`;
   pinPad(L.querySelector('.lk-box'),{
     head:`<div class="lk-ic" aria-hidden="true"><svg class="ic"><use href="#i-candado"/></svg></div><h2>Chat cerrado</h2><p class="lead">Poné tu PIN para ver el chat.</p>`,
-    back:['Volver',()=>{chatPadOff();go('cliente')}],
+    back:['Volver',()=>{chatPadOff();go('inicio')}],
     done:(pin,ui)=>pinCheck(pin,ui,()=>{chatOpen();chatPadOff();const w=chatWant;chatWant=null;if(cur==='chat')V.chat.render(w?{chat:w}:{})}),
   });
   return true;
@@ -8955,7 +8795,7 @@ const padUp=()=>locked||chatPadOn; // con un teclado de PIN a la vista, las tecl
 
 /* ---------- a dónde se entra ---------- */
 // la primera vez del día, Inicio (tu mes, el turno); después, directo al Panel. Tapado no cuenta: cuenta cuando entrás de verdad.
-function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return isDirector()?'gerencia':'inicio'}return isDirector()?'gerencia':tlView()?'callman':'cliente'} // el team leader, a su Manager; el agente, a su cliente
+function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return isDirector()?'gerencia':'inicio'}return isDirector()?'gerencia':tlView()?'callman':'agenda'} // el team leader, a su Manager; el agente, a su agenda
 
 // Ajustes: ya no hay tiempos (los candados son a mano); queda la línea para que se sepa
 function locksTxt(){return 'Nada se bloquea solo: el candado de la barra bloquea Vitalis y el del chat bloquea el chat. Los dos piden tu PIN.'}

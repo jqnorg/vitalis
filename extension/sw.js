@@ -788,7 +788,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'dock-act' && msg.a) {
     const a = String(msg.a);
     if (['bano', 'd10', 'd30', 'vuelta'].includes(a)) { toVitalis({ cmd: 'turno', k: a, at: Date.now() }).then((ok) => reply({ ok }), () => reply({ ok: false })); return true; }
-    if (a === 'ver') { openPanel().then(() => toVitalis({ cmd: 'ir', k: 'cliente', at: Date.now() })).then((ok) => reply({ ok }), () => reply({ ok: false })); return true; }
     if (a === 'abrir') { openPanel().then(() => reply({ ok: true }), () => reply({ ok: false })); return true; }
     return false;
   }

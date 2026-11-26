@@ -58,7 +58,7 @@
   <nav id="nav" aria-label="Secciones">
     <button type="button" data-g="inicio" data-v="inicio"><svg><use href="#i-inicio"/></svg><span class="nm">Inicio</span><kbd>1</kbd></button>
     <button type="button" data-g="callman" data-v="callman" id="navCm" class="nv-cli" hidden title="Manager (M)"><svg><use href="#i-cm"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbCm"></span><kbd>M</kbd></button>
-    <button type="button" data-g="panel" data-v="cliente" id="navPanel" class="nv-cli" title="Manager: tu cliente y tu agenda (2)"><svg><use href="#i-cliente"/></svg><span class="nm">Manager</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
+    <button type="button" data-g="agenda" data-v="agenda" id="navAgenda" title="Agenda (2)"><svg><use href="#i-agenda"/></svg><span class="nm">Agenda</span><span class="nb hot" id="nbPanel"></span><kbd>2</kbd></button>
     <button type="button" data-g="tareas" data-v="tareas"><svg><use href="#i-tareas"/></svg><span class="nm">Tareas</span><span class="nb hot" id="nbTa"></span><kbd>3</kbd></button>
     <button type="button" data-g="chat" data-v="chat"><svg><use href="#i-chat"/></svg><span class="nm">Chat</span><span class="nb hot" id="nbChat"></span><kbd>4</kbd></button>
     <button type="button" data-g="banking" data-v="banking"><svg><use href="#i-banking"/></svg><span class="nm">Banking</span><span class="nb hot" id="nbBk"></span><kbd>5</kbd></button>
@@ -84,7 +84,7 @@
   <div class="brand mini"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div>
   <button type="button" class="pill" id="sMes" data-go="sueldo" title="Sueldo del mes"></button>
   <span class="pill liq" id="sLiq"><button type="button" class="liq-v" data-go="sueldo" title="Líquido estimado del mes"></button><button type="button" class="liq-eye" id="sLiqEye" title="Mostrar u ocultar el líquido" aria-label="Mostrar u ocultar el líquido"><svg class="ic"><use href="#i-ojo"/></svg></button></span>
-  <button type="button" class="pill new wr" id="sNew" data-go="cliente" title="Clientes en New: llamalos ya" hidden></button>
+  <button type="button" class="pill new wr" id="sNew" data-go="agenda" title="Clientes en New: llamalos ya" hidden></button>
   <button type="button" class="pill ayuda wr" id="sAyuda" data-act="ayuda" title="Le avisa al team leader y a los administradores" hidden><svg class="ic" aria-hidden="true"><use href="#i-campana"/></svg>Pedir ayuda</button>
   <div class="pill turno" id="sTurno"></div>
   <button type="button" class="pill" id="sPend" data-go="agenda" title="Agenda"></button>
@@ -203,11 +203,6 @@
     <div class="frow" style="align-items:center;gap:14px"><input type="range" id="siR" min="0" max="50" step="1" style="flex:1;min-width:180px" aria-label="FTDs"><span class="step"><button type="button" id="siMinus" aria-label="menos">−</button><input type="number" id="siN" min="0" max="999" aria-label="FTDs"><button type="button" id="siPlus" aria-label="más">+</button></span><span class="chips" id="siChips"></span></div>
     <div class="grid2" style="margin:14px 0 0"><div id="siOut"></div><div id="siTbl"></div></div>
   </section>
-</section>
-
-<section class="view" id="v-cliente" hidden>
-  <div id="cuTop" class="cu-top"></div>
-  <div id="cuBody"></div>
 </section>
 
 <section class="view" id="v-callman" hidden>

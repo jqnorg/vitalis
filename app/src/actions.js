@@ -629,7 +629,7 @@ function fire(p){
 const AG_RE=15*6e4,AG_RE_MAX=90*6e4,agRe={};
 function refire(p,late){
   toast(`⏰ Sigue sin cerrar: <b>${esc(p.id)}</b>${p.kw?`: ${esc(p.kw)}`:''}<br><span style="font-weight:500">Agenda de las ${esc(p.due.slice(11,16))}, hace ${mins(late)} min. ¿Lo llamaste?</span>`,'alert',
-    {sticky:1,key:'p'+p._id,actions:[{l:'Ya lo llamé',fn:()=>pendHecho(p)},{l:'Ver ficha',fn:()=>openFicha(p.id)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
+    {sticky:1,key:'p'+p._id,actions:[{l:'Ya lo llamé',fn:()=>pendHecho(p)},{l:'+15 min',fn:()=>posponer(p,15)},{l:'+1 h',fn:()=>posponer(p,60)}]});
   flash();if(extOn())return;beep(2);
   sysNotify(`📞 Sigue sin cerrar: ${p.id}`,`${p.kw||''} · agenda de las ${p.due.slice(11,16)}, hace ${mins(late)} min`,'ftdc-'+p._id);
 }
@@ -685,8 +685,8 @@ function ayuda(){
     <dt>Tiempo muerto</dt><dd>Lo del turno que no es hablar, ni descanso marcado, ni marcar (cada línea marcada cubre 50 s, más 3 para cambiar de línea). Una llamada cuenta como conversación si después el cliente pasó a Talking. Lo hablado es ese tiempo menos 50 s por cada línea que hubo que marcar (el tiempo que costó llamarlo no es charla).</dd>
     <dt>Lo que se pide por día</dt><dd>Una de dos, sin compensar: <b>250 llamadas</b> (lo fija el team leader) o <b>2 h 30 habladas</b>. Con cualquiera de las dos el día está cumplido.</dd>
     <dt>Franja</dt><dd>Según el tiempo muerto proyectado al día: <b>Q1</b> menos de 30 min (la mejor) · <b>Q2</b> hasta 1 h · <b>Q3</b> más de 1 h.</dd></dl>
-  <h4>Cliente (tu Manager)</h4><dl>
-    <dt>El que tenés abierto</dt><dd>La ficha del cliente que abrís en el CRM, o del último new que entró: su campaña con sus números, el depósito (qué ofrecerle según Banking), los comentarios de la mesa y la palabra clave. Cuando entra un new, la ficha se abre sola.</dd>
+  <h4>Tus news</h4><dl>
+    <dt>Cuando entra un new</dt><dd>Te avisa con el ID (y, con la extensión, con una tarjeta y sonido). En el CRM, la mini ficha te muestra su campaña, qué ofrecerle para depositar (según Banking) y los comentarios de la mesa.</dd>
     <dt>En New</dt><dd>La pastilla roja de la barra cuenta los tuyos que están en New: llamalos ya. Se va cuando dejan de ser New.</dd>
     <dt>La hora de cada país</dt><dd>El Radar sabe a qué hora deposita cada país: al Agendar, aparece un botón con la hora que más deposita el país del cliente.</dd></dl>
   <h4>Clientes</h4><dl>
@@ -764,7 +764,7 @@ function ayuda(){
     <dt>Qué ve la mesa</dt><dd>Ventas, clientes, snippets compartidos y el target. Tu sueldo es solo tuyo. Tu agenda, turnos, faltas y FTDs sin detalle los ves vos y el team leader.</dd>
     <dt>CSV</dt><dd>Exportar incluye registro, tipo y marca. Importar acepta el export de la plataforma y no duplica.</dd></dl>
   <h4>Atajos de teclado</h4><dl>
-    <dt><kbd>1</kbd>–<kbd>7</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Manager, Tareas, Chat, Banking, Knowledgebase, Análisis; 0 Ajustes)</dd><dt><kbd>K</kbd></dt><dd>Knowledgebase</dd><dt><kbd>L</kbd></dt><dd>Cliente: el que tenés abierto en el CRM</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
+    <dt><kbd>1</kbd>–<kbd>7</kbd>, <kbd>0</kbd></dt><dd>Secciones del menú, en orden (Inicio, Agenda, Tareas, Chat, Banking, Knowledgebase, Análisis; 0 Ajustes)</dd><dt><kbd>K</kbd></dt><dd>Knowledgebase</dd><dt><kbd>B</kbd></dt><dd>Banking</dd><dt><kbd>E</kbd></dt><dd>Equipo (team leader)</dd><dt><kbd>C</kbd></dt><dd>Chat</dd><dt><kbd>F</kbd></dt><dd>Filtros</dd><dt><kbd>T</kbd></dt><dd>Tareas</dd><dt><kbd>A</kbd></dt><dd>Agendar</dd><dt><kbd>/</kbd></dt><dd>Buscar ventas</dd><dt><kbd>?</kbd></dt><dd>Esta ayuda</dd></dl>
   </div>`});
 }
 
@@ -811,7 +811,6 @@ document.addEventListener('keydown',e=>{
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
   if(k==='k'){e.preventDefault();if(cur==='kb'&&kbMode!=='edit')kbGo('home');else go('kb');return}
-  if(k==='l'){e.preventDefault();go(tlView()?'callman':'cliente');return} // el team leader no tiene clientes: su botón brillante es el Manager
   if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}

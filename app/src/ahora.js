@@ -89,7 +89,7 @@ async function crmLoad(force){
 }
 let crmSnapAt=0;
 const tsMax=(L,k)=>{let m=0;for(const r of L){const t=Date.parse(r[k]);if(t>m)m=t}return m};
-const CRM_VIEWS=['inicio','clientes','campanas','equipo','agenda','cliente','callman','gerencia'];
+const CRM_VIEWS=['inicio','clientes','campanas','equipo','agenda','callman','gerencia'];
 function crmApply(rows,rot){
   const m=new Map();for(const r of rows){const x=C2X(r);m.set(ckey(x.brand,x.id),x)}
   crm.seenMs=tsMax(rows,'last_seen');crm.rotMs=Math.max(tsMax(rot||[],'seen_at'),parseYMD(todayS()).getTime());
@@ -151,7 +151,7 @@ function newCheck(){
   out.sort((a,b)=>new Date(b.first)-new Date(a.first));
   for(const x of out)newMark(x.id);
   const away=pageAway();
-  fichaNew(out[0].id); // pasa adelante en Cliente (o aviso con "Ver" si estás escribiendo)
+  fichaNew(out[0].id); // aviso con el ID (y queda como cliente actual para la mini ficha)
   if(out.length>1)toast(`Entraron ${out.length} news: ${out.slice(0,4).map(x=>`<b>${esc(x.id)}</b>`).join(', ')}${out.length>4?'…':''}`,'imp',{key:'news',actions:[{l:'Ver',fn:()=>go('cliente')}]});
   if(away)for(const x of out.slice(0,3))extSocial({k:'crm:id:'+x.id,v:x.id,lvl:'imp',title:'Cliente nuevo en el CRM',id:x.id,kw:x.name||'',meta:[paisOf(x.country),'entró '+hhmm(+new Date(x.first))].filter(Boolean).join(' · '),btns:[['crm','Ver en el CRM',1],['close','Ok']]});
   else beep(1);
@@ -163,7 +163,7 @@ async function newPoll(){
   try{
     const rows=await Q(sb.from('crm_clients').select('*').neq('brand',ARCH).eq('status_group','new').gte('first_seen',new Date(Date.now()-NEW_FRESH).toISOString()).limit(200));
     let n=0;for(const r of rows){const x=C2X(r),k=ckey(x.brand,x.id);if(!crm.rows.has(k))n++;crm.rows.set(k,x);if(!crm.byId.has(norm(x.id)))crm.byId.set(norm(x.id),x)}
-    newCheck();if(n&&['inicio','cliente','callman'].includes(cur))refresh();
+    newCheck();if(n&&['inicio','callman'].includes(cur))refresh();
   }catch(e){}finally{newBusy=false}
 }
 async function crmOne(id){const r=await Q(sb.from('crm_clients').select('*').eq('client_id',String(id)).limit(5));const x=r.map(C2X);return x.find(c=>!isArch(c.brand))||x[0]||null}

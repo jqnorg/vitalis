@@ -229,14 +229,14 @@ async def main():
               const d=document.createElement('div');d.id='fic';d.innerHTML=__mk('68636','Lucio Diaz');document.body.prepend(d)}"""); await Nv.wait_for_timeout(1800)
             cur = await A2.evaluate("curCl&&[curCl.id,curCl.name,curCl.src]")
             ok(cur == ['68636', '', 'crm'], f'la ficha a la vista del CRM es el cliente actual, aunque la dirección haya quedado vieja y haya otra ficha escondida ({cur})')
-            ok(await A2.evaluate("cur") == 'cliente' and await A2.locator('#nbCli').inner_text() == '68636', 'Vitalis pasa solo a la sección Cliente, con el ID en el menú')
+            ok(await A2.evaluate("cur") != 'cliente' and await A2.locator('#nbCli').inner_text() == '68636' and await A2.locator('#v-cliente').count() == 0, 'Vitalis lo toma como cliente actual sin cambiar de sección (sin sección Cliente desde el 26/11)')
             await Nv.wait_for_function("(document.getElementById('vitalis-dock')||{shadowRoot:{textContent:''}}).shadowRoot.textContent.includes('68636')", timeout=6000)
             ok(True, 'y la mini ficha del CRM lo muestra')
             t0 = await Nv.evaluate("performance.now()")
             await Nv.evaluate("document.getElementById('fic').innerHTML=__mk('68700','Marta Gomez')")
             await A2.wait_for_function("curCl&&curCl.id==='68700'", timeout=4000)
             dt = await Nv.evaluate("performance.now()") - t0
-            ok(await A2.evaluate("[curCl.id,cur,document.getElementById('nbCli').textContent]") == ['68700', 'cliente', '68700'], 'al abrir otro cliente en el CRM, Vitalis cambia solo, sin refrescar')
+            ok(await A2.evaluate("[curCl.id,document.getElementById('nbCli').textContent]") == ['68700', '68700'], 'al abrir otro cliente en el CRM, Vitalis cambia solo, sin refrescar')
             ok(dt < 2500, f'enseguida ({dt:.0f} ms)')
             # la mini ficha de Vitalis en el CRM (abajo a la izquierda): el cliente actual en corto, el siguiente de la Cola y el turno
             await Nv.locator('#vitalis-dock #pill').click(); await Nv.wait_for_timeout(200)
@@ -367,10 +367,10 @@ async def main():
             await C.evaluate("""() => { document.querySelector('tbody').insertAdjacentHTML('beforeend', '<tr><td>555006</td><td>Rita Nueva</td><td>Chile</td><td>New</td><td>17/11/2026 13:00</td></tr>'); }""")
             await C.wait_for_timeout(3500)
             await A2.evaluate("document.hasFocus=()=>true;dispatchEvent(new Event('focus'))"); await A2.wait_for_timeout(3000)
-            fi = await A2.inner_text('#v-cliente') if await A2.is_visible('#v-cliente') else ''
-            ok('entró un new' in fi and 'Rita Nueva' not in fi and 'Chile' in fi, f'al volver a Vitalis, el new está en la sección Cliente ({fi[:120]!r})')
-            await A2.screenshot(path=OUT / 'x11_ficha_new.png')
-            await A2.keyboard.press('Escape'); await A2.wait_for_timeout(300)
+            fi = await A2.inner_text('#toasts') if await A2.locator('#toasts .toast').count() else ''
+            ok(await A2.evaluate("curCl&&curCl.id") == '555006' and 'Entró un new' in fi and '555006' in fi and 'Rita Nueva' not in fi, f'al volver a Vitalis, el new avisa con el ID y queda como cliente actual ({fi[:120]!r})')
+            await A2.screenshot(path=OUT / 'x11_aviso_new.png')
+            await A2.evaluate("closeToast('ficha')"); await A2.wait_for_timeout(300)
             await A2.evaluate("(()=>{const h=document.getElementById('ftd-agenda-overlay');if(h)h.remove()})()")
             # un Talking que desaparece de la lista que se actualiza: en Vitalis deja de ser new
             await C.evaluate("() => { document.querySelector('tbody').insertAdjacentHTML('afterbegin', '<tr id=tk><td>555007</td><td>Tito Habla</td><td>Peru</td><td>Talking</td><td>17/11/2026 13:10</td></tr>'); }")

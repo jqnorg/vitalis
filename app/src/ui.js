@@ -120,7 +120,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','historial','cliente','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','inicio','historial','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -128,7 +128,7 @@ function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.
 const GROUPS=[
   {g:'inicio',views:['inicio','sueldo','turnos','historial'],tabs:['Hoy','Sueldo','Turnos','Historial']}, // Historial: todas tus ventas y tus lates, venta por venta
   {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
-  {g:'panel',views:['cliente','agenda'],tabs:['Cliente','Agenda'],def:'cliente'}, // el Manager del agente (lo pidió el dueño): el cliente actual y la agenda (sin cola: solo news y FTDs, el dueño, 24/11/2026). El team leader no tiene Cliente
+  {g:'agenda',views:['agenda']}, // Agenda con botón propio (el dueño, 26/11/2026: se fue el "Manager (agente)" y la sección Cliente)
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
   {g:'banking',views:['banking','bkprocs','bkbancos'],tabs:['¿Cómo paga el cliente?','Procesadores','Bancos'],def:'banking'}, // Banking 3: la del agente, las cajas y los bancos
@@ -140,25 +140,24 @@ const GROUPS=[
 ];
 // lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
 function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navGer').hidden=!isMgmt();document.body.classList.toggle('dir',isDirector());$('#navCm').classList.toggle('nv-cli',tlView());
-  const p=$('#navPanel');p.classList.toggle('nv-cli',!tlView());p.querySelector('.nm').innerHTML=tlView()?'Panel':isLeader()?'Manager<small class="ag"> (agente)</small>':'Manager';p.title=tlView()?'Panel: la agenda (2)':'Manager: tu cliente y tu agenda (2)'}
+}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
 function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Hoy
-const NAVKEYS={1:'inicio',2:'panel',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
+const NAVKEYS={1:'inicio',2:'agenda',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
   if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';
   if(isDirector()&&v!=='gerencia'&&v!=='config')v='gerencia'; // el director solo ve Gerencia (y sus Ajustes)
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
-  if(v==='cliente'&&tlView())v='agenda'; // el team leader no tiene clientes
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
   cur=v;hideTip();document.body.dataset.view=v;
   $$('.view').forEach(s=>s.hidden=s.id!=='v-'+v);
   const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
-  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader())&&(x!=='cliente'||!tlView()));sn.hidden=tabs.length<2;
-  sn.innerHTML=tabs.length<2?'':tabs.map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}${x==='cliente'&&curCl?` <b class="tab-id">${esc(curCl.id)}</b>`:''}</button>`).join('');
+  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader()));sn.hidden=tabs.length<2;
+  sn.innerHTML=tabs.length<2?'':tabs.map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
   if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
@@ -197,9 +196,9 @@ function status(){
   $('#nbTa').textContent=tk.length||'';
   if(crm.ok){const n=newsOf(tlView()||isLeadUid(me)?null:me).filter(inNew).length;$('#nbAh').textContent=n||''}
   if(isLeader())cmBadge(); // Manager: lo que hay que atender ya
-  // una sola marca por sección, y solo si hay algo que hacer: Panel = news + agendas vencidas; Chat = no leídos + pedidos para vos
+  // una sola marca por sección, y solo si hay algo que hacer: Agenda = agendas vencidas; Chat = no leídos + pedidos para vos
   cliBadge();
-  {const nw=+($('#nbAh').textContent||0),pn=nw+venc;$('#nbPanel').textContent=pn||'';$('#nbPanel').title=[nw&&plural(nw,'new'),venc&&plural(venc,'agenda vencida','agendas vencidas')].filter(Boolean).join(' · ');
+  {$('#nbPanel').textContent=venc||'';$('#nbPanel').title=venc?plural(venc,'agenda vencida','agendas vencidas'):'';
    const cs=ch+so;$('#nbChat').textContent=cs?(cs>99?'99+':cs):''}
   // sin marca en Banking: siempre hay algo fallando y molestaba a la vista (lo pidió el dueño); las fallas viven en Banking
   $('#sAyuda').hidden=!profile||profile.role==='leader';

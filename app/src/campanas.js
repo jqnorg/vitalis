@@ -115,7 +115,7 @@ function campDetail(k,from,to,perTxt){
     ${g.rows.length?`<h4 class="cmp-h">Sus news</h4><div class="p-tablewrap"><table class="pt"><thead><tr><th>Cliente</th><th>Quedó</th><th>Registro</th><th>Agente</th></tr></thead><tbody>${g.rows.sort((a,b)=>(regAt(b)||0)-(regAt(a)||0)).slice(0,150).map(r=>`<tr><td><button type="button" class="lnkp" data-cmo="${esc(r.id)}"><b>${esc(r.id)}</b></button> <span class="ah-nm">${esc(r.name)}</span></td><td>${stBadge(r)}</td><td class="d">${esc(r.reg||'')}</td><td class="trunc">${esc(crmOwner(r)?memberName(crmOwner(r)):r.agent||'—')}</td></tr>`).join('')}</tbody></table></div>`:''}`;
   modal({title:esc(g.camp||'Sin campaña'),wide:true,body:body(),
     onOpen:api=>api.box.addEventListener('click',e=>{
-      const o=e.target.closest('[data-cmo]');if(o){api.close();openFicha(o.dataset.cmo);return}
+      const o=e.target.closest('[data-cmo]');if(o){openFicha(o.dataset.cmo);return} // copia el ID
       const a=e.target.closest('[data-cma]');if(!a)return;
       const after=async()=>{await campLoad(from,to,true);api.close();campDetail(k,from,to,perTxt)};
       if(a.dataset.cma==='req')return campReqModal(d,g.camp);

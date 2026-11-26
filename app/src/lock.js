@@ -72,7 +72,7 @@ function chatGate(o){ // true: el chat está cerrado y pide el PIN (se muestra e
   L.innerHTML=`<div class="abox"><div class="lk-box"></div></div>`;
   pinPad(L.querySelector('.lk-box'),{
     head:`<div class="lk-ic" aria-hidden="true"><svg class="ic"><use href="#i-candado"/></svg></div><h2>Chat cerrado</h2><p class="lead">Poné tu PIN para ver el chat.</p>`,
-    back:['Volver',()=>{chatPadOff();go('cliente')}],
+    back:['Volver',()=>{chatPadOff();go('inicio')}],
     done:(pin,ui)=>pinCheck(pin,ui,()=>{chatOpen();chatPadOff();const w=chatWant;chatWant=null;if(cur==='chat')V.chat.render(w?{chat:w}:{})}),
   });
   return true;
@@ -85,7 +85,7 @@ const padUp=()=>locked||chatPadOn; // con un teclado de PIN a la vista, las tecl
 
 /* ---------- a dónde se entra ---------- */
 // la primera vez del día, Inicio (tu mes, el turno); después, directo al Panel. Tapado no cuenta: cuenta cuando entrás de verdad.
-function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return isDirector()?'gerencia':'inicio'}return isDirector()?'gerencia':tlView()?'callman':'cliente'} // el team leader, a su Manager; el agente, a su cliente
+function landing(){const k='dia:'+me,te=todayS();if(local.get(k,'')!==te){if(!locked)local.set(k,te);return isDirector()?'gerencia':'inicio'}return isDirector()?'gerencia':tlView()?'callman':'agenda'} // el team leader, a su Manager; el agente, a su agenda
 
 // Ajustes: ya no hay tiempos (los candados son a mano); queda la línea para que se sepa
 function locksTxt(){return 'Nada se bloquea solo: el candado de la barra bloquea Vitalis y el del chat bloquea el chat. Los dos piden tu PIN.'}
