@@ -120,7 +120,7 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','historial','cliente','callman','banking','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','inicio','historial','cliente','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
@@ -131,7 +131,7 @@ const GROUPS=[
   {g:'panel',views:['cliente','agenda'],tabs:['Cliente','Agenda'],def:'cliente'}, // el Manager del agente (lo pidió el dueño): el cliente actual y la agenda (sin cola: solo news y FTDs, el dueño, 24/11/2026). El team leader no tiene Cliente
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
-  {g:'banking',views:['banking']},
+  {g:'banking',views:['banking','bkprocs','bkbancos'],tabs:['¿Cómo paga el cliente?','Procesadores','Bancos'],def:'banking'}, // Banking 3: la del agente, las cajas y los bancos
   {g:'kb',views:['kb']}, // Knowledgebase: guías para el agente (pedido del dueño, 25/11/2026)
   {g:'analisis',views:['ventas','clientes','campanas','filtros','radar'],tabs:['Ventas','Clientes','Campañas','Filtros','Radar']}, // Clientes: solo team leader y admin
   {g:'equipo',views:['equipo']},

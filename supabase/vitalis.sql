@@ -1757,7 +1757,7 @@ do $$
 declare t text;
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
-    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','processor_methods','pay_incidents','banks','pay_methods','client_comments','campaign_info','campaign_requests','calls','teams'] loop
+    foreach t in array array['sales','agenda','settings','adjustments','shifts','profiles','snippets','leads','pings','chats','chat_members','messages','tasks','task_people','targets','avatars','message_reactions','user_targets','processors','pay_incidents','banks','client_comments','campaign_info','campaign_requests','calls','teams'] loop
       if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
         execute format('alter publication supabase_realtime add table public.%I', t);
       end if;
@@ -2673,3 +2673,116 @@ create index if not exists kb_articles_cat on public.kb_articles (category_id);
 -- Sin perfil del cliente (el dueño, 26/11/2026): Vitalis se enfoca en la campaña, no en el cliente. La tabla y la función se borran con lo guardado.
 drop function if exists public.prof_save(text, text, jsonb);
 drop table if exists public.client_profiles;
+
+-- ---------- Banking 3 (el dueño, 26/11/2026): procesadores, sub-procesadores, métodos y bancos, todo editable y por país ----------
+-- Un método es un renglón propio del procesador (o del sub-procesador, que es un procesador con parent_id), con UN país:
+-- "Nequi · Colombia" y "Nequi · Panamá" conviven en la misma caja. Se ordena arrastrando (sort). El catálogo compartido (pay_methods +
+-- processor_methods) se migra acá y se borra.
+create table if not exists public.methods (
+  id           uuid primary key default gen_random_uuid(),
+  team_id      uuid not null default public.my_team() references public.teams(id),
+  processor_id uuid not null references public.processors(id) on delete cascade,
+  name         text not null check (length(btrim(name)) between 1 and 60),
+  kind         text check (kind in ('efectivo', 'transferencia', 'tarjeta')),
+  country      text not null default '' check (length(country) <= 40), -- '' = todos los países
+  note         text check (length(note) <= 1000),
+  status       text not null default 'ok' check (status in ('ok', 'falla')),
+  status_note  text check (length(status_note) <= 1000),
+  status_at    timestamptz,
+  status_by    uuid references public.profiles(id) on delete set null,
+  sort         integer not null default 0,
+  src          uuid, -- de qué pay_methods vino (migración)
+  created_at   timestamptz not null default now()
+);
+create unique index if not exists methods_uniq on public.methods (processor_id, lower(btrim(name)), coalesce(kind, ''), country);
+create index if not exists methods_proc on public.methods (processor_id, sort);
+alter table public.methods enable row level security;
+drop policy if exists methods_read on public.methods;
+create policy methods_read on public.methods for select to authenticated using (true);
+drop policy if exists methods_write on public.methods;
+create policy methods_write on public.methods for all to authenticated using ((select public.pay_editor())) with check ((select public.pay_editor()));
+do $$ begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'methods') then
+    alter publication supabase_realtime add table public.methods;
+  end if;
+end $$;
+-- migración: cada método asignado pasa a un renglón por país (los países del método, si no los del procesador, si no "todos")
+do $$ begin
+  if to_regclass('public.processor_methods') is not null then
+    insert into public.methods (team_id, processor_id, name, kind, country, note, status, status_note, status_at, status_by, sort, src)
+    select pm.team_id, pm.processor_id, m.name, m.kind, c.country, pm.note,
+      case when pm.status = 'falla' and (cardinality(pm.fail_countries) = 0 or c.country = '' or c.country = any (pm.fail_countries)) then 'falla' else 'ok' end,
+      pm.status_note, pm.status_at, pm.status_by, m.sort, m.id
+    from public.processor_methods pm join public.pay_methods m on m.id = pm.method_id join public.processors p on p.id = pm.processor_id
+    cross join lateral (select unnest(case when cardinality(pm.countries) > 0 then pm.countries when cardinality(p.countries) > 0 then p.countries else array['']::text[] end) as country) c
+    where not exists (select 1 from public.methods x where x.processor_id = pm.processor_id and x.src = m.id and x.country = c.country)
+    on conflict do nothing;
+    -- el orden por banco: {p, m} viejo → {m: el renglón de ese procesador en el país del banco}
+    update public.banks b set
+      use_pm = coalesce((select jsonb_agg(jsonb_build_object('m', x.id) order by e.ord) from jsonb_array_elements(b.use_pm) with ordinality e(v, ord)
+        join lateral (select id from public.methods x where x.processor_id = nullif(e.v->>'p', '')::uuid and x.src = nullif(e.v->>'m', '')::uuid and (x.country = b.country or x.country = '' or b.country = '') order by (x.country = b.country) desc limit 1) x on true), '[]'::jsonb),
+      avoid_pm = coalesce((select jsonb_agg(jsonb_build_object('m', x.id) order by e.ord) from jsonb_array_elements(b.avoid_pm) with ordinality e(v, ord)
+        join lateral (select id from public.methods x where x.processor_id = nullif(e.v->>'p', '')::uuid and x.src = nullif(e.v->>'m', '')::uuid and (x.country = b.country or x.country = '' or b.country = '') order by (x.country = b.country) desc limit 1) x on true), '[]'::jsonb)
+    where exists (select 1 from jsonb_array_elements(b.use_pm) e where e ? 'p') or exists (select 1 from jsonb_array_elements(b.avoid_pm) e where e ? 'p');
+    -- el historial: los métodos viejos apuntan al renglón nuevo
+    alter table public.pay_incidents drop constraint if exists pay_incidents_method_id_fkey;
+    update public.pay_incidents i set method_id = (select x.id from public.methods x where x.processor_id = i.processor_id and x.src = i.method_id order by x.country limit 1)
+      where i.method_id is not null and exists (select 1 from public.pay_methods m where m.id = i.method_id);
+    update public.pay_incidents i set method_ids = coalesce((select array_agg(distinct x.id) from unnest(i.method_ids) o join public.methods x on x.processor_id = i.processor_id and x.src = o), '{}')
+      where exists (select 1 from unnest(i.method_ids) o join public.pay_methods m on m.id = o);
+    update public.pay_incidents set method_id = null where method_id is not null and not exists (select 1 from public.methods x where x.id = method_id);
+    drop table public.processor_methods;
+    drop table public.pay_methods;
+  end if;
+end $$;
+alter table public.pay_incidents drop constraint if exists pay_incidents_method_id_fkey;
+alter table public.pay_incidents add constraint pay_incidents_method_id_fkey foreign key (method_id) references public.methods(id) on delete set null;
+-- la falla de un método es del método (ya tiene su país); la del procesador puede ser en todos los países o en algunos (fail_countries)
+create or replace function public._pay_set(pid uuid, mid uuid, falla boolean, n text, c text[]) returns text[]
+  language plpgsql security definer set search_path = public as $$
+declare st text; fc text[]; scope text[]; nf text[]; nst text;
+begin
+  if mid is not null then
+    select status into st from public.methods where id = mid and processor_id = pid;
+    if not found then raise exception 'METODO: ese procesador no tiene ese método'; end if;
+    update public.methods set status = case when falla then 'falla' else 'ok' end,
+      status_note = case when falla then case when st = 'falla' then coalesce(n, status_note) else n end end,
+      status_at = now(), status_by = auth.uid() where id = mid;
+    return '{}';
+  end if;
+  select status, fail_countries, countries into st, fc, scope from public.processors where id = pid;
+  if cardinality(scope) = 0 then scope := array['Colombia','México','Chile','Panamá','Guatemala','Costa Rica','Perú']; end if;
+  if falla then
+    nst := 'falla';
+    if cardinality(c) = 0 or (st = 'falla' and cardinality(fc) = 0) then nf := '{}';
+    elsif st = 'falla' then nf := (select array_agg(distinct x order by x) from unnest(fc || c) x);
+    else nf := c; end if;
+    if cardinality(nf) > 0 and scope <@ nf then nf := '{}'; end if;
+  elsif cardinality(c) = 0 or st <> 'falla' then
+    nst := 'ok'; nf := '{}';
+  else
+    nf := (select coalesce(array_agg(x order by x), '{}') from unnest(case when cardinality(fc) = 0 then scope else fc end) x where x <> all (c));
+    nst := case when cardinality(nf) = 0 then 'ok' else 'falla' end;
+  end if;
+  update public.processors set status = nst, fail_countries = nf, status_note = case when falla then case when st = 'falla' then coalesce(n, status_note) else n end when nst = 'falla' then status_note end,
+    status_at = now(), status_by = auth.uid(), updated_at = now() where id = pid;
+  return nf;
+end $$;
+revoke all on function public._pay_set(uuid, uuid, boolean, text, text[]) from public, anon, authenticated;
+-- el orden, arrastrando: pay_order('proc', ids) ordena procesadores (o sub-procesadores); pay_order('method', ids, pid) ordena los métodos de una caja y, si vienen de otra, los pasa a esa
+create or replace function public.pay_order(kind text, ids uuid[], parent uuid default null) returns void
+  language plpgsql security definer set search_path = public as $$
+declare i int;
+begin
+  if not public.pay_editor() then raise exception 'Solo el administrador o el team leader'; end if;
+  if kind = 'proc' then
+    for i in 1..coalesce(cardinality(ids), 0) loop update public.processors set sort = i, updated_at = now() where id = ids[i]; end loop;
+  elsif kind = 'method' then
+    if parent is not null and not exists (select 1 from public.processors where id = parent) then raise exception 'PROC: no existe esa caja'; end if;
+    for i in 1..coalesce(cardinality(ids), 0) loop
+      update public.methods set sort = i, processor_id = coalesce(parent, processor_id) where id = ids[i];
+    end loop;
+  else raise exception 'ORDEN: proc o method'; end if;
+end $$;
+revoke all on function public.pay_order(text, uuid[], uuid) from public, anon;
+grant execute on function public.pay_order(text, uuid[], uuid) to authenticated;

@@ -243,9 +243,8 @@ async def main():
             sql("insert into public.client_keywords (team_id,client_id,kw) select team_id,'68700','Montevideo' from public.profiles where name='Sofía Ar'")
             sql("insert into public.client_comments (team_id,client_id,body,created_by) select team_id,'68700','Dijo que cobra el viernes',id from public.profiles where name='Sofía Ar'")
             sql("""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent) select team_id,'Novara Markets','68700','Marta Gomez','Mexico','2026-11-17 10:00','New','new','Sofía Ar' from public.profiles where name='Sofía Ar'""")
-            sql("""with m as (insert into public.pay_methods (team_id,name,kind) select team_id,'OXXO','efectivo' from public.profiles where name='Sofía Ar' returning id,team_id),
-                   p as (insert into public.processors (team_id,name,countries) select team_id,'PagoMX',array['México'] from m returning id,team_id)
-                   insert into public.processor_methods (processor_id,method_id,team_id,note) select p.id,m.id,p.team_id,'Paga en cualquier OXXO con el código' from p,m""")
+            sql("""with p as (insert into public.processors (team_id,name,countries) select team_id,'PagoMX',array['México'] from public.profiles where name='Sofía Ar' returning id,team_id)
+                   insert into public.methods (processor_id,team_id,name,kind,country,note) select p.id,p.team_id,'OXXO','efectivo','México','Paga en cualquier OXXO con el código' from p""")
             await A2.evaluate("Promise.all([kwLoad(true),bkLoad(true),crmLoad(true)]).then(()=>{fichaCache.clear();dockSync()})"); await Nv.wait_for_timeout(2500)
             DKT = "(document.getElementById('vitalis-dock')||{shadowRoot:{textContent:''}}).shadowRoot.textContent"
             t = await Nv.evaluate(DKT)

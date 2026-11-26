@@ -9,9 +9,9 @@ const dockSoon=()=>{clearTimeout(dockT);dockT=setTimeout(()=>dockSync(),350)};
 function dockCl(d){
   const id=String(d.id),r=crmStatusOf(id)||d.r,f=soldOf(id,r&&r.brand),pais=PAISES.includes(d.pais)?d.pais:'';
   const ags=[...pend,...teamAg].filter(p=>norm(p.id)===norm(id)&&!p.done).sort(byDue).map(p=>whenTxt(parseDue(p.due)));
-  const opt=o=>({m:o.x.m.name,p:o.p.name,n:clip(o.x.note||'',160)});
+  const opt=o=>({m:o.m.name,p:procName(o.p),n:clip(o.m.note||'',160)});
   const pay=pais&&bk.ok?{pais,k:Object.fromEntries(['efectivo','transferencia','tarjeta'].map(k=>{const L=bkOptions(pais,k);
-    return [k,{ok:L.filter(o=>!o.falla).slice(0,12).map(opt),bad:L.filter(o=>o.falla).slice(0,8).map(o=>o.x.m.name+' · '+o.p.name)}]}))}:null;
+    return [k,{ok:L.filter(o=>!o.falla).slice(0,12).map(opt),bad:L.filter(o=>o.falla).slice(0,8).map(o=>o.m.name+' · '+procName(o.p))}]}))}:null;
   return {id,name:d.name||'',pais:d.pais||d.country||'',hora:cliTime(d.country)||'',
     st:r?(sgPlain(r)||r.status||''):'',crm:r&&r.status||'',
     stop:(f||(r&&paidCrm(r)))?'paid':'',

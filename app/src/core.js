@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.64.0';
+const VERSION='1.65.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -445,7 +445,7 @@ function live(){ // cambios en vivo: lo que carguen los compañeros o yo desde o
   if(callsOk)chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'calls'},callLive); // las llamadas de la mesa, en vivo
   chan.on('postgres_changes',{event:'UPDATE',schema:'public',table:'teams'},p=>{if(p.new&&teamInfo&&p.new.id===teamInfo.id){teamInfo={...teamInfo,...p.new};refresh()}}); // tope de la cola, mínimo de llamadas
   if(ficOk){for(const t of ['client_comments','campaign_info'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},fichaLive);if(bkEd())chan.on('postgres_changes',{event:'INSERT',schema:'public',table:'campaign_requests'},()=>campReqPoll())} // la ficha: comentarios y campañas en vivo
-  if(bk.ok)for(const t of ['pay_incidents','processors','processor_methods','banks','pay_methods'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},()=>bkLoad(true)); // Banking: una falla avisa al instante
+  if(bk.ok)for(const t of ['pay_incidents','processors','methods','banks'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},()=>bkLoad(true)); // Banking: una falla avisa al instante
   if(reactOk)chan.on('postgres_changes',{event:'*',schema:'public',table:'message_reactions'},reactLive); // si la base todavía no tiene la tabla, no la pido (se caería el canal)
   // el team leader ve en vivo la agenda, los turnos y los FTDs sin detalle de todos
   if(isLeader())for(const t of ['agenda','shifts','adjustments'])chan.on('postgres_changes',{event:'*',schema:'public',table:t},p=>mesaLive(t,p));

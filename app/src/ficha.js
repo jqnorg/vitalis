@@ -73,7 +73,7 @@ function fiPayHTML(d){
     const L=bkOptions(pais,t),ok=L.filter(o=>!o.falla),bad=L.filter(o=>o.falla),show=fiPayT.all?ok:ok.slice(0,FI_OPTS);
     h+=`<div class="fi-opts"><span class="fi-pl">${dig?'3':'2'}. Ofrecele ${esc(KINDS[t].toLowerCase())}:</span>
       ${ok.length?show.map(bkOptHTML).join('')+(ok.length>show.length?`<button type="button" class="lnk" data-fpall>Ver las ${ok.length} que andan</button>`:''):`<p class="p-sub" style="margin:0">Ahora no anda ningún${t==='tarjeta'?'a tarjeta':t==='efectivo'?' efectivo':'a transferencia'} en ${esc(pais)}. Probá con otra forma de pago.</p>`}
-      ${bad.length?`<p class="fi-bad"><b>No ofrecer ahora (fallan):</b> ${bad.map(o=>esc(o.x.m.name+' · '+o.p.name)).join(', ')}</p>`:''}</div>`;
+      ${bad.length?`<p class="fi-bad"><b>No ofrecer ahora (fallan):</b> ${bad.map(o=>esc(o.m.name+' · '+procName(o.p))).join(', ')}</p>`:''}</div>`;
   }
   const banks=bk.banks.filter(b=>!b.country||b.country===pais),bk1=banks.find(b=>b.id===fiPayT.bank);
   return `<div class="fi-c fi-pay">${H}${h}
@@ -82,7 +82,7 @@ function fiPayHTML(d){
 }
 function fiBankFlow(b){
   if(!b)return '';
-  return `${(b.use_pm||[]).length||(b.avoid_pm||[]).length?`<div class="bk-chips" style="margin:6px 0">${bankChips(b)}</div>`:''}${(b.steps||[]).length?`<ol class="bk-steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}${b.notes?`<p class="bk-notes">${esc(b.notes)}</p>`:''}${(bkFilesOf('bank',b.id)||[]).length?`<button type="button" class="lnk" data-fa="bankview" data-id="${esc(b.id)}">Ver fotos</button>`:''}`;
+  return `${(b.use_pm||[]).length?`<div class="bk-chips" style="margin:6px 0">${bankChips(b)}</div>`:''}${(b.steps||[]).length?`<ol class="bk-steps">${b.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}${b.notes?`<p class="bk-notes">${esc(b.notes)}</p>`:''}${(bkFilesOf('bank',b.id)||[]).length?`<button type="button" class="lnk" data-fa="bankview" data-id="${esc(b.id)}">Ver fotos</button>`:''}`;
 }
 // las campañas del afiliador en el país: monto mínimo y qué ve la persona en el anuncio
 function fiCampsHTML(d){ // el anuncio de la campaña del cliente (y las otras del afiliador en una línea): va adentro de la tarjeta Campaña

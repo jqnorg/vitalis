@@ -693,8 +693,9 @@ function ayuda(){
     <dt>Registro</dt><dd>Con la extensión, los news que ves en el CRM se guardan con su registro, campaña y agente (los otros status no). Una sola pestaña se actualiza sola: la que elegís con <b>Actualizar esta pestaña</b>; esa avisa cuando entra un new.</dd>
     <dt>CR (%) (conversión)</dt><dd>De los registrados en el período, cuántos depositaron el mismo día (new) y cuántos después (late). Late es cuando el FTD cae otro día calendario que el registro.</dd></dl>
   <h4>Banking</h4><dl>
-    <dt>Procesadores</dt><dd>Qué procesadores y métodos de pago andan, por país. Si algo falla, aparece arriba del inicio y te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
-    <dt>Bancos</dt><dd>Cómo conviene pagar según el banco del cliente: pasos, qué usar y qué evitar (por ejemplo, Falabella Chile: no transferencia). Lo cargan el administrador y el team leader, con fotos.</dd></dl>
+    <dt>¿Cómo paga el cliente?</dt><dd>Elegí el país y si paga en efectivo o con qué banco: te dice qué ofrecerle, numerado de mejor a peor. Lo que falla va último, en rojo.</dd>
+    <dt>Procesadores</dt><dd>Cada procesador es una caja con sus métodos adentro (nombre, tipo, país); un sub-procesador es una cajita adentro de la caja. El administrador y el team leader cargan, editan y arrastran ⋮⋮ para cambiar el orden. Si algo falla, te llega un aviso urgente; cuando vuelve, un aviso normal.</dd>
+    <dt>Bancos</dt><dd>Los pasos para pagar con cada banco y, con "Ordenar", qué conviene ofrecerle a un cliente de ese banco, de mejor a peor.</dd></dl>
   <h4>Aguinaldo</h4><dl><dt>Cuánto</dt><dd>La suma de lo nominal del semestre dividido 12: en junio (diciembre a mayo) y en diciembre (junio a noviembre). Entra el fijo menos las faltas, los premios en pesos y, si las comisiones van en el recibo, también las comisiones. Es una estimación; "Trabajás desde" descuenta los meses que todavía no estabas.</dd></dl>
   <h4>Knowledgebase</h4><dl>
     <dt>Guías</dt><dd>Cómo se hace cada cosa, por tema, con capturas paso a paso, qué decir y qué no, videos y una pregunta para ver si quedó claro. Buscá arriba. Al final de cada guía, "Lo leí" y si te sirvió.</dd>
