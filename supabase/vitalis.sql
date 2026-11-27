@@ -1200,7 +1200,8 @@ begin
   if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
   -- la mesa en el CRM: los nombres (y `crm_name`) de los activos; un new de otro agente es de otra mesa (27/11/2026: las pestañas del team leader
   -- listan los news de todo el piso y Vitalis se llenaba de clientes ajenos "sin agente" y "sin gestionar")
-  select coalesce(array_agg(lower(x)), '{}') into mesa from (
+  -- sin acentos ni mayúsculas: en el CRM figura "Sofia Ar" y el perfil es "Sofía Ar" (27/11/2026: sus news quedaban afuera como ajenos)
+  select coalesce(array_agg(translate(lower(x), 'áéíóúüñ', 'aeiouun')), '{}') into mesa from (
     select name from public.profiles where team_id = t and active union select crm_name from public.profiles where team_id = t and active and crm_name is not null) z(x);
   if rows is null or jsonb_typeof(rows) <> 'array' then raise exception 'BAD: se esperaba una lista'; end if;
   if jsonb_array_length(rows) > 500 then raise exception 'TOO_MANY: de a 500'; end if;
@@ -1226,7 +1227,7 @@ begin
     ag := public._clip(r->>'agent', 80);
     g := public.crm_group(st, t);
     if fa is not null and st is null then st := 'FTD'; g := 'ftd'; end if; -- la lista de depósitos: el cliente ya depositó
-    ajeno := ag is not null and ag <> '' and not (lower(ag) = any(mesa));
+    ajeno := ag is not null and ag <> '' and not (translate(lower(ag), 'áéíóúüñ', 'aeiouun') = any(mesa));
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
     if ajeno and g = 'new' then -- un new de un agente de otra mesa
       if not found then n_aj := n_aj + 1; continue; end if; -- no entra
