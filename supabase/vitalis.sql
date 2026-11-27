@@ -1193,10 +1193,15 @@ create or replace function public.crm_seen(rows jsonb) returns json
   language plpgsql security definer set search_path = public as $$
 declare
   t uuid := public.my_team();
-  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; fa text; ag text; hit boolean; cur record;
-  n_new integer := 0; n_chg integer := 0; n_bad integer := 0; fresh text[] := '{}';
+  r jsonb; cid text; br text; st text; g text; rg text; lc text; nt text; fa text; ag text; hit boolean; ajeno boolean; cur record;
+  n_new integer := 0; n_chg integer := 0; n_bad integer := 0; n_aj integer := 0; fresh text[] := '{}';
+  mesa text[]; hl integer;
 begin
   if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  -- la mesa en el CRM: los nombres (y `crm_name`) de los activos; un new de otro agente es de otra mesa (27/11/2026: las pestañas del team leader
+  -- listan los news de todo el piso y Vitalis se llenaba de clientes ajenos "sin agente" y "sin gestionar")
+  select coalesce(array_agg(lower(x)), '{}') into mesa from (
+    select name from public.profiles where team_id = t and active union select crm_name from public.profiles where team_id = t and active and crm_name is not null) z(x);
   if rows is null or jsonb_typeof(rows) <> 'array' then raise exception 'BAD: se esperaba una lista'; end if;
   if jsonb_array_length(rows) > 500 then raise exception 'TOO_MANY: de a 500'; end if;
   for r in select * from jsonb_array_elements(rows) loop
@@ -1221,7 +1226,16 @@ begin
     ag := public._clip(r->>'agent', 80);
     g := public.crm_group(st, t);
     if fa is not null and st is null then st := 'FTD'; g := 'ftd'; end if; -- la lista de depósitos: el cliente ya depositó
+    ajeno := ag is not null and ag <> '' and not (lower(ag) = any(mesa));
     select * into cur from public.crm_clients where team_id = t and brand = br and client_id = cid for update;
+    if ajeno and g = 'new' then -- un new de un agente de otra mesa
+      if not found then n_aj := n_aj + 1; continue; end if; -- no entra
+      if cur.status_group = 'new' and cur.left_new_at is null then -- era de la mesa y lo rotaron afuera: dejó de ser new para nosotros
+        update public.crm_clients set left_new_at = now(), last_seen = now(), last_seen_by = auth.uid(), crm_agent = ag where team_id = t and brand = br and client_id = cid;
+        insert into public.crm_agent_log (team_id, brand, client_id, old_agent, new_agent, status, seen_by) values (t, br, cid, cur.crm_agent, ag, coalesce(st, cur.status), auth.uid());
+        n_chg := n_chg + 1; continue;
+      end if;
+    end if;
     if st is not null and g not in ('new', 'ftd') then -- otro status: no se guarda; solo dice que ya no es new
       if found and cur.status_group = 'new' and cur.left_new_at is null then
         update public.crm_clients set left_new_at = now(), last_seen = now(), last_seen_by = auth.uid(), crm_agent = coalesce(ag, crm_agent), last_call = coalesce(lc, last_call),
@@ -1274,7 +1288,12 @@ begin
       end if;
     end if;
   end loop;
-  return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'bad', n_bad, 'fresh', to_json(fresh));
+  -- los que nadie vio en 3 h en horario (la pestaña que los tenía se cerró sin mandar `gone`) ya no están en la lista de news: dejaron de ser new
+  hl := extract(hour from now() at time zone 'America/Montevideo')::integer;
+  if hl between 10 and 18 and (select role from public.profiles where id = auth.uid()) in ('leader', 'admin') then
+    update public.crm_clients set left_new_at = last_seen where team_id = t and status_group = 'new' and left_new_at is null and ftd_at is null and last_seen < now() - interval '3 hours';
+  end if;
+  return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'bad', n_bad, 'ajenos', n_aj, 'fresh', to_json(fresh));
 end $$;
 
 -- ---------- registro de accesos: exportaciones y cambios a ventas ajenas (lo ven team leader y admin) ----------
