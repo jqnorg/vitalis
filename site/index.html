@@ -1839,7 +1839,6 @@ body.dark #main{background-image:none}
   <h2 class="hm-h" id="hmMesaH">la mesa hoy</h2>
   <section class="card ms" id="iMesa" aria-label="La mesa" hidden></section>
   <section class="card" id="iHoy" aria-label="Ventas de hoy de la mesa"></section>
-  <h2 class="hm-h" id="hmCmH">para atender ya <small>solo team leader y admin</small></h2>
   <p class="sub" id="cmSub" hidden></p>
   <div id="cmBody"></div>
 </section>
@@ -8281,7 +8280,6 @@ async function stationCheck(){
 const CM_NEW=5*6e4,CM_QUIET=20*6e4; // un new sin gestionar a los 5 min (salvo que su agente tenga otro en Talking) · en turno y sin llamar hace 20 min
 const cmAgo=ms=>{const m=Math.max(0,Math.round(ms/6e4));return m<1?'recién':m<60?`${m} min`:m<48*60?`${Math.floor(m/60)} h ${z(m%60)}`:`${Math.round(m/1440)} días`};
 const CM_AG=30*6e4; // una agenda vencida hace más de 30 min sin cerrar: aviso al team leader
-const CM_STUCK=2*36e5; // un cliente en Talking hace más de 2 h quedó colgado: al cortar tiene que salir de Talking (lo dijo el dueño)
 const cmHace=ms=>ms<6e4?'recién':`hace ${cmAgo(ms)}`; // "recién", nunca "hace recién"
 const cmInCall=(R,now)=>!!(R&&R.segs&&R.segs.some(s=>s.k==='talk'&&now-s.b<9e4)); // el sistema ya sabe que está en llamada (conversación abierta)
 function cmTurno(uid){ // el turno de hoy de alguien, con el descanso que tiene abierto
@@ -8314,26 +8312,20 @@ function cmData(){
   const rows=[...per.values()].map(p=>({...p,tu:cmTurno(p.m.id),pc:dayPace(p.m.id),R:ritmo(p.m.id),venc:agStats(p.m.id).venc,sp:newSpeedOf(p.m.id,te,te)}));
   const ord={br:0,in:0,none:2,out:3};
   rows.sort((a,b)=>ord[a.tu.k]-ord[b.tu.k]||(b.newN+b.talk)-(a.newN+a.talk)||a.m.name.localeCompare(b.m.name));
-  // lo que hay que atender ya, lo más urgente primero
+  // lo que hay que atender (el dueño, 27/11/2026, sacó la tarjeta "Para atender ya" y dejó solo esto; home lo muestra en "para hacer ahora", una fila por tipo): cada aviso lleva `t` (texto corto) para esa fila
   const al=[];
-  for(const p of pings)if(p.kind==='ayuda'&&!p.reply&&now-Date.parse(p.at)<30*6e4)al.push({w:0,k:'ayuda',pid:p._id,uid:p.from,key:'ayuda:'+p._id,html:`<b>${esc(first(p.from))}</b> pidió ayuda ${cmHace(now-Date.parse(p.at))} y nadie fue todavía`});
-  // new sin gestionar y Talking colgados, agrupados por agente (una fila por agente, desplegable), lo más viejo primero
-  const grp=(list,k,one,many,kind,msg)=>{const by=new Map();for(const x of list)(by.get(x.u||'')||by.set(x.u||'',[]).get(x.u||'')).push(x);
-    for(const [u,xs] of by){xs.sort((a,b)=>a.a-b.a);const nm=u?esc(memberName(u)):'<span class="hot">Sin agente</span>';
-      const li=x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.r.id)}"><b>${esc(x.r.id)}</b></button> ${esc(clip(x.r.name,26))}${x.r.country?` <span class="d">(${esc(x.r.country)})</span>`:''} · ${cmHace(now-x.a)}</li>`;
-      if(xs.length===1)al.push({w:k,k:kind,uid:u,key:kind+':'+u+':'+norm(xs[0].r.id),msg:msg(xs),id:xs[0].r.id,html:`${nm}: ${one(xs[0])}`});
-      else al.push({w:k,k:kind,uid:u,key:kind+':'+u+':'+xs.map(x=>norm(x.r.id)).join(','),msg:msg(xs),html:`<details class="cm-g"><summary><b>${nm}</b>: ${many(xs)}</summary><ul>${xs.map(li).join('')}</ul></details>`});}};
-  grp(cur.filter(x=>x.wait),1,x=>`new sin gestionar <b>${cmHace(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''}`,xs=>`<b>${xs.length}</b> new sin gestionar, el más viejo <b>${cmHace(now-xs[0].a)}</b>`,'new',xs=>xs.length===1?`Tenés el new ${xs[0].r.id} sin gestionar desde hace ${cmAgo(now-xs[0].a)}. Pasalo a Talking y gestionalo.`:`Tenés ${xs.length} news sin gestionar (${xs.map(x=>x.r.id).join(', ')}). Pasalos a Talking y gestionalos.`);
-  const stuck=cur.filter(x=>x.talk&&x.r.since&&now-Date.parse(x.r.since)>CM_STUCK).map(x=>({...x,a:Date.parse(x.r.since)}));
-  grp(stuck,2,x=>`<b>${esc(x.r.id)}</b> ${esc(x.r.name)} quedó en <b>Talking</b> ${cmHace(now-x.a)}: al cortar tiene que salir de Talking`,xs=>`<b>${xs.length}</b> clientes quedaron en <b>Talking</b> (el más viejo ${cmHace(now-xs[0].a)}): al cortar tienen que salir de Talking`,'talk',xs=>`${xs.length===1?`El cliente ${xs[0].r.id} quedó`:`Los clientes ${xs.map(x=>x.r.id).join(', ')} quedaron`} en Talking. Al cortar, sacalo de Talking.`);
+  // con uno en Talking no se llama a otro (lo dijo el dueño, 27/11/2026): un toque en Omega/Gizat/Voiso a otro cliente mientras tiene uno en Talking es un aviso. El primer contacto puede durar lo que sea.
+  {const byU=new Map();for(const x of cur)if(x.talk&&x.u&&x.r.since){const s=Date.parse(x.r.since);const o=byU.get(x.u);if(!o||s>o.s)byU.set(x.u,{x,s})}
+    for(const [u,{x,s}] of byU){const others=calls.filter(c=>c.uid===u&&c.at>s&&norm(c.id)!==norm(x.r.id));if(!others.length)continue;const ids=[...new Set(others.map(c=>c.id))],last=Math.max(...others.map(c=>c.at));
+      al.push({w:2,k:'talk',uid:u,key:'talk:'+u+':'+norm(x.r.id)+':'+ids.join(','),msg:`Tenés a ${x.r.id} en Talking y llamaste a ${ids.join(', ')}. Con uno en Talking no se llama a otro: cerralo primero.`,id:x.r.id,t:`${memberName(u)}: ${x.r.id} en Talking ${cmHace(now-s)} y llamó a ${ids.length===1?ids[0]:ids.length+' más'}`,html:`<b>${esc(memberName(u))}</b> tiene a <b>${esc(x.r.id)}</b> en <b>Talking</b> ${cmHace(now-s)} y llamó a ${ids.length===1?`<b>${esc(ids[0])}</b>`:`<b>${ids.length}</b> clientes más`} (${cmHace(now-last)}): con uno en Talking no se llama a otro`})}}
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
-    if(p.tu.ex)al.push({w:2,k:'rest',uid:p.m.id,key:'rest:'+p.m.id+':'+(p.tu.at||''),msg:`Llevás ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k} min. ¿Volvés?`,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
+    if(p.tu.ex)al.push({w:2,k:'rest',uid:p.m.id,key:'rest:'+p.m.id+':'+(p.tu.at||''),msg:`Llevás ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k} min. ¿Volvés?`,t:`${p.m.name}: ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k} min`,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
     const vz=agOf(p.m.id).filter(x=>!x.done&&now-parseDue(x.due)>=CM_AG&&!soldOf(x.id)).sort((a,b)=>parseDue(a.due)-parseDue(b.due)); // agendas vencidas sin "Ya lo llamé"
-    if(vz.length===1)al.push({w:2,k:'agenda',uid:p.m.id,key:'agenda:'+p.m.id+':'+vz[0]._id,msg:`Tenés la agenda de ${vz[0].id} (${vz[0].due.slice(11,16)}) vencida y sin cerrar. ¿Lo llamaste?`,id:vz[0].id,html:`${nm} tiene la agenda de <b>${esc(vz[0].id)}</b> (${esc(vz[0].due.slice(11,16))}) vencida <b>${cmHace(now-parseDue(vz[0].due))}</b> y sin cerrar`});
-    else if(vz.length)al.push({w:2,k:'agenda',uid:p.m.id,key:'agenda:'+p.m.id+':'+vz.map(x=>x._id).join(','),msg:`Tenés ${vz.length} agendas vencidas sin cerrar (${vz.map(x=>x.id).join(', ')}). ¿Las llamaste?`,html:`<details class="cm-g"><summary>${nm} tiene <b>${vz.length}</b> agendas vencidas sin cerrar, la más vieja <b>${cmHace(now-parseDue(vz[0].due))}</b></summary><ul>${vz.map(x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button> agenda de las ${esc(x.due.slice(11,16))} · ${cmHace(now-parseDue(x.due))}${x.kw?` · ${esc(x.kw)}`:''}</li>`).join('')}</ul></details>`});
-    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,k:'q3',uid:p.m.id,key:'q3:'+p.m.id+':'+te,msg:`Vas RMO Q3 hoy: ${minsTxt(p.R.dead)} de tiempo muerto. Mantené el ritmo.`,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
-    if(p.tu.k==='in'&&!cmInCall(p.R,now)&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,k:'quiet',uid:p.m.id,key:'quiet:'+p.m.id+':'+Math.floor(now/36e5),msg:p.last?`Hace ${cmAgo(now-p.last)} que no llamás. ¿Todo bien?`:'No llamaste todavía. ¿Todo bien?',html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`}); // en llamada no se avisa: el tiempo está justificado
+    if(vz.length===1)al.push({w:2,k:'agenda',uid:p.m.id,key:'agenda:'+p.m.id+':'+vz[0]._id,msg:`Tenés la agenda de ${vz[0].id} (${vz[0].due.slice(11,16)}) vencida y sin cerrar. ¿Lo llamaste?`,id:vz[0].id,t:`${p.m.name}: ${vz[0].id} (${vz[0].due.slice(11,16)}) hace ${cmAgo(now-parseDue(vz[0].due))}`,html:`${nm} tiene la agenda de <b>${esc(vz[0].id)}</b> (${esc(vz[0].due.slice(11,16))}) vencida <b>${cmHace(now-parseDue(vz[0].due))}</b> y sin cerrar`});
+    else if(vz.length)al.push({w:2,k:'agenda',uid:p.m.id,key:'agenda:'+p.m.id+':'+vz.map(x=>x._id).join(','),msg:`Tenés ${vz.length} agendas vencidas sin cerrar (${vz.map(x=>x.id).join(', ')}). ¿Las llamaste?`,t:`${p.m.name}: ${vz.length} vencidas, la más vieja hace ${cmAgo(now-parseDue(vz[0].due))}`,html:`<details class="cm-g"><summary>${nm} tiene <b>${vz.length}</b> agendas vencidas sin cerrar, la más vieja <b>${cmHace(now-parseDue(vz[0].due))}</b></summary><ul>${vz.map(x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button> agenda de las ${esc(x.due.slice(11,16))} · ${cmHace(now-parseDue(x.due))}${x.kw?` · ${esc(x.kw)}`:''}</li>`).join('')}</ul></details>`});
+    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,k:'q3',uid:p.m.id,key:'q3:'+p.m.id+':'+te,msg:`Vas RMO Q3 hoy: ${minsTxt(p.R.dead)} de tiempo muerto. Mantené el ritmo.`,t:`${p.m.name}: RMO Q3, ${minsTxt(p.R.dead)} muertos`,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
+    if(p.tu.k==='in'&&!cmInCall(p.R,now)&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,k:'quiet',uid:p.m.id,key:'quiet:'+p.m.id+':'+Math.floor(now/36e5),msg:p.last?`Hace ${cmAgo(now-p.last)} que no llamás. ¿Todo bien?`:'No llamaste todavía. ¿Todo bien?',t:`${p.m.name}: ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`}); // en llamada no se avisa: el tiempo está justificado
   }
   al.sort((a,b)=>a.w-b.w);
   return {now,cur,rows,al,hoyMesa,newN:cur.filter(x=>!x.talk).length,talk:cur.filter(x=>x.talk).length,wait:cur.filter(x=>x.wait).length,callsN:calls.length};
@@ -8349,15 +8341,13 @@ V.callman={
     const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin gestionar hace +5 min</span>`:'nadie espera','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+
       kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`)+
       (sp0=>kpi('Al new en',sp0.n?esc(minTxt2(sp0.med)):'—',sp0.n?`de que lo tiene el agente a Talking · ${sp0.slow?`${sp0.slow} de ${sp0.n} tardaron +5 min`:'todos antes de 5 min'}`:'sin news gestionados hoy'))(newSpeedOf(null,todayS(),todayS()));
-    const alerts=D.al.length?`<section class="card cm-al"><div class="card-h"><h3>Para atender ya</h3><span class="p-sub">${plural(D.al.length,'cosa','cosas')}</span></div>
-      <ul class="cm-list">${D.al.slice(0,20).map(a=>`<li class="w${a.w}"><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg><span>${a.html}</span>${a.id?`<button type="button" class="btn sm" data-hy="ficha" data-id="${esc(a.id)}">Ficha</button>`:''}</li>`).join('')}</ul></section>`:'';
     const cRow=x=>{const r=x.r,c=x.k;
       return `<tr class="${x.wait?'cm-wait':''}"><td><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> ${esc(clip(r.name,26))}<div class="d">${esc(r.country||'')}${r.camp?' · '+esc(clip(r.camp,22)):''}</div></td>
         <td>${x.u?`<span class="eq-who">${avatar(memberName(x.u))}${esc(first(x.u))}</span>`:'<span class="hot">sin agente</span>'}</td>
         <td>${x.talk?sp('ok b','Talking'):sp(x.wait?'hot b':'b','New')}</td>
         <td>${x.a?cmHace(D.now-x.a):'—'}</td>
         <td>${x.talk?sp('ok','gestionando'):sp(x.wait?'hot b':'d','sin gestionar')}${c.last?` <span class="d">· ${c.lines.size?`${c.lines.size} línea${c.lines.size===1?'':'s'}, `:''}última llamada ${cmHace(D.now-c.last)}</span>`:''}</td></tr>`};
-    const cur=`${D.al.length>20?`<p class="p-sub" style="margin:-8px 2px 12px">Y ${D.al.length-20} avisos más.</p>`:''}<section class="card"><div class="card-h"><h3>News en curso</h3><span class="p-sub">New y Talking, sin depositar · primero los que siguen sin gestionar</span></div>
+    const cur=`<section class="card"><div class="card-h"><h3>News en curso</h3><span class="p-sub">New y Talking, sin depositar · primero los que siguen sin gestionar</span></div>
       ${D.cur.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Cliente</th><th>Agente</th><th>Estado</th><th>Lo tiene hace</th><th>Gestión</th></tr></thead><tbody>${D.cur.slice(0,40).map(cRow).join('')}</tbody></table></div>${D.cur.length>40?`<p class="p-sub" style="margin:8px 2px 0">Y ${D.cur.length-40} más.</p>`:''}`:'<div class="p-empty">Nadie en New ni en Talking ahora.</div>'}</section>`;
     const aRow=p=>`<tr><td><button type="button" class="eq-who lnkp" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}<b>${esc(p.m.name)}</b></button></td>
       <td><span class="${p.tu.cls}">${esc(p.tu.txt)}</span></td>
@@ -8371,7 +8361,7 @@ V.callman={
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
       ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="CR (%) de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">CR (%) hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th title="Velocidad al new: de que lo tiene el agente a Talking (mediana de sus news de hoy)">Al new en</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
-    body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
+    body.innerHTML=`<div class="kpis">${k}</div>${cur}${ags}`;reopen(body,op);
   }
 };
 
@@ -8379,7 +8369,8 @@ V.callman={
    1) para hacer ahora: el new en New → copiar ID; la agenda vencida → ya lo llamé; la tarea → ya la hice; el aviso del team leader → leído; la falla de pago → ok
       (lista tipo movimientos, `.mv`; lo marcado ok/leído queda dos días en `local` `hmDone`). Debajo, las acciones redondas (agendar, copiar el new, baño, 10, 30, compartir).
    2) mi turno (lo que era la franja del Inicio, `#iTurno`, con el RMO). 3) la mesa hoy (la mesa contra su target y las ventas de hoy).
-   4) para atender ya (team leader y admin: el Manager entero, `V.callman` en `#cmBody`). Se entra siempre acá (`landing`). ---------- */
+   Para el team leader y el admin, en "para hacer ahora" van los avisos de la mesa (`cmData().al`), **uno por tipo** (el dueño, 27/11/2026, sacó "Para atender ya": llamó a otro con uno en Talking · descanso pasado · agendas vencidas sin cerrar · sin llamar o RMO Q3),
+   y debajo de "la mesa hoy" el Manager (news en curso y por agente, `V.callman` en `#cmBody`). Se entra siempre acá (`landing`). ---------- */
 const HM_KEEP=2*864e5;
 const hmDone=()=>{const d=local.get('hmDone',{}),now=Date.now();let ch=false;for(const k in d)if(now-(d[k]||0)>HM_KEEP){delete d[k];ch=true}if(ch)local.set('hmDone',d);return d};
 function hmMark(key){const d=hmDone();d[key]=Date.now();local.set('hmDone',d);refresh()}
@@ -8388,27 +8379,29 @@ const hmRow=(lv,ic,t,s,acts)=>`<div class="mv-i ${lv}"><div class="ic"><svg clas
 const hmBtn=(l,a,cls='')=>`<button type="button" class="btn ${cls}" ${a}>${esc(l)}</button>`;
 // lo que hay que hacer ahora (el agente); el team leader no gestiona clientes
 function hmAhora(){
-  const now=Date.now(),te=todayS(),D=hmDone(),L=[];let luego=[];
+  // lo mínimo (el dueño, 27/11/2026: "hay demasiadas notificaciones"): cada new es una fila (es lo urgente); las agendas vencidas, las tareas y los avisos van en una fila cada uno, con la cuenta
+  const now=Date.now(),te=todayS(),D=hmDone(),L=[];
   if(!tlView()){
     const news=newsOf(me).filter(inNew).map(r=>({r,a:assignedAt(r)||+regAt(r)||0})).sort((a,b)=>(a.a||0)-(b.a||0));
-    for(const x of news)L.push({w:0,h:hmRow('urg','cliente',`new <b>${esc(x.r.id)}</b>${x.r.country?` · ${esc(paisOf(x.r.country))}`:''}`,`<b>sin gestionar</b>: pasalo a Talking${x.a?` · te llegó hace ${hmAgo(now-x.a)}`:''}${x.r.camp?` · ${esc(x.r.camp)}`:''}`,hmBtn('copiar ID',`data-hm="copiar" data-id="${esc(x.r.id)}"`,'pri'))});
-    for(const p of pend.filter(p=>!p.done).sort((a,b)=>parseDue(a.due)-parseDue(b.due))){
-      const d=parseDue(p.due),late=now-d;
-      if(soldOf(p.id)){luego.push(`agenda <b>${esc(p.id)}</b> ya depositó`);continue}
-      if(late>=0)L.push({w:1,h:hmRow(late>=30*6e4?'urg':'imp','agenda',`agenda <b>${esc(p.id)}</b>${p.kw?` · ${esc(p.kw)}`:''}`,`era a las ${esc(p.due.slice(11,16))}${late>=6e4?` · <b>hace ${hmAgo(late)}</b>`:''}`,hmBtn('ya lo llamé',`data-hm="agHecho" data-id="${esc(p._id)}"`,'pri')+hmBtn('+1 h',`data-hm="agPos" data-id="${esc(p._id)}"`))});
-      else if(p.due.slice(0,10)===te)luego.push(`agenda de las ${esc(p.due.slice(11,16))} (<b>${esc(p.id)}</b>${p.kw?` · ${esc(p.kw)}`:''})`);
-    }
-    for(const t of pendingTasks()){const due=t.due&&t.due<te;L.push({w:2,h:hmRow(due?'urg':'imp','tareas',`tarea de <b class="nm">${esc(first(t.by))}</b>: ${esc(clip(taskTxt(t),140))}`,t.due?`para ${esc(dueTxt(t.due))}${due?' · <b>atrasada</b>':''}`:`mandada ${esc(rel(new Date(t.at)))}`,hmBtn('ya la hice',`data-hm="tkHecha" data-id="${esc(t._id)}"`,'pri')+hmBtn('ver',`data-go="tareas"`))})}
-    const hot=typeof hotMine==='function'?hotMine(newsOf(me)):[];for(const h of hot.slice(0,2))luego.push(`campaña caliente <b>${esc(h.txt||h.key||'')}</b>${h.n?`: ${plural(h.n,'FTD')} hoy`:''}${h.cl&&h.cl.length?` y tenés ${plural(h.cl.length,'new')} de esa campaña`:''}`);
+    for(const x of news.slice(0,5))L.push({w:0,h:hmRow('urg','cliente',`new <b>${esc(x.r.id)}</b>${x.r.country?` · ${esc(paisOf(x.r.country))}`:''}`,`pasalo a Talking${x.a?` · te llegó hace ${hmAgo(now-x.a)}`:''}${x.r.camp?` · ${esc(x.r.camp)}`:''}`,hmBtn('copiar ID',`data-hm="copiar" data-id="${esc(x.r.id)}"`,'pri'))});
+    if(news.length>5)L.push({w:0,h:hmRow('urg','cliente',`y <b>${news.length-5}</b> news más sin gestionar`,'',hmBtn('ver',`data-go="agenda"`))});
+    const venc=pend.filter(p=>!p.done&&parseDue(p.due)<=now&&!soldOf(p.id)).sort((a,b)=>parseDue(a.due)-parseDue(b.due));
+    if(venc.length===1){const p=venc[0];L.push({w:1,h:hmRow('imp','agenda',`agenda <b>${esc(p.id)}</b>${p.kw?` · ${esc(p.kw)}`:''}`,`era a las ${esc(p.due.slice(11,16))} · hace ${hmAgo(now-parseDue(p.due))}`,hmBtn('ya lo llamé',`data-hm="agHecho" data-id="${esc(p._id)}"`,'pri')+hmBtn('+1 h',`data-hm="agPos" data-id="${esc(p._id)}"`))})}
+    else if(venc.length)L.push({w:1,h:hmRow('imp','agenda',`<b>${venc.length}</b> agendas vencidas`,`la más vieja, <b>${esc(venc[0].id)}</b>, era a las ${esc(venc[0].due.slice(11,16))}`,hmBtn('ver agenda',`data-go="agenda"`,'pri'))});
+    const tk=pendingTasks();
+    if(tk.length===1){const t=tk[0];L.push({w:2,h:hmRow('imp','tareas',`tarea de <b class="nm">${esc(first(t.by))}</b>: ${esc(clip(taskTxt(t),120))}`,t.due?`para ${esc(dueTxt(t.due))}`:'',hmBtn('ya la hice',`data-hm="tkHecha" data-id="${esc(t._id)}"`,'pri'))})}
+    else if(tk.length)L.push({w:2,h:hmRow('imp','tareas',`<b>${tk.length}</b> tareas pendientes`,esc(clip(taskTxt(tk[0]),100))+' …',hmBtn('ver tareas',`data-go="tareas"`,'pri'))});
   }
-  for(const c of chats)for(const m of (msgs[c.id]||[]))if(m.aviso&&m.uid!==me&&now-m.t<12*36e5&&!D['av:'+m._id]){
-    const sh=chatShut(),k=sh?null:msgCard(m.body),txt=sh?'abrí el chat para verlo.':k?(k.title||'datos')+(k.rest?': '+k.rest:''):msgTxt(m.body);
-    L.push({w:3,h:hmRow('inf','campana',`aviso de <b class="nm">${esc(first(m.uid))}</b>${c.kind==='team'?'':` en ${esc(c.kind==='dm'?'tu privado':chatName(c))}`}`,esc(clip(txt,160)),hmBtn('ver',`data-hm="chat" data-id="${esc(c.id)}"`)+hmBtn('leído',`data-hm="ok" data-key="av:${esc(m._id)}"`,'pri'))});
-  }
-  for(const f of (typeof bkFallas==='function'?bkFallas():[])){const key='bk:'+(f.mid||f.pid)+':'+(f.at||'');if(D[key])continue;const nm=bkName(f.pid,f.mid)+(f.fc&&f.fc.length&&!f.mid?enTxt(f.fc):'');
-    L.push({w:4,h:hmRow('inf','banking',`<b class="nm">${esc(nm)}</b> está fallando`,`${f.note?esc(clip(f.note,120))+' · ':''}no lo ofrezcas por ahora${f.by?` · avisó ${esc(first(f.by))}`:''}`,hmBtn('ver banking',`data-go="banking"`)+hmBtn('ok',`data-hm="ok" data-key="${esc(key)}"`,'pri'))})}
+  const av=[];for(const c of chats)for(const m of (msgs[c.id]||[]))if(m.aviso&&m.uid!==me&&now-m.t<12*36e5&&!D['av:'+m._id])av.push({m,c});
+  if(av.length){const {m,c}=av[av.length-1],sh=chatShut(),k=sh?null:msgCard(m.body),txt=sh?'abrí el chat para verlo.':k?(k.title||'datos')+(k.rest?': '+k.rest:''):msgTxt(m.body);
+    L.push({w:3,h:hmRow('inf','campana',av.length===1?`aviso de <b class="nm">${esc(first(m.uid))}</b>`:`<b>${av.length}</b> avisos, el último de <b class="nm">${esc(first(m.uid))}</b>`,esc(clip(txt,140)),hmBtn('ver',`data-hm="chat" data-id="${esc(c.id)}"`)+hmBtn('leído',`data-hm="ok" data-key="${av.map(x=>'av:'+x.m._id).join(' ')}"`,'pri'))})}
+  if(isLeader()&&crm.ok){ // los avisos de la mesa, uno por tipo, con todos los agentes en la misma situación juntos (lo pidió el dueño)
+    const by=new Map();for(const a of cmData().al){const k=a.k==='quiet'||a.k==='q3'?'ritmo':a.k;(by.get(k)||by.set(k,[]).get(k)).push(a)}
+    const KD={talk:[0,'urg','cliente','llamó a otro con uno en Talking','llamaron a otro con uno en Talking'],rest:[1,'imp','turnos','pasado del descanso','pasados del descanso'],agenda:[1,'imp','agenda','con agendas vencidas sin cerrar','con agendas vencidas sin cerrar'],ritmo:[2,'inf','alerta','sin llamar o RMO Q3','sin llamar o RMO Q3']};
+    for(const [k,xs] of by){const d=KD[k];if(!d)continue;const us=[...new Set(xs.map(a=>a.uid))];
+      L.push({w:4+d[0],h:hmRow(d[1],d[2],us.length===1?esc(xs[0].t):`<b>${us.length}</b> agentes ${d[4]}`,us.length===1&&xs.length===1?'':esc(xs.map(a=>a.t).join(' · ')),hmBtn('ver',`data-hmsec="cmBody"`))})}}
   L.sort((a,b)=>a.w-b.w);
-  return {n:L.length,html:(L.length?`<div class="mv">${L.map(x=>x.h).join('')}</div>`:`<div class="mv"><div class="mv-empty"><b>todo al día.</b> cuando entre un new, venza una agenda, te manden una tarea o un aviso, aparece acá.</div></div>`)+(luego.length?`<p class="sub">después · ${luego.join(' · ')}</p>`:'')};
+  return {n:L.length,html:L.length?`<div class="mv">${L.map(x=>x.h).join('')}</div>`:`<div class="mv"><div class="mv-empty"><b>todo al día.</b> cuando entre un new, venza una agenda o te manden una tarea, aparece acá.</div></div>`};
 }
 function hmActs(){
   const nx=tlView()?null:newsOf(me).filter(inNew)[0];
@@ -8422,12 +8415,13 @@ V.home={
   build(){
     V.callman.build();
     document.addEventListener('click',e=>{
+      const hs=e.target.closest('[data-hmsec]');if(hs){const el=$('#'+hs.dataset.hmsec);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});return}
       const sl=e.target.closest('#hmSel [data-sec]');if(sl){const el=$('#'+sl.dataset.sec);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});$$('#hmSel button').forEach(b=>b.classList.toggle('on',b===sl));return}
       const b=e.target.closest('[data-hm]');if(!b||!ready)return;
       const {hm,id,key}=b.dataset;
       if(hm==='copiar')openFicha(id);
       else if(hm==='chat')go('chat',{chat:id});
-      else if(hm==='ok')hmMark(key);
+      else if(hm==='ok'){const d=hmDone();for(const k of key.split(' '))d[k]=Date.now();local.set('hmDone',d);refresh()}
       else if(hm==='agHecho'){const p=pend.find(x=>x._id===id);if(p&&noRO())pendHecho(p)}
       else if(hm==='agPos'){const p=pend.find(x=>x._id===id);if(p&&noRO())posponer(p,60)}
       else if(hm==='tkHecha'){if(noRO())B.taskDone(id,true)}
@@ -8440,14 +8434,13 @@ V.home={
     $('#hmFecha').textContent=`${DIAL[now.getDay()]} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
     const A=hmAhora();
     $('#hmAhora').innerHTML=A.html;$('#hmActs').innerHTML=hmActs();
-    const al=isLeader()?cmData().al.filter(a=>a.w<=2).length:0;
-    $('#hmSel').innerHTML=[['hmAhoraH','para hacer ahora',A.n],['hmTurnoH','mi turno',0],['hmMesaH','la mesa hoy',0],...(isLeader()?[['hmCmH','para atender ya',al]]:[])].map(([k,l,n],i)=>`<button type="button" data-sec="${k}"${i===0?' class="on"':''}>${esc(l)}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
-    {const b=$('#nbHome');if(b)b.textContent=(A.n+al)||''}
+    $('#hmSel').innerHTML=[['hmAhoraH','para hacer ahora',A.n],['hmTurnoH','mi turno',0],['hmMesaH','la mesa hoy',0]].map(([k,l,n],i)=>`<button type="button" data-sec="${k}"${i===0?' class="on"':''}>${esc(l)}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
+    {const b=$('#nbHome');if(b)b.textContent=A.n||''}
     $('#iTurno').hidden=TL;$('#hmTurnoH').hidden=TL;
     crmLoad();
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
     $('#iHoy').innerHTML=hoyMesaCard();
-    const L=isLeader();$('#hmCmH').hidden=!L;$('#cmBody').hidden=!L;$('#cmSub').hidden=!L;if(L)V.callman.render({});
+    const L=isLeader();$('#cmBody').hidden=!L;$('#cmSub').hidden=!L;if(L)V.callman.render({});
     hotNotify();
     this.turno(true);
   },
