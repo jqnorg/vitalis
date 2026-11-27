@@ -1661,23 +1661,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--pri);box-shadow:0 0 0
 .qb.q1{color:var(--v-ok);border-color:var(--v-ok)}
 /* el halo abajo del contenido (de Rentier), solo en Noche */
 body.dark #main{background-image:radial-gradient(55% 55% at 50% 100%,var(--glow),transparent 70%);background-attachment:fixed}
-/* ---- la Bandeja (bandeja.js): una lista de cosas para hacer, un botón por cosa ---- */
-.bj{display:flex;flex-direction:column;gap:10px}
-.bj-i{display:grid;grid-template-columns:46px 1fr auto;align-items:center;gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:13px 18px;position:relative;overflow:hidden}
-.bj-i:before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:3px;background:var(--lv,var(--line))}
-.bj-i.urg{--lv:var(--v-err)}.bj-i.imp{--lv:var(--v-warn)}.bj-i.info{--lv:var(--v-info)}.bj-i.done{opacity:.6}
-.bj-i .bj-ic{width:46px;height:46px;border-radius:13px;background:var(--raised);border:1px solid var(--line);display:grid;place-items:center;color:var(--dim)}
-.bj-i.urg .bj-ic{color:var(--err)}.bj-i.imp .bj-ic{color:var(--acc)}
-.bj-i .bj-ic svg.ic{width:22px;height:22px;stroke-width:1.8}
-.bj-i .tt{font-size:16px;font-weight:600;line-height:1.3}.bj-i .tt b{font-weight:700}.bj-i .tt>b:first-child,.bj-i .tt b.id,.bj-i .tt summary>b:first-child{color:var(--pri)}.bj-i .tt details{display:inline}.bj-i .tt ul{margin:6px 0 0;padding-left:18px;font-size:13.5px;font-weight:500}.bj-i .ss{color:var(--dim);font-size:13px;margin-top:3px}
-.bj-i .bj-a{display:flex;gap:6px;align-items:center}.bj-i .btn{padding:9px 18px;font-size:14px}
-.bj-i .lnkp{font:inherit;font-weight:700;color:var(--pri)}
-.bj-g{margin:22px 2px 8px;font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--dim)}
-.bj-empty{padding:34px 16px;text-align:center;color:var(--dim);border:1px dashed var(--line);border-radius:16px;font-size:15px}
-.bj-empty b{display:block;color:var(--fg);font-size:18px;margin-bottom:4px}
-.bj-cnt{color:var(--dim);font-weight:600;margin-left:4px}
-.bj-live{margin-top:22px}
-@media (max-width:640px){.bj-i{grid-template-columns:38px 1fr;gap:10px}.bj-i .bj-a{grid-column:2;justify-content:flex-end}.bj-i .bj-ic{width:38px;height:38px}}
 /* la racha: dos semanas con un punto por día con venta */
 .rk-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:10px;text-align:center;font-size:11px;color:var(--dim)}
 .rk-cal span{padding:4px 0;border-radius:7px}.rk-cal .h{font-weight:700;font-size:10px}.rk-cal .on{background:var(--pri);color:var(--pri-ink);font-weight:800}.rk-cal .has{background:color-mix(in srgb,var(--pri) 18%,transparent);color:var(--pri);font-weight:700}.rk-cal .off{opacity:.45}
