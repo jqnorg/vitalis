@@ -7658,7 +7658,10 @@ function hoyBand(){ // los clientes en New, como pastilla en la barra (lo pidió
 
 /* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
    Hablar no suma ni resta: no depende del agente que el cliente atienda. Lo que se mide es si, cuando no está hablando, marca al ritmo.
-   Una llamada cubre CALL_S (50 s de espera + 3 s para cambiar de línea). Los toques seguidos al mismo cliente (Omega, Gizat, Voiso) son un
+   Lo que cubre una llamada se calibra con los datos de toda la mesa (`callCal`, 27/11/2026, lo pidió el dueño: "calibremos el costo de la llamada
+   con los datos de todos juntos"): de las llamadas de hoy de todos, el tiempo entre un toque y el siguiente. La espera de una línea (`ring`) es la
+   mediana entre dos toques al mismo cliente; lo que cubre un intento hasta el siguiente cliente (`cap`) es el cuartil 75 de los cambios de
+   cliente. Con menos de 200 muestras quedan los fijos CALL_S (53 s) y RING_S (50 s). Los toques seguidos al mismo cliente (Omega, Gizat, Voiso) son un
    intento. Un intento es conversación si después el cliente pasó a Talking (o depositó) antes del siguiente intento. Lo hablado es el tiempo
    en Talking menos 50 s por cada línea que hubo que marcar (1 línea: 50 s; 2: 100 s; 3: 150 s): el tiempo que costó llamarlo no es charla.
    Lo demás, sin descanso marcado, es tiempo muerto.
@@ -7666,6 +7669,18 @@ function hoyBand(){ // los clientes en New, como pastilla en la barra (lo pidió
    (TALK_MIN). La franja sale del tiempo muerto proyectado al día: Q1 menos de 30 min (la mejor) · Q2 hasta 1 h · Q3 más. */
 const TALK_MIN=150*6e4,CALL_S=53e3,RING_S=50e3,TALK_MAX=3*36e5,Q_MIN=[30*6e4,60*6e4],TALK_G=['ftd']; // solo news y FTDs: el resultado que se ve es Talking (o el depósito)
 const isTalk=l=>/talk|habl/.test(l.st); // Talking: tiempo de llamada justificado
+// el costo de la llamada, de los datos de todos (hoy, toda la mesa): {ring, cap, n, learned}
+const calMemo={p:-1,v:null};
+function callCal(){
+  if(calMemo.p===pass&&calMemo.v)return calMemo.v;
+  const by=new Map();for(const c of calls){(by.get(c.uid)||by.set(c.uid,[]).get(c.uid)).push(c)}
+  const same=[],other=[];
+  for(const L of by.values()){L.sort((a,b)=>a.at-b.at);for(let i=1;i<L.length;i++){const s=L[i].at-L[i-1].at;if(s<5e3||s>10*6e4)continue;(norm(L[i].id)===norm(L[i-1].id)?same:other).push(s)}}
+  const pct=(A,p)=>{if(!A.length)return 0;A.sort((a,b)=>a-b);return A[Math.min(A.length-1,Math.floor(A.length*p))]};
+  const n=same.length+other.length,learned=same.length>=200&&other.length>=200;
+  const v=learned?{ring:Math.round(pct(same,.5)),cap:Math.round(pct(other,.75)),n,learned}:{ring:RING_S,cap:CALL_S,n,learned:false};
+  calMemo.p=pass;calMemo.v=v;return v;
+}
 const ritmoMemo={p:-1,m:new Map()};
 function ritmo(uid){
   if(ritmoMemo.p!==pass){ritmoMemo.p=pass;ritmoMemo.m.clear()}
@@ -7681,6 +7696,7 @@ function ritmo(uid){
       if(cur&&/talk|habl/.test(norm(cur.status))&&cur.since){const t=Date.parse(cur.since);if(t>=from-10*6e4&&t<=until+10*6e4)return true} // pasó a Talking alrededor del intento (uno colgado de días es un error del CRM, no charla)
       return stLog.some(l=>l.id===k&&l.at>=from&&l.at<=until+10*6e4&&(isTalk(l)||TALK_G.includes(l.grp)));
     };
+    const CAL=callCal();
     let dead=0,talk=0,cur=t.in;const segs=[]; // segs: qué pasó en cada tramo del día (para el detalle)
     const seg=(k,a,b,x)=>{if(b-a>=1000)segs.push({k,a,b,...x})}; // k: call · talk · dead · br
     const deadSeg=(a,b)=>{const d=Math.max(0,b-a-brIn(a,b));dead+=d;if(d>0)seg('dead',a,b,{d})};
@@ -7689,10 +7705,10 @@ function ritmo(uid){
     for(let i=0;i<G.length;i++){
       const g=G[i],nx=G[i+1],until=nx?nx.at:end;
       deadSeg(cur,g.at); // antes de este intento: nada cubría
-      const ring=Math.min(until-g.at,g.last-g.at+CALL_S),gap=Math.max(0,until-g.at-ring); // lo que cubren las líneas marcadas; después, el hueco
+      const ring=Math.min(until-g.at,g.last-g.at+CAL.cap),gap=Math.max(0,until-g.at-ring); // lo que cubren las líneas marcadas (calibrado con la mesa); después, el hueco
       seg('call',g.at,g.at+ring,{id:g.id,line:g.lines.join('+'),n:g.n});
       if(gap>0){
-        if(talked(g.id,g.at,until)){const x=Math.min(Math.max(0,until-g.at-RING_S*g.n),TALK_MAX);talk+=x;seg('talk',g.at+ring,g.at+ring+Math.max(0,x-(ring-RING_S*g.n)),{id:g.id,n:g.n})} // hablado: el hueco menos 50 s por línea marcada
+        if(talked(g.id,g.at,until)){const x=Math.min(Math.max(0,until-g.at-CAL.ring*g.n),TALK_MAX);talk+=x;seg('talk',g.at+ring,g.at+ring+Math.max(0,x-(ring-CAL.ring*g.n)),{id:g.id,n:g.n})} // hablado: el hueco menos la espera de cada línea marcada
         else deadSeg(g.at+ring,until);
       }
       cur=until;
@@ -7702,7 +7718,7 @@ function ritmo(uid){
     const brTot=brIn(t.in,end),useful=Math.max(1,end-t.in-brTot),full=t.out?useful:Math.max(useful,jorMs()-brTot);
     const proj=t.out?dead:Math.round(dead/useful*full);
     const req=minCalls(),ok=L.length>=req||talk>=TALK_MIN; // una de las dos, sin compensar
-    R={n:L.length,dead,talk,proj,req,ok,talkOk:talk>=TALK_MIN,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4,segs,in:t.in,end,open:!t.out};
+    R={n:L.length,dead,talk,proj,req,ok,talkOk:talk>=TALK_MIN,useful,q:proj<Q_MIN[0]?1:proj<Q_MIN[1]?2:3,young:useful<30*6e4,segs,in:t.in,end,open:!t.out,cal:CAL};
   }
   ritmoMemo.m.set(uid,R);return R;
 }
@@ -7762,6 +7778,7 @@ function ritmoModal(uid){
     <div class="rt-sum"><span><b>${R.n}</b> llamadas <span class="d">de ${R.req}</span></span><span><b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> hablando <span class="d">de 2 h 30</span></span><span><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos${R.open?` <span class="d">(a fin de día serían ${esc(minsTxt(R.proj))})</span>`:''}</span></div>
     <div class="rt-tl" role="img" aria-label="Línea de tiempo del día">${tl}</div><div class="tll"><span>${hhmm(R.in)}</span><span>${R.open?'ahora':'salida'} ${hhmm(R.end)}</span></div>
     <div class="legend rt-lg"><span><i class="sw call"></i>Llamada</span><span><i class="sw talk"></i>Conversación</span><span><i class="sw br"></i>Descanso</span><span><i class="sw dead"></i>Sin marcar</span></div>
+    <p class="p-sub" style="margin:6px 2px 0">${R.cal&&R.cal.learned?`Calibrado con la mesa de hoy (${nf(R.cal.n)} toques): una línea espera ${Math.round(R.cal.ring/1000)} s y un intento cubre hasta ${Math.round(R.cal.cap/1000)} s antes del siguiente cliente.`:'Todavía pocos toques en la mesa: una línea espera 50 s y un intento cubre 53 s.'}</p>
     <h4 class="rt-h">Huecos sin marcar</h4>${holes.length?`<ul class="rt-list">${holes.map(s=>`<li><b>${esc(minsTxt(s.d))}</b> de ${hhmm(s.a)} a ${hhmm(s.b)}, ${before(s)}</li>`).join('')}</ul>`:'<p class="p-sub" style="margin:0">Ninguno de más de 3 minutos.</p>'}
     ${talks.length?`<h4 class="rt-h">Conversaciones</h4><ul class="rt-list">${talks.map(s=>`<li><b>${esc(minsTxt(s.b-s.a))}</b> desde las ${hhmm(s.a)} con <b>${esc(s.id)}</b> ${esc(name(s.id))}${s.n>1?` <span class="d">(atendió a la ${s.n}ª línea)</span>`:''}</li>`).join('')}</ul>`:''}
     <p class="p-sub" style="margin:10px 0 0">Cada línea marcada cubre 50 s. Es conversación si después el cliente pasó a Talking antes del siguiente intento; se le restan 50 s por línea marcada. Los descansos marcados no cuentan.</p>`,
