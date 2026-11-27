@@ -3126,9 +3126,8 @@ function lowerize(root){
   for(const n of l){const v=n.nodeValue.replace(LOW_RE,(m,a,b,c)=>a+b.toLowerCase()+c);if(v!==n.nodeValue)n.nodeValue=v}
   for(const el of root.querySelectorAll?root.querySelectorAll('[title],[placeholder],[aria-label]'):[])for(const at of ['title','placeholder','aria-label']){const v=el.getAttribute(at);if(v&&/\p{Lu}\p{Ll}/u.test(v)&&!el.closest(LOW_SKIP))el.setAttribute(at,v.replace(LOW_RE,(m,a,b,c)=>a+b.toLowerCase()+c))}
 }
-// lo que aparece después (avisos, modales, lo que se redibuja) también baja, de a poco y sin frenar nada
-let lowQ=new Set(),lowT=0;
-new MutationObserver(ms=>{for(const m of ms){for(const n of m.addedNodes)if(n.nodeType===1)lowQ.add(n);else if(n.nodeType===3&&n.parentElement)lowQ.add(n.parentElement)}if(!lowT)lowT=setTimeout(()=>{lowT=0;const q=[...lowQ];lowQ.clear();for(const n of q)if(n.isConnected)lowerize(n)},30)}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+// lo que aparece después (avisos, modales, lo que se redibuja) también baja, en el mismo microtask de la mutación, antes de pintar: si no, el texto "tiembla" (se vio el 27/11)
+new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(!n.isConnected)continue;if(n.nodeType===1)lowerize(n);else if(n.nodeType===3&&n.parentElement)lowerize(n.parentElement)}}).observe(document.documentElement,{childList:true,subtree:true});
 let rT=null;
 // con la pestaña escondida no se dibuja la sección (nadie la ve): se dibuja al volver. La barra y la extensión sí se actualizan.
 let rDirty=false;
