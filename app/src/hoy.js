@@ -153,6 +153,14 @@ function rmoHistCard(rows,people,title){ // una tabla agentes × días (los últ
 const qCls=q=>q===1?'ok':q===2?'warn':'hot';
 const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
 const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;
+// la tarjeta "mi turno" de home (27/11/2026, el dueño: "esto está muy feo, que esté todo alineado"): tres casillas iguales, llamadas · hablados · tiempo muerto con la franja
+function ritmoKpis(uid){
+  const R=ritmo(uid);if(!R)return '';
+  const k=(lb,v,s)=>`<div class="k"><span class="lb">${lb}</span><span class="v">${v}</span><span class="s">${s}</span></div>`;
+  return k('llamadas',`${R.n}<small> de ${R.req}</small>${R.ok&&R.n>=R.req?' <span class="ok">✓</span>':''}`,`mínimo del día`)+
+    k('hablados',`${esc(minsTxt(R.talk))}${R.talkOk?' <span class="ok">✓</span>':''}`,'de 2 h 30')+
+    k('tiempo muerto',`<span class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</span>`,`${qBadge(R,true)} · <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">ver qué pasó</button>`);
+}
 function ritmoLine(uid){ // en palabras: "180 llamadas · 25 min muertos · Q1"
   const R=ritmo(uid);if(!R)return '';
   return `<b class="rmo-t" title="RMO: tu ritmo del día">RMO</b> · <span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}<span class="d"> de ${R.req}</span></span> · <span class="rt-t"><b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> <span class="d">hablados de 2 h 30</span></span>${R.ok?' <span class="ok" title="Cumplido: 250 llamadas o 2 h 30 habladas">✓</span>':''} · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;

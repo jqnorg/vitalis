@@ -1712,6 +1712,23 @@ body.dark #main{background-image:none}
 .rk-cal span{padding:4px 0;border-radius:7px}.rk-cal .h{font-weight:700;font-size:10px}.rk-cal .on{background:var(--pri);color:var(--pri-ink);font-weight:800}.rk-cal .has{background:color-mix(in srgb,var(--pri) 18%,transparent);color:var(--pri);font-weight:700}.rk-cal .off{opacity:.45}
 #bar .tb.go{background:var(--fg);color:var(--bg)}#bar .tb.go:hover{background:var(--fg);opacity:.9}
 #bar .pill.turno{box-shadow:var(--sh)}
+
+/* mi turno (home), en bloques alineados (27/11/2026) */
+.turno-mini{display:block;padding:18px 20px 16px}
+.turno-mini .tm-top{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.turno-mini .tm-top .tm-l{flex:1;min-width:0;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.turno-mini .tm-top .tstate .big{font-size:30px}
+.turno-mini .tm-top .btns{margin:0;justify-content:flex-end}
+.turno-mini .tm-k{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.turno-mini .tm-k .k{background:var(--raised);border-radius:16px;padding:12px 14px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.turno-mini .tm-k .lb{color:var(--dim);font-size:12.5px;font-weight:600}
+.turno-mini .tm-k .v{font-family:var(--display);font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.15}
+.turno-mini .tm-k .v small{font-family:var(--ui);font-size:13px;font-weight:600;color:var(--dim);letter-spacing:0}
+.turno-mini .tm-k .s{color:var(--dim);font-size:12.5px}.turno-mini .tm-k .s .lnk{font-size:12.5px}
+.turno-mini .tm-m{margin-top:14px}.turno-mini .tm-m:empty{display:none}
+.turno-mini .marks{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--dim);font-size:13px}.turno-mini .marks b{color:var(--fg)}
+.turno-mini #itTl{margin-top:8px}.turno-mini .tl{height:8px;margin:0}
+@media (max-width:820px){.turno-mini .tm-k{grid-template-columns:1fr}}
 </style>
 </head>
 <body class="auth">
@@ -1827,13 +1844,12 @@ body.dark #main{background-image:none}
 <section class="view" id="v-home" hidden>
   <div class="vh"><div><h1 id="hmHola">Hola</h1><p class="sub" id="hmFecha"></p></div></div>
   <div class="hm-sel" id="hmSel"></div>
-  <h2 class="hm-h" id="hmAhoraH">para hacer ahora</h2>
-  <div id="hmAhora"></div>
   <div class="acts" id="hmActs"></div>
   <h2 class="hm-h" id="hmTurnoH">mi turno</h2>
   <section class="card turno-mini" id="iTurno" aria-label="Turno">
-    <div class="tm-l"><h3>Turno</h3><div class="tstate" id="itState"></div><div class="ritmo" id="itRitmo" hidden></div></div>
-    <div class="btns wr" id="itBtns"></div>
+    <div class="tm-top"><div class="tm-l"><h3>turno</h3><div class="tstate" id="itState"></div></div><div class="btns wr" id="itBtns"></div></div>
+    <div class="tm-k" id="itRitmo" hidden></div>
+    <div class="tm-m" id="itMarks"></div>
     <div id="itTl"></div>
   </section>
   <h2 class="hm-h" id="hmMesaH">la mesa hoy</h2>
@@ -2108,7 +2124,7 @@ body.dark #main{background-image:none}
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
 const VERSION='1.68.0';
-const EXT_VER='1.29.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const EXT_VER='1.30.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -3215,7 +3231,8 @@ function dockCl(d){
   const opt=o=>({m:o.m.name,p:procName(o.p),n:clip(o.m.note||'',160)});
   const pay=pais&&bk.ok?{pais,k:Object.fromEntries(['efectivo','transferencia','tarjeta'].map(k=>{const L=bkOptions(pais,k);
     return [k,{ok:L.filter(o=>!o.falla).slice(0,12).map(opt),bad:L.filter(o=>o.falla).slice(0,8).map(o=>o.m.name+' · '+procName(o.p))}]}))}:null;
-  return {id,name:d.name||'',pais:d.pais||d.country||'',hora:cliTime(d.country)||'',
+  const aff=String((r&&r.aff)||d.aff||'').trim(),camp=String((r&&r.camp)||d.camp||'').trim();
+  return {id,name:d.name||'',pais:d.pais||d.country||'',country:d.pais||d.country||'',hora:cliTime(d.country)||'',aff,camp,camps:dockCamps(aff,camp,d.pais||d.country||''),
     st:r?(sgPlain(r)||r.status||''):'',crm:r&&r.status||'',
     stop:(f||(r&&paidCrm(r)))?'paid':'',
     paid:f?`Depositó ${f.date===todayS()?'hoy':dm(f.date)}`:r&&paidCrm(r)?'Tiene FTD en el CRM':'',
@@ -3236,6 +3253,24 @@ function dockBoard(){
     const P=dayPool(me),sp=newSpeedOf(me,te,te);
     return {news:mine,stats:{news:P.total,done:P.done,calls:P.n,med:sp.n?sp.med:null}};
   }catch(e){return null}
+}
+// la campaña del cliente para la mini ficha: la suya (con mínimo y anuncio de `campaign_info`) y las otras de su afiliador en su país; cache de 2 min por afiliador · país
+const dkCamps=new Map();
+function dockCamps(aff,camp,pais){
+  if(!aff||ficOk===false)return camp?[{camp,mine:true,min:'',ad:''}]:[];
+  const k=aff+'|'+pais,c=dkCamps.get(k);
+  if(!c||Date.now()-c.at>12e4){dkCamps.set(k,{at:Date.now(),rows:c?c.rows:[]});Q(sb.from('campaign_info').select('*').eq('aff',aff).eq('country',pais)).then(rows=>{dkCamps.set(k,{at:Date.now(),rows:rows||[]});dockSoon()}).catch(()=>{})}
+  const rows=(dkCamps.get(k)||{}).rows||[],mine=rows.find(i=>norm(i.camp)===norm(camp));
+  return [...(camp?[{camp,mine:true,min:mine&&mine.min_amount||'',ad:mine&&mine.ad_text||''}]:[]),...rows.filter(i=>norm(i.camp)!==norm(camp)).map(i=>({camp:i.camp,mine:false,min:i.min_amount||'',ad:i.ad_text||''}))];
+}
+async function dockCampSet(r){ // "Guardar" en la mini ficha: el monto mínimo y el anuncio de esa afiliador · campaña · país
+  const aff=String(r.aff||'').trim().slice(0,60),camp=String(r.camp||'').trim().slice(0,120),pais=String(r.country||'').trim().slice(0,60),min_amount=String(r.min||'').trim().slice(0,60)||null,ad_text=String(r.ad||'').trim().slice(0,2000)||null;
+  if(!aff||!camp||!(min_amount||ad_text))return;
+  try{const ex=await Q(sb.from('campaign_info').select('aff').eq('aff',aff).eq('camp',camp).eq('country',pais));
+    if(ex&&ex.length)await Q(sb.from('campaign_info').update({min_amount,ad_text,updated_by:me,updated_at:new Date().toISOString()}).eq('aff',aff).eq('camp',camp).eq('country',pais));
+    else await Q(sb.from('campaign_info').insert({aff,camp,country:pais,min_amount,ad_text}));
+    dkCamps.delete(aff+'|'+pais);toast('Campaña guardada.');dockSoon()}
+  catch(e){toast('No pude guardar la campaña: '+errMsg(e),'err')}
 }
 async function dockData(){
   if(isLeadUid(me))return {off:1,board:dockBoard()};
@@ -3265,6 +3300,7 @@ async function dockSync(beat){
 function dockCmd(d){
   if(!ready)return;
   if(d.cmd==='turno'){const k=String(d.k||'');if(['bano','d10','d30','vuelta'].includes(k))marcar(k);return}
+  if(d.cmd==='campset'&&d.r&&typeof d.r==='object'){dockCampSet(d.r);return}
 }
 // el comentario para el CRM: lo traduce el traductor de Chrome de esta pestaña (si en la del CRM no anda)
 async function dockTr(txt){
@@ -3830,7 +3866,7 @@ window.addEventListener('message',e=>{
   if(d&&d.type==='ftd-agenda-station'&&d.v===1&&Array.isArray(d.views)){stationFromExt(d.views);return}
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='nuevo'){const k=String(d.k||'').slice(0,60);newMark(k);fichaNew(k);return} // entró un new: la ficha se abre cuando entres
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='actual'){const k=String(d.k||'').slice(0,60),r=String(d.r||'').slice(0,120);if(!k)return;if(ready)setCurrent(k,r,'crm');else{curCl={id:k,name:r,src:'crm',at:Date.now()};local.set('curCl',curCl)}return} // el cliente abierto en el CRM (si Vitalis todavía está arrancando, queda para cuando entre)
-  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir')){dockCmd(d);return} // desde la mini ficha del CRM
+  if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&(d.cmd==='turno'||d.cmd==='ir'||d.cmd==='campset')){dockCmd(d);return} // desde la mini ficha del CRM
   if(d&&d.type==='ftd-agenda-tr'&&d.v===1){const src=e.source;dockTr(d.txt).catch(()=>({why:'no'})).then(r=>{try{src.postMessage({type:'ftd-agenda-tr-ack',v:1,reqId:d.reqId,...r},'*')}catch(x){}});return} // traducir el comentario de la mini ficha
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='banking'){if(ready)go('banking');return} // desde la tarjeta de una falla de pago
   if(d&&d.type==='ftd-agenda-cmd'&&d.v===1&&d.cmd==='chat'){if(ready)go('chat',{chat:String(d.k||'').split(':')[0]});return} // un aviso trae chat:aId
@@ -7701,6 +7737,14 @@ function rmoHistCard(rows,people,title){ // una tabla agentes × días (los últ
 const qCls=q=>q===1?'ok':q===2?'warn':'hot';
 const minsTxt=ms=>{const m=Math.round(ms/6e4);return m<60?`${m} min`:`${Math.floor(m/60)} h ${z(m%60)}`};
 const qBadge=(R,full)=>!R?'<span class="d">sin entrada</span>':R.young?'<span class="d">recién empieza</span>':`<span class="qb q${R.q}">Q${R.q}</span>${full?` <span class="d">${R.q===1?'muy bien':R.q===2?'justo':'mucho tiempo muerto'}</span>`:''}`;
+// la tarjeta "mi turno" de home (27/11/2026, el dueño: "esto está muy feo, que esté todo alineado"): tres casillas iguales, llamadas · hablados · tiempo muerto con la franja
+function ritmoKpis(uid){
+  const R=ritmo(uid);if(!R)return '';
+  const k=(lb,v,s)=>`<div class="k"><span class="lb">${lb}</span><span class="v">${v}</span><span class="s">${s}</span></div>`;
+  return k('llamadas',`${R.n}<small> de ${R.req}</small>${R.ok&&R.n>=R.req?' <span class="ok">✓</span>':''}`,`mínimo del día`)+
+    k('hablados',`${esc(minsTxt(R.talk))}${R.talkOk?' <span class="ok">✓</span>':''}`,'de 2 h 30')+
+    k('tiempo muerto',`<span class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</span>`,`${qBadge(R,true)} · <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">ver qué pasó</button>`);
+}
 function ritmoLine(uid){ // en palabras: "180 llamadas · 25 min muertos · Q1"
   const R=ritmo(uid);if(!R)return '';
   return `<b class="rmo-t" title="RMO: tu ritmo del día">RMO</b> · <span class="rt-n"><b>${R.n}</b> ${R.n===1?'llamada':'llamadas'}<span class="d"> de ${R.req}</span></span> · <span class="rt-t"><b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> <span class="d">hablados de 2 h 30</span></span>${R.ok?' <span class="ok" title="Cumplido: 250 llamadas o 2 h 30 habladas">✓</span>':''} · <span class="rt-d"><b class="${R.dead>=Q_MIN[1]?'hot':R.dead>=Q_MIN[0]?'warn':''}">${esc(minsTxt(R.dead))}</b> muertos</span> · ${qBadge(R,true)} <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(uid)}">Ver qué pasó</button>`;
@@ -8454,10 +8498,9 @@ V.home={
     const now=new Date(),te=todayS(),h=now.getHours(),TL=tlView();
     $('#hmHola').textContent=`${h<13?'buen día':h<20?'buenas tardes':'buenas noches'}, ${profile.name.split(/\s+/)[0]}`;
     $('#hmFecha').textContent=`${DIAL[now.getDay()]} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
-    const A=hmAhora();
-    $('#hmAhora').innerHTML=A.html;$('#hmActs').innerHTML=hmActs();
-    $('#hmSel').innerHTML=[['hmAhoraH','para hacer ahora',A.n],['hmTurnoH','mi turno',0],['hmMesaH','la mesa hoy',0]].map(([k,l,n],i)=>`<button type="button" data-sec="${k}"${i===0?' class="on"':''}>${esc(l)}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
-    {const b=$('#nbHome');if(b)b.textContent=A.n||''}
+    $('#hmActs').innerHTML=hmActs(); // sin "para hacer ahora" (el dueño, 27/11/2026: "no sirve de nada"); `hmAhora` queda sin uso
+    $('#hmSel').innerHTML=[['hmTurnoH','mi turno',0],['hmMesaH','la mesa hoy',0]].map(([k,l,n],i)=>`<button type="button" data-sec="${k}"${i===0?' class="on"':''}>${esc(l)}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
+    {const b=$('#nbHome');if(b)b.textContent=''}
     $('#iTurno').hidden=TL;$('#hmTurnoH').hidden=TL;
     crmLoad();
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
@@ -8473,8 +8516,7 @@ V.home={
       this.k=key;let bt='';
       if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">marcar entrada</button>';
       else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">volví ${isBano(b)?'del baño':'del descanso'}</button>`;
-      else bt=day?`<span class="marks">${marksHTML(day)}</span>`:'';
-      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">corregir</button>';
+      if(day)bt+='<button type="button" class="btn" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">corregir</button>';
       $('#itBtns').innerHTML=bt;
     }
     let st='<span class="dim">todavía no marcaste entrada hoy.</span>';
@@ -8486,7 +8528,8 @@ V.home={
       else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
     $('#itState').innerHTML=st;
-    {const el=$('#itRitmo');if(el){const h=ritmoLine(me);el.hidden=!h;el.innerHTML=h}}
+    {const el=$('#itRitmo');if(el){const h=ritmoKpis(me);el.hidden=!h;el.innerHTML=h}}
+    $('#itMarks').innerHTML=day?`<span class="marks">${marksHTML(day)}</span>`:'';
     $('#itTl').innerHTML=day?timeline(day,now):'';
     lowerize($('#iTurno'));
   },

@@ -65,10 +65,9 @@ V.home={
     const now=new Date(),te=todayS(),h=now.getHours(),TL=tlView();
     $('#hmHola').textContent=`${h<13?'buen día':h<20?'buenas tardes':'buenas noches'}, ${profile.name.split(/\s+/)[0]}`;
     $('#hmFecha').textContent=`${DIAL[now.getDay()]} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
-    const A=hmAhora();
-    $('#hmAhora').innerHTML=A.html;$('#hmActs').innerHTML=hmActs();
-    $('#hmSel').innerHTML=[['hmAhoraH','para hacer ahora',A.n],['hmTurnoH','mi turno',0],['hmMesaH','la mesa hoy',0]].map(([k,l,n],i)=>`<button type="button" data-sec="${k}"${i===0?' class="on"':''}>${esc(l)}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
-    {const b=$('#nbHome');if(b)b.textContent=A.n||''}
+    $('#hmActs').innerHTML=hmActs(); // sin "para hacer ahora" (el dueño, 27/11/2026: "no sirve de nada"); `hmAhora` queda sin uso
+    $('#hmSel').innerHTML=[['hmTurnoH','mi turno',0],['hmMesaH','la mesa hoy',0]].map(([k,l,n],i)=>`<button type="button" data-sec="${k}"${i===0?' class="on"':''}>${esc(l)}${n?`<span class="n">${n}</span>`:''}</button>`).join('');
+    {const b=$('#nbHome');if(b)b.textContent=''}
     $('#iTurno').hidden=TL;$('#hmTurnoH').hidden=TL;
     crmLoad();
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard();
@@ -84,8 +83,7 @@ V.home={
       this.k=key;let bt='';
       if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">marcar entrada</button>';
       else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">volví ${isBano(b)?'del baño':'del descanso'}</button>`;
-      else bt=day?`<span class="marks">${marksHTML(day)}</span>`:'';
-      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">corregir</button>';
+      if(day)bt+='<button type="button" class="btn" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">corregir</button>';
       $('#itBtns').innerHTML=bt;
     }
     let st='<span class="dim">todavía no marcaste entrada hoy.</span>';
@@ -97,7 +95,8 @@ V.home={
       else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
     }
     $('#itState').innerHTML=st;
-    {const el=$('#itRitmo');if(el){const h=ritmoLine(me);el.hidden=!h;el.innerHTML=h}}
+    {const el=$('#itRitmo');if(el){const h=ritmoKpis(me);el.hidden=!h;el.innerHTML=h}}
+    $('#itMarks').innerHTML=day?`<span class="marks">${marksHTML(day)}</span>`:'';
     $('#itTl').innerHTML=day?timeline(day,now):'';
     lowerize($('#iTurno'));
   },

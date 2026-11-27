@@ -423,7 +423,7 @@
     h.style.cssText = 'all:initial;position:fixed;right:16px;bottom:16px;z-index:2147483646;';
     const root = h.attachShadow({ mode: 'open' });
     root.innerHTML = `<style>
-      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-top:5px solid #00b36b;border-radius:18px;padding:12px 14px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);min-width:272px;max-width:372px}
+      .box{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:0;border-radius:20px;padding:14px 16px;box-shadow:0 2px 6px rgba(16,24,40,.06),0 16px 40px rgba(16,24,40,.14);min-width:272px;max-width:372px}
       .h{display:flex;align-items:center;gap:8px}
       .mk{width:20px;height:20px;flex:none}
       .tag{font-weight:700;font-size:15px;letter-spacing:-.035em}
@@ -432,15 +432,15 @@
       .x{all:unset;cursor:pointer;color:#6b7684;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;font-size:15px}.x:hover{background:#eef0f3;color:#0f1720}
       .sec{margin-top:10px}[hidden]{display:none!important}
       .sec+.sec{border-top:1.5px solid #eef0f3;padding-top:10px}
-      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#6d4ff0;color:#fff;font-weight:700;border-radius:12px;padding:8px 12px;box-shadow:0 2px 0 #00573a}
-      .go:hover{background:#006e49}
-      .go[disabled]{background:#eef0f3;color:#6b7684;cursor:default;font-weight:600;box-shadow:none}
-      .go.alt{background:#fff;color:#0f1720;border:1.5px solid #dde2e7;box-shadow:none}
-      .go.alt:hover{border-color:#6b7684}
+      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#111114;color:#fff;font-weight:700;border-radius:999px;padding:9px 14px}
+      .go:hover{background:#2a2a30}
+      .go[disabled]{background:#f4f4f6;color:#6b7684;cursor:default;font-weight:600}
+      .go.alt{background:#f4f4f6;color:#0f1720}
+      .go.alt:hover{background:#e9e9ee}
       .go:focus-visible,select:focus-visible,.x:focus-visible,.lnk:focus-visible{outline:2px solid #6d4ff0;outline-offset:2px}
       .row{display:flex;gap:6px;align-items:center}
       .row .go{flex:1}
-      select{font:inherit;font-size:12.5px;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-radius:10px;padding:6px 8px;width:100%;box-sizing:border-box}
+      select{font:inherit;font-size:12.5px;background:#f4f4f6;color:#0f1720;border:0;border-radius:999px;padding:8px 12px;width:100%;box-sizing:border-box}
       .ids{margin-top:7px;color:#6b7684;font-size:12px;word-break:break-word}
       .ids b{color:#0f1720;font-weight:600}
       .ids:empty{display:none}
@@ -560,34 +560,34 @@
   const mmss = (ms) => { const x = Math.max(0, Math.floor(ms / 1000)); return z(Math.floor(x / 60)) + ':' + z(x % 60); };
   const brLab = (t) => (t.k ? `Descanso ${t.k}'` : 'Baño');
   const DK_CSS = `.dk{font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;color:#0f1720}
-    .box{background:#fff;border:1.5px solid #dde2e7;border-top:5px solid #00b36b;border-radius:18px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.14);width:320px;max-height:min(62vh,600px);display:flex;flex-direction:column;overflow:hidden}
+    .box{background:#fff;border:0;border-radius:20px;box-shadow:0 2px 6px rgba(16,24,40,.06),0 16px 40px rgba(16,24,40,.14);width:320px;max-height:min(62vh,600px);display:flex;flex-direction:column;overflow:hidden}
     .h{display:flex;align-items:center;gap:8px;padding:10px 10px 8px 14px}.mk{width:20px;height:20px;flex:none}
     .tag{font-weight:700;font-size:15px;letter-spacing:-.035em}.t{flex:1;color:#6b7684;font-size:12px;text-align:right}
     .x{all:unset;cursor:pointer;color:#6b7684;width:28px;height:28px;display:grid;place-items:center;border-radius:8px;font-size:18px;font-weight:700}.x:hover{background:#eef0f3;color:#0f1720}
     .bd{overflow:auto;padding:0 14px 12px;min-height:0}.ft{flex:none;border-top:1.5px solid #eef0f3;padding:2px 14px 12px}.ft:has(#nx:empty):has(#tu:empty){display:none}#nx:empty,#tu:empty{display:none}#nx+#tu:not(:empty){margin-top:2px}[hidden]{display:none!important}
     .sec{border-top:1.5px solid #eef0f3;padding-top:4px;margin-top:12px}.sec:empty{display:none}
     .stop{font-weight:700;border-radius:10px;padding:7px 10px;margin-bottom:8px;font-size:13.5px}
-    .stop.err{background:#fff1f3;color:#be123c;border:1.5px solid #f43f5e}.stop.ok{background:#ecfdf5;color:#047857;border:1.5px solid #00b36b}
+    .stop.err{background:#fff1f3;color:#be123c}.stop.ok{background:#ecfdf5;color:#047857}
     .cid{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.cid b{font-size:18px;letter-spacing:-.02em}.nm{font-weight:600}
     .meta{color:#6b7684;font-size:12px;margin:1px 0 6px}
     .kv{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid #f1f3f5;font-size:12.5px}
     .kv span{color:#6b7684;flex:none}.kv b{font-weight:600;text-align:right}.kv i{color:#6b7684;font-weight:400;font-style:normal}
     .falta{margin-top:8px;background:#fffbeb;border:1.5px solid #f59e0b;color:#92400e;border-radius:10px;padding:6px 10px;font-size:12.5px;font-weight:600}
-    .lb{display:block;color:#6b7684;font-size:11.5px;font-weight:700;margin:10px 0 5px}.lb i{font-style:normal;font-weight:500}
+    .lb{display:block;color:#6b7684;font-size:11.5px;font-weight:700;margin:12px 0 5px;text-transform:lowercase}.lb i{font-style:normal;font-weight:500}
     .coms p{margin:0 0 6px;font-size:12.5px;background:#f6f7f9;border-radius:10px;padding:6px 9px;word-break:break-word}.coms i{color:#6b7684;font-style:normal;font-size:11.5px}
-    details{margin-top:12px;border:1.5px solid #dde2e7;border-radius:12px;padding:0 10px}
+    details{margin-top:12px;background:#f4f4f6;border-radius:14px;padding:0 10px}
     summary{cursor:pointer;font-weight:700;padding:9px 0;list-style:none;display:flex;gap:7px;align-items:center}summary::-webkit-details-marker{display:none}
     summary::before{content:'';width:0;height:0;border-left:5px solid #6b7684;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
     details[open] summary::before{transform:rotate(90deg)}details[open]{padding-bottom:10px}#payp{color:#6b7684;font-weight:500}
-    .seg{display:flex;gap:6px}.seg button{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 6px;font-weight:600;font-size:13px}
+    .seg{display:flex;gap:6px}.seg button{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;background:#f4f4f6;border-radius:999px;padding:7px 6px;font-weight:600;font-size:13px}
     .seg button:hover{border-color:#6b7684}.seg button.on{border-color:#6d4ff0;background:#efeafe;color:#6d4ff0}.seg button.no{color:#9aa3ad}
-    .op{border:1.5px solid #d5efe1;background:#f3fbf6;border-radius:10px;padding:6px 9px;margin-bottom:6px;font-size:12.5px}.opn{color:#4b5563;font-size:12px;margin-top:2px}
+    .op{background:#f4f4f6;border-radius:14px;padding:8px 11px;margin-bottom:6px;font-size:12.5px}.opn{color:#4b5563;font-size:12px;margin-top:2px}
     .bad{color:#be123c;font-size:12px;margin:6px 0 0}
-    textarea{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 9px;resize:vertical;min-height:64px;color:#0f1720;background:#fff}
+    textarea,input[type=text]{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #e9e9ee;border-radius:12px;padding:8px 10px;resize:vertical;color:#0f1720;background:#fff}textarea{min-height:64px}input[type=text]{resize:none;margin-bottom:6px}input[type=text]:focus{outline:none;border-color:#6d4ff0}
     textarea:focus{outline:none;border-color:#6d4ff0;box-shadow:0 0 0 2px #6d4ff033}
     .row{display:flex;gap:8px;margin-top:6px;align-items:center}.row .go{flex:1}
-    .go{all:unset;box-sizing:border-box;display:block;text-align:center;cursor:pointer;background:#6d4ff0;color:#fff;font-weight:700;border-radius:12px;padding:9px 12px;box-shadow:0 2px 0 #00573a}
-    .go:hover{background:#006e49}.go[disabled]{opacity:.6;cursor:default}.go.alt{background:#fff;color:#0f1720;border:1.5px solid #dde2e7;box-shadow:none}.go.alt:hover{border-color:#6b7684}
+    .go{all:unset;box-sizing:border-box;display:block;text-align:center;cursor:pointer;background:#111114;color:#fff;font-weight:700;border-radius:999px;padding:9px 14px}
+    .go:hover{background:#2a2a30}.go[disabled]{opacity:.6;cursor:default}.go.alt{background:#f4f4f6;color:#0f1720}.go.alt:hover{background:#e9e9ee}
     .go.sm{padding:6px 10px;font-size:12.5px;flex:none}
     .lnk{all:unset;cursor:pointer;color:#6d4ff0;font-weight:600;font-size:12.5px;text-decoration:underline;margin-top:8px;display:inline-block}
     .msg{font-size:12.5px;margin-top:6px;font-weight:600}.msg:empty{display:none}
@@ -595,15 +595,15 @@
     .ok{color:#047857}.warn{color:#b45309}.err{color:#be123c}
     .note{color:#6b7684;font-size:12.5px;margin:6px 0}.note.warn{color:#b45309}
     .nr{display:flex;align-items:center;gap:8px}.nx-o{all:unset;cursor:pointer;color:#6d4ff0;font-weight:600;font-size:12px;margin-left:4px;text-decoration:underline}.nt{flex:1;min-width:0}.nt b{font-size:15px}.why{color:#4b5563;font-size:12px}
-    .tb3{display:flex;gap:6px;margin-top:8px}.tb{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;border:1.5px solid #dde2e7;border-radius:12px;padding:9px 4px;font-weight:700;font-size:13px}
-    .tb:hover{border-color:#6d4ff0;color:#6d4ff0}.tb[disabled]{opacity:.5}
+    .tb3{display:flex;gap:6px;margin-top:8px}.tb{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;background:#f4f4f6;border-radius:999px;padding:9px 4px;font-weight:700;font-size:13px}
+    .tb:hover{background:#e9e9ee}.tb[disabled]{opacity:.5}
     .trow{display:flex;align-items:center;gap:8px;margin-top:8px}.brk{flex:1;font-weight:600}.brk b{font-variant-numeric:tabular-nums;margin-left:4px}.brk b.hot{color:#be123c}
-    .pill{display:none;align-items:center;gap:8px;background:#fff;border:1.5px solid #00b36b;border-radius:999px;padding:7px 13px 7px 9px;box-shadow:0 8px 24px rgba(16,24,40,.16);cursor:pointer;font-weight:600;font-size:12.5px;color:#0f1720}
-    .pill .mk{width:18px;height:18px}.pill .plus{color:#6b7684;font-weight:700;font-size:15px;line-height:1}.pill.stp{border-color:#f43f5e}
+    .pill{display:none;align-items:center;gap:8px;background:#fff;border:0;border-radius:999px;padding:8px 14px 8px 10px;box-shadow:0 2px 6px rgba(16,24,40,.06),0 16px 40px rgba(16,24,40,.14);cursor:pointer;font-weight:600;font-size:12.5px;color:#0f1720}
+    .pill .mk{width:18px;height:18px}.pill .plus{color:#6b7684;font-weight:700;font-size:15px;line-height:1}.pill.stp{color:#be123c}
     .min .pill{display:inline-flex}.min .box{display:none}
-    .bdg{font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid}.bdg.w{background:#fffbeb;color:#92400e;border-color:#f59e0b}.bdg.ok{background:#ecfdf5;color:#047857;border-color:#00b36b}
+    .bdg{font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid}.bdg.w{background:#fffbeb;color:#92400e;border-color:#f59e0b}.bdg.ok{background:#ecfdf5;color:#047857;border-color:#a7e6c8}
     .pf label{display:block;color:#4b5563;font-size:12px;font-weight:700;margin:8px 0 3px}.pf label i{color:#be123c;font-style:normal}.pf label .o{color:#6b7684;font-weight:500}
-    .pf input[type=text],.pf input[type=number],.pf select{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 9px;color:#0f1720;background:#fff;height:36px}
+    .pf input[type=text],.pf input[type=number],.pf select{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #e9e9ee;border-radius:12px;padding:7px 9px;color:#0f1720;background:#fff;height:36px}
     .pf input:focus,.pf select:focus{outline:none;border-color:#6d4ff0;box-shadow:0 0 0 2px #6d4ff033}.pf textarea{min-height:48px}
     .pf label.ck{display:flex;align-items:center;gap:8px;color:#0f1720;font-size:13px;font-weight:600;cursor:pointer;margin:9px 0 2px}.pf .ck input{width:17px;height:17px;margin:0;accent-color:#6d4ff0}
     .two{display:flex;gap:8px}.two>div:first-child{width:70px;flex:none}.two>div:last-child{flex:1;min-width:0}
@@ -623,17 +623,23 @@
     if (!c) return `<p class="note">Abrí un cliente en el CRM (o tocá Omega/Gizat/Voiso) y acá te muestro su campaña.</p>`;
     const camps = c.camps, mine = camps ? camps.find((x) => x.mine) : null, others = camps ? camps.filter((x) => !x.mine) : [];
     const ed = dCamp.id === c.id && dCamp.open;
-    let h = `<div class="cid"><b>${escH(c.id)}</b>${c.country ? `<span class="nm">${escH(c.country)}</span>` : ''}</div>
-      <span class="lb">Campaña</span>`;
+    let h = `<div class="cid"><b>${escH(c.id)}</b>${c.country ? `<span class="nm">${escH(c.country)}</span>` : ''}</div>`;
+    return h + dockCampHTML(c);
+  }
+  // la campaña del cliente: afiliador · campaña · país, el monto mínimo y qué ve en el anuncio (se ven y se escriben acá; lo pidió el dueño, 27/11/2026)
+  function dockCampHTML(c) {
+    const camps = c.camps, mine = camps ? camps.find((x) => x.mine) : null, others = camps ? camps.filter((x) => !x.mine) : [];
+    const ed = dCamp.id === c.id && dCamp.open;
+    let h = `<span class="lb">Campaña</span>`;
     if (!c.aff && !c.camp) h += `<p class="note">No sé de qué campaña es: cuando aparezca en tu lista de news lo aprendo.</p>`;
     else {
-      h += `<div class="kv"><span>Afiliado</span><b>${c.aff ? escH(c.aff) : '<i>?</i>'}</b></div><div class="kv"><span>Campaña</span><b>${c.camp ? escH(c.camp) : '<i>?</i>'}</b></div>`;
+      h += `<div class="kv"><span>afiliador</span><b>${c.aff ? escH(c.aff) : '<i>?</i>'}</b></div><div class="kv"><span>campaña</span><b>${c.camp ? escH(c.camp) : '<i>?</i>'}</b></div><div class="kv"><span>país</span><b>${c.country ? escH(c.country) : '<i>?</i>'}</b></div>`;
       if (camps == null) h += `<p class="note warn">No pude traer la info de la campaña: ¿hay internet?</p>`;
       else if (ed) h += `<div class="pf"><label for="cmin">Monto mínimo del anuncio</label><input id="cmin" type="text" maxlength="60" value="${escH(mine && mine.min ? mine.min : '')}" placeholder="250 USD">
         <label for="cad">¿Qué ve la persona en el anuncio?</label><textarea id="cad" rows="3" maxlength="2000" placeholder="Invertí desde 250 USD con el banco…">${escH(mine && mine.ad ? mine.ad : '')}</textarea>
         <div class="row"><button class="go" data-cs="1">Guardar</button><button class="go alt sm" data-cx="1">Cancelar</button></div><div class="msg" id="csmsg"></div></div>`;
-      else if (mine && (mine.min || mine.ad)) h += `<div class="op"><b>${mine.min ? 'Mínimo ' + escH(mine.min) : 'Sin monto mínimo cargado'}</b>${mine.ad ? `<div class="opn">${escH(mine.ad)}</div>` : ''}</div><button class="lnk" data-ce="1" style="margin-top:2px">Editar</button>`;
-      else h += `<p class="note">Todavía no sabemos el monto mínimo ni qué ve en el anuncio. ${c.camp ? '<button class="lnk" data-ce="1" style="margin:0">Agregar</button>' : ''}</p>`;
+      else if (mine && (mine.min || mine.ad)) h += `<div class="op"><b>${mine.min ? 'mínimo ' + escH(mine.min) : 'Sin monto mínimo cargado'}</b>${mine.ad ? `<div class="opn">${escH(mine.ad)}</div>` : ''}</div><button class="lnk" data-ce="1" style="margin-top:2px">editar</button>`;
+      else h += `<p class="note">Todavía no sabemos el monto mínimo ni qué ve en el anuncio. ${c.camp ? '<button class="lnk" data-ce="1" style="margin:0">agregar</button>' : ''}</p>`;
       if (others.length) h += `<p class="note">Otras de ${escH(c.aff || '?')}${c.country ? ' en ' + escH(c.country) : ''}: ${others.map((x) => `<b>${escH(x.camp)}</b>${x.min ? ' (mín. ' + escH(x.min) + ')' : ''}`).join(', ')}</p>`;
     }
     return h;
@@ -665,23 +671,13 @@
       <div class="pill" id="pill" role="button" tabindex="0" aria-label="Abrir la ficha de Vitalis">${SEAL}<b class="tag">vitalis</b><span id="pt"></span><span class="plus" aria-hidden="true">+</span></div>
       <div class="box" id="box"><div class="h">${SEAL}<span class="tag">vitalis</span><span class="t" id="ht"></span><button class="x" id="dmin" title="Minimizar" aria-label="Minimizar">–</button></div>
         <div class="bd"><div id="info"></div>
-          <div id="cl"><div id="clh"></div>
-            <span class="lb cm">Comentario para el CRM</span><textarea id="cmt" rows="3" maxlength="2000" placeholder="Escribilo en español: se copia en inglés" aria-label="Comentario para el CRM"></textarea>
-            <div class="row"><button class="go" id="cpen">Copiar en inglés</button><button class="lnk" id="cclr" style="margin:0">Borrar</button></div><div class="msg" id="cmsg"></div>
-            <details id="pay"><summary>Depósito <span id="payp"></span></summary><div id="payb"></div></details>
-            <div id="clc"></div></div></div>
+          <div id="cl"><div id="clh"></div><div class="msg" id="cmsg"></div><div id="clc"></div></div></div>
         <div class="ft" id="ft"><div id="nx"></div><div id="tu"></div></div></div></div>`;
     const $ = (id) => root.getElementById(id);
     // las teclas que se escriben acá no le llegan al CRM (sus atajos); espacio, Tab y Enter sí, para los snippets
     root.addEventListener('keydown', (e) => { if (!/^( |Tab|Enter)$/.test(e.key)) e.stopPropagation(); });
     for (const ev of ['keyup', 'keypress']) root.addEventListener(ev, (e) => e.stopPropagation());
-    $('pay').addEventListener('toggle', () => { dPayOpen = $('pay').open; });
     $('pill').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dockMin(false); } });
-    $('cmt').addEventListener('input', () => {
-      const c = dock && dock.cl; if (!c) return;
-      dDrafts[c.id] = $('cmt').value; $('cmsg').textContent = '';
-      clearTimeout(dDraftT); dDraftT = setTimeout(() => send({ type: 'dock-draft', id: c.id, txt: $('cmt').value }), 600);
-    });
     root.addEventListener('click', (e) => dockClick(e));
     document.documentElement.appendChild(h);
     return { h, root, $, clId: '' };
@@ -700,12 +696,11 @@
       : old ? `<p class="note warn">Vitalis no contesta desde hace ${Math.round((now - dock.at) / 6e4)} min: esto puede estar viejo.</p><button class="go alt" data-a="abrir">Abrir Vitalis</button>` : '';
     if (dock.trial) { $('ht').textContent = dock.me ? `${dock.me.desk} · ${dock.me.name}` : ''; $('info').innerHTML = ''; dockTrialDraw(cl); dockNext(cl, false); $('tu').innerHTML = ''; return; }
     $('cl').hidden = !cl;
-    if (!cl && dk.clId) { dk.clId = ''; $('clh').innerHTML = ''; $('clc').innerHTML = ''; $('payb').innerHTML = ''; $('cmt').value = ''; $('cmsg').textContent = ''; } // tapado o sin cliente: nada del cliente queda en la página
-    if (cl) {
-      $('clh').innerHTML = dockClHTML(cl); $('clc').innerHTML = dockComsHTML(cl);
-      if (dk.clId !== cl.id) { dk.clId = cl.id; $('cmt').value = dDrafts[cl.id] || ''; $('cmsg').textContent = ''; dPayOpen = false; }
-      $('pay').open = dPayOpen;
-      dockPay(cl);
+    if (!cl && dk.clId) { dk.clId = ''; $('clh').innerHTML = ''; $('clc').innerHTML = ''; $('cmsg').textContent = ''; } // tapado o sin cliente: nada del cliente queda en la página
+    if (cl) { // el cliente, su status y su campaña (afiliador · campaña · país, mínimo y anuncio); sin comentario ni depósito (el dueño, 27/11/2026: "más nada")
+      const a = dk.root.activeElement, keep = dCamp.open && !!(a && (a.id === 'cmin' || a.id === 'cad')); // escribiendo el anuncio no se redibuja
+      if (!keep) $('clh').innerHTML = dockClHTML(cl);
+      if (dk.clId !== cl.id) { dk.clId = cl.id; $('cmsg').textContent = ''; dCamp = { id: '', open: false }; }
     }
     dockNext(cl, lk);
     dockTurno(tu, lk || old);
@@ -716,10 +711,8 @@
     return `${c.stop === 'dnc' ? '<div class="stop err">No llamar: es Do Not Call</div>' : c.stop === 'paid' ? `<div class="stop ok">Ya depositó${c.paid ? ' · ' + escH(c.paid) : ''}</div>` : ''}
       <div class="cid"><b>${escH(c.id)}</b>${c.name ? `<span class="nm">${escH(c.name)}</span>` : ''}</div>
       <div class="meta">${[c.pais ? escH(c.pais) : '', c.hora ? `allá son las ${escH(c.hora)}` : ''].filter(Boolean).join(' · ') || '&nbsp;'}</div>
-      <div class="kv"><span>Status</span><b>${c.st ? escH(c.st) : '<i>todavía no se vio en el CRM</i>'}</b></div>
-      <div class="kv"><span>Palabra clave</span><b>${c.kw ? escH(c.kw) : '<i>sin asignar</i>'}</b></div>
-      ${c.ag && c.ag.length ? `<div class="kv"><span>Agenda</span><b>${escH(c.ag.join(', '))}</b></div>` : ''}
-`;
+      <div class="kv"><span>status</span><b>${c.st ? escH(c.st) : '<i>todavía no se vio en el CRM</i>'}</b></div>
+      ${dockCampHTML(c)}`;
   }
   const dockComsHTML = (c) => `${c.coms && c.coms.length ? `<span class="lb">Comentarios de la mesa</span><div class="coms">${c.coms.map((x) => `<p><b>${escH(x.w)}</b> <i>${escH(x.t)}</i><br>${escH(x.x)}</p>`).join('')}</div>` : ''}
       <p class="note" style="margin-top:8px">¿No es el que tenés abierto en el CRM? <button class="lnk" data-diag style="margin:0">Copiar diagnóstico</button></p>`;
@@ -802,17 +795,6 @@
     if (b.hasAttribute('data-skip')) { dSkip++; dockNext(cl, !!(dock && dock.locked)); return; }
     if (b.dataset.pt && cl) { dPay.t = b.dataset.pt; dPay.all = false; dockPay(cl); return; }
     if (b.hasAttribute('data-pall') && cl) { dPay.all = true; dockPay(cl); return; }
-    if (b.id === 'cclr' && cl) { dk.$('cmt').value = ''; dDrafts[cl.id] = ''; send({ type: 'dock-draft', id: cl.id, txt: '' }); cmsg('', ''); dk.$('cmt').focus(); return; }
-    if (b.id === 'cpen' && cl) {
-      const txt = dk.$('cmt').value.trim();
-      if (!txt) { cmsg('warn', 'Escribí el comentario primero.'); dk.$('cmt').focus(); return; }
-      b.disabled = true; b.textContent = 'Traduciendo…';
-      const r = await dockEn(txt);
-      b.disabled = false; b.textContent = 'Copiar en inglés';
-      if (!r.en) return cmsg('err', r.why === 'bajando' ? 'Chrome está bajando el traductor: probá de nuevo en un minuto.' : r.why === 'cerrado' ? 'No pude traducirlo: abrí Vitalis y probá de nuevo.' : 'Este Chrome no tiene el traductor: hay que actualizar Chrome. No copié nada.');
-      const ok = await dockCopy(r.en);
-      cmsg(ok ? 'ok' : 'err', (ok ? 'Copiado en inglés. Pegalo en el CRM:' : 'No pude copiarlo: tocá de nuevo.') + `<div class="en">${escH(r.en)}</div>`);
-    }
   }
   // ---- el cliente actual: la ficha abierta en el CRM ----
   // La ficha (panel arriba de la lista o página propia) tiene el nombre, "ID 68636" y los botones para llamar (Omega/Gizat/Voiso).
@@ -987,7 +969,7 @@
     if (!h) { h = document.createElement('div'); h.id = 'vitalis-cur-pill'; h.attachShadow({ mode: 'open' }); document.documentElement.appendChild(h); }
     const diag = r && r.diag, ok = r && r.sent;
     const txt = diag ? 'no encuentro el ID de esta ficha' : !r ? 'la extensión se actualizó: recargá la página' : ok ? `cliente actual: ${id}` : `abrí Vitalis para ver a ${id}`;
-    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:1.5px solid ${ok ? '#00b36b' : '#f59e0b'};padding:7px 12px 7px 11px;${dk ? `bottom:${Math.round(dk.h.getBoundingClientRect().height) + 26}px;` : ''}border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.16);display:flex;gap:8px;align-items:center}i{width:9px;height:9px;border-radius:50%;background:${ok ? '#00b36b' : '#f59e0b'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:700;color:#0f1720;background:#fff;border:1.5px solid #dde2e7;border-radius:999px;padding:3px 10px;cursor:pointer}button:hover{border-color:#6b7684}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
+    h.shadowRoot.innerHTML = `<style>div{position:fixed;left:16px;bottom:16px;z-index:2147483646;font:500 12.5px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased;background:#fff;color:#0f1720;border:0;padding:8px 13px 8px 11px;${dk ? `bottom:${Math.round(dk.h.getBoundingClientRect().height) + 26}px;` : ''}border-radius:999px;box-shadow:0 8px 24px rgba(16,24,40,.16);display:flex;gap:8px;align-items:center}i{width:9px;height:9px;border-radius:50%;background:${ok ? '#6d4ff0' : '#f59e0b'};flex:none}b{font-weight:700;letter-spacing:-.03em}button{font:inherit;font-weight:700;color:#0f1720;background:#f4f4f6;border:0;border-radius:999px;padding:4px 11px;cursor:pointer}button:hover{background:#e9e9ee}</style><div><i></i><span><b>vitalis</b> · ${txt.replace(/[<>&]/g, '')}</span>${diag ? '<button type="button">Copiar diagnóstico</button>' : ''}</div>`;
     const btn = h.shadowRoot.querySelector('button');
     if (btn) btn.onclick = () => navigator.clipboard.writeText(diagCur()).then(() => { btn.textContent = 'Copiado: mandáselo a quien mantiene Vitalis'; }, () => { btn.textContent = 'No pude copiar'; });
     clearTimeout(pillT); pillT = setTimeout(() => h.remove(), diag ? 20000 : 4500);

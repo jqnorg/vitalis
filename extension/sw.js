@@ -78,12 +78,16 @@ async function trialFresh(fresh) { // un new mío que vio otra pestaña (la del 
 const TR_SLOW = 5;
 // el team leader de Vitalis (como en la prueba, lo pidió el dueño el 27/11/2026): una tarjeta urgente por cada New sin gestionar a los 5 min
 // (`wait` lo calcula Vitalis y ya descuenta al agente que tiene otro en Talking); se cierra sola cuando lo gestionan
-async function tlCards(b) {
+async function tlCards(b) { // una sola vez por cliente: cerrada con "Ok", no vuelve (antes volvía con cada tablero, cada 30 s: "la notificación se sigue spameando", el dueño)
   const late = (b.news || []).filter((x) => x.wait && !x.talking && x.min >= TR_SLOW), lateK = new Set(late.map((x) => 'crm:tl:' + x.id)), shown = new Set((await liveNow()).map((x) => x.k));
-  for (const x of late.filter((x) => !shown.has('crm:tl:' + x.id)).slice(0, 6)) {
+  const done = await sess.get('tlDone', {}); let ch = false;
+  for (const x of late.filter((x) => !shown.has('crm:tl:' + x.id) && !done['crm:tl:' + x.id]).slice(0, 6)) {
+    done['crm:tl:' + x.id] = Date.now(); ch = true;
     await alertCard({ k: 'crm:tl:' + x.id, kind: 'crm', lvl: 'urg', title: 'New sin gestionar', id: x.id, kw: x.agent || 'sin agente', meta: `hace ${trMin(x.min)}${x.country ? ' · ' + x.country : ''}`, btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `New sin gestionar: ${x.id}`, `${x.agent || 'sin agente'} · hace ${trMin(x.min)}`);
   }
   for (const k of shown) if (k.startsWith('crm:tl:') && !lateK.has(k)) await dismiss(k);
+  for (const k in done) if (!lateK.has(k) && Date.now() - done[k] > 36e5) { delete done[k]; ch = true; } // lo gestionado se olvida a la hora
+  if (ch) await sess.set('tlDone', done);
 }
 let trialTicking = false, trialAgain = false;
 async function trialBoardTick(force) {
@@ -176,7 +180,7 @@ function ftdOverlay(items) {
     (document.body || document.documentElement).appendChild(host);
     host.attachShadow({ mode: 'open' }).innerHTML = `<style>
       .stack{display:flex;flex-direction:column;gap:10px;width:min(372px,calc(100vw - 32px));font:13.5px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
-      .card{--c:#e11d48;--cb:#f43f5e;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-top:5px solid var(--cb);border-radius:18px;padding:12px 14px 13px;box-shadow:0 1px 2px rgba(16,24,40,.06),0 14px 36px rgba(16,24,40,.18);animation:in .22s ease-out}
+      .card{--c:#e11d48;--cb:#f43f5e;background:#fff;color:#0f1720;border:0;border-radius:20px;padding:13px 16px 14px;box-shadow:0 2px 6px rgba(16,24,40,.06),0 16px 40px rgba(16,24,40,.14);animation:in .22s ease-out}
       .card.urg{--c:#e11d48;--cb:#f43f5e}
       .card.imp{--c:#c2410c;--cb:#f59e0b}
       .card.info{--c:#2563eb;--cb:#3b82f6}
@@ -195,10 +199,10 @@ function ftdOverlay(items) {
       .kw:empty{display:none}
       .m{color:#6b7684;font-size:12.5px}
       .b{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
-      .b button{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;color:#0f1720;background:#fff;border:1.5px solid #dde2e7;border-radius:10px;padding:6px 12px}
-      .b button:hover{border-color:#6b7684}
-      .b button.p{background:#6d4ff0;border-color:#6d4ff0;color:#fff}
-      .b button.p:hover{background:#006e49;border-color:#006e49}
+      .b button{all:unset;cursor:pointer;font-size:12.5px;font-weight:700;color:#0f1720;background:#f4f4f6;border-radius:999px;padding:7px 14px}
+      .b button:hover{background:#e9e9ee}
+      .b button.p{background:#111114;color:#fff}
+      .b button.p:hover{background:#2a2a30}
       .b button:focus-visible,.x:focus-visible{outline:2px solid #6d4ff0;outline-offset:2px}
     </style><div class="stack"></div>`;
   }
@@ -819,6 +823,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if (msg.type === 'trial-board') { trialBoardTick(true).then(() => sess.get('trialBoard', null)).then(reply, () => reply(null)); return true; }
   if (msg.type === 'dock-camp-set' && msg.aff && msg.camp) {
     (async () => {
+      if (!TRIAL) { const ok = await toVitalis({ cmd: 'campset', r: { aff: String(msg.aff).slice(0, 60), camp: String(msg.camp).slice(0, 120), country: String(msg.country || '').slice(0, 60), min: String(msg.min || '').slice(0, 60), ad: String(msg.ad || '').slice(0, 2000) } }); return ok ? { ok: true } : { ok: false, err: 'Abrí Vitalis para guardarlo.' }; }
       const me = await trialMe(); if (!me) return { ok: false, err: 'Entrá con tu código' };
       const r = await rpc('trial_camp_set', { code: me.code, nm: me.name, aff_: String(msg.aff).slice(0, 60), camp_: String(msg.camp).slice(0, 120), country_: String(msg.country || '').slice(0, 60), min_: String(msg.min || '').slice(0, 60), ad_: String(msg.ad || '').slice(0, 2000) });
       const cur = await sess.get('trialCur', null); if (cur) await trialCurrent(cur.id, cur.name);
