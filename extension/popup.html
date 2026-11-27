@@ -3,12 +3,14 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @font-face{font-family:"Geist";src:url(fonts/geist.woff2) format("woff2");font-weight:100 900}
+  @font-face{font-family:"Plus Jakarta Sans";src:url(fonts/pjs.woff2) format("woff2-variations");font-weight:200 800}
+  @font-face{font-family:"Plus Jakarta Sans";src:url(fonts/pjs-ext.woff2) format("woff2-variations");font-weight:200 800;unicode-range:U+0100-02BA}
+  @font-face{font-family:"Geist Mono";src:url(fonts/geistmono.woff2) format("woff2-variations");font-weight:100 900}
   :root{color-scheme:light;--bg:#f6f7f8;--panel:#fff;--fg:#0f1720;--dim:#6b7684;--line:#dde2e7;--soft:#eef0f3;--pri:#6d4ff0;--pri-h:#5a3fd6;--pri-soft:#efeafe;--acc:#c2410c;--err:#e11d48;--v-ok:#00b36b}
   @media (prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#0d1114;--panel:#151a1f;--fg:#eef1f4;--dim:#94a0ad;--line:#262d35;--soft:#1c232a;--pri:#a78bfa;--pri-h:#b9a3ff;--pri-soft:#261f40;--acc:#f0a23a;--err:#ff6a7c}}
   *{box-sizing:border-box}
   [hidden]{display:none!important}
-  body{margin:0;width:340px;background:var(--bg);color:var(--fg);font:13px/1.5 "Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  body{margin:0;width:340px;background:var(--bg);color:var(--fg);font:13px/1.5 "Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
   header{display:flex;align-items:center;gap:9px;padding:14px 16px 8px}
   header img{width:26px;height:26px}
   header b{font-weight:700;font-size:19px;letter-spacing:-.035em}

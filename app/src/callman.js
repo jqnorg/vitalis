@@ -64,10 +64,10 @@ function cmData(){
 }
 function cmBadge(){const b=$('#nbCm');if(!b)return;if(!ready||!isLeader()||!crm.ok){b.textContent='';return}const n=cmData().al.filter(a=>a.w<=2).length;b.textContent=n||''}
 V.callman={
-  build(){setInterval(()=>{if(ready&&cur==='callman'&&!document.hidden)V.callman.render({})},3e4)}, // los "hace X min" se mueven solos
+  build(){setInterval(()=>{if(ready&&cur==='home'&&!document.hidden&&isLeader())V.callman.render({})},3e4)}, // los "hace X min" se mueven solos
   render(){
     const body=$('#cmBody');if(!body||!isLeader())return;
-    $('#cmSub').textContent=`La mesa en vivo · ${hhmm(Date.now())}`;
+    $('#cmSub').textContent=`la mesa en vivo · ${hhmm(Date.now())}`;$('#cmSub').hidden=false;
     if(crm.ok===false){body.innerHTML='<div class="card"><div class="p-empty">Sin clientes del CRM todavía: hace falta la estación o la extensión.</div></div>';return}
     const D=cmData(),op=openKeys(body);
     const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin llamar hace +5 min</span>`:'todos llamados','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+

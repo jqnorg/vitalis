@@ -1,28 +1,31 @@
-@font-face{font-family:"Geist";src:url(fonts/geist.woff2) format("woff2");font-weight:100 900;font-display:swap}
+@font-face{font-family:"Plus Jakarta Sans";src:url(fonts/pjs.woff2) format("woff2-variations");font-weight:200 800;font-display:swap}
+@font-face{font-family:"Plus Jakarta Sans";src:url(fonts/pjs-ext.woff2) format("woff2-variations");font-weight:200 800;font-display:swap;unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0}
+@font-face{font-family:"Geist Mono";src:url(fonts/geistmono.woff2) format("woff2-variations");font-weight:100 900;font-display:swap}
 
 /* ---------- tokens: estilo Claro (blanco, gris suave, verde profundo) ---------- */
 /* ---------- tokens: Claro (blanco, gris suave) y Noche (casi negro); el color de Vitalis es el morado (el dueño, 27/11/2026) ---------- */
+/* ---------- tokens (27/11/2026, estética Revolut elegida por el dueño): Claro —gris muy suave, tarjetas blancas sin borde, sombra apenas— y Noche —negro, tarjetas gris oscuro—. El morado es la marca; los botones principales van en el color del texto ---------- */
 :root{color-scheme:light;
-  --bg:#f6f6f9;--panel:#fff;--raised:#f8f8fb;--fg:#121318;--dim:#6b7080;--line:#e2e3ea;--soft:#eeeef4;
+  --bg:#f4f4f6;--panel:#fff;--raised:#f1f1f4;--fg:#111114;--dim:#6f727c;--line:#e9e9ee;--soft:#f1f1f4;
   --pri:#6d4ff0;--pri-h:#5a3fd6;--pri-ink:#fff;--pri-soft:#efeafe;--brand:#6d4ff0;--brand-2:#8b6ff5;
-  --cuero:#d97706;--cuero-soft:#fdf1e3;--alpaca:#c9ced3;
-  --ok:#0f9a62;--acc:#c2410c;--err:#e11d48;--info:#2563eb;
-  --s1:#6d4ff0;--s2:#f59e0b;--sx:#d5d7e0;
-  --v-ok:#13b26e;--v-warn:#f59e0b;--v-err:#f43f5e;--v-info:#3b82f6;
-  --hero:#fff;--hero-2:#f8f8fb;--hero-ink:#121318;--hero-dim:#6b7080;
+  --cuero:#d9820b;--cuero-soft:#fdf2e3;--alpaca:#c9ced3;
+  --ok:#1e9e6a;--acc:#d9820b;--err:#e5484d;--info:#2563eb;
+  --s1:#6d4ff0;--s2:#f59e0b;--sx:#d9dae2;
+  --v-ok:#1e9e6a;--v-warn:#d9820b;--v-err:#e5484d;--v-info:#3b82f6;
+  --hero:#111114;--hero-2:#1d1d22;--hero-ink:#fff;--hero-dim:rgba(255,255,255,.65);
   --glow:rgba(109,79,240,.10);
-  --r:16px;--r-sm:10px;--sh:0 1px 2px rgba(16,24,40,.04);
-  --display:"Geist",ui-sans-serif,system-ui,sans-serif;
-  --ui:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  --r:24px;--r-sm:14px;--sh:0 1px 2px rgba(17,17,20,.04),0 10px 28px -14px rgba(17,17,20,.14);
+  --display:"Plus Jakarta Sans",ui-sans-serif,system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --ui:"Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body.dark{color-scheme:dark;
-  --bg:#0e0f11;--panel:#17181b;--raised:#1d1f23;--fg:#f2f3f5;--dim:#8b9097;--line:#24262b;--soft:#1d1f23;
-  --pri:#a78bfa;--pri-h:#b9a3ff;--pri-ink:#14102a;--pri-soft:#261f40;--brand:#a78bfa;--brand-2:#7c5cf5;
+  --bg:#000;--panel:#141416;--raised:#1e1e22;--fg:#f5f5f7;--dim:#8a8d97;--line:#232327;--soft:#1e1e22;
+  --pri:#a78bfa;--pri-h:#b9a3ff;--pri-ink:#14102a;--pri-soft:#241e3d;--brand:#a78bfa;--brand-2:#7c5cf5;
   --cuero:#e39a4d;--cuero-soft:#2b2014;
-  --ok:#4ade80;--acc:#f7c54b;--err:#ff6b6b;--info:#8da6ff;
+  --ok:#34d399;--acc:#f7c54b;--err:#ff6b6b;--info:#8da6ff;
   --s1:#a78bfa;--s2:#f7c54b;--sx:#2e3137;
   --v-ok:#34d399;--v-warn:#f7c54b;--v-err:#ff6b6b;--v-info:#8da6ff;
-  --hero:#17181b;--hero-2:#1d1f23;--hero-ink:#f2f3f5;--hero-dim:#8b9097;--sh:none;
-  --glow:rgba(124,92,245,.26)}
+  --hero:#1b1530;--hero-2:#2a1f4e;--hero-ink:#fff;--hero-dim:rgba(255,255,255,.65);--sh:none;
+  --glow:rgba(124,92,245,.18)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;background:var(--bg)}
@@ -1595,72 +1598,104 @@ details.bk-hist>summary{list-style:none;cursor:pointer;display:flex;align-items:
 .pt tr.dim td{color:var(--dim)}
 
 
-/* =========== NOCHE (27/11/2026, el dueño): la estética nueva, mezcla de dos referencias de Behance (Tavli CRM y Rentier) ===========
-   casi negro con tarjetas apenas más claras y borde fino, un solo acento morado (botones principales, marca, pista),
-   pestañas en una pastilla, etiquetas chicas en mayúsculas, números grandes y finos, chips de estado, halo de luz abajo.
-   Los colores de urgencia (rojo · ámbar · azul) solo como línea de borde. Claro es la misma capa con los tokens claros. */
-body.dark{--sh:none}
-#side{background:var(--bg)}
-body.dark #side{background:#131416}
-#nav button{border-radius:12px;font-weight:550}
-#nav button.on{background:var(--pri-soft);color:var(--pri);box-shadow:none}
-body.dark #nav button.on{color:var(--pri)}
-#nav .nb.hot{background:var(--pri);color:var(--pri-ink)}
-#side .me{border-radius:14px}
-.brand .mark{border-radius:9px}
-#bar{padding:14px 26px 6px}
-.pill{height:36px;padding:0 14px;font-weight:600;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--dim)}
-.pill b{color:var(--fg)}
-#sTurno .btn.pri,#bar .btn.pri{box-shadow:none}
-.pill.ayuda{color:var(--err);border-color:color-mix(in srgb,var(--err) 45%,var(--line))}
+/* =========== REVOLUT (27/11/2026, el dueño: "la estética Revolut me fascina"): fondo gris muy suave, tarjetas blancas sin borde con esquinas de 24 px y sombra apenas;
+   Plus Jakarta Sans para el texto (bold en títulos), Geist Mono solo en números, IDs, horas y montos (`.num`, y lo que lista `mono` abajo);
+   todo en minúscula salvo las siglas (lo hace `lowerize` en ui.js, no el CSS); botones en pastilla (999 px), el principal en el color del texto;
+   el morado queda para la marca, los links, las marcas del menú y el botón del new; sin mayúsculas ni etiquetas espaciadas; sin halo.
+   Noche es la misma capa con el fondo negro. La capa anterior ("NOCHE") se reemplazó entera. =========== */
+body{font-family:var(--ui);font-size:14.5px}
+h1,h2,h3,.vh h1{font-family:var(--ui);font-weight:800;letter-spacing:-.02em}
+.vh h1{font-size:32px}.vh .sub{font-size:14.5px}
+.kpi .v,.hero .n,.hero .usd .v,.ms .n,.tstate .big,.big,.pt td,.hi-kpi .v,.pf-k .v{font-variant-numeric:tabular-nums}
+.num,#sClock,.lnkp b,.id,td.id,.mv-i .tt b{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0;font-weight:600} /* la mono solo en los IDs y la hora (los números grandes van en la misma letra que todo, como en Revolut) */
+/* nada en mayúsculas espaciadas */
+.kpi .lb,.hero .lab,.pt th,.turno-mini h3,.bj-g,.card-h h3,.lab{text-transform:none;letter-spacing:0}
+.kpi .lb,.hero .lab{font-size:13.5px;font-weight:600;color:var(--dim)}
+.pt th{font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none}
+.card-h h3{font-size:19px;font-weight:800}
+/* menú: fondo del mismo gris, el activo blanco con sombra; los grupos "yo" y la mesa como titulitos */
+#side{background:var(--bg);border-right:0;padding:22px 16px}
+body.dark #side{background:var(--bg)}
+#nav{gap:2px}
+#nav button{border-radius:14px;font-weight:600;font-size:14.5px;color:var(--dim);padding:11px 14px}
+#nav button.on{background:var(--panel);color:var(--fg);box-shadow:var(--sh)}
+body.dark #nav button.on{background:var(--panel)}
+#nav button.s2{padding:9px 14px 9px 16px;font-size:14px}#nav button.s2 svg{width:18px;height:18px}
+#nav .grp{font-weight:800;font-size:13px;color:var(--dim);padding:14px 14px 2px;line-height:1.2}#nav .grp:empty{padding:8px 0 0}
+#nav .nb.hot{background:var(--fg);color:var(--bg)}#nav .nb.hot.red{background:var(--err);color:#fff}
+#nav button.nv-cli::after{display:none}
+#side .me{border-radius:16px;background:none;border:0}
+.brand .word{font-weight:800;font-size:21px;letter-spacing:-.02em}.brand .mark{border-radius:10px}
+/* barra: pastillas blancas con sombra */
+#bar{padding:16px 30px 4px;background:var(--bg)}
+.pill{height:38px;padding:0 16px;font-weight:700;border-radius:999px;background:var(--panel);border:0;box-shadow:var(--sh);color:var(--fg)}
+.pill.new{background:color-mix(in srgb,var(--err) 12%,var(--panel));color:var(--err);box-shadow:none}
+.pill.ayuda{color:var(--fg);border:0}
+#bar #sTurno .btn.pri,#bar .btn.pri,#bar .pill.pri{background:var(--fg)!important;color:var(--bg)!important;border-color:var(--fg)!important}
 #sClock{font-weight:600;color:var(--dim)}
-.subnav{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px}
-.subnav button{border-radius:9px;padding:7px 14px}
-.subnav button.on{background:var(--raised);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
-.seg{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:3px}
-.seg button.on{background:var(--raised);color:var(--fg);box-shadow:inset 0 0 0 1px var(--line)}
-.card,.kpi{border-radius:18px;border-width:1px;box-shadow:none}
+/* selector de partes de una sección: pastilla grande, el activo en el color del texto, con la cuenta */
+.subnav{position:sticky;top:0;z-index:5;display:inline-flex;gap:4px;background:var(--raised);border:0;border-radius:999px;padding:4px;margin:0 0 22px}
+.subnav button{border-radius:999px;padding:10px 18px;font-weight:700;font-size:14.5px;color:var(--dim)}
+.subnav button.on{background:var(--fg);color:var(--bg);box-shadow:none}
+.subnav button .n{background:var(--err);color:#fff;border-radius:999px;font-size:11.5px;padding:0 7px;margin-left:6px;font-weight:800}
+.seg{background:var(--raised);border:0;border-radius:999px;padding:4px}.seg button{border-radius:999px;padding:8px 14px;font-weight:700}.seg button.on{background:var(--fg);color:var(--bg);box-shadow:none}
+/* tarjetas: blancas, sin borde, esquinas 24, sombra apenas */
+.card,.kpi{border:0;border-radius:24px;box-shadow:var(--sh);padding:22px 24px}
 body.dark .card,body.dark .kpi{background:var(--panel)}
-.card-h h3{font-weight:600;font-size:16px}
-.kpi .lb{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--dim)}
-.kpi .v{font-weight:600;font-size:30px;letter-spacing:-.03em}
-.btn{border-radius:11px;font-weight:650;padding:8px 16px}
-.btn.sm{border-radius:9px;padding:5px 11px}
-.btn.pri{box-shadow:none}
-.btn.pri:hover{background:var(--pri-h);border-color:var(--pri-h)}
-.ib{border-radius:9px}
-.badge{border-radius:8px;font-weight:650;font-size:11.5px}
-.badge.paid{background:color-mix(in srgb,var(--v-ok) 16%,transparent);color:var(--v-ok)}
-.badge.bad{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
-.pt th{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:650}
+.kpi .v{font-size:36px;font-weight:800;letter-spacing:-.03em}
+.btn{border-radius:999px;font-weight:700;padding:9px 18px;border:0;background:var(--raised);color:var(--fg)}
+.btn.sm{padding:6px 12px;font-size:12.5px}
+.btn.pri{background:var(--fg);color:var(--bg);border:0;box-shadow:none}.btn.pri:hover{background:var(--fg);opacity:.9}
+.btn.big{padding:12px 22px;font-size:15px}
+.ib{border-radius:999px}
+.badge{border-radius:999px;font-weight:700;font-size:12px;padding:3px 10px}
+.badge.paid{background:color-mix(in srgb,var(--v-ok) 14%,transparent);color:var(--v-ok)}
+.badge.bad{background:color-mix(in srgb,var(--err) 14%,transparent);color:var(--err)}
+.pt td{padding:13px 12px}.pt th{padding:10px 12px}
 body.dark .pt td{border-bottom-color:var(--line)}
-input,select,textarea{border-radius:11px}
-body.dark input,body.dark select,body.dark textarea{background:var(--raised);border-color:var(--line2,var(--line))}
-input:focus,select:focus,textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 25%,transparent)}
-.mbox{border-radius:22px}
-.toast{border-radius:14px}
-/* el mes: etiqueta chica arriba del número, como en la referencia */
-.hero{border-radius:20px;padding:24px 26px 14px}
+input,select,textarea{border-radius:14px;border-color:transparent;background:var(--raised)}
+input:focus,select:focus,textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb,var(--pri) 22%,transparent)}
+.mbox{border-radius:28px;border:0;box-shadow:0 30px 80px -20px rgba(0,0,0,.35)}
+.toast{border-radius:18px}
+/* el mes: tarjeta oscura tipo saldo */
+.hero{border-radius:28px;padding:26px 28px 18px;background:var(--hero);color:var(--hero-ink);border:0;box-shadow:none}
+body.dark .hero{background:linear-gradient(135deg,var(--hero),var(--hero-2))}
 .hero .top>div:first-child{display:flex;flex-direction:column}
-.hero .lab{order:-1;font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;font-weight:700;color:var(--dim);margin:0 0 10px}
-.hero .n{font-size:84px;font-weight:600}
-.hero .msg{margin-top:6px}
-.hero .cr{margin-top:8px}
-.hero .cr .cr-t{background:color-mix(in srgb,var(--pri) 16%,transparent);color:var(--pri);border-radius:8px;padding:2px 8px}
-.hero .usd .v{font-weight:600}
-.track .rail,.track.lite .rail{background:var(--soft)}
-.track .glow{background:var(--pri)}
-.track .lb b,.track.lite .lb b{font-weight:600}
-.turno-mini h3{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);font-weight:700}
+.hero .lab{order:-1;font-size:14px;font-weight:600;color:var(--hero-dim);margin:0 0 6px;text-transform:none;letter-spacing:0}
+.hero .n{font-size:64px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.hero .msg,.hero .cr,.hero .usd .s,.hero .ut{color:var(--hero-dim)}.hero .msg b,.hero .cr b{color:var(--hero-ink)}
+.hero .cr .cr-t{background:rgba(255,255,255,.14);color:var(--hero-ink);border:0;border-radius:999px;padding:2px 9px}
+.hero .usd .v{font-weight:800;color:var(--hero-ink)}
+.track .rail,.track.lite .rail{background:rgba(255,255,255,.14)}.track .fill,.track.lite .fill{background:var(--pri)}
+.track .glow{background:var(--pri);box-shadow:0 0 0 3px rgba(255,255,255,.25)}
+.track .lb,.track.lite .lb{color:var(--hero-dim)}.track .lb b,.track.lite .lb b{color:var(--hero-ink);font-weight:700}
+.turno-mini h3{font-size:13.5px;font-weight:600;color:var(--dim);text-transform:none;letter-spacing:0}
 .dia-mini{border-left-color:var(--pri)}
-/* la marca en el chat, agenda y demás: lo que era verde fijo */
 .ag-s.best small{color:var(--pri)}
 .toast.win{background:var(--pri);color:var(--pri-ink)}
-.rl.on{background:var(--pri);color:var(--pri-ink)}
-.rd-map td b{color:var(--pri-ink)}
+.rl.on{background:var(--fg);color:var(--bg)}
 .qb.q1{color:var(--v-ok);border-color:var(--v-ok)}
-/* el halo abajo del contenido (de Rentier), solo en Noche */
-body.dark #main{background-image:radial-gradient(55% 55% at 50% 100%,var(--glow),transparent 70%);background-attachment:fixed}
+body.dark #main{background-image:none}
+/* listas tipo movimientos (home): ícono redondo de color suave, texto, botón a la derecha */
+.mv{background:var(--panel);border-radius:24px;box-shadow:var(--sh);overflow:hidden;margin-bottom:14px}
+.mv-i{display:grid;grid-template-columns:46px 1fr auto;gap:16px;align-items:center;padding:15px 22px;border-bottom:1px solid var(--line)}.mv-i:last-child{border:0}
+.mv-i .ic{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:var(--raised)}.mv-i .ic svg.ic{width:21px;height:21px;color:var(--fg);stroke-width:1.8}
+.mv-i.urg .ic{background:color-mix(in srgb,var(--err) 12%,var(--panel))}.mv-i.urg .ic svg{color:var(--err)}
+.mv-i.imp .ic{background:color-mix(in srgb,var(--acc) 14%,var(--panel))}.mv-i.imp .ic svg{color:var(--acc)}
+.mv-i.inf .ic{background:var(--pri-soft)}.mv-i.inf .ic svg{color:var(--pri)}
+.mv-i .tt{font-weight:700;font-size:15.5px}.mv-i .tt b{font-family:var(--mono);font-weight:700}.mv-i .ss{color:var(--dim);font-size:13px;margin-top:1px}
+.mv-i .ac{display:flex;gap:6px;align-items:center}
+.mv-empty{padding:26px 22px;color:var(--dim)}
+/* acciones redondas (home) */
+.acts{display:flex;gap:24px;margin:4px 0 8px;flex-wrap:wrap}.act{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--dim);border:0;background:none;font-family:inherit;cursor:pointer;min-width:64px}
+.act i{width:54px;height:54px;border-radius:50%;background:var(--panel);box-shadow:var(--sh);display:grid;place-items:center;font-style:normal;font-weight:800;color:var(--fg);font-size:14px}.act i svg.ic{width:22px;height:22px}
+.act.pri i{background:var(--pri);color:var(--pri-ink)}
+.hm-h{font-size:21px;font-weight:800;margin:34px 0 12px;display:flex;align-items:center;gap:10px;letter-spacing:-.02em;scroll-margin-top:70px}.hm-h small{color:var(--dim);font-weight:500;font-size:13.5px}.hm-h .lnkp{margin-left:auto;font-size:13.5px}
+.hm-sel{position:sticky;top:0;z-index:5;display:inline-flex;gap:4px;background:var(--raised);border-radius:999px;padding:4px;margin-bottom:6px}
+.hm-sel button{border:0;background:none;color:var(--dim);font:inherit;font-weight:700;font-size:14.5px;padding:10px 18px;border-radius:999px;cursor:pointer}.hm-sel button.on{background:var(--fg);color:var(--bg)}.hm-sel button .n{background:var(--err);color:#fff;border-radius:999px;font-size:11.5px;padding:0 7px;margin-left:6px;font-weight:800}
+.rk-cal span.on{background:var(--pri);color:var(--pri-ink)}
 /* la racha: dos semanas con un punto por día con venta */
 .rk-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:10px;text-align:center;font-size:11px;color:var(--dim)}
 .rk-cal span{padding:4px 0;border-radius:7px}.rk-cal .h{font-weight:700;font-size:10px}.rk-cal .on{background:var(--pri);color:var(--pri-ink);font-weight:800}.rk-cal .has{background:color-mix(in srgb,var(--pri) 18%,transparent);color:var(--pri);font-weight:700}.rk-cal .off{opacity:.45}
+#bar .tb.go{background:var(--fg);color:var(--bg)}#bar .tb.go:hover{background:var(--fg);opacity:.9}
+#bar .pill.turno{box-shadow:var(--sh)}

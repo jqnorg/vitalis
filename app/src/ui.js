@@ -120,34 +120,37 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','historial','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
-let cur='inicio';
+const VIEWS=['gerencia','home','inicio','historial','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+let cur='home';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
 function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.title=curCl?'Cliente actual: '+(curCl.name||curCl.id):''}} // el cliente actual, en el botón del menú
+// el menú (27/11/2026, lo definió el dueño): home · yo (rendimiento · turnos · agenda · sueldo) · la mesa (rendimiento · campañas · tareas) · chat · banking · knowledgebase
 const GROUPS=[
-  {g:'inicio',views:['inicio','sueldo','turnos','historial'],tabs:['Mi día','Sueldo','Turnos','Historial']}, // Mi día: tu mes, hoy, racha, turno; Historial: todas tus ventas y tus lates
-  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
-  {g:'agenda',views:['agenda']}, // Agenda con botón propio (el dueño, 26/11/2026: se fue el "Manager (agente)" y la sección Cliente)
+  {g:'home',views:['home']}, // lo de hoy, tuyo y de la mesa: para hacer ahora, el turno, la mesa hoy y (team leader/admin) para atender ya
+  {g:'rend',views:['inicio','historial'],tabs:['tu mes','historial']}, // yo → rendimiento
+  {g:'turnos',views:['turnos']},
+  {g:'agenda',views:['agenda']},
+  {g:'sueldo',views:['sueldo']},
+  {g:'mesa',views:['equipo','gerencia','ventas','clientes','filtros','radar'],tabs:['la mesa','gerencia','ventas','clientes','filtros','radar'],def:'equipo'}, // la mesa → rendimiento (equipo, gerencia y clientes son de team leader y admin)
+  {g:'campanas',views:['campanas']},
   {g:'tareas',views:['tareas']},
-  {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
-  {g:'banking',views:['banking','bkprocs','bkbancos'],tabs:['¿Cómo paga el cliente?','Procesadores','Bancos'],def:'banking'}, // Banking 3: la del agente, las cajas y los bancos
-  {g:'kb',views:['kb']}, // Knowledgebase: guías para el agente (pedido del dueño, 25/11/2026)
-  {g:'analisis',views:['ventas','clientes','campanas','filtros','radar'],tabs:['Ventas','Clientes','Campañas','Filtros','Radar']}, // Clientes: solo team leader y admin
-  {g:'equipo',views:['equipo']},
-  {g:'gerencia',views:['gerencia']}, // los de arriba: team leader, admin y el rol director (que solo ve esto)
-  {g:'ajustes',views:['config','snippets'],tabs:['Ajustes','Snippets']},
+  {g:'chat',views:['chat','social'],tabs:['chat','mate y toques']},
+  {g:'banking',views:['banking','bkprocs','bkbancos'],tabs:['¿cómo paga el cliente?','procesadores','bancos'],def:'banking'},
+  {g:'kb',views:['kb']},
+  {g:'gerencia',views:['gerencia']}, // el director solo ve esto (su botón propio)
+  {g:'ajustes',views:['config','snippets'],tabs:['ajustes','snippets']},
 ];
 // lo del menú que depende del rol: Equipo y el Manager (team leader y admin); el team leader no tiene Cliente (no tiene clientes)
-function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLeader();$('#navGer').hidden=!isMgmt();document.body.classList.toggle('dir',isDirector());$('#navCm').classList.toggle('nv-cli',tlView());
-}
+function navRoles(){$('#navGer').hidden=!isDirector();document.body.classList.toggle('dir',isDirector());$('#navMesa').dataset.v=isLeader()?'equipo':'ventas';$('#navSueldo').hidden=tlView();const t=$('#navMesaT');if(t)t.textContent=teamInfo?teamInfo.name:'la mesa'}
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
-function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Mi día
-const NAVKEYS={1:'inicio',2:'agenda',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
+function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(G.views.includes(v)?v:G.def||G.views[0])}
+const NAVKEYS={1:'home',2:'agenda',3:'tareas',4:'chat',5:'banking',6:'kb',7:'mesa',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
-  if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';
+  if(!VIEWS.includes(v)||(v==='equipo'&&!isLeader())||(v==='gerencia'&&!isMgmt()))v=VIEWS.includes(v)&&v!=='gerencia'?'ventas':'home';
+  if(v==='callman')v='home'; // el Manager vive en home
   if(isDirector()&&v!=='gerencia'&&v!=='config')v='gerencia'; // el director solo ve Gerencia (y sus Ajustes)
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
@@ -156,12 +159,26 @@ function go(v,opts){
   const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
-  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader()));sn.hidden=tabs.length<2;
+  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader())&&(x!=='gerencia'||isMgmt()));sn.hidden=tabs.length<2;
   sn.innerHTML=tabs.length<2?'':tabs.map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;
-  if(ready){V[v].render(opts||{});hoyBand()} // la franja de news no va en el Panel
+  if(ready){V[v].render(opts||{});hoyBand();lowerize($('#main'))}
 }
+// todo en minúscula salvo las siglas (el dueño, 27/11/2026): baja las palabras que empiezan con mayúscula seguida de minúscula ("New" → "new", "Joaquín" → "joaquín");
+// lo que es todo mayúsculas (FTD, CR, RMO, ID, USD, FB-01, PIN) queda. No toca lo que escribe la gente: chat, snippets, guías, comentarios, campos.
+const LOW_SKIP='input,textarea,select,option,datalist,[contenteditable],pre,code,.ch-m,.ch-pv,.sn .bd,.kb-body,.kb-edmain,.chc-b,.fi-cm,.keep,script,style';
+const LOW_RE=/(^|[^\p{L}\p{N}])(\p{Lu})(\p{Ll}+)/gu;
+function lowerize(root){
+  if(!root)return;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>{const p=n.parentElement;return p&&!p.closest(LOW_SKIP)&&/\p{Lu}\p{Ll}/u.test(n.nodeValue)?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT}});
+  const l=[];while(w.nextNode())l.push(w.currentNode);
+  for(const n of l){const v=n.nodeValue.replace(LOW_RE,(m,a,b,c)=>a+b.toLowerCase()+c);if(v!==n.nodeValue)n.nodeValue=v}
+  for(const el of root.querySelectorAll?root.querySelectorAll('[title],[placeholder],[aria-label]'):[])for(const at of ['title','placeholder','aria-label']){const v=el.getAttribute(at);if(v&&/\p{Lu}\p{Ll}/u.test(v)&&!el.closest(LOW_SKIP))el.setAttribute(at,v.replace(LOW_RE,(m,a,b,c)=>a+b.toLowerCase()+c))}
+}
+// lo que aparece después (avisos, modales, lo que se redibuja) también baja, de a poco y sin frenar nada
+let lowQ=new Set(),lowT=0;
+new MutationObserver(ms=>{for(const m of ms){for(const n of m.addedNodes)if(n.nodeType===1)lowQ.add(n);else if(n.nodeType===3&&n.parentElement)lowQ.add(n.parentElement)}if(!lowT)lowT=setTimeout(()=>{lowT=0;const q=[...lowQ];lowQ.clear();for(const n of q)if(n.isConnected)lowerize(n)},30)}).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
 let rT=null;
 // con la pestaña escondida no se dibuja la sección (nadie la ve): se dibuja al volver. La barra y la extensión sí se actualizan.
 let rDirty=false;
@@ -178,6 +195,7 @@ const avatar=(name,cls='')=>{const m=members.find(x=>x.name===name)||(botU&&botU
   return a?`<span class="av pic ${cls}" aria-hidden="true"><img src="${a.url}" alt=""></span>`:`<span class="av ${cls}" style="--h:${avHue(name)}" aria-hidden="true">${esc(initials(name))}</span>`};
 const roleTxt=r=>r==='admin'?'Administrador':r==='leader'?'Team leader':r==='director'?'Director':'Agente';
 function status(){
+  {const t=$('#navMesaT'),n=teamInfo?teamInfo.name:'la mesa';if(t&&t.textContent.toLowerCase()!==n.toLowerCase())t.textContent=n} // el titulito de la mesa en el menú
   pass++;
   const now=new Date(),te=todayS();
   $('#sClock').textContent=`${z(now.getHours())}:${z(now.getMinutes())}`;$('#sClock').title=`${DIAL[now.getDay()]} ${dm(te)}`;

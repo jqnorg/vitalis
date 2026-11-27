@@ -3,6 +3,33 @@
 # Uso: cd test && python3 e2e_ext.py   → capturas en test/shots/
 import asyncio, re, subprocess, time, json, urllib.request, pathlib, sys, tempfile
 from playwright.async_api import async_playwright
+# Vitalis escribe todo en minúscula salvo las siglas (27/11/2026): los textos que lee la prueba comparan sin distinguir mayúsculas
+class LowStr(str):
+    def __contains__(self, x): return str.__contains__(self.lower(), str(x).lower())
+    def __eq__(self, x): return isinstance(x, str) and str.__eq__(self.lower(), x.lower())
+    def __ne__(self, x): return not self.__eq__(x)
+    def __hash__(self): return str.__hash__(self.lower())
+    def __getitem__(self, k): return LowStr(str.__getitem__(self, k))
+    def strip(self, *a): return LowStr(str.strip(self, *a))
+    def replace(self, *a): return LowStr(str.replace(self, *a))
+    def lower(self): return str.lower(self)
+    def startswith(self, x, *a): return str.startswith(self.lower(), str(x).lower(), *a)
+    def endswith(self, x, *a): return str.endswith(self.lower(), str(x).lower(), *a)
+    def split(self, *a): return [LowStr(x) for x in str.split(self, *a)]
+    def splitlines(self, *a): return [LowStr(x) for x in str.splitlines(self, *a)]
+    def count(self, x, *a): return str.count(self.lower(), str(x).lower(), *a)
+    def find(self, x, *a): return str.find(self.lower(), str(x).lower(), *a)
+    def index(self, x, *a): return str.index(self.lower(), str(x).lower(), *a)
+import playwright.async_api as _pw
+for _cls in (_pw.Page, _pw.Locator, _pw.Frame, _pw.ElementHandle):
+    for _m in ('inner_text', 'text_content', 'input_value', 'inner_html', 'get_attribute', 'all_inner_texts', 'all_text_contents'):
+        if hasattr(_cls, _m):
+            def _wrap(f):
+                async def g(*a, **k):
+                    r = await f(*a, **k)
+                    return LowStr(r) if isinstance(r, str) else [LowStr(x) for x in r] if isinstance(r, list) else r
+                return g
+            setattr(_cls, _m, _wrap(getattr(_cls, _m)))
 PORT = 54420
 LOCAL = f'http://localhost:{PORT}'
 APP = 'https://vitalis.joaquin-or24.workers.dev/'

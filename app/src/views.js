@@ -40,11 +40,10 @@ V.inicio={
   k:'',
   build(){},
   render(){
-    const now=new Date(),te=todayS(),ym=ymNow(),s=calc(ym),P=sueldoPesos(s),h=now.getHours();
-    $('#iHola').textContent=`${h<13?'Buen día':h<20?'Buenas tardes':'Buenas noches'}, ${profile.name.split(/\s+/)[0]}`;
-    $('#iFecha').textContent=`${cap(DIAL[now.getDay()])} ${+te.slice(8)} de ${MES[now.getMonth()]}`;
+    const now=new Date(),te=todayS(),ym=ymNow(),s=calc(ym),P=sueldoPesos(s),h=now.getHours(),mes=MES[+ym.slice(5,7)-1];
+    $('#iHola').textContent=tlView()?'la mesa este mes':'tu rendimiento';
+    $('#iFecha').textContent=`${mes} · tu mes, hoy, la semana y la racha`;
     const hoy=ftds.filter(f=>f.date===te),t=openTurno()||turnos[te],m=t?metr(t):null;
-    const mes=MES[+ym.slice(5,7)-1];
     const sub=s.extra?`${s.loaded} cargados + ${s.extra} sin detalle`:`tus clientes depositaron ${money(s.monto)} USD`;
     const msg=s.next?`Faltan <b>${s.next[0]-s.n}</b> para el bono de <b>${s.next[1]} USD</b>`:s.n?'<b>Bono máximo.</b> Esto merece un mate 🧉':'La primera venta del mes pone el mate en marcha.';
     const TL=tlView(); // el team leader ve la mesa entera
@@ -56,36 +55,9 @@ V.inicio={
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
       (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,(r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca')+rachaCal(me),'racha'+(r.n>=3?' on':''))})();
-    $('#iBank').hidden=true; // las fallas de pago ya no van en el Inicio (lo pidió el dueño): quedan en Banking y en la marca del menú
+    $('#iBank').hidden=true; // las fallas de pago van en home
     crmLoad();
-    $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
-    $('#iHoy').innerHTML=hoyMesaCard()+(TL?'':`<p class="mt"><button type="button" class="lnkp" data-go="historial">Ver tu historial ›</button></p>`);
-    {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
-    this.turno(true);
-  },
-  turno(force){
-    if(cur!=='inicio')return;
-    const {t,b,h,key}=turnoState(),now=Date.now(),day=t||h;
-    if(force||key!==this.k){
-      this.k=key;let bt='';
-      // los botones del turno están en la barra de arriba (una sola vez); acá, el tiempo y las marcas del día
-      if(!t)bt=h&&h.out?'<button type="button" class="btn" data-act="entrada">Reabrir turno</button>':'<button type="button" class="btn pri big" data-act="entrada">Marcar entrada</button>';
-      else if(b)bt=`<button type="button" class="btn pri big" data-act="vuelta">Volví ${isBano(b)?'del baño':'del descanso'}</button>`;
-      else bt=day?`<span class="marks">${marksHTML(day)}</span>`:'';
-      if(day)bt+='<span style="flex:1"></span><button type="button" class="ib" data-go="turnos" title="Ver, deshacer o corregir las marcas en Turnos">Corregir</button>';
-      $('#itBtns').innerHTML=bt;
-    }
-    let st='<span class="dim">Todavía no marcaste entrada hoy.</span>';
-    if(day){
-      const m=metr(day,now);
-      if(b&&isBano(b))st=`<span class="big">${mmss(now-b.s)}</span><span>En el baño desde las ${hhmm(b.s)}</span>`;
-      else if(b){const left=b.s+b.k*6e4-now;st=`<span class="big${left<0?' hot':''}">${left>=0?mmss(left):'+'+mmss(-left)}</span><span>Descanso de ${b.k}': ${left>=0?'volvés a las '+hhmm(b.s+b.k*6e4):sp('hot','te pasaste')}</span>`}
-      else if(t){const rest=m.salidaEst-now;st=`<span class="big">${durS(m.total)}</span><span>${rest>0?`Salís a las ${hhmm(m.salidaEst)}, faltan ${dur(rest)}`:sp('hot','+'+dur(-rest)+' extra')}</span>`}
-      else st=`<span class="big">${durS(m.total)}</span><span>${hhmm(day.in)} a ${hhmm(day.out)}, ${Math.abs(m.extra)<6e4?'justo':m.extra>0?sp('hot','+'+dur(m.extra)+' extra'):dur(-m.extra)+' menos'}</span>`;
-    }
-    $('#itState').innerHTML=st;
-    {const el=$('#itRitmo');if(el){const h=tlView()?'':ritmoLine(me);el.hidden=!h;el.innerHTML=h}} // tu ritmo de hoy: llamadas, tiempo muerto y franja
-    $('#itTl').innerHTML=day?timeline(day,now):'';
+    {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl} // tu día según a qué hora llegó el primer FTD
   },
 };
 function timeline(t,now){
@@ -490,15 +462,15 @@ V.sueldo={
 };
 
 /* ---------- config ---------- */
-const TEMAS=[['oscuro','Noche'],['claro','Claro'],['auto','Como la compu']]; // Noche (oscuro, morado) es el predeterminado desde el 27/11/2026
+const TEMAS=[['claro','claro'],['oscuro','noche'],['auto','como la compu']]; // claro es el predeterminado (estética Revolut, 27/11/2026)
 const darkMq=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
 function applyTheme(t){
-  t=t||cfg.tema;if(!['claro','oscuro','auto'].includes(t))t='oscuro';local.set('tema',t);
+  t=t||cfg.tema;if(!['claro','oscuro','auto'].includes(t))t='claro';local.set('tema',t);
   const dark=t==='oscuro'||(t==='auto'&&!!(darkMq&&darkMq.matches));
   document.body.classList.toggle('dark',dark);
-  const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#0e0f11':'#f6f7f8';
+  const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#000000':'#f4f4f6';
 }
-if(darkMq&&darkMq.addEventListener)darkMq.addEventListener('change',()=>{applyTheme(ready?cfg.tema:local.get('tema','oscuro'));if(ready)refresh()});
+if(darkMq&&darkMq.addEventListener)darkMq.addEventListener('change',()=>{applyTheme(ready?cfg.tema:local.get('tema','claro'));if(ready)refresh()});
 let bonosDraft=null;
 V.config={
   build(){
@@ -569,7 +541,7 @@ V.config={
       el.disabled=readOnly;
     });
     if(!bonosDraft||!$('#cfBonos').contains(document.activeElement)){bonosDraft=tiers().map(([t,u])=>[String(t),String(u)]);this.drawBonos()}
-    const tm=['claro','oscuro','auto'].includes(cfg.tema)?cfg.tema:'oscuro';$$('[data-tema]',$('#cfTemas')).forEach(b=>b.classList.toggle('on',b.dataset.tema===tm));
+    const tm=['claro','oscuro','auto'].includes(cfg.tema)?cfg.tema:'claro';$$('[data-tema]',$('#cfTemas')).forEach(b=>b.classList.toggle('on',b.dataset.tema===tm));
     const LB=cfg.laborables||DEF.laborables;$$('[data-dow]',$('#cfDow')).forEach(c=>c.classList.toggle('on',LB.includes(+c.dataset.dow)));
     if($('#cfInicio')!==document.activeElement)$('#cfInicio').value=cfg.inicio||'';
     const sf=cfg.sinFer||DEF.sinFer,y=+todayS().slice(0,4),fl=t=>feriadosUY(y).filter(x=>x.t===t).map(x=>`${dm(x.d)} ${x.n}`).join('\n');
@@ -879,7 +851,7 @@ function importarRespaldo(){
 
 function onReady(){
   ready=true;
-  if(!local.get('noche',0)){local.set('noche',1);if(cfg.tema!=='oscuro'){cfg={...cfg,tema:'oscuro'};if(!readOnly)setTimeout(()=>{if(cfg.tema==='oscuro')B.saveCfg()},4000)}} // se guarda después, sin pisarse con el alta de la cuenta // Noche (27/11/2026): una vez, todos pasan al tema nuevo; después cada uno elige en Ajustes
+  if(!local.get('rev',0)){local.set('rev',1);if(cfg.tema!=='claro'){cfg={...cfg,tema:'claro'};if(!readOnly)setTimeout(()=>{if(cfg.tema==='claro')B.saveCfg()},4000)}} // estética Revolut (27/11/2026): una vez, todos pasan a claro (se guarda después, sin pisarse con el alta de la cuenta); después cada uno elige en ajustes
   applyTheme();
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
   navRoles();
@@ -890,7 +862,7 @@ function onReady(){
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
 }
 function boot(){
-  applyTheme(local.get('tema','oscuro'));
+  applyTheme(local.get('tema','claro'));
   $('#ver').textContent='Vitalis '+VERSION;
   for(const v of VIEWS)V[v].build();
   V.cuenta.build();

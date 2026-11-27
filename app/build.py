@@ -9,7 +9,7 @@ logo=re.search(r'<symbol id="logo" viewBox="0 0 48 48">(.*?)</symbol>', body, re
 fav_svg="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'>"+re.sub(r'\s+',' ',logo).replace('"',"'")+"</svg>"
 (D/'logo.svg').write_text(fav_svg.replace("'",'"'))
 fav="data:image/svg+xml,"+urllib.parse.quote(fav_svg)
-js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','dock.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','kb.js','ficha.js','hoy.js','campanas.js','radar.js','estacion.js','callman.js','gerencia.js','historial.js','share.js','lock.js','auth.js'])
+js='\n'.join((S/f).read_text() for f in ['core.js','ui.js','dock.js','actions.js','views.js','social.js','chat.js','tasks.js','filtros.js','mesa.js','ahora.js','banking.js','kb.js','ficha.js','hoy.js','campanas.js','radar.js','estacion.js','callman.js','home.js','gerencia.js','historial.js','share.js','lock.js','auth.js'])
 js=js.replace('\nboot();\n','\n')+'\nboot();\n'
 js=js.replace('__EXT_VER__', json.loads((ROOT/'extension'/'manifest.json').read_text())['version'])   # la versión de la extensión que se descarga   # boot() al final, después de auth.js
 cfg=json.loads((ROOT/'app'/'config.json').read_text())
@@ -18,7 +18,7 @@ vend=(ROOT/'app'/'vendor'/'supabase.js').read_bytes()
 SUPA='supabase.'+hashlib.sha256(vend).hexdigest()[:10]+'.js'   # con el hash en el nombre: el navegador lo guarda para siempre y no vuelve a preguntar
 cfgjs='window.VITALIS_CONFIG = '+json.dumps(cfg)+';'
 # antes de que cargue nada: el tema guardado y la pantalla de entrada (nunca se ve la app sin sesión)
-pre='''<script>try{var t=JSON.parse(localStorage.getItem('vitalis.tema'))||'oscuro';if(t==='oscuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))document.body.classList.add('dark')}catch(e){}</script>
+pre='''<script>try{var t=JSON.parse(localStorage.getItem('vitalis.tema'))||'claro';if(t==='oscuro'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))document.body.classList.add('dark')}catch(e){}</script>
 <div id="auth"><div class="abox"><div class="brand"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span class="word">vitalis</span></div><div id="abox"><div class="aload"><svg aria-hidden="true"><use href="#logo"/></svg>Cebando…</div></div></div></div>
 '''
 html=f'''<!DOCTYPE html>
@@ -27,12 +27,12 @@ html=f'''<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="vitalis" content="app">
-<meta name="theme-color" content="#f6f7f8">
+<meta name="theme-color" content="#f4f4f6">
 <title>Vitalis</title>
 <link rel="icon" href="{fav}">
 <link rel="preconnect" href="{cfg['url']}" crossorigin>
 <link rel="preload" href="{SUPA}" as="script">
-<link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/pjs.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 {(S/'style.css').read_text()}</style>
 </head>

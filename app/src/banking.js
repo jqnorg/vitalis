@@ -57,7 +57,7 @@ function bkApply(x,quiet){
   if(!x){bk.ok=false;return}
   const {pr,ms,bn,inc,fl}=x,was=bk.ok;Object.assign(bk,{ok:true,procs:pr,methods:ms,banks:bn,inc,files:fl,at:Date.now()});
   if(was!==true||quiet){bkSeenAt=Math.max(bkSeenAt,0,...inc.map(i=>+new Date(i.created_at)));local.set('bkSeen',bkSeenAt)}else bkNotify(inc); // al entrar no avisa lo viejo
-  if(ready&&[...BK_VIEWS,'inicio'].includes(cur))refresh();else if(ready)status();
+  if(ready&&[...BK_VIEWS,'home'].includes(cur))refresh();else if(ready)status();
 }
 function bkNotify(list){
   const fresh=list.filter(i=>+new Date(i.created_at)>bkSeenAt).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));

@@ -648,7 +648,7 @@ function check(){
 function tick(){
   if(!ready)return;
   const now=new Date();$('#sClock').textContent=`${z(now.getHours())}:${z(now.getMinutes())}`;
-  turnoBar();if(cur==='inicio')V.inicio.turno();
+  turnoBar();if(cur==='home')V.home.turno();
   const t=openTurno(),b=breakAbierto(t);if(!b||isBano(b))return; // el baño no tiene alarma
   const end=b.s+b.k*6e4,ms=Date.now();if(ms<end)return;
   const key=t.date+':'+b.s;
@@ -811,7 +811,7 @@ document.addEventListener('keydown',e=>{
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
   if(k==='k'){e.preventDefault();if(cur==='kb'&&kbMode!=='edit')kbGo('home');else go('kb');return}
-  if(k==='m'&&isLeader()){e.preventDefault();goGroup('callman');return}
+  if(k==='m'&&isLeader()){e.preventDefault();go('home');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}

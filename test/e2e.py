@@ -2,6 +2,33 @@
 # Uso: cd test && python3 e2e.py   → capturas en test/shots/
 import re, asyncio, base64, subprocess, time, json, urllib.request, pathlib, sys
 from playwright.async_api import async_playwright
+# Vitalis escribe todo en minúscula salvo las siglas (27/11/2026): los textos que lee la prueba comparan sin distinguir mayúsculas
+class LowStr(str):
+    def __contains__(self, x): return str.__contains__(self.lower(), str(x).lower())
+    def __eq__(self, x): return isinstance(x, str) and str.__eq__(self.lower(), x.lower())
+    def __ne__(self, x): return not self.__eq__(x)
+    def __hash__(self): return str.__hash__(self.lower())
+    def __getitem__(self, k): return LowStr(str.__getitem__(self, k))
+    def strip(self, *a): return LowStr(str.strip(self, *a))
+    def replace(self, *a): return LowStr(str.replace(self, *a))
+    def lower(self): return str.lower(self)
+    def startswith(self, x, *a): return str.startswith(self.lower(), str(x).lower(), *a)
+    def endswith(self, x, *a): return str.endswith(self.lower(), str(x).lower(), *a)
+    def split(self, *a): return [LowStr(x) for x in str.split(self, *a)]
+    def splitlines(self, *a): return [LowStr(x) for x in str.splitlines(self, *a)]
+    def count(self, x, *a): return str.count(self.lower(), str(x).lower(), *a)
+    def find(self, x, *a): return str.find(self.lower(), str(x).lower(), *a)
+    def index(self, x, *a): return str.index(self.lower(), str(x).lower(), *a)
+import playwright.async_api as _pw
+for _cls in (_pw.Page, _pw.Locator, _pw.Frame, _pw.ElementHandle):
+    for _m in ('inner_text', 'text_content', 'input_value', 'inner_html', 'get_attribute', 'all_inner_texts', 'all_text_contents'):
+        if hasattr(_cls, _m):
+            def _wrap(f):
+                async def g(*a, **k):
+                    r = await f(*a, **k)
+                    return LowStr(r) if isinstance(r, str) else [LowStr(x) for x in r] if isinstance(r, list) else r
+                return g
+            setattr(_cls, _m, _wrap(getattr(_cls, _m)))
 from datetime import date, timedelta
 PORT = 54410
 URL = f'http://localhost:{PORT}/'
@@ -66,7 +93,7 @@ async def main():
             await A.keyboard.type('4821'); await A.wait_for_timeout(2000)
             ok(await A.evaluate('ready'), 'entra a Vitalis')
             ok(await A.evaluate('profile.role') == 'admin', 'el primero queda como admin')
-            ok(await A.evaluate("cur") == 'inicio', 'la primera vez del día entra a Inicio')
+            ok(await A.evaluate("cur") == 'home', 'la primera vez del día entra a home')
             await A.screenshot(path=OUT / 'b0_inicio_vacio.png')
             PNG1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
             # datos de ejemplo (las felicitaciones de Vitalis se prueban al final: acá ensuciarían el chat)
@@ -77,18 +104,19 @@ async def main():
             html = urllib.request.urlopen(URL).read().decode()
             ok('<body class="auth">' in html and 'Cebando' in html.split('<nav')[0], 'antes de cargar se ve la entrada, nunca la app sin sesión')
             ok(await A.evaluate("snapGet('boot:'+me).then(x=>!!(x&&x.raw&&x.raw.sales.length))"), 'lo cargado queda guardado en esta computadora')
-            t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&cur==='agenda'&&document.querySelector('#v-agenda')", timeout=15000)
+            t0 = time.time(); await A.reload(); await A.wait_for_function("ready&&cur==='home'&&document.querySelector('#v-home')", timeout=15000)
             ok(time.time() - t0 < 1.5, f'al volver a abrir, Vitalis se dibuja al instante con lo guardado ({time.time()-t0:.2f}s)')
-            ok(await A.evaluate("cur") == 'agenda', 'después, entra directo a la Agenda')
-            ok(await A.evaluate("document.body.classList.contains('dark')&&cfg.tema==='oscuro'"), 'Noche (oscuro, morado) es el tema de todos desde el 27/11/2026')
+            ok(await A.evaluate("cur") == 'home', 'después, entra directo a home')
+            ok(await A.evaluate("!document.body.classList.contains('dark')&&cfg.tema==='claro'"), 'claro (estética Revolut) es el tema de todos desde el 27/11/2026')
             await A.evaluate("go('inicio')"); await A.wait_for_function("document.querySelector('#iHero .n')&&document.querySelector('#iHero .n').textContent.trim()==='13'", timeout=5000)
             await A.screenshot(path=OUT / 'b1_inicio.png', full_page=False)
             ok((await A.inner_text('#iHero .n')).strip() == '13', 'la pista muestra 13 FTDs')
-            order = ['inicio', 'callman', 'agenda', 'tareas', 'chat', 'banking', 'kb', 'analisis', 'ajustes', 'equipo', 'gerencia']
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú: Inicio, (Manager de la mesa), Agenda, Tareas, Chat, Banking, Knowledgebase, Análisis (y Equipo, Gerencia); Ajustes abajo')
-            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 10, 'el admin ve 10 botones en la compu: con los dos Manager, Equipo y Gerencia (Ajustes va abajo, junto a tu nombre)')
-            ok(await A.locator('#navPanel').count() == 0 and await A.locator('#v-cliente').count() == 0 and (await A.inner_text('#navAgenda .nm')).strip() == 'Agenda', 'sin "Manager (agente)" ni sección Cliente: la Agenda tiene su botón (el dueño, 26/11/2026)')
-            tabs = {'inicio': ['inicio', 'sueldo', 'turnos', 'historial'], 'agenda': ['agenda'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking', 'bkprocs', 'bkbancos'], 'analisis': ['ventas', 'clientes', 'campanas', 'filtros']}
+            order = ['home', 'rend', 'turnos', 'agenda', 'sueldo', 'mesa', 'campanas', 'tareas', 'chat', 'banking', 'kb', 'ajustes', 'gerencia']
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].map(b=>b.dataset.g)") == order, 'el menú (27/11/2026): home · yo (rendimiento, turnos, agenda, sueldo) · la mesa (rendimiento, campañas, tareas) · chat · banking · knowledgebase')
+            ok(await A.evaluate("[...document.querySelectorAll('#nav [data-g]')].filter(b=>b.offsetParent).length") == 11, 'el admin ve 11 botones en la compu (gerencia es solo del director; ajustes va abajo, junto a tu nombre)')
+            ok((await A.evaluate("[...document.querySelectorAll('#nav .grp')].map(x=>x.textContent)"))[:2] == ['yo', 'team matías'], 'los titulitos del menú: yo y el nombre de la mesa')
+            ok(await A.locator('#navPanel').count() == 0 and await A.locator('#v-cliente').count() == 0 and (await A.inner_text('#navAgenda .nm')).strip() == 'agenda', 'sin "Manager (agente)" ni sección Cliente: la agenda tiene su botón (el dueño, 26/11/2026)')
+            tabs = {'home': ['home'], 'rend': ['inicio', 'historial'], 'turnos': ['turnos'], 'agenda': ['agenda'], 'sueldo': ['sueldo'], 'mesa': ['equipo', 'gerencia', 'ventas', 'clientes', 'filtros', 'radar'], 'campanas': ['campanas'], 'tareas': ['tareas'], 'chat': ['chat', 'social'], 'banking': ['banking', 'bkprocs', 'bkbancos']}
             i = 0
             for g, vs in tabs.items():
                 await A.click(f'#nav [data-g={g}]'); await A.wait_for_timeout(400)
@@ -114,14 +142,14 @@ async def main():
             ok(await A.locator('#hiBody .hi-t tbody tr:not(.hi-day):not(.late)').count() == 0 and await A.locator('#hiBody tr.late').count() >= 1, 'el filtro Late deja solo los lates')
             await A.click('#hiBody [data-tipo=""]'); await A.wait_for_timeout(300)
             await A.screenshot(path=OUT / 'c14b_historial.png', full_page=True)
-            await A.click('#nav [data-g=analisis]'); await A.wait_for_timeout(300)
-            ok(await A.is_visible('#v-filtros'), 'cada sección vuelve a la última solapa que usaste')
+            await A.click('#nav [data-g=mesa]'); await A.wait_for_timeout(300)
+            ok(await A.is_visible('#v-radar'), 'cada sección vuelve a la última solapa que usaste')
             await A.click('#navAjustes'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-config') and await A.is_visible('#subnav [data-tab=snippets]'), 'Ajustes (con Snippets) desde abajo')
             await A.keyboard.press('2'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-agenda'), 'las teclas van a las secciones (2 = Agenda)')
-            await A.click('#navEquipo'); await A.wait_for_timeout(500)
-            ok(await A.is_visible('#v-equipo'), 'sección equipo (admin)')
+            await A.evaluate("go('equipo')"); await A.wait_for_timeout(500)
+            ok(await A.is_visible('#v-equipo') and 'on' in (await A.get_attribute('#navMesa', 'class') or ''), 'la mesa → rendimiento: equipo (admin)')
             await A.screenshot(path=OUT / 'c15_equipo.png')
             # ajustes: días que no se cuentan (día y mes, sin año); las faltas, solo en Sueldo
             await A.evaluate("go('config')"); await A.wait_for_timeout(300)
@@ -135,13 +163,13 @@ async def main():
             await A.keyboard.press('2'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-agenda'), 'tecla 2: Panel (en la última solapa)')
             await A.keyboard.press('7'); await A.wait_for_timeout(300)
-            ok(await A.is_visible('#v-filtros'), 'tecla 7: Análisis')
+            ok(await A.evaluate("GROUPS.find(g=>g.g==='mesa').views.includes(cur)"), 'tecla 7: la mesa → rendimiento')
             await A.keyboard.press('6'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-kb'), 'tecla 6: Knowledgebase')
             await A.keyboard.press('4'); await A.wait_for_timeout(300)
             ok(await A.is_visible('#v-social'), 'tecla 4: Chat')
             await A.keyboard.press('1'); await A.wait_for_timeout(300)
-            ok(await A.is_visible('#v-inicio'), 'tecla 1: Inicio (siempre en Mi día)')
+            ok(await A.is_visible('#v-home'), 'tecla 1: home')
             # ventas: filtrar por fechas exactas
             await A.evaluate("go('ventas')"); await A.wait_for_timeout(400)
             await A.fill('#pFilters [data-f=desde]', '2026-11-05'); await A.wait_for_timeout(300)
@@ -201,6 +229,7 @@ async def main():
             await D.keyboard.type('2468'); await D.wait_for_timeout(300); await D.keyboard.type('2468'); await D.wait_for_timeout(2200)
             ok(await D.evaluate('ready') and await D.evaluate('profile.role') == 'leader', 'el team leader entra (sigue team leader)')
             ok(await D.locator('#iMesa .mb-r:has-text("Joaquín Or") .av.pic img').count() == 1, 'el team leader ve la foto de Joaquín')
+            await D.evaluate("go('inicio')"); await D.wait_for_timeout(500)
             ok('ftds de la mesa' in (await D.inner_text('#iHero')).lower() and (await D.inner_text('#iHero .n')).strip() == str(await D.evaluate("team.filter(f=>f.date.slice(0,7)===ymNow()).length")), 'el inicio del team leader es el de la mesa')
             ok(await D.locator('#iMesa .mb-r').count() == await D.evaluate("sellers(team.filter(f=>f.date.slice(0,7)===ymNow())).length"), 'y abajo, cada agente')
             ok(not await D.evaluate("sellers([]).some(m=>m.role==='leader')"), 'el team leader no cuenta como agente (si no vende)')
@@ -431,9 +460,10 @@ async def main():
             await D.evaluate('catchUp(true)'); await D.wait_for_timeout(700)
             ok(await D.locator('#toasts .toast:has-text("prueba de agente")').count() == 0, 'el @todos de otro no salta el silencio')
             # compartir datos: cada tarjeta tiene su botón; el team leader lo manda como aviso y a todos les queda hasta que lo cierren
-            await D.evaluate("go('inicio')"); await D.wait_for_timeout(700)
-            ok(await D.locator('#iHero > .sh-btn').count() == 1 and await D.locator('#iHoy > .sh-btn').count() == 1, 'cada tarjeta de datos tiene su botón Compartir')
-            ok(await D.locator('#iTurno .sh-btn').count() == 0, 'la franja del turno no')
+            await D.evaluate("go('home')"); await D.wait_for_timeout(700)
+            ok(await D.locator('#iHoy > .sh-btn').count() == 1 and await D.locator('#iTurno .sh-btn').count() == 0, 'cada tarjeta de datos tiene su botón Compartir; la franja del turno no')
+            await D.evaluate("go('inicio')"); await D.wait_for_timeout(500)
+            ok(await D.locator('#iHero > .sh-btn').count() == 1, 'el hero también')
             hero_txt = (await D.inner_text('#iHero')).split('\n')[0]
             await A.evaluate("go('radar')"); await A.wait_for_timeout(900); await A.screenshot(path=OUT / 'x_share_btns.png'); await A.evaluate("go('social')")
             await D.click('#iHero > .sh-btn'); await D.wait_for_timeout(400)
@@ -534,11 +564,11 @@ async def main():
             await A.click('#toasts .toast.imp:has-text("te mandó una tarea") .btn:has-text("Ver")'); await A.wait_for_timeout(600)
             ok(await A.is_visible('#v-tareas') and 'FB Perú' in await A.inner_text('#tkList'), '"Ver" lleva a Tareas con los datos')
             await A.screenshot(path=OUT / 'm2_tareas_agente.png')
-            await D.evaluate("go('inicio')"); await D.evaluate("window.__tk=[];{const o=toast;toast=(...a)=>{__tk.push(String(a[0]));return o(...a)}}") # registro los avisos (el sondeo automático puede mostrarlo antes)
+            await D.evaluate("go('home')"); await D.evaluate("window.__tk=[];{const o=toast;toast=(...a)=>{__tk.push(String(a[0]));return o(...a)}}") # registro los avisos (el sondeo automático puede mostrarlo antes)
             await A.click('#tkList [data-ta=done]'); await A.wait_for_timeout(900)
             ok(sql(f"select done_at is not null d from public.task_people p join public.profiles u on u.id=p.user_id where u.name='Joaquín Or'")[0]['d'], 'Joaquín la marca hecha')
             ok(await A.inner_text('#nbTa') == '' and not await A.is_visible('#sTask'), 'y deja de figurar como pendiente')
-            await D.evaluate("go('inicio')"); await D.wait_for_timeout(300)
+            await D.evaluate("go('home')"); await D.wait_for_timeout(300)
             for _ in range(4): # si justo había una puesta al día en curso, espero la siguiente
                 await D.evaluate('catchUp(true)'); await D.wait_for_timeout(1500)
                 if await D.locator('#toasts .toast:has-text("Joaquín")').filter(has_text='hizo').count(): break
@@ -650,16 +680,17 @@ async def main():
             ok('13/18' in await D.inner_text('#eqTable tr:has-text("Joaquín Or")'), 'en Equipo se ve cómo viene cada uno contra su target')
             te0 = await A.evaluate('todayS()')
             sql(f"insert into public.sales (team_id,user_id,n,date,time,client_id,country,name,camp,amount,brand) select team_id,id,99,'{te0}','10:30','990001','Peru','Hoy Cliente','FB-01',180,'Trade24Seven' from public.profiles where name='Mateo He'")
-            await A.reload(); await A.wait_for_timeout(2500); await A.evaluate("go('inicio')"); await A.wait_for_timeout(500)
+            await A.reload(); await A.wait_for_timeout(2500); await A.evaluate("go('home')"); await A.wait_for_timeout(500)
             hv = await A.inner_text('#iHoy')
             ok('Ventas de hoy' in hv and '990001' in hv and 'Mateo' in hv and '10:30' in hv, f'el inicio lista las ventas de hoy de toda la mesa ({hv[:120]!r})')
             await A.locator('#iHoy').scroll_into_view_if_needed(); await A.screenshot(path=OUT / 'p1b_inicio_hoy.png')
             await A.click('#iHoy [data-act=hoyVentas]'); await A.wait_for_timeout(500)
             ok(await A.evaluate("cur==='ventas'&&pWho==='all'") and '990001' in await A.inner_text('#pTable'), '"Ver en Ventas" abre las de hoy de la mesa')
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(400)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(400)
             mt = await A.inner_text('#iMesa')
             n_mesa = await A.evaluate("team.filter(f=>f.date.slice(0,7)===ymNow()).length")
-            ok('target 60' in mt and str(n_mesa) in mt and ('Faltan' in mt or 'cumplido' in mt), f'el inicio muestra la mesa contra el target ({n_mesa} de 60)')
+            ok('target 60' in mt and str(n_mesa) in mt and ('Faltan' in mt or 'cumplido' in mt), f'home muestra la mesa contra el target ({n_mesa} de 60)')
+            await A.evaluate("go('inicio')"); await A.wait_for_timeout(400)
             ok('tus ftds' in (await A.inner_text('#iHero')).lower(), 'y arriba, lo mío')
             ok('Tu target: 18 FTDs' in await A.inner_text('#iHero') and 'faltan 5' in await A.inner_text('#iHero') and await A.locator('#iHero .ut-tick').count() == 1, 'Joaquín ve su target en el inicio (y la marca en la pista)')
             ok('target 18' in await A.text_content('#sMes'), 'y en el dato de la barra')
@@ -675,8 +706,9 @@ async def main():
             row = await D.inner_text('#eqTable tr:has-text("Sofía Ar")')
             ok('en turno desde' in row and '2 · 1 venc.' in row, f'equipo: turno y agenda de cada uno ({row!r})')
             await D.screenshot(path=OUT / 'p2_equipo_leader.png', full_page=True)
-            await D.evaluate("go('inicio')"); await D.wait_for_timeout(500)
-            ok('en turno' in await D.inner_text('#iMesa .mb-r:has-text("Sofía Ar")') and 'venc.' in await D.inner_text('#iMesa .mb-r:has-text("Sofía Ar")'), 'el inicio del team leader muestra el turno y la agenda de cada uno')
+            await D.evaluate("go('home')"); await D.wait_for_timeout(500)
+            ok('en turno' in await D.inner_text('#iMesa .mb-r:has-text("Sofía Ar")') and 'venc.' in await D.inner_text('#iMesa .mb-r:has-text("Sofía Ar")'), 'home del team leader muestra el turno y la agenda de cada uno')
+            await D.evaluate("go('inicio')"); await D.wait_for_timeout(400)
             ok('target 60' in (await D.inner_text('#iHero')).replace('el target de 60', 'target 60') or 'target' in await D.inner_text('#iHero'), 'y el target en la pista')
             await D.screenshot(path=OUT / 'p0_inicio_leader.png', full_page=True)
             await D.evaluate("go('equipo')"); await D.wait_for_timeout(400)
@@ -704,8 +736,8 @@ async def main():
             await E.click('.person:has-text("Elias Me")'); await E.keyboard.type('0000'); await E.wait_for_timeout(1500)
             await E.keyboard.type('1357'); await E.wait_for_timeout(300); await E.keyboard.type('1357'); await E.wait_for_timeout(2200)
             ok(await E.evaluate("ready&&profile.role==='agent'"), 'entra un agente (Elias)')
-            await E.evaluate("goGroup('analisis')"); await E.wait_for_timeout(300)
-            ok(await E.locator('#subnav [data-tab=clientes]').count() == 0 and await E.locator('#subnav [data-tab=campanas]').count() == 1, 'un agente no tiene la solapa Clientes (sí Campañas)')
+            await E.evaluate("goGroup('mesa')"); await E.wait_for_timeout(300)
+            ok(await E.locator('#subnav [data-tab=clientes]').count() == 0 and await E.locator('#subnav [data-tab=equipo]').count() == 0 and await E.locator('#subnav [data-tab=ventas]').count() == 1 and await E.evaluate('cur') == 'ventas', 'un agente no tiene equipo, gerencia ni clientes en la mesa: entra por ventas')
             await E.evaluate("go('clientes')"); await E.wait_for_timeout(300)
             ok(await E.evaluate("cur") == 'campanas', 'y si la pide, va a Campañas')
             await D.evaluate("modals.slice().forEach(m=>m.close());goGroup('analisis')"); await D.wait_for_timeout(300)
@@ -739,7 +771,7 @@ async def main():
             te = await A.evaluate('todayS()'); ym = te[:7]; pym = await A.evaluate("ymStep(ymNow(),-1)")
             # 500002 se registra 'hoy 10:20' o, si todavía es más temprano, una hora atrás (la primera llamada tiene que ser después del registro)
             h10 = min('10:20', await A.evaluate("(()=>{const d=new Date(Date.now()-36e5);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')})()"))
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(300)
             res = await A.evaluate(f'''()=>crmSeenFromExt([
               {{id:'500001',brand:'Novara Markets',name:'Nueva Uno',country:'Chile',status:'New',reg:'{te} 09:10',agent:'Joaquín Or',camp:'FB-01',aff:'12',k:'a'}},
               {{id:'500002',brand:'Novara Markets',name:'Nueva Dos',country:'Peru',status:'New',reg:'{te} {h10}',agent:'Joaquín Or',camp:'GG-UY',k:'b'}},
@@ -767,26 +799,26 @@ async def main():
             stn = lambda cid: sql(f"""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent,first_seen_by)
                 select team_id,'Novara Markets','{cid}','Por la estación','Chile','{te} 09:00','New','new','Joaquín Or',id from public.profiles where name='Matias Me'""")
             stn('500030')
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(200)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(200)
             await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900)
-            ok(await A.evaluate('curCl&&curCl.id') == '500030' and await A.evaluate('cur') == 'inicio' and await A.locator('#toasts .toast:has-text("Entró un new")').count() == 1, 'un new que vio la estación le llega a su agente (sin pestaña propia vigilando): aviso con el ID, sin cambiar de sección')
-            await A.evaluate("closeToast('ficha');go('inicio')"); await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900)
-            ok(await A.evaluate('cur') == 'inicio' and await A.locator('#toasts .toast:has-text("Entró un new")').count() == 0, 'una sola vez por cliente')
+            ok(await A.evaluate('curCl&&curCl.id') == '500030' and await A.evaluate('cur') == 'home' and await A.locator('#toasts .toast:has-text("Entró un new")').count() == 1, 'un new que vio la estación le llega a su agente (sin pestaña propia vigilando): aviso con el ID, sin cambiar de sección')
+            await A.evaluate("closeToast('ficha');go('home')"); await A.evaluate('crmLoad(true)'); await A.wait_for_timeout(900)
+            ok(await A.evaluate('cur') == 'home' and await A.locator('#toasts .toast:has-text("Entró un new")').count() == 0, 'una sola vez por cliente')
             await D.evaluate('crmLoad(true)'); await D.wait_for_timeout(900)
             ok(await D.evaluate("!curCl||curCl.id!=='500030'") and await D.locator('#toasts .toast:has-text("500030")').count() == 0, 'al team leader no le llega (no gestiona clientes)')
             stn('500031')
             await A.evaluate("newAt=0;newPoll()"); await A.wait_for_timeout(900)
             ok(await A.evaluate('curCl&&curCl.id') == '500031', 'la consulta liviana de los new (la despierta la extensión cada 30 s) también lo trae')
             await A.evaluate("window.postMessage({type:'ftd-agenda-cmd',v:1,cmd:'nuevo',k:'500032'},location.origin)"); await A.wait_for_timeout(600)
-            stn('500032'); await A.evaluate("closeToast('ficha');go('inicio');newAt=0;newPoll()"); await A.wait_for_timeout(900)
-            ok(await A.evaluate('cur') == 'inicio', 'lo que ya avisó la pestaña vigilada de la extensión no se repite')
+            stn('500032'); await A.evaluate("closeToast('ficha');go('home');newAt=0;newPoll()"); await A.wait_for_timeout(900)
+            ok(await A.evaluate('cur') == 'home', 'lo que ya avisó la pestaña vigilada de la extensión no se repite')
             sql("delete from public.crm_clients where client_id in ('500030','500031','500032')")
             await A.evaluate("closeToast('ficha');crmLoad(true)"); await A.wait_for_timeout(600)
             # el new de la pestaña vigilada: aviso con el ID y queda como cliente actual (para la mini ficha); sin sección Cliente
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(300)
             await A.evaluate("window.postMessage({type:'ftd-agenda-cmd',v:1,cmd:'nuevo',k:'500002'},location.origin)"); await A.wait_for_timeout(1200)
             t = A.locator('#toasts .toast:has-text("Entró un new")')
-            ok(await A.evaluate('cur') == 'inicio' and await A.evaluate('curCl&&curCl.id') == '500002' and await t.count() == 1 and '500002' in await t.inner_text() and 'Nueva Dos' not in await t.inner_text() and await t.locator('button:has-text("Copiar ID")').count() == 1, 'cuando entra un new, un aviso con el ID y Copiar ID (sin nombre); queda como cliente actual')
+            ok(await A.evaluate('cur') == 'home' and await A.evaluate('curCl&&curCl.id') == '500002' and await t.count() == 1 and '500002' in await t.inner_text() and 'Nueva Dos' not in await t.inner_text() and await t.locator('button:has-text("Copiar ID")').count() == 1, 'cuando entra un new, un aviso con el ID y Copiar ID (sin nombre); queda como cliente actual')
             await A.screenshot(path=OUT / 'q2_aviso_new.png')
             await A.evaluate("closeToast('ficha')"); await A.wait_for_timeout(300)
             await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
@@ -807,10 +839,10 @@ async def main():
             ok('entraron al registro' in await A.inner_text('#clSeen'), 'Clientes dice cuántos entraron hoy al registro')
             await A.screenshot(path=OUT / 'q4_clientes_conversion.png')
             # las llamadas: cada toque en Omega, Gizat o Voiso cuenta; los news del día
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(500)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(500)
             pool = await A.evaluate("(()=>{const P=dayPool(me);return {t:P.total,d:P.done,ids:P.items.map(x=>x.r.id).sort(),due:P.due.map(x=>x.r.id).sort()}})()")
             ok(pool['ids'] == ['500002', '500009'] and pool['due'] == ['500002'] and pool['d'] == 0, f'los news del día: los míos en New o Talking y los de hoy, sin depositar (500001 ya depositó; 500009 sigue en Talking) ({pool})')
-            band = (await A.inner_text('#sNew') + ' | ' + (await A.get_attribute('#sNew', 'title') or '')) if await A.is_visible('#sNew') else ''
+            band = LowStr(await A.inner_text('#sNew') + ' | ' + (await A.get_attribute('#sNew', 'title') or '')) if await A.is_visible('#sNew') else LowStr('')
             ok(band.replace('\n', ' ').startswith('1 en New') and '500002' in band and await A.locator('#hoyBand').is_hidden(), f'la pastilla de New en la barra: solo los que están en New ({band[:120]!r})')
             res = await A.evaluate("""()=>crmSeenFromExt([{id:'500003',brand:'Novara Markets',ln:'omega',at:new Date().toISOString(),k:'c1'},{id:'500003',brand:'Novara Markets',ln:'gizat',at:new Date(Date.now()+5000).toISOString(),k:'c2'},
               {id:'500003',brand:'Novara Markets',ln:'voiso',at:new Date(Date.now()+9000).toISOString(),k:'c3'},{id:'500002',brand:'Novara Markets',ln:'omega',at:new Date().toISOString(),k:'c4'},{id:'500002',brand:'Novara Markets',ln:'omega',at:new Date(Date.now()+10000).toISOString(),k:'c5'}])""")
@@ -834,7 +866,7 @@ async def main():
             ok(85 <= rt2 <= 91, f'un cliente colgado en Talking desde hace días no suma charla ({rt2})')
             rt3 = await A.evaluate("(()=>{crm.byId.get('c').since=new Date(Date.now()-57*6e4).toISOString();pass++;const r=ritmo(me);crm.byId.delete('c');pass++;return Math.round(r.talk/6e4)})()")
             ok(rt3 > rt2 + 30, f'si pasó a Talking con la llamada, lo que siguió es charla ({rt3})')
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(600)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(600)
             ok('muertos' in await A.inner_text('#itRitmo') and 'Q3' in await A.inner_text('#itRitmo') and 'hablados de 2 h 30' in await A.inner_text('#itRitmo'), 'el Inicio dice llamadas de 250, hablados de 2 h 30, tiempo muerto y franja')
             # la historia del RMO: se guarda cada 5 min y se ve en Turnos (lo tuyo) y en Equipo (todos)
             await A.evaluate("rmoLastSig='';rmoSave()"); await A.wait_for_timeout(900)
@@ -845,7 +877,7 @@ async def main():
             await D.evaluate("rmoAt={};rmoRows={};go('equipo')"); await D.wait_for_timeout(1500)
             eqr = await D.inner_text('#eqRmo')
             ok('RMO por día' in eqr and 'Joaquín Or' in eqr and await D.locator('#eqRmo .qb.q3').count() >= 1, f'en Equipo, la tabla RMO por día con cada agente ({eqr[:120]!r})')
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(600)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(600)
             await A.click('#itRitmo [data-hy=ritmo]'); await A.wait_for_timeout(500)
             dt = await A.inner_text('.mbox')
             ok('Huecos sin marcar' in dt and 'después de llamar a' in dt and 'Conversaciones' in dt and 'con B' in dt and await A.locator('.mbox .rt-tl .rs.dead').count() >= 2 and await A.locator('.mbox .rt-tl .rs.talk').count() == 1, f'"Ver qué pasó": la línea de tiempo, los huecos y las conversaciones ({dt[:160]!r})')
@@ -855,7 +887,7 @@ async def main():
             ok(await A.is_visible('#sNew') and '1' in await A.inner_text('#sNew'), 'llamado y todavía en New: sigue siendo urgente, la pastilla queda')
             await A.evaluate("go('agenda')"); await A.wait_for_timeout(400)
             ok(await A.is_visible('#sNew') and await A.get_attribute('#sNew', 'data-go') == 'agenda', 'y se ve también en la Agenda (la barra está en todas las secciones; la pastilla lleva ahí)')
-            await D.evaluate("go('inicio');crmLoad(true)"); await D.wait_for_timeout(1500); await D.evaluate("calls=[];callsFetch().then(x=>{callsApply(x);refresh()})"); await D.wait_for_timeout(1200)
+            await D.evaluate("go('home');crmLoad(true)"); await D.wait_for_timeout(1500); await D.evaluate("calls=[];callsFetch().then(x=>{callsApply(x);refresh()})"); await D.wait_for_timeout(1200)
             await D.evaluate("go('equipo')"); await D.wait_for_timeout(800)
             mesa = await D.inner_text('#eqPool') if await D.is_visible('#eqPool') else ''
             ok('Llamadas de hoy' in mesa and 'Joaquín' in mesa and '4/250' in mesa.replace('\n', '') and 'al new en' in mesa.lower(), f'en Equipo, las llamadas de hoy de cada uno y la velocidad al new ({mesa[:120]!r})')
@@ -865,17 +897,16 @@ async def main():
             sql('update public.teams set min_calls = 250')
             # el Manager del team leader: su botón brillante; la Agenda es un botón más para todos
             await D.evaluate("navRoles()"); await A.evaluate("navRoles()")
-            ok(await D.is_visible('#navCm') and 'nv-cli' in (await D.get_attribute('#navCm', 'class') or '') and await D.is_visible('#navAgenda') and 'nv-cli' not in (await D.get_attribute('#navAgenda', 'class') or ''), 'el team leader tiene el Manager brillando y la Agenda sin brillo')
+            ok(await D.is_hidden('#navSueldo') and await A.is_visible('#navSueldo') and await A.evaluate("GROUPS.find(g=>g.g==='mesa').views.filter(v=>v!=='equipo'&&v!=='gerencia'&&v!=='clientes')[0]") == 'ventas', 'el team leader no tiene sueldo; el agente entra a la mesa por ventas')
             await D.evaluate("go('cliente')"); await D.wait_for_timeout(300)
-            ok(await D.evaluate('cur') == 'inicio', 'ir a Cliente ya no existe: cae en Inicio')
-            ok(await A.is_visible('#navCm') and 'nv-cli' not in (await A.get_attribute('#navCm', 'class') or ''), 'el admin lo tiene también, sin brillo')
+            ok(await D.evaluate('cur') == 'home', 'ir a Cliente ya no existe: cae en home')
             import datetime as _dt
             r10 = (_dt.datetime.now() - _dt.timedelta(minutes=10)).strftime('%Y-%m-%d %H:%M')
             sql(f"""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent) select team_id,'Novara Markets','500040','Nadie Lollama','Peru','{r10}','New','new','Joaquín Or' from public.profiles where name='Matias Me'""")
             sql(f"""insert into public.crm_clients (team_id,brand,client_id,name,country,reg,status,status_group,crm_agent) select team_id,'Novara Markets','500041','Ya Hablando','Chile','{r10}','Talking','new','Sofía Ar' from public.profiles where name='Matias Me'""")
             await D.evaluate("crmLoad(true)"); await D.wait_for_timeout(900)
             await D.keyboard.press('Escape'); await D.keyboard.press('m'); await D.wait_for_timeout(700)
-            ok(await D.evaluate('cur') == 'callman', 'la M abre el Manager')
+            ok(await D.evaluate('cur') == 'home', 'la M abre home (el Manager vive ahí)')
             cm = await D.inner_text('#cmBody')
             ok('Para atender ya' in cm and ('New sin llamar hace' in cm or 'new sin llamar' in cm) and '500040' in cm, f'arriba, lo que hay que atender: un new que nadie llamó a los 5 min ({cm[:200]!r})')
             ok('News en curso' in cm and '500041' in cm and 'Talking' in cm and 'al new en' in cm.lower(), 'los news en curso, New y Talking, con su agente; y la velocidad al new')
@@ -893,7 +924,7 @@ async def main():
             ok(await D.inner_text('#nbCm') != '', 'el botón marca que hay algo para atender')
             await D.screenshot(path=OUT / 'cm_call_manager.png', full_page=True)
             sql("delete from public.crm_clients where client_id in ('500040','500041')")
-            await D.evaluate("crmLoad(true);go('inicio')"); await D.wait_for_timeout(600)
+            await D.evaluate("crmLoad(true);go('home')"); await D.wait_for_timeout(600)
             await A.evaluate("go('ventas',{f:{desde:todayS(),hasta:todayS()}})"); await A.wait_for_timeout(500)
             ok('new · 40 min' in await A.inner_text('#pTable'), 'cada venta muestra cuánto tardó desde el registro')
             # el team leader no tiene clientes: ve los de toda la mesa (aunque los haya visto primero él)
@@ -972,7 +1003,7 @@ async def main():
             await A.click('#bkBody [data-bkw=efectivo]'); await A.wait_for_timeout(300)
             ok('No hay efectivo' in await A.inner_text('#bkBody .bk-paso'), 'en efectivo no aparece un procesador solo digital')
             await A.click('#bkBody [data-bkw=otro]'); await A.wait_for_timeout(300)
-            ok(await A.locator('#bkBody .bk-opt').count() == 2 and 'Transferencia con Kushki' in ' '.join(await A.locator('#bkBody .bk-opt summary').all_inner_texts()), 'con otro banco muestra lo digital: transferencia y tarjeta con Kushki')
+            ok(await A.locator('#bkBody .bk-opt').count() == 2 and 'Transferencia con Kushki' in LowStr(' '.join(await A.locator('#bkBody .bk-opt summary').all_inner_texts())), 'con otro banco muestra lo digital: transferencia y tarjeta con Kushki')
             await A.click('#bkBody .bk-opt summary:has-text("Transferencia con")'); await A.wait_for_timeout(300)
             ok(await A.locator('#bkBody .bk-opt[open]').count() == 1 and 'Pide el RUT' in await A.inner_text('#bkBody .bk-opt[open] .bk-od'), 'la opción se despliega con la nota del método')
             await A.locator('#bkBody .bk-paso').screenshot(path=OUT / 'b3_como_paga.png')
@@ -1011,7 +1042,7 @@ async def main():
             # fallas: un método (ya tiene su país), varios a la vez, todo el procesador; al agente le llega urgente
             E = await newpage('E2'); await E.goto(URL); await E.wait_for_timeout(1200)
             await E.click('.person:has-text("Elias Me")'); await E.keyboard.type('1357'); await E.wait_for_timeout(2500)
-            await E.evaluate("modals.slice().forEach(m=>m.close());go('inicio');bkLoad(true)"); await E.wait_for_timeout(800)
+            await E.evaluate("modals.slice().forEach(m=>m.close());go('home');bkLoad(true)"); await E.wait_for_timeout(800)
             await A.evaluate("bkPais='';go('bkprocs')"); await A.wait_for_timeout(400)
             await A.click(f'#bkpBody [data-bka=mfalla][data-id="{cid}"]'); await A.wait_for_timeout(300)
             ok(await A.locator('.mbox [name=brM]:checked').count() == 1 and not await A.locator('#brAll').is_checked() and await A.locator('#brCF').is_hidden(), 'reportar la falla de un método: viene marcado y no pregunta el país (ya lo tiene)')
@@ -1118,11 +1149,11 @@ async def main():
             ok(sql(f"select kb_editor from public.profiles where id='{eid}'")[0]['kb_editor'] is True, 'en Ajustes → Mesa el admin marca quién escribe guías')
             await E.evaluate("profile.kb_editor=true;kbGo('home')"); await E.wait_for_timeout(400)
             ok(await E.locator('#kbTools [data-kba=new]').count() == 1, 'y ese agente ya ve el botón para escribir')
-            await A.evaluate("go('inicio')")
+            await A.evaluate("go('home')")
             # sin sección Cliente (el dueño, 26/11/2026): el cliente abierto en el CRM queda como "cliente actual" solo para la mini ficha del CRM
-            await E.evaluate("modals.slice().forEach(m=>m.close());go('inicio');setCurrent('500001','Nueva Uno','crm')"); await E.wait_for_timeout(300)
-            await A.evaluate("modals.slice().forEach(m=>m.close());go('inicio');setCurrent('500001','Nueva Uno','crm')"); await A.wait_for_timeout(600)
-            ok(await A.evaluate('cur') == 'inicio' and await A.evaluate('curCl&&curCl.id') == '500001' and await A.locator('#v-cliente').count() == 0 and await A.locator('#toasts .toast:has-text("Cliente actual")').count() == 0, 'el cliente abierto en el CRM no cambia de sección ni avisa: queda como cliente actual para la mini ficha')
+            await E.evaluate("modals.slice().forEach(m=>m.close());go('home');setCurrent('500001','Nueva Uno','crm')"); await E.wait_for_timeout(300)
+            await A.evaluate("modals.slice().forEach(m=>m.close());go('home');setCurrent('500001','Nueva Uno','crm')"); await A.wait_for_timeout(600)
+            ok(await A.evaluate('cur') == 'home' and await A.evaluate('curCl&&curCl.id') == '500001' and await A.locator('#v-cliente').count() == 0 and await A.locator('#toasts .toast:has-text("Cliente actual")').count() == 0, 'el cliente abierto en el CRM no cambia de sección ni avisa: queda como cliente actual para la mini ficha')
             dd = await A.evaluate("dockData().then(d=>d.cl)")
             ok(dd and dd['id'] == '500001' and dd['pay'] and dd['pay']['pais'] == 'Chile' and any('Kushki' in o['p'] for o in dd['pay']['k']['transferencia']['ok']), f'la mini ficha recibe el depósito del cliente actual: qué ofrecerle en su país ({str(dd)[:160]!r})')
             # la campaña (monto mínimo y anuncio) se carga desde Campañas, en Análisis
@@ -1181,7 +1212,7 @@ async def main():
 
             # una venta de hoy: Vitalis felicita en el chat de la mesa y le avisa a todos
             sql("alter table public.sales enable trigger sales_cheer")
-            await A.evaluate("go('inicio')"); await A.wait_for_timeout(300)
+            await A.evaluate("go('home')"); await A.wait_for_timeout(300)
             sql("insert into public.sales (team_id,user_id,date,time,client_id,amount,tx,brand) select team_id,id,((now() at time zone 'UTC') - interval '3 hours')::date,'11:20','919191',250,'919191','Novara Markets' from public.profiles where name='Sofía Ar'")
             r = sql("select m.body, p.name from public.messages m join public.profiles p on p.id=m.user_id where p.bot")
             ok(len(r) == 1 and r[0]['name'] == 'Vitalis' and 'Sofía' in r[0]['body'], f'la venta de Sofía: Vitalis la felicita en el chat ({r})')
@@ -1391,7 +1422,7 @@ async def main():
             await A.wait_for_timeout(800)
 
             # la barra de arriba: Pedir ayuda y el turno (Entrada, Baño, 10 min, 30 min, Salida)
-            await A.evaluate("modals.slice().forEach(m=>m.close());document.querySelectorAll('#toasts .toast').forEach(t=>t.remove());go('inicio')"); await A.wait_for_timeout(400)
+            await A.evaluate("modals.slice().forEach(m=>m.close());document.querySelectorAll('#toasts .toast').forEach(t=>t.remove());go('home')"); await A.wait_for_timeout(400)
             await D.evaluate("modals.slice().forEach(m=>m.close());document.querySelectorAll('#toasts .toast').forEach(t=>t.remove())")
             ok(await A.is_visible('#sAyuda') and await A.is_visible('#sTurno'), 'arriba: Pedir ayuda y el turno')
             ok(not await D.is_visible('#sAyuda'), 'el team leader no pide ayuda: la recibe')
@@ -1430,7 +1461,7 @@ async def main():
             ok(await A.is_visible('#lock .pad'), 'recargar no lo destapa')
             ok(await A.evaluate("ready"), 'por detrás sigue andando (lo del CRM y los avisos no se cortan)')
             await A.keyboard.type('4821'); await A.wait_for_timeout(1200)
-            ok(not await A.is_visible('#lock') and await A.evaluate("cur") == 'agenda', 'con el PIN vuelve, directo a la Agenda')
+            ok(not await A.is_visible('#lock') and await A.evaluate("cur") == 'home', 'con el PIN vuelve, directo a home')
             ok(await A.evaluate("!chatLocked()"), 'y el chat queda abierto (acaba de poner el PIN)')
             await b.close()
     finally:
