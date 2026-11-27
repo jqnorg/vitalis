@@ -1023,6 +1023,7 @@
     reportSeen(seen);
     goneCheck(seen);
     if (stView) stReport();
+    if (stView === 'news') fullReport(seen);
     dockVis();
     if (!sales && !seen && !looksFtd) { if (ui) { ui.h.remove(); ui = null; } return; }
     if (!ui) ui = build();
@@ -1081,6 +1082,16 @@
     navigator.clipboard.writeText(html).then(() => setMsg('Copiado. Mandáselo a quien mantiene Vitalis para ajustar el botón.', 'ok', 10000), () => setMsg('No pude copiar.', 'err'));
   }
 
+  // ---- la lista completa de news de la estación (1.29.0): lo que no está en ella dejó de ser new (`crm_full` en la base). Solo si la lista no está paginada ----
+  let fullSig = '', fullAt = 0;
+  function fullReport(list) {
+    if (!list || !list.length || loginPage()) return;
+    const tot = pagerTotal(); if (tot != null && list.length < tot) return; // paginada: no es la lista entera
+    const ids = list.filter((c) => c.id).map((c) => ({ id: c.id, brand: c.brand }));
+    const sig = ids.map((c) => c.brand + '|' + c.id).sort().join(','), now = Date.now();
+    if (sig === fullSig && now - fullAt < 5 * 6e4) return; // la misma lista: cada 5 min alcanza
+    fullSig = sig; fullAt = now; send({ type: 'crm-full', ids: ids.slice(0, 2000) });
+  }
   // ---- estación: lo que vio esta pestaña al leer (filas, status de cada una, si hay sesión, el total que dice el CRM) ----
   let stLast = '', stLastAt = 0;
   function stReport() {

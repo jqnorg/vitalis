@@ -1288,13 +1288,32 @@ begin
       end if;
     end if;
   end loop;
-  -- los que nadie vio en 3 h en horario (la pestaña que los tenía se cerró sin mandar `gone`) ya no están en la lista de news: dejaron de ser new
+  -- los que nadie vio en 1 h en horario (la pestaña que los tenía se cerró sin mandar `gone`) ya no están en la lista de news: dejaron de ser new
   hl := extract(hour from now() at time zone 'America/Montevideo')::integer;
   if hl between 10 and 18 and (select role from public.profiles where id = auth.uid()) in ('leader', 'admin') then
-    update public.crm_clients set left_new_at = last_seen where team_id = t and status_group = 'new' and left_new_at is null and ftd_at is null and last_seen < now() - interval '3 hours';
+    update public.crm_clients set left_new_at = last_seen where team_id = t and status_group = 'new' and left_new_at is null and ftd_at is null and last_seen < now() - interval '1 hour';
   end if;
   return json_build_object('ok', true, 'new', n_new, 'changed', n_chg, 'bad', n_bad, 'ajenos', n_aj, 'fresh', to_json(fresh));
 end $$;
+
+-- la lista completa de news de la estación (27/11/2026): la pestaña de news del team leader manda todos los que ve; un New/Talking de la mesa
+-- que no está en esa lista dejó de ser new (antes solo se infería por "desapareció de la pestaña", y con pestañas cerradas o listas largas no llegaba nunca).
+-- Solo team leader y admin; los recién vistos (menos de 2 min) se perdonan por si la lista todavía no los trajo.
+create or replace function public.crm_full(ids jsonb) returns json
+  language plpgsql security definer set search_path = public as $$
+declare t uuid := public.my_team(); n integer;
+begin
+  if t is null then raise exception 'NO_SESSION: volvé a entrar'; end if;
+  if coalesce(public.my_role(), '') not in ('leader', 'admin') then raise exception 'Solo el team leader o el administrador'; end if;
+  if ids is null or jsonb_typeof(ids) <> 'array' or jsonb_array_length(ids) = 0 or jsonb_array_length(ids) > 2000 then raise exception 'BAD: se esperaba una lista'; end if;
+  update public.crm_clients c set left_new_at = now()
+    where c.team_id = t and c.status_group = 'new' and c.left_new_at is null and c.ftd_at is null and c.first_seen < now() - interval '2 minutes'
+      and not exists (select 1 from jsonb_array_elements(ids) x where public._clip(x->>'id', 60) = c.client_id and coalesce(public._clip(x->>'brand', 40), 'Novara Markets') = c.brand);
+  get diagnostics n = row_count;
+  return json_build_object('ok', true, 'gone', n);
+end $$;
+revoke all on function public.crm_full(jsonb) from public, anon;
+grant execute on function public.crm_full(jsonb) to authenticated;
 
 -- ---------- registro de accesos: exportaciones y cambios a ventas ajenas (lo ven team leader y admin) ----------
 create table if not exists public.audit_log (

@@ -412,6 +412,15 @@ async function crmSeen(rows) {
   await deliverSeen();
   return { ok: true };
 }
+// la lista completa de la estación de news: va por la misma cola, una sola (la última), y Vitalis la manda a crm_full
+async function crmFull(ids) {
+  const cl = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+  const row = { full: 1, ids: ids.slice(0, 2000).map((c) => ({ id: cl(c.id, 60), brand: cl(c.brand, 40) })).filter((c) => c.id), k: 'full@' + Date.now() };
+  if (!row.ids.length) return { ok: false };
+  await crmQMut((q) => [...q.filter((r) => !r.full), row]);
+  await deliverSeen();
+  return { ok: true };
+}
 let delivering = false;
 async function deliverSeen() {
   if (delivering) return false; delivering = true;
@@ -835,6 +844,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
     return true;
   }
   if (msg.type === 'crm-seen' && Array.isArray(msg.rows)) { crmSeen(msg.rows).then(reply).catch(() => reply(null)); return true; }
+  if (msg.type === 'crm-full' && Array.isArray(msg.ids) && sender.tab && stationOf(sender.tab.id) === 'news') { crmFull(msg.ids).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'seen-done' && Array.isArray(msg.keys)) { seenDone(msg.keys).then(() => deliverSeen()); return false; } // si quedaron más en cola, siguen
   if (msg.type === 'crm-watch-stop' && sender.tab) {
     watchStop(sender.tab.id).then(async () => {

@@ -666,6 +666,14 @@ ok(!!r.error, 'el mes va como AAAA-MM');
   R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900032', brand: 'Novara Markets', status: 'Talking', agent: 'Lorena Lo' }])]);
   r = await as(Dh, "select left_new_at is not null salio, crm_agent, (select count(*)::int from public.crm_agent_log where client_id = '900032') rot from public.crm_clients where client_id = '900032'");
   ok(R.changed === 1 && r.rows[0].salio && r.rows[0].crm_agent === 'Lorena Lo' && r.rows[0].rot === 1, `rotado a otra mesa: deja de ser new y queda la rotación (${JSON.stringify(r.rows[0])})`);
+  // la lista completa de la estación de news: lo que no está dejó de ser new (solo team leader/admin; los de menos de 2 min se perdonan)
+  await rpc(B, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900033', brand: 'Novara Markets', status: 'New', agent: 'Arlette Ga' }, { id: '900034', brand: 'Novara Markets', status: 'New', agent: 'Dahiana Le' }])]);
+  await db.query("update public.crm_clients set first_seen = now() - interval '5 minutes' where client_id = '900033'");
+  R = await rpc(M, 'select public.crm_full($1::jsonb) j', [JSON.stringify([{ id: '900032', brand: 'Novara Markets' }])]);
+  r = await as(B, "select client_id, left_new_at is not null salio from public.crm_clients where client_id in ('900033', '900034') order by 1");
+  ok(R.ok && R.gone === 1 && r.rows[0].salio && !r.rows[1].salio, `la lista completa: el que no está dejó de ser new; el recién visto se perdona (${JSON.stringify(R)})`);
+  R = await rpc(Dh, 'select public.crm_full($1::jsonb) j', [JSON.stringify([{ id: '900032' }])]);
+  ok(R && /team leader/.test(String(R.error || '')), 'un agente no manda la lista completa');
   // la columna "Status" de registro o de una transacción (Full Registration, Success…) no es su status
   R = await rpc(Dh, 'select public.crm_seen($1::jsonb) j', [JSON.stringify([{ id: '900002', brand: 'Novara Markets', status: 'Full Registration', camp: 'Google ES' }, { id: '900050', brand: 'Novara Markets', status: 'Success' }])]);
   r = await as(Dh, "select (select status from public.crm_clients where client_id = '900002') s, (select count(*)::int from public.crm_clients where client_id = '900050') n, (select camp from public.crm_clients where client_id = '900002') c");
