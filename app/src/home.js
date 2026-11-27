@@ -13,8 +13,8 @@ const hmBtn=(l,a,cls='')=>`<button type="button" class="btn ${cls}" ${a}>${esc(l
 function hmAhora(){
   const now=Date.now(),te=todayS(),D=hmDone(),L=[];let luego=[];
   if(!tlView()){
-    const news=newsOf(me).filter(inNew).map(r=>({r,a:regAt(r),k:contactOf(r)})).sort((a,b)=>(a.k.last?1:0)-(b.k.last?1:0)||(a.a||0)-(b.a||0));
-    for(const x of news)L.push({w:0,h:hmRow('urg','cliente',`new <b>${esc(x.r.id)}</b>${x.r.country?` · ${esc(paisOf(x.r.country))}`:''}`,`${x.k.last?`llamado hace ${hmAgo(now-x.k.last)}`:'<b>sin llamar</b>'}${x.a?` · registrado hace ${hmAgo(now-x.a)}`:''}${x.r.camp?` · ${esc(x.r.camp)}`:''}`,hmBtn('copiar ID',`data-hm="copiar" data-id="${esc(x.r.id)}"`,'pri'))});
+    const news=newsOf(me).filter(inNew).map(r=>({r,a:assignedAt(r)||+regAt(r)||0})).sort((a,b)=>(a.a||0)-(b.a||0));
+    for(const x of news)L.push({w:0,h:hmRow('urg','cliente',`new <b>${esc(x.r.id)}</b>${x.r.country?` · ${esc(paisOf(x.r.country))}`:''}`,`<b>sin gestionar</b>: pasalo a Talking${x.a?` · te llegó hace ${hmAgo(now-x.a)}`:''}${x.r.camp?` · ${esc(x.r.camp)}`:''}`,hmBtn('copiar ID',`data-hm="copiar" data-id="${esc(x.r.id)}"`,'pri'))});
     for(const p of pend.filter(p=>!p.done).sort((a,b)=>parseDue(a.due)-parseDue(b.due))){
       const d=parseDue(p.due),late=now-d;
       if(soldOf(p.id)){luego.push(`agenda <b>${esc(p.id)}</b> ya depositó`);continue}

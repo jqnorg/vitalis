@@ -47,7 +47,7 @@ function dayPool(uid){
   if(poolMemo.m.has(uid))return poolMemo.m.get(uid);
   const now=Date.now(),items=[];
   for(const r of newsOf(uid)){const k=contactOf(r);items.push({r,k,g:'news',due:inNew(r)})} // en New: urgente siempre
-  const done=items.filter(x=>x.k.today).length,half=items.filter(x=>x.k.today&&!x.k.full&&x.k.lines.size&&now-x.k.last>3*6e4);
+  const done=items.filter(x=>managedAt(x.r)!=null).length,half=items.filter(x=>x.k.today&&!x.k.full&&x.k.lines.size&&now-x.k.last>3*6e4);
   const P={items,done,total:items.length,due:items.filter(x=>x.due),half,n:callsOf(uid)};
   poolMemo.m.set(uid,P);return P;
 }
@@ -68,9 +68,8 @@ function hoyBand(){ // los clientes en New, como pastilla en la barra (lo pidió
   const p=$('#sNew');if(!p)return;
   const due=meNeedsDay()?dayPool(me).due:[];
   p.hidden=!due.length;if(!due.length)return;
-  const sin=due.filter(x=>!x.k.last).length;
-  p.innerHTML=`<span class="hb-dot" aria-hidden="true"></span>${due.length===1?'<b>1</b> en New':`<b>${due.length}</b> en New`}${sin&&sin!==due.length?` <span class="d">· ${sin} sin llamar</span>`:''}`;
-  p.title=`${plural(due.length,'cliente')} en New: ${due.length===1?'llamalo':'llamalos'} ya. ${due.slice(0,6).map(x=>x.r.id+(x.k.last?'':' (sin llamar)')).join(', ')}${due.length>6?'…':''}`;
+  p.innerHTML=`<span class="hb-dot" aria-hidden="true"></span>${due.length===1?'<b>1</b> en New':`<b>${due.length}</b> en New`}`;
+  p.title=`${plural(due.length,'cliente')} en New, sin gestionar: ${due.length===1?'pasalo':'pasalos'} a Talking. ${due.slice(0,6).map(x=>x.r.id).join(', ')}${due.length>6?'…':''}`;
 }
 
 /* ---------- el ritmo del día: tiempo muerto y franja Q (lo definió el dueño, noviembre 2026) ----------
@@ -184,9 +183,9 @@ function callsMesaCard(){
   const all=sellers(team).filter(m=>!isLeadUid(m.id)).map(m=>({m,pc:dayPace(m.id),P:crm.ok?dayPool(m.id):null})).sort((a,b)=>b.pc.n-a.pc.n||a.m.name.localeCompare(b.m.name));
   const on=all.filter(x=>x.pc.n||(x.P&&x.P.total)),off=all.filter(x=>!(x.pc.n||(x.P&&x.P.total)));
   const row=({m,pc,P})=>{const R=ritmo(m.id),sp2=crm.ok?newSpeedOf(m.id,todayS(),todayS()):null;return `<tr><td><span class="eq-who">${avatar(m.name)}<b>${esc(m.name)}</b></span></td><td><b class="${R&&pc.n>=R.req?'ok':''}">${pc.n}</b><span class="d">/${R?R.req:pc.min}</span>${R?` <span class="d">· <b class="${R.talkOk?'ok':''}">${esc(minsTxt(R.talk))}</b> hablados</span>`:''}</td>
-    <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td><td title="Del registro a la primera llamada (mediana de los news de hoy)">${sp2&&sp2.n?`<b class="${sp2.med>5?'hot':'ok'}">${esc(minTxt2(sp2.med))}</b>`:'<span class="d">—</span>'}</td></tr>`};
+    <td>${R?`<button type="button" class="lnkp" data-hy="ritmo" data-uid="${esc(m.id)}" title="Ver qué pasó">${esc(minsTxt(R.dead))}</button>`:'<span class="d">—</span>'}</td><td>${qBadge(R)}</td><td>${P?`${P.done}<span class="d">/${P.total}</span>`:''}</td><td>${P&&P.due.length?sp('hot b',String(P.due.length)):'<span class="d">—</span>'}</td><td title="De que lo tiene el agente a Talking (mediana de los news de hoy)">${sp2&&sp2.n?`<b class="${sp2.med>5?'hot':'ok'}">${esc(minTxt2(sp2.med))}</b>`:'<span class="d">—</span>'}</td></tr>`};
   return `<div class="card-h"><h3>Llamadas de hoy</h3><span class="p-sub">llamadas, tiempo muerto y franja: Q1 menos de 30 min muertos en el día · Q2 hasta 1 h · Q3 más</span><span class="grow"></span>${isLeader()?`<button type="button" class="btn sm" data-hy="min" title="Llamadas mínimas por día">Mínimo ${minCalls()} ✎</button>`:''}</div>
-    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th>News de hoy llamados</th><th>En New</th><th title="Velocidad al new: del registro a la primera llamada">Al new en</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
+    ${on.length?`<div class="p-tablewrap"><table class="pt eq-calls"><thead><tr><th>Agente</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th title="De sus news de hoy, cuántos ya pasó a Talking">News de hoy gestionados</th><th>En New</th><th title="Velocidad al new: de que lo tiene el agente a Talking">Al new en</th></tr></thead><tbody>${on.map(row).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie llamó hoy.</div>'}
     ${off.length&&on.length?`<p class="p-sub" style="margin:10px 2px 0">Sin llamadas ni pool todavía: ${off.map(x=>esc(first(x.m.id))).join(', ')}</p>`:''}`;
 }
 function minModal(){
@@ -249,7 +248,7 @@ async function cierreTxt(){ // el resumen de la mesa, en texto plano para el cha
   const q=n=>rows.filter(p=>p.R&&!p.R.young&&p.R.q===n);
   if(q(1).length+q(2).length+q(3).length)L.push(`RMO: ${[q(1).length&&`Q1 ${nombres(q(1))}`,q(2).length&&`Q2 ${nombres(q(2))}`,q(3).length&&`Q3 ${q(3).map(p=>`${first(p.m.id)} (${minsTxt(p.R.dead)} muertos)`).join(', ')}`].filter(Boolean).join(' · ')}`);
   const cv=convPeriod(te,te,null);if(cv.leads)L.push(`CR (%) del día: ${pct(cv.ftd/cv.leads)} (${cv.ftd} de ${plural(cv.leads,'new')})`);
-  const sp2=newSpeedOf(null,te,te);if(sp2.n)L.push(`Velocidad al new: ${minTxt2(sp2.med)} del registro a la primera llamada (mediana de ${plural(sp2.n,'new')}${sp2.slow?`; ${sp2.slow} tardaron más de 5 min`:''})`);
+  const sp2=newSpeedOf(null,te,te);if(sp2.n)L.push(`Velocidad al new: ${minTxt2(sp2.med)} de que lo tiene el agente a Talking (mediana de ${plural(sp2.n,'new')}${sp2.slow?`; ${sp2.slow} tardaron más de 5 min`:''})`);
   const venc=rows.filter(p=>p.venc).map(p=>`${first(p.m.id)} ${p.venc}`).join(', ');
   L.push(`Agendas vencidas: ${venc||'ninguna'}`);
   if(parseYMD(te).getDay()===5){ // viernes: el ranking de la semana

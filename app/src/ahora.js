@@ -212,16 +212,26 @@ function convCardsX(uid){ // con el registro del CRM: conversión de verdad; sin
 }
 const convSubX=tl=>cohortOn()?(tl?'de la mesa: ':'')+'de los registrados, cuántos depositaron el mismo día (new)':(tl?'de la mesa: ':'')+'FTDs sobre clientes vistos (cuenta aproximada)';
 
-/* ---------- velocidad al new: del registro a la primera llamada ----------
-   La primera llamada es el primer toque en Omega/Gizat/Voiso (calls) o, si no se vio, el paso a Talking (crm_status_log). */
-function newSpeed(r){ // minutos del registro a la primera llamada; null si no se llamó o no hay hora
-  const a=regAt(r);if(!a||!r.reg||r.reg.length<=10)return null;
-  const c=callIdx().by.get(norm(r.id));let t=c&&c.first?c.first:0;
-  if(!t){const l=stLog.filter(x=>x.id===norm(r.id)&&isTalk(x)).sort((p,q)=>p.at-q.at)[0];if(l)t=l.at}
-  if(!t&&r.firstAgent&&r.first_call_at)t=Date.parse(r.first_call_at);
-  if(!t)return null;const m=(t-a)/6e4;return m>=0&&m<24*60?m:null;
+/* ---------- el new y su reloj (lo definió el dueño, 27/11/2026) ----------
+   New = sin gestionar. Talking = lo está gestionando ahora. El agente, apenas lo ve, lo pasa a Talking (conteste o no) y al terminar el primer contacto a otro status: nunca vuelve a New.
+   El reloj corre desde que lo tiene el agente (cuando Vitalis lo vio por primera vez, o la última rotación de hoy hacia él), no desde que el cliente existe en el CRM.
+   Gestionado = pasó a Talking (o ya a otro status). Las llamadas de Omega/Gizat/Voiso son un dato más (RMO), no la prueba. */
+function assignedAt(r){ // desde cuándo lo tiene su agente
+  const k=norm(r.id);let t=r.first?Date.parse(r.first):0;
+  for(const x of (crm.rot||[]))if(norm(x.client_id)===k){const s=Date.parse(x.seen_at);if(s>t)t=s}
+  return t||null;
 }
-function newSpeedOf(uid,from,to){ // {n, med, p90, slow} de los news registrados en el rango con primera llamada vista
+function managedAt(r){ // cuándo lo gestionaron: el paso a Talking (si está en Talking, desde cuándo; si no, el primer Talking del log de hoy) o cuando dejó de ser new
+  const a=assignedAt(r)||0;
+  if(isTalking(r)&&r.since){const s=Date.parse(r.since);if(s>=a)return s}
+  const l=stLog.filter(x=>x.id===norm(r.id)&&isTalk(x)&&x.at>=a).sort((p,q)=>p.at-q.at)[0];if(l)return l.at;
+  if(r.left){const s=Date.parse(r.left);if(s>=a)return s}
+  return null;
+}
+function newSpeed(r){ // minutos desde que lo tiene el agente hasta que lo gestionó; null si sigue sin gestionar o no hay hora
+  const a=assignedAt(r),t=managedAt(r);if(!a||!t)return null;const m=(t-a)/6e4;return m>=0&&m<24*60?m:null;
+}
+function newSpeedOf(uid,from,to){ // {n, med, p90, slow} de los news registrados en el rango que ya se gestionaron
   const own=r=>uid==null||convOwner(r)===uid,ms=[];
   for(const r of crmAll()){if(isArch(r.brand)||!own(r))continue;const d=regDay(r);if(d<from||d>to)continue;const m=newSpeed(r);if(m!=null)ms.push(m)}
   ms.sort((a,b)=>a-b);const q=p=>ms.length?ms[Math.min(ms.length-1,Math.floor(ms.length*p))]:null;
