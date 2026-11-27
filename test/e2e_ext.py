@@ -573,11 +573,11 @@ async def main():
             ok(await Wp2.evaluate('window.__clicks||0') == 0, 'la otra no se recarga: queda para sumar clientes')
             ws = await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.keys(s.watches||{}).length)")
             ok(ws == 1, f'una sola pestaña vigilada ({ws})')
-            # la pestaña que se actualiza sola para los news no cambia el cliente actual; las demás sí
+            # la pestaña que se actualiza sola para los news también manda el cliente abierto (el agente abre la ficha desde ahí; 1.28.0, como en la prueba)
             await A2.evaluate("setCurrent('555001','Antes','lista')"); await A2.wait_for_timeout(300)
             panel = "(id)=>{const d=document.createElement('div');d.innerHTML='<div class=hd><div>Cli '+id+'</div><div class=sub>ID <span>'+id+'</span></div></div>';document.body.appendChild(d)}"
             await Wp.bring_to_front(); await Wp.evaluate(panel, '71111'); await Wp.wait_for_timeout(2500)
-            ok(await A2.evaluate("curCl&&curCl.id") == '555001', 'la pestaña de los news no cambia el cliente actual')
+            ok(await A2.evaluate("curCl&&curCl.id") == '71111', 'la pestaña de los news del agente también cambia el cliente actual')
             await Wp2.bring_to_front(); await Wp2.evaluate(panel, '72222'); await Wp2.wait_for_timeout(2500)
             ok(await A2.evaluate("curCl&&curCl.id") == '72222', 'otra pestaña del CRM sí lo cambia')
             ok(await sw.evaluate("chrome.storage.local.get('watches').then(s=>Object.values(s.watches)[0].tabId).then(id=>chrome.tabs.get(id)).then(t=>t.autoDiscardable===false)"), 'y Chrome no la duerme')

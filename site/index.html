@@ -2108,7 +2108,7 @@ body.dark #main{background-image:none}
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
 const VERSION='1.68.0';
-const EXT_VER='1.27.0'; // la extensión que se baja desde Ajustes (la pone build.py)
+const EXT_VER='1.28.0'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 
@@ -3222,8 +3222,23 @@ function dockCl(d){
     kw:clientKw(id)||'',ag:ags.slice(0,2),
     coms:(d.coms||[]).slice(0,3).map(c=>({w:first(c.created_by),t:rel(new Date(c.created_at)),x:clip(c.body,220)})),pay};
 }
+// el tablero del ícono de la extensión (lo mismo que tenía la extensión de prueba, lo pidió el dueño el 27/11/2026): el team leader ve a todos los
+// que están en New (con agente y hace cuánto, sin gestionar en rojo) y en Talking, y hoy por agente; el agente ve sus news en New y sus números.
+// El team leader además recibe una tarjeta urgente por cada New sin gestionar a los 5 min (`wait`, ya descuenta al agente que tiene otro en Talking).
+function dockBoard(){
+  if(!crm.ok)return null;
+  const now=Date.now(),te=todayS(),mins=a=>a?Math.max(0,Math.round((now-a)/6e4)):0;
+  try{
+    if(isLeader()){const D=cmData();
+      return {tl:1,news:D.cur.map(x=>({id:String(x.r.id),agent:x.u?first(x.u):'',talking:!!x.talk,wait:!!x.wait,min:x.talk?mins(x.r.since?Date.parse(x.r.since):0):mins(x.a),country:paisOf(x.r.country||'')||''})),
+        agents:D.rows.map(p=>({name:p.m.name,news:p.hoy,inNew:p.newN,talk:p.talk,calls:p.pc.n,med:p.sp.n?p.sp.med:null,slow:p.sp.slow||0}))}}
+    const mine=newsOf(me).filter(inNew).map(r=>({id:String(r.id),country:paisOf(r.country||'')||'',min:mins(assignedAt(r)||+regAt(r)||0)})).sort((a,b)=>b.min-a.min);
+    const P=dayPool(me),sp=newSpeedOf(me,te,te);
+    return {news:mine,stats:{news:P.total,done:P.done,calls:P.n,med:sp.n?sp.med:null}};
+  }catch(e){return null}
+}
 async function dockData(){
-  if(isLeadUid(me))return {off:1};
+  if(isLeadUid(me))return {off:1,board:dockBoard()};
   if(locked)return {locked:1};
   const {t,b}=turnoState(),h=turnos[todayS()];
   const tu=!t?{st:h&&h.out?'out':'none'}:b?{st:'br',k:b.k||0,s:b.s}:{st:'in'};
@@ -3234,7 +3249,7 @@ async function dockData(){
     cl=d?dockCl(d):{id:String(curCl.id),name:curCl.name||''};
     if(!cl.name&&curCl.name)cl.name=curCl.name;
   }
-  return {tu,next,cl};
+  return {tu,next,cl,board:dockBoard()};
 }
 async function dockSync(beat){
   if(!ready||!profile||!extOk)return; // sin extensión no hay a quién mandarle
@@ -8341,14 +8356,16 @@ V.callman={
     const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin gestionar hace +5 min</span>`:'nadie espera','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+
       kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`)+
       (sp0=>kpi('Al new en',sp0.n?esc(minTxt2(sp0.med)):'—',sp0.n?`de que lo tiene el agente a Talking · ${sp0.slow?`${sp0.slow} de ${sp0.n} tardaron +5 min`:'todos antes de 5 min'}`:'sin news gestionados hoy'))(newSpeedOf(null,todayS(),todayS()));
-    const cRow=x=>{const r=x.r,c=x.k;
-      return `<tr class="${x.wait?'cm-wait':''}"><td><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> ${esc(clip(r.name,26))}<div class="d">${esc(r.country||'')}${r.camp?' · '+esc(clip(r.camp,22)):''}</div></td>
-        <td>${x.u?`<span class="eq-who">${avatar(memberName(x.u))}${esc(first(x.u))}</span>`:'<span class="hot">sin agente</span>'}</td>
-        <td>${x.talk?sp('ok b','Talking'):sp(x.wait?'hot b':'b','New')}</td>
-        <td>${x.a?cmHace(D.now-x.a):'—'}</td>
-        <td>${x.talk?sp('ok','gestionando'):sp(x.wait?'hot b':'d','sin gestionar')}${c.last?` <span class="d">· ${c.lines.size?`${c.lines.size} línea${c.lines.size===1?'':'s'}, `:''}última llamada ${cmHace(D.now-c.last)}</span>`:''}</td></tr>`};
-    const cur=`<section class="card"><div class="card-h"><h3>News en curso</h3><span class="p-sub">New y Talking, sin depositar · primero los que siguen sin gestionar</span></div>
-      ${D.cur.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Cliente</th><th>Agente</th><th>Estado</th><th>Lo tiene hace</th><th>Gestión</th></tr></thead><tbody>${D.cur.slice(0,40).map(cRow).join('')}</tbody></table></div>${D.cur.length>40?`<p class="p-sub" style="margin:8px 2px 0">Y ${D.cur.length-40} más.</p>`:''}`:'<div class="p-empty">Nadie en New ni en Talking ahora.</div>'}</section>`;
+    // dos listas (lo pidió el dueño, 27/11/2026): clientes en New con su agente, clientes en Talking con su agente
+    const who=x=>x.u?`<span class="eq-who">${avatar(memberName(x.u))}${esc(first(x.u))}</span>`:'<span class="hot">sin agente</span>';
+    const cli=r=>`<button type="button" class="lnkp" data-hy="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button><div class="d">${esc(paisOf(r.country||'')||'')}${r.camp?' · '+esc(clip(r.camp,22)):''}</div>`;
+    const nRow=x=>`<tr class="${x.wait?'cm-wait':''}"><td>${cli(x.r)}</td><td>${who(x)}</td><td>${x.a?`<span class="${x.wait?'hot b':''}">${cmHace(D.now-x.a)}</span>`:'—'}</td></tr>`;
+    const tRow=x=>{const s=x.r.since?Date.parse(x.r.since):0;return `<tr><td>${cli(x.r)}</td><td>${who(x)}</td><td>${s?cmHace(D.now-s):'—'}</td></tr>`};
+    const lista=(t,sub,rows,row,th,empty)=>`<section class="card"><div class="card-h"><h3>${t}</h3><span class="p-sub">${sub}</span></div>
+      ${rows.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Cliente</th><th>Agente</th><th>${th}</th></tr></thead><tbody>${rows.slice(0,60).map(row).join('')}</tbody></table></div>${rows.length>60?`<p class="p-sub" style="margin:8px 2px 0">Y ${rows.length-60} más.</p>`:''}`:`<div class="p-empty">${empty}</div>`}</section>`;
+    const nws=D.cur.filter(x=>!x.talk),tks=D.cur.filter(x=>x.talk).sort((a,b)=>(Date.parse(b.r.since)||0)-(Date.parse(a.r.since)||0));
+    const cur=lista(`En New <span class="d">${nws.length}</span>`,'sin gestionar · primero los más viejos',nws,nRow,'Sin gestionar hace','Nadie en New ahora.')+
+      lista(`En Talking <span class="d">${tks.length}</span>`,'lo está gestionando su agente',tks,tRow,'Gestionando hace','Nadie en Talking ahora.');
     const aRow=p=>`<tr><td><button type="button" class="eq-who lnkp" data-act="ficha" data-uid="${esc(p.m.id)}" title="Ver la ficha de ${esc(p.m.name)}">${avatar(p.m.name)}<b>${esc(p.m.name)}</b></button></td>
       <td><span class="${p.tu.cls}">${esc(p.tu.txt)}</span></td>
       <td>${p.newN?sp(p.list.some(x=>x.wait)?'hot b':'b',String(p.newN)):'<span class="d">0</span>'}</td><td>${p.talk?sp('ok b',String(p.talk)):'<span class="d">0</span>'}</td>

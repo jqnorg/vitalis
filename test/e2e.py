@@ -915,7 +915,7 @@ async def main():
             ok(await D.evaluate('cur') == 'home', 'la M abre home (el Manager vive ahí)')
             cm = await D.inner_text('#cmBody')
             ok('Para atender ya' not in cm and 'sin gestionar hace +5 min' in cm and '500040' in cm, f'sin tarjeta "Para atender ya" (el dueño la sacó); el new sin gestionar a los 5 min solo se cuenta arriba ({cm[:200]!r})')
-            ok('News en curso' in cm and '500041' in cm and 'Talking' in cm and 'al new en' in cm.lower(), 'los news en curso, New y Talking, con su agente; y la velocidad al new')
+            ok('En New' in cm and 'En Talking' in cm and '500040' in cm and '500041' in cm and 'al new en' in cm.lower(), 'dos listas: en New y en Talking, cada uno con su agente; y la velocidad al new')
             # agrupados por agente; y con uno en Talking no se llama a otro (el dueño, 27/11/2026): un toque a otro cliente mientras tiene uno en Talking es un aviso (el primer contacto puede durar lo que sea)
             sql("update public.crm_clients set status_since = now() - interval '3 hours' where client_id='500041'")
             sql("insert into public.calls (team_id,user_id,client_id,line,at) select team_id,id,'500099','omega',now() - interval '20 minutes' from public.profiles where name='Sofía Ar'")

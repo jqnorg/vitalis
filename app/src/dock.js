@@ -19,8 +19,23 @@ function dockCl(d){
     kw:clientKw(id)||'',ag:ags.slice(0,2),
     coms:(d.coms||[]).slice(0,3).map(c=>({w:first(c.created_by),t:rel(new Date(c.created_at)),x:clip(c.body,220)})),pay};
 }
+// el tablero del ícono de la extensión (lo mismo que tenía la extensión de prueba, lo pidió el dueño el 27/11/2026): el team leader ve a todos los
+// que están en New (con agente y hace cuánto, sin gestionar en rojo) y en Talking, y hoy por agente; el agente ve sus news en New y sus números.
+// El team leader además recibe una tarjeta urgente por cada New sin gestionar a los 5 min (`wait`, ya descuenta al agente que tiene otro en Talking).
+function dockBoard(){
+  if(!crm.ok)return null;
+  const now=Date.now(),te=todayS(),mins=a=>a?Math.max(0,Math.round((now-a)/6e4)):0;
+  try{
+    if(isLeader()){const D=cmData();
+      return {tl:1,news:D.cur.map(x=>({id:String(x.r.id),agent:x.u?first(x.u):'',talking:!!x.talk,wait:!!x.wait,min:x.talk?mins(x.r.since?Date.parse(x.r.since):0):mins(x.a),country:paisOf(x.r.country||'')||''})),
+        agents:D.rows.map(p=>({name:p.m.name,news:p.hoy,inNew:p.newN,talk:p.talk,calls:p.pc.n,med:p.sp.n?p.sp.med:null,slow:p.sp.slow||0}))}}
+    const mine=newsOf(me).filter(inNew).map(r=>({id:String(r.id),country:paisOf(r.country||'')||'',min:mins(assignedAt(r)||+regAt(r)||0)})).sort((a,b)=>b.min-a.min);
+    const P=dayPool(me),sp=newSpeedOf(me,te,te);
+    return {news:mine,stats:{news:P.total,done:P.done,calls:P.n,med:sp.n?sp.med:null}};
+  }catch(e){return null}
+}
 async function dockData(){
-  if(isLeadUid(me))return {off:1};
+  if(isLeadUid(me))return {off:1,board:dockBoard()};
   if(locked)return {locked:1};
   const {t,b}=turnoState(),h=turnos[todayS()];
   const tu=!t?{st:h&&h.out?'out':'none'}:b?{st:'br',k:b.k||0,s:b.s}:{st:'in'};
@@ -31,7 +46,7 @@ async function dockData(){
     cl=d?dockCl(d):{id:String(curCl.id),name:curCl.name||''};
     if(!cl.name&&curCl.name)cl.name=curCl.name;
   }
-  return {tu,next,cl};
+  return {tu,next,cl,board:dockBoard()};
 }
 async function dockSync(beat){
   if(!ready||!profile||!extOk)return; // sin extensión no hay a quién mandarle

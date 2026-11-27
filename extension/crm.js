@@ -416,6 +416,7 @@
   const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#7c5cf5"/><path d="M14 19 23.4 34.6" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/><path d="M23.4 34.6 34.2 13.4" stroke="#fff" stroke-width="8" stroke-linecap="round"/></svg>';
   let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, seen = null, whoSel = '', stMsg = null, stMsgT = null;
   const isLeader = () => !!(desk && (desk.role === 'leader' || desk.role === 'admin'));
+  const tlOnly = () => !!(desk && desk.role === 'leader'); // el team leader no gestiona clientes (el admin sí)
   function build() {
     const h = document.createElement('div');
     h.id = 'ftd-crm-button';
@@ -946,7 +947,7 @@
   }
   // el cliente actual sale de las pestañas donde el agente trabaja y llama, nunca de la que se actualiza sola para los news
   function reportCurrent(force) {
-    if ((watched && !trial) || document.visibilityState !== 'visible' || !document.body) return;
+    if ((watched && tlOnly()) || document.visibilityState !== 'visible' || !document.body) return;
     const t0 = performance.now();
     try {
       const uid = idInUrl(), { pick, calls } = panelClient(), urlNew = !!uid && uid !== urlSeen; urlSeen = uid;
@@ -960,7 +961,7 @@
     } finally { curMs = performance.now() - t0; }
   }
   function sendCurrent(id, name, force) {
-    if ((watched && !trial) || !id) return;
+    if ((watched && tlOnly()) || !id) return;
     if (!force && id === curSent && (curName || !name)) return; // ya lo mandé (salvo que recién aparezca el nombre)
     curName = name || (id === curSent ? curName : ''); curSent = id;
     send({ type: 'crm-current', id, name: '', brand }).then((r) => curPill(id, r)); // aviso chico para saber que Vitalis lo tomó
@@ -994,12 +995,12 @@
   // la ficha cambió: lo miro enseguida (aparte de la lectura de la lista, que espera a que la página se quede quieta), como mucho ~1 vez por segundo
   let curT = null, curLast = 0;
   function schedCur() {
-    if ((watched && !trial) || stView || curT || document.visibilityState !== 'visible') return; // en la prueba la pestaña de news también manda el cliente abierto
+    if ((watched && tlOnly()) || stView || curT || document.visibilityState !== 'visible') return; // la pestaña de news del agente también manda el cliente abierto (abre la ficha desde ahí); la del team leader no
     curT = setTimeout(() => { curT = null; curLast = Date.now(); if (live()) reportCurrent(); }, Math.max(120, Math.max(700, curMs * 25) - (Date.now() - curLast)));
   }
   document.addEventListener('visibilitychange', () => { if (live() && document.visibilityState === 'visible' && !stView) { reportCurrent(true); } });
   for (const ev of ['transitionend', 'animationend']) addEventListener(ev, () => { if (live()) schedCur(); }, { capture: true, passive: true }); // la ficha terminó de entrar
-  const poll = () => setTimeout(() => { if (!live()) return; if ((!watched || trial) && !stView && document.visibilityState === 'visible') reportCurrent(); poll(); }, Math.max(1500, curMs * 30)); // y cada 1,5 s, por las dudas
+  const poll = () => setTimeout(() => { if (!live()) return; if ((!watched || !tlOnly()) && !stView && document.visibilityState === 'visible') reportCurrent(); poll(); }, Math.max(1500, curMs * 30)); // y cada 1,5 s, por las dudas
   poll();
   let lastMs = 0, againT = null, refAt = Date.now(), lastRead = 0; // refAt: el último ⟳ de la estación (al cargar la página cuenta como uno)
   const again = () => { clearTimeout(againT); againT = setTimeout(() => { if (live()) refresh(); }, 3000); }; // algo no llegó a la extensión: vuelvo a leer y lo mando

@@ -111,7 +111,9 @@ async function renderTrial() {
   else if (me.role === 'tl') {
     const all = (b.news || []).slice().sort((p, q) => q.min - p.min), news = all.filter((x) => !x.talking), sin = news.filter((x) => !x.called), talk = all.length - news.length;
     h += `<div class="big">${all.length} <small style="font-size:13px;font-weight:500;color:var(--dim)">activos</small></div><p class="lead">${news.length} en New (${sin.length ? `<b class="bad">${sin.length} sin llamar</b>` : 'todos llamados'}) · ${talk} en llamada</p>`;
-    if (all.length) h += `<h3>Activos</h3><table><tr><th>ID</th><th>Agente</th><th>Está</th><th class="n">Hace</th></tr>${all.slice(0, 30).map((x) => `<tr><td class="i">${esc(x.id)}</td><td>${esc(x.agent || '—')}</td><td>${x.talking ? 'En llamada' : x.called ? 'New · llamado' : '<b class="bad">New · sin llamar</b>'}</td><td class="n${!x.talking && !x.called && x.min >= 5 ? ' hot' : ''}">${trMin(x.min)}</td></tr>`).join('')}</table>`;
+    if (news.length) h += `<h3>En New</h3><table><tr><th>ID</th><th>Agente</th><th>Está</th><th class="n">Hace</th></tr>${news.slice(0, 30).map((x) => `<tr><td class="i">${esc(x.id)}</td><td>${esc(x.agent || '—')}</td><td>${x.called ? 'llamado' : '<b class="bad">sin llamar</b>'}</td><td class="n${!x.called && x.min >= 5 ? ' hot' : ''}">${trMin(x.min)}</td></tr>`).join('')}</table>`;
+    const tk = all.filter((x) => x.talking);
+    if (tk.length) h += `<h3>En Talking</h3><table><tr><th>ID</th><th>Agente</th><th class="n">Hace</th></tr>${tk.slice(0, 30).map((x) => `<tr><td class="i">${esc(x.id)}</td><td>${esc(x.agent || '—')}</td><td class="n">${trMin(x.min)}</td></tr>`).join('')}</table>`;
     const ag = (b.agents || []).filter((a) => a.role !== 'tl');
     h += `<h3>Hoy por agente</h3><table><tr><th>Agente</th><th class="n">News</th><th class="n">Llamados</th><th class="n">Llam.</th><th class="n">Al new en</th></tr>${ag.length ? ag.map((a) => `<tr><td>${esc(a.name)}</td><td class="n">${a.news}</td><td class="n${a.news && a.called < a.news ? ' hot' : ''}">${a.called}</td><td class="n">${a.calls}</td><td class="n${a.med != null && a.med > 5 ? ' hot' : ''}">${a.med == null ? '—' : Math.round(a.med) + ' min'}${a.slow ? ` <small>(${a.slow} >5)</small>` : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="empty">Todavía nadie entró con la extensión de agente.</td></tr>'}</table>
       <p class="lead" style="margin-top:8px">Te aviso con una tarjeta y sonido por cada New que pasa de 5 min sin llamar. Código de la mesa: <b>${esc(me.code)}</b>.</p>`;
@@ -128,4 +130,26 @@ async function renderTrial() {
   else { clearTimeout(trT); trT = setTimeout(() => chrome.runtime.sendMessage({ type: 'trial-board' }, () => renderTrial()), 30000); }
   return true;
 }
-renderTrial().then((t) => { if (t) return; render(); renderWatch(); renderStation(); renderCrm(); });
+/* ---------- el tablero de Vitalis en el ícono (lo mismo que tenía la prueba, 1.28.0): el team leader ve New y Talking con su agente y hoy por agente; el agente, sus news en New ---------- */
+let bdT = null;
+async function renderBoard() {
+  const el = document.getElementById('board'); let d = null; try { d = (await chrome.storage.session.get('dock')).dock || null; } catch (e) {}
+  const b = d && d.board; clearTimeout(bdT); bdT = setTimeout(renderBoard, 30000);
+  if (!b || Date.now() - (d.at || 0) > 10 * 6e4) { el.hidden = true; return; } // sin Vitalis abierto no hay tablero
+  el.hidden = false; let h = '';
+  if (b.tl) {
+    const all = (b.news || []).slice(), news = all.filter((x) => !x.talking).sort((p, q) => q.min - p.min), talk = all.filter((x) => x.talking).sort((p, q) => q.min - p.min), sin = news.filter((x) => x.wait);
+    h += `<div class="big">${news.length} <small style="font-size:13px;font-weight:500;color:var(--dim)">en New</small> · ${talk.length} <small style="font-size:13px;font-weight:500;color:var(--dim)">en Talking</small></div><p class="lead">${sin.length ? `<b class="bad">${sin.length} sin gestionar hace +5 min</b>` : 'nadie espera'}</p>`;
+    if (news.length) h += `<h3>En New</h3><table><tr><th>ID</th><th>Agente</th><th class="n">Sin gestionar hace</th></tr>${news.slice(0, 30).map((x) => `<tr><td class="i">${esc(x.id)}</td><td>${esc(x.agent || 'sin agente')}</td><td class="n${x.wait ? ' hot' : ''}">${trMin(x.min)}</td></tr>`).join('')}</table>`;
+    if (talk.length) h += `<h3>En Talking</h3><table><tr><th>ID</th><th>Agente</th><th class="n">Hace</th></tr>${talk.slice(0, 30).map((x) => `<tr><td class="i">${esc(x.id)}</td><td>${esc(x.agent || 'sin agente')}</td><td class="n">${trMin(x.min)}</td></tr>`).join('')}</table>`;
+    const ag = (b.agents || []).filter((a) => a.news || a.inNew || a.talk || a.calls);
+    if (ag.length) h += `<h3>Hoy por agente</h3><table><tr><th>Agente</th><th class="n">News</th><th class="n">New</th><th class="n">Talking</th><th class="n">Llam.</th><th class="n">Al new en</th></tr>${ag.map((a) => `<tr><td>${esc(a.name)}</td><td class="n">${a.news}</td><td class="n${a.inNew ? ' hot' : ''}">${a.inNew}</td><td class="n">${a.talk}</td><td class="n">${a.calls}</td><td class="n${a.med != null && a.med > 5 ? ' hot' : ''}">${a.med == null ? '—' : Math.round(a.med) + ' min'}${a.slow ? ` <small>(${a.slow} >5)</small>` : ''}</td></tr>`).join('')}</table>`;
+  } else {
+    const mine = (b.news || []).slice().sort((p, q) => q.min - p.min), st = b.stats || {};
+    h += `<div class="big">${mine.length} <small style="font-size:13px;font-weight:500;color:var(--dim)">en New: pasalos a Talking</small></div>`;
+    if (mine.length) h += `<table>${mine.slice(0, 15).map((x) => `<tr><td class="i">${esc(x.id)}</td><td>${esc(x.country || '')}</td><td class="n${x.min >= 5 ? ' hot' : ''}">${trMin(x.min)}</td></tr>`).join('')}</table>`;
+    h += `<h3>Tus news de hoy</h3><table><tr><td>Te llegaron</td><td class="n">${st.news || 0}</td></tr><tr><td>Gestionados</td><td class="n">${st.done || 0}</td></tr><tr><td>Llamadas</td><td class="n">${st.calls || 0}</td></tr><tr><td>Al new en (mediana)</td><td class="n">${st.med != null ? Math.round(st.med) + ' min' : '—'}</td></tr></table>`;
+  }
+  el.innerHTML = h;
+}
+renderTrial().then((t) => { if (t) return; render(); renderWatch(); renderStation(); renderCrm(); renderBoard(); });

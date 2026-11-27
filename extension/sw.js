@@ -76,6 +76,15 @@ async function trialFresh(fresh) { // un new mío que vio otra pestaña (la del 
 }
 // el tablero de la mesa (cada 30 s): el team leader recibe aviso por cada New sin llamar a los 5 min; el agente ve su siguiente new y sus números
 const TR_SLOW = 5;
+// el team leader de Vitalis (como en la prueba, lo pidió el dueño el 27/11/2026): una tarjeta urgente por cada New sin gestionar a los 5 min
+// (`wait` lo calcula Vitalis y ya descuenta al agente que tiene otro en Talking); se cierra sola cuando lo gestionan
+async function tlCards(b) {
+  const late = (b.news || []).filter((x) => x.wait && !x.talking && x.min >= TR_SLOW), lateK = new Set(late.map((x) => 'crm:tl:' + x.id)), shown = new Set((await liveNow()).map((x) => x.k));
+  for (const x of late.filter((x) => !shown.has('crm:tl:' + x.id)).slice(0, 6)) {
+    await alertCard({ k: 'crm:tl:' + x.id, kind: 'crm', lvl: 'urg', title: 'New sin gestionar', id: x.id, kw: x.agent || 'sin agente', meta: `hace ${trMin(x.min)}${x.country ? ' · ' + x.country : ''}`, btns: [['crm', 'Ver en el CRM', 1], ['close', 'Ok']] }, 'crm', `New sin gestionar: ${x.id}`, `${x.agent || 'sin agente'} · hace ${trMin(x.min)}`);
+  }
+  for (const k of shown) if (k.startsWith('crm:tl:') && !lateK.has(k)) await dismiss(k);
+}
 let trialTicking = false, trialAgain = false;
 async function trialBoardTick(force) {
   if (trialTicking) { trialAgain = true; return; } trialTicking = true; trialAgain = false;
@@ -476,6 +485,7 @@ const watchedTab = (id) => !!wCache[id];
 const isCrmUrl = async (url) => { try { const h = new URL(url).hostname, s = (await chrome.storage.local.get('crmSites')).crmSites || {}; return /(^|\.)crm(novaramarkets|trade24seven)\.com$/.test(h) || !!s[h]; } catch (e) { return false; } };
 // el team leader no gestiona clientes: puede tener varias pestañas actualizándose (para el registro, sin avisos de new)
 const deskRole = async () => (((await chrome.storage.local.get('desk')).desk) || {}).role || '';
+let ROLE = ''; deskRole().then((r) => { ROLE = r; }); chrome.storage.onChanged.addListener((ch, area) => { if (area === 'local' && ch.desk) ROLE = ((ch.desk.newValue || {}).role) || ''; }); // el rol a mano para lo que no puede esperar
 const MAX_WATCH = 8;
 const watchStart = (tab) => lock('w', () => watchStart0(tab)).then(async (r) => { if (r && r.ok) { await ensureLoop(); if ((await liveNow()).some((x) => x.k === 'crm:nowatch')) await dismiss('crm:nowatch'); } return r; });
 async function watchStart0(tab) {
@@ -490,7 +500,7 @@ async function watchStart0(tab) {
   const old = all[tab.id];
   all[tab.id] = { tabId: tab.id, url: tab.url, title: tab.title, seen: old ? old.seen : {}, base: old ? old.base : false, since: old ? old.since : Date.now(), lastRefresh: old ? old.lastRefresh : 0, loginAt: old ? old.loginAt : 0, inNew: old ? old.inNew : null };
   await chrome.storage.local.set({ watches: all });
-  try { await chrome.tabs.update(tab.id, { autoDiscardable: false, ...((await trialCfg()) ? { pinned: true } : {}) }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria; en la prueba, fijada (el agente no la cierra ni la pierde por error)
+  try { await chrome.tabs.update(tab.id, { autoDiscardable: false, pinned: true }); } catch (e) {} // que Chrome no la duerma para ahorrar memoria; fijada, así el agente no la cierra ni la pierde por error (como en la prueba, 1.28.0)
   return { ok: true };
 }
 async function watchGo() { const w = Object.values(await allW())[0]; if (!w) return; try { const t = await chrome.tabs.get(w.tabId); await chrome.tabs.update(t.id, { active: true }); await chrome.windows.update(t.windowId, { focused: true }); } catch (e) {} }
@@ -500,7 +510,7 @@ async function watchPrune() { // de la versión anterior (todas las pestañas): 
   await chrome.storage.local.set({ watches: { [keep.tabId]: keep } });
 }
 watchPrune();
-async function watchStop(tabId) { await setW(tabId, null); if (await trialCfg()) { try { await chrome.tabs.update(tabId, { pinned: false }); } catch (e) {} } if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); await chrome.alarms.clear('crm-watch'); } }
+async function watchStop(tabId) { await setW(tabId, null); try { await chrome.tabs.update(tabId, { pinned: false }); } catch (e) {} if (!Object.keys(await allW()).length) { loopOn = false; clearTimeout(loopT); await chrome.alarms.clear('crm-watch'); } }
 async function tickOne(w) {
   let tab = null; try { tab = await chrome.tabs.get(w.tabId); } catch (e) {}
   if (!tab || !(await isCrmUrl(tab.url))) return watchStop(w.tabId); // se cerró o se fue del CRM
@@ -727,6 +737,7 @@ async function tellCrm(res) {
 async function dockSet(d) {
   const dk = { ...(d && typeof d === 'object' ? d : { off: 1 }), at: Date.now() };
   await sess.set('dock', dk);
+  if (dk.board && dk.board.tl) tlCards(dk.board).catch(() => {});
   for (const t of await chrome.tabs.query({ url: await crmUrls() })) { if (stationOf(t.id)) continue; try { chrome.tabs.sendMessage(t.id, { type: 'dock', d: dk }).catch(() => {}); } catch (e) {} }
 }
 async function toVitalis(cmd) { // solo si Vitalis está abierto (marcar el baño con Vitalis cerrado no puede quedar para después)
@@ -808,7 +819,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   }
   if (msg.type === 'crm-watch-start' && sender.tab) { watchStart(sender.tab).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'crm-watch-go') { watchGo().then(() => reply({ ok: true })); return true; }
-  if (msg.type === 'crm-current' && msg.id && sender.tab && (stationOf(sender.tab.id) || (watchedTab(sender.tab.id) && !TRIAL))) { reply({ sent: false, watched: true }); return false; } // la pestaña de los news y las de la estación no cuentan (copias viejas de crm.js); en la prueba la de news sí (el agente abre la ficha desde ahí)
+  if (msg.type === 'crm-current' && msg.id && sender.tab && (stationOf(sender.tab.id) || (watchedTab(sender.tab.id) && ROLE === 'leader'))) { reply({ sent: false, watched: true }); return false; } // las pestañas de la estación y las del team leader no cuentan (no gestiona clientes); la de news del agente sí: abre la ficha desde ahí (como en la prueba, 1.28.0)
   if (msg.type === 'station-set' && sender.tab) { stationSet(sender.tab, String(msg.view || '')).then(reply).catch((e) => reply({ err: String(e && e.message || e) })); return true; }
   if (msg.type === 'station-scan' && sender.tab) { stScan(sender.tab.id, msg, sender.tab.url).then(reply).catch(() => reply(null)); return true; }
   if (msg.type === 'station-off') { stationOff().then(reply).catch(() => reply(null)); return true; }

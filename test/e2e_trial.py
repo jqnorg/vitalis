@@ -122,7 +122,7 @@ async def main():
             ok(any(x['k'] == 'crm:tl:661002' for x in live) and not any(x['k'] == 'crm:tl:661001' for x in live), f'el team leader recibe aviso del New sin llamar a los 5 min (y no del que ya llamaron) ({[x["k"] for x in live]})')
             await P.reload(); await P.wait_for_timeout(2500)
             tp = await P.locator('#trial').inner_text()
-            ok('Activos' in tp and '661002' in tp and 'Otro Rep' in tp and '661003' in tp and 'En llamada' in tp and 'Hoy por agente' in tp and 'Pepe Rep' in tp, 'el tablero del team leader: los activos (en New y en llamada), hace cuánto, y los agentes de hoy')
+            ok('En New' in tp and '661002' in tp and 'Otro Rep' in tp and '661003' in tp and 'En Talking' in tp and 'Hoy por agente' in tp and 'Pepe Rep' in tp, 'el tablero del team leader: los activos (en New y en llamada), hace cuánto, y los agentes de hoy')
             await P.screenshot(path=OUT / 'tr_tl_popup.png')
             G = await ctx.new_page(); await G.goto('https://crmnovaramarkets.com/clients'); await G.bring_to_front(); await G.wait_for_timeout(2500); await G.screenshot(path=OUT / 'tr_tl_card.png'); await G.close()
             C = await ctx.new_page(); await C.goto('https://crmnovaramarkets.com/clients'); await C.wait_for_timeout(3000)
