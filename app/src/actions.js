@@ -811,7 +811,7 @@ document.addEventListener('keydown',e=>{
   if(k==='t'){e.preventDefault();go('tareas');return}
   if(k==='b'){e.preventDefault();go('banking');return}
   if(k==='k'){e.preventDefault();if(cur==='kb'&&kbMode!=='edit')kbGo('home');else go('kb');return}
-  if(k==='m'&&isLeader()){e.preventDefault();go('callman');return}
+  if(k==='m'&&isLeader()){e.preventDefault();goGroup('callman');return}
   if(k==='c'){e.preventDefault();go('chat');return}
   if(k==='f'){e.preventDefault();go('filtros');return}
   if(k==='e'&&isLeader()){e.preventDefault();go('equipo');return}

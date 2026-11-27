@@ -40,24 +40,24 @@ function cmData(){
   rows.sort((a,b)=>ord[a.tu.k]-ord[b.tu.k]||(b.newN+b.talk)-(a.newN+a.talk)||a.m.name.localeCompare(b.m.name));
   // lo que hay que atender ya, lo más urgente primero
   const al=[];
-  for(const p of pings)if(p.kind==='ayuda'&&!p.reply&&now-Date.parse(p.at)<30*6e4)al.push({w:0,html:`<b>${esc(first(p.from))}</b> pidió ayuda ${cmHace(now-Date.parse(p.at))} y nadie fue todavía`});
+  for(const p of pings)if(p.kind==='ayuda'&&!p.reply&&now-Date.parse(p.at)<30*6e4)al.push({w:0,k:'ayuda',pid:p._id,uid:p.from,key:'ayuda:'+p._id,html:`<b>${esc(first(p.from))}</b> pidió ayuda ${cmHace(now-Date.parse(p.at))} y nadie fue todavía`});
   // New sin llamar y Talking colgados, agrupados por agente (una fila por agente, desplegable), lo más viejo primero
-  const grp=(list,k,one,many)=>{const by=new Map();for(const x of list)(by.get(x.u||'')||by.set(x.u||'',[]).get(x.u||'')).push(x);
+  const grp=(list,k,one,many,kind,msg)=>{const by=new Map();for(const x of list)(by.get(x.u||'')||by.set(x.u||'',[]).get(x.u||'')).push(x);
     for(const [u,xs] of by){xs.sort((a,b)=>a.a-b.a);const nm=u?esc(memberName(u)):'<span class="hot">Sin agente</span>';
       const li=x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.r.id)}"><b>${esc(x.r.id)}</b></button> ${esc(clip(x.r.name,26))}${x.r.country?` <span class="d">(${esc(x.r.country)})</span>`:''} · ${cmHace(now-x.a)}</li>`;
-      if(xs.length===1)al.push({w:k,id:xs[0].r.id,html:`${nm}: ${one(xs[0])}`});
-      else al.push({w:k,html:`<details class="cm-g"><summary><b>${nm}</b>: ${many(xs)}</summary><ul>${xs.map(li).join('')}</ul></details>`});}};
-  grp(cur.filter(x=>x.wait),1,x=>`New sin llamar <b>${cmHace(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''}`,xs=>`<b>${xs.length}</b> new sin llamar, el más viejo <b>${cmHace(now-xs[0].a)}</b>`);
+      if(xs.length===1)al.push({w:k,k:kind,uid:u,key:kind+':'+u+':'+norm(xs[0].r.id),msg:msg(xs),id:xs[0].r.id,html:`${nm}: ${one(xs[0])}`});
+      else al.push({w:k,k:kind,uid:u,key:kind+':'+u+':'+xs.map(x=>norm(x.r.id)).join(','),msg:msg(xs),html:`<details class="cm-g"><summary><b>${nm}</b>: ${many(xs)}</summary><ul>${xs.map(li).join('')}</ul></details>`});}};
+  grp(cur.filter(x=>x.wait),1,x=>`New sin llamar <b>${cmHace(now-x.a)}</b>: <b>${esc(x.r.id)}</b> ${esc(x.r.name)}${x.r.country?` (${esc(x.r.country)})`:''}`,xs=>`<b>${xs.length}</b> new sin llamar, el más viejo <b>${cmHace(now-xs[0].a)}</b>`,'new',xs=>xs.length===1?`Tenés el new ${xs[0].r.id} sin llamar desde hace ${cmAgo(now-xs[0].a)}. Llamalo ya.`:`Tenés ${xs.length} news sin llamar (${xs.map(x=>x.r.id).join(', ')}). Llamalos ya.`);
   const stuck=cur.filter(x=>x.talk&&x.r.since&&now-Date.parse(x.r.since)>CM_STUCK).map(x=>({...x,a:Date.parse(x.r.since)}));
-  grp(stuck,2,x=>`<b>${esc(x.r.id)}</b> ${esc(x.r.name)} quedó en <b>Talking</b> ${cmHace(now-x.a)}: al cortar tiene que salir de Talking`,xs=>`<b>${xs.length}</b> clientes quedaron en <b>Talking</b> (el más viejo ${cmHace(now-xs[0].a)}): al cortar tienen que salir de Talking`);
+  grp(stuck,2,x=>`<b>${esc(x.r.id)}</b> ${esc(x.r.name)} quedó en <b>Talking</b> ${cmHace(now-x.a)}: al cortar tiene que salir de Talking`,xs=>`<b>${xs.length}</b> clientes quedaron en <b>Talking</b> (el más viejo ${cmHace(now-xs[0].a)}): al cortar tienen que salir de Talking`,'talk',xs=>`${xs.length===1?`El cliente ${xs[0].r.id} quedó`:`Los clientes ${xs.map(x=>x.r.id).join(', ')} quedaron`} en Talking. Al cortar, sacalo de Talking.`);
   for(const p of rows){
     const nm=`<b>${esc(p.m.name)}</b>`;
-    if(p.tu.ex)al.push({w:2,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
+    if(p.tu.ex)al.push({w:2,k:'rest',uid:p.m.id,key:'rest:'+p.m.id+':'+(p.tu.at||''),msg:`Llevás ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k} min. ¿Volvés?`,html:`${nm} lleva ${cmAgo(p.tu.d)} en un descanso de ${p.tu.b.k}'`});
     const vz=agOf(p.m.id).filter(x=>!x.done&&now-parseDue(x.due)>=CM_AG&&!soldOf(x.id)).sort((a,b)=>parseDue(a.due)-parseDue(b.due)); // agendas vencidas sin "Ya lo llamé"
-    if(vz.length===1)al.push({w:2,id:vz[0].id,html:`${nm} tiene la agenda de <b>${esc(vz[0].id)}</b> (${esc(vz[0].due.slice(11,16))}) vencida <b>${cmHace(now-parseDue(vz[0].due))}</b> y sin cerrar`});
-    else if(vz.length)al.push({w:2,html:`<details class="cm-g"><summary>${nm} tiene <b>${vz.length}</b> agendas vencidas sin cerrar, la más vieja <b>${cmHace(now-parseDue(vz[0].due))}</b></summary><ul>${vz.map(x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button> agenda de las ${esc(x.due.slice(11,16))} · ${cmHace(now-parseDue(x.due))}${x.kw?` · ${esc(x.kw)}`:''}</li>`).join('')}</ul></details>`});
-    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
-    if(p.tu.k==='in'&&!cmInCall(p.R,now)&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`}); // en llamada no se avisa: el tiempo está justificado
+    if(vz.length===1)al.push({w:2,k:'agenda',uid:p.m.id,key:'agenda:'+p.m.id+':'+vz[0]._id,msg:`Tenés la agenda de ${vz[0].id} (${vz[0].due.slice(11,16)}) vencida y sin cerrar. ¿Lo llamaste?`,id:vz[0].id,html:`${nm} tiene la agenda de <b>${esc(vz[0].id)}</b> (${esc(vz[0].due.slice(11,16))}) vencida <b>${cmHace(now-parseDue(vz[0].due))}</b> y sin cerrar`});
+    else if(vz.length)al.push({w:2,k:'agenda',uid:p.m.id,key:'agenda:'+p.m.id+':'+vz.map(x=>x._id).join(','),msg:`Tenés ${vz.length} agendas vencidas sin cerrar (${vz.map(x=>x.id).join(', ')}). ¿Las llamaste?`,html:`<details class="cm-g"><summary>${nm} tiene <b>${vz.length}</b> agendas vencidas sin cerrar, la más vieja <b>${cmHace(now-parseDue(vz[0].due))}</b></summary><ul>${vz.map(x=>`<li><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(x.id)}"><b>${esc(x.id)}</b></button> agenda de las ${esc(x.due.slice(11,16))} · ${cmHace(now-parseDue(x.due))}${x.kw?` · ${esc(x.kw)}`:''}</li>`).join('')}</ul></details>`});
+    if(p.R&&!p.R.young&&p.R.q===3&&p.tu.k!=='out')al.push({w:3,k:'q3',uid:p.m.id,key:'q3:'+p.m.id+':'+te,msg:`Vas RMO Q3 hoy: ${minsTxt(p.R.dead)} de tiempo muerto. Mantené el ritmo.`,html:`${nm} va <b>RMO Q3</b>: ${esc(minsTxt(p.R.dead))} de tiempo muerto hoy <button type="button" class="lnk" data-hy="ritmo" data-uid="${esc(p.m.id)}">Ver qué pasó</button>`});
+    if(p.tu.k==='in'&&!cmInCall(p.R,now)&&now-Math.max(p.last,p.tu.at||0)>=CM_QUIET)al.push({w:3,k:'quiet',uid:p.m.id,key:'quiet:'+p.m.id+':'+Math.floor(now/36e5),msg:p.last?`Hace ${cmAgo(now-p.last)} que no llamás. ¿Todo bien?`:'No llamaste todavía. ¿Todo bien?',html:`${nm} está en turno y ${p.last?`no llama hace ${cmAgo(now-p.last)}`:'no llamó todavía'}`}); // en llamada no se avisa: el tiempo está justificado
   }
   al.sort((a,b)=>a.w-b.w);
   return {now,cur,rows,al,hoyMesa,newN:cur.filter(x=>!x.talk).length,talk:cur.filter(x=>x.talk).length,wait:cur.filter(x=>x.wait).length,callsN:calls.length};
@@ -73,8 +73,7 @@ V.callman={
     const k=kpi('En new ahora',`${D.newN}`,D.wait?`<span class="hot b">${D.wait} sin llamar hace +5 min</span>`:'todos llamados','')+kpi('Talking',`${D.talk}`,'ya lo tiene un agente')+
       kpi('News de hoy',`${D.hoyMesa}`,'registrados hoy en la mesa')+kpi('Llamadas de hoy',`${nf(D.callsN)}`,`mínimo ${minCalls()} por agente`)+
       (sp0=>kpi('Al new en',sp0.n?esc(minTxt2(sp0.med)):'—',sp0.n?`del registro a la primera llamada · ${sp0.slow?`${sp0.slow} de ${sp0.n} tardaron +5 min`:'todos antes de 5 min'}`:'sin news llamados hoy'))(newSpeedOf(null,todayS(),todayS()));
-    const alerts=D.al.length?`<section class="card cm-al"><div class="card-h"><h3>Para atender ya</h3><span class="p-sub">${plural(D.al.length,'cosa','cosas')}</span></div>
-      <ul class="cm-list">${D.al.slice(0,20).map(a=>`<li class="w${a.w}"><svg class="ic" aria-hidden="true"><use href="#i-alerta"/></svg><span>${a.html}</span>${a.id?`<button type="button" class="btn sm" data-hy="ficha" data-id="${esc(a.id)}">Ficha</button>`:''}</li>`).join('')}</ul></section>`:'';
+    // lo que hay que atender vive en la Bandeja de la mesa (bandeja.js); acá solo los números y las tablas
     const cRow=x=>{const r=x.r,c=x.k;
       return `<tr class="${x.wait?'cm-wait':''}"><td><button type="button" class="lnkp" data-hy="ficha" data-id="${esc(r.id)}"><b>${esc(r.id)}</b></button> ${esc(clip(r.name,26))}<div class="d">${esc(r.country||'')}${r.camp?' · '+esc(clip(r.camp,22)):''}</div></td>
         <td>${x.u?`<span class="eq-who">${avatar(memberName(x.u))}${esc(first(x.u))}</span>`:'<span class="hot">sin agente</span>'}</td>
@@ -95,6 +94,6 @@ V.callman={
     const ags=`<section class="card"><div class="card-h"><h3>Por agente</h3><span class="p-sub">tocá uno para ver su ficha</span></div>
       ${on.length?`<div class="p-tablewrap"><table class="pt cm-t"><thead><tr><th>Agente</th><th>Turno</th><th>New</th><th>Talking</th><th title="News registrados hoy que le llegaron (si lo rotaron, al primero)">News hoy</th><th>FTD hoy</th><th title="CR (%) de hoy: de los news que le llegaron hoy, cuántos depositaron hoy">CR (%) hoy</th><th>Llamadas</th><th title="RMO: tiempo muerto del día">Muerto</th><th title="RMO: franja del día (Q1 la mejor, Q3 la peor)">RMO</th><th title="Velocidad al new: del registro a la primera llamada (mediana de sus news de hoy)">Al new en</th><th>Última llamada</th><th>Agendas vencidas</th></tr></thead><tbody>${on.map(aRow).join('')}</tbody></table></div>`:'<div class="p-empty">Todavía nadie marcó la entrada hoy.</div>'}
       ${off.length?`<p class="p-sub" style="margin:10px 2px 0">Sin entrada ni actividad hoy: ${off.map(p=>`<button type="button" class="lnkp" data-act="ficha" data-uid="${esc(p.m.id)}">${esc(p.m.name.split(/\s+/)[0])}</button>`).join(', ')}</p>`:''}</section>`;
-    body.innerHTML=`<div class="kpis">${k}</div>${alerts}${cur}${ags}`;reopen(body,op);
+    body.innerHTML=`<div class="kpis">${k}</div>${cur}${ags}`;reopen(body,op);
   }
 };

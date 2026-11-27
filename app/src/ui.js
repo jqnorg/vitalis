@@ -120,14 +120,14 @@ function colChart(el,data,o={}){
 }
 
 /* ---------- navegación ---------- */
-const VIEWS=['gerencia','inicio','historial','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
+const VIEWS=['gerencia','bandeja','cmbandeja','inicio','historial','callman','banking','bkprocs','bkbancos','kb','ventas','clientes','campanas','agenda','turnos','sueldo','snippets','chat','social','config','equipo','tareas','filtros','radar'];
 let cur='inicio';
 const V={}; // vistas: {build(), render()}
 // el menú: pocas secciones; las que tienen varias partes, con solapas arriba (recuerda la última que usaste)
 function cliBadge(){const c=$('#nbCli');if(c){c.textContent=curCl?curCl.id:'';c.title=curCl?'Cliente actual: '+(curCl.name||curCl.id):''}} // el cliente actual, en el botón del menú
 const GROUPS=[
-  {g:'inicio',views:['inicio','sueldo','turnos','historial'],tabs:['Hoy','Sueldo','Turnos','Historial']}, // Historial: todas tus ventas y tus lates, venta por venta
-  {g:'callman',views:['callman']}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
+  {g:'inicio',views:['bandeja','inicio','sueldo','turnos','historial'],tabs:['Bandeja','Mi día','Sueldo','Turnos','Historial'],def:'bandeja'}, // Bandeja: lo que hay que hacer (el agente entra ahí); Mi día: tu mes, hoy, racha, turno; Historial: todas tus ventas y tus lates
+  {g:'callman',views:['cmbandeja','callman'],tabs:['Bandeja','En vivo'],def:'cmbandeja'}, // el team leader (y el admin): la mesa en vivo. Para el team leader, su botón brillante
   {g:'agenda',views:['agenda']}, // Agenda con botón propio (el dueño, 26/11/2026: se fue el "Manager (agente)" y la sección Cliente)
   {g:'tareas',views:['tareas']},
   {g:'chat',views:['chat','social'],tabs:['Chat','Mate y toques']},
@@ -143,11 +143,12 @@ function navRoles(){$('#navEquipo').hidden=!isLeader();$('#navCm').hidden=!isLea
 }
 const groupOf=v=>GROUPS.find(G=>G.views.includes(v))||GROUPS[0];
 let lastTab=local.get('tabs',{});
-function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g!=='inicio'&&G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a Hoy
+function goGroup(g){const G=GROUPS.find(x=>x.g===g);if(!G)return;const v=lastTab[g];go(g==='inicio'?(tlView()?'inicio':'bandeja'):g==='callman'?'cmbandeja':G.views.includes(v)?v:G.def||G.views[0])} // Inicio siempre vuelve a la Bandeja (el team leader, a Mi día); Manager, a la Bandeja de la mesa
 const NAVKEYS={1:'inicio',2:'agenda',3:'tareas',4:'chat',5:'banking',6:'kb',7:'analisis',0:'ajustes'}; // grupos; letras: L Cliente, B Banking, T Tareas, C Chat, F Filtros, E Equipo (Cliente es la L)
 function go(v,opts){
   pass++;
-  if(!VIEWS.includes(v)||((v==='equipo'||v==='callman')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';
+  if(!VIEWS.includes(v)||((v==='equipo'||v==='callman'||v==='cmbandeja')&&!isLeader())||(v==='gerencia'&&!isMgmt()))v='inicio';
+  if(v==='bandeja'&&tlView())v='inicio'; // el team leader tiene la Bandeja de la mesa
   if(isDirector()&&v!=='gerencia'&&v!=='config')v='gerencia'; // el director solo ve Gerencia (y sus Ajustes)
   if(v==='clientes'&&!isLeader())v='campanas'; // la solapa Clientes es del team leader (y el admin)
   if(v!=='chat'&&typeof chatPadOff==='function')chatPadOff(); // el teclado del PIN del chat no se queda escuchando en otra sección
@@ -156,7 +157,7 @@ function go(v,opts){
   const G=groupOf(v);lastTab[G.g]=v;local.set('tabs',lastTab);
   $$('#nav [data-g]').forEach(b=>{const on=b.dataset.g===G.g;b.classList.toggle('on',on);if(on){b.dataset.v=v;b.setAttribute('aria-current','page')}else b.removeAttribute('aria-current')});
   {const a=$('#navAjustes');if(a)a.classList.toggle('on',G.g==='ajustes')}
-  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader()));sn.hidden=tabs.length<2;
+  const sn=$('#subnav'),tabs=G.views.filter(x=>((x!=='equipo'&&x!=='clientes')||isLeader())&&(x!=='bandeja'||!tlView()));sn.hidden=tabs.length<2;
   sn.innerHTML=tabs.length<2?'':tabs.map((x,i)=>`<button type="button" role="tab" data-tab="${x}" aria-selected="${x===v}"${x===v?' class="on"':''}>${esc(G.tabs[G.views.indexOf(x)])}</button>`).join('');
   try{if(location.hash!=='#'+v)history.replaceState(null,'','#'+v)}catch(e){}
   $('#main').scrollTop=0;

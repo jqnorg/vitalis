@@ -3,7 +3,7 @@
    VITALIS — asistente de ventas para la mesa.
    Datos en Supabase: ventas compartidas en la mesa; sueldo, agenda, turnos y ajustes privados.
    ============================================================ */
-const VERSION='1.66.0';
+const VERSION='1.67.0';
 const EXT_VER='__EXT_VER__'; // la extensión que se baja desde Ajustes (la pone build.py)
 const $=s=>document.querySelector(s);
 const $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -13,7 +13,7 @@ const local={
   get(k,d){try{const v=localStorage.getItem('vitalis.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem('vitalis.'+k,JSON.stringify(v))}catch(e){}}
 };
-const DEF={base:33500,porftd:20,bonos:[[10,80],[16,150],[21,250],[26,350],[31,450]],tc:0,hora:'09:00',sep:',',tema:'auto',
+const DEF={base:33500,porftd:20,bonos:[[10,80],[16,150],[21,250],[26,350],[31,450]],tc:0,hora:'09:00',sep:',',tema:'oscuro',
   fonasa:'nadie',hijos:0,comRecibo:true,bpc:6864,fondoSol:0,tcFecha:'',jornada:450,
   laborables:[1,2,3,4,5],libres:['05-01','08-25'],faltas:[],inicio:'',sinFer:{no:true,lab:true},premios:[],descFalta:0,faltaJust:true};
   // libres: 'MM-DD' todos los años · faltas: [{d:'YYYY-MM-DD',j:true}] · sinFer: feriados que no se cuentan (no laborables / laborables)

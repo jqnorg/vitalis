@@ -413,7 +413,7 @@
   const markTried = (list) => { for (const x of list) tried.add(norm(x.brand) + '|' + norm(x.id)); try { sessionStorage.setItem('vitalis-auto', JSON.stringify([...tried].slice(-2000))); } catch (e) {} };
 
   /* ================= botón ================= */
-  const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#00875a"/><path d="M14 19 23.4 34.6" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/><path d="M23.4 34.6 34.2 13.4" stroke="#fff" stroke-width="8" stroke-linecap="round"/></svg>';
+  const SEAL = '<svg class="mk" viewBox="0 0 48 48" aria-hidden="true"><rect x="2" y="2" width="44" height="44" rx="12" fill="#7c5cf5"/><path d="M14 19 23.4 34.6" stroke="#fff" stroke-opacity=".6" stroke-width="8" stroke-linecap="round"/><path d="M23.4 34.6 34.2 13.4" stroke="#fff" stroke-width="8" stroke-linecap="round"/></svg>';
   let ui = null, busy = false, msg = null, msgT = null, sales = null, clients = null, seen = null, whoSel = '', stMsg = null, stMsgT = null;
   const isLeader = () => !!(desk && (desk.role === 'leader' || desk.role === 'admin'));
   function build() {
@@ -431,12 +431,12 @@
       .x{all:unset;cursor:pointer;color:#6b7684;width:24px;height:24px;display:grid;place-items:center;border-radius:8px;font-size:15px}.x:hover{background:#eef0f3;color:#0f1720}
       .sec{margin-top:10px}[hidden]{display:none!important}
       .sec+.sec{border-top:1.5px solid #eef0f3;padding-top:10px}
-      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#00875a;color:#fff;font-weight:700;border-radius:12px;padding:8px 12px;box-shadow:0 2px 0 #00573a}
+      .go{all:unset;box-sizing:border-box;display:block;width:100%;text-align:center;cursor:pointer;background:#6d4ff0;color:#fff;font-weight:700;border-radius:12px;padding:8px 12px;box-shadow:0 2px 0 #00573a}
       .go:hover{background:#006e49}
       .go[disabled]{background:#eef0f3;color:#6b7684;cursor:default;font-weight:600;box-shadow:none}
       .go.alt{background:#fff;color:#0f1720;border:1.5px solid #dde2e7;box-shadow:none}
       .go.alt:hover{border-color:#6b7684}
-      .go:focus-visible,select:focus-visible,.x:focus-visible,.lnk:focus-visible{outline:2px solid #00875a;outline-offset:2px}
+      .go:focus-visible,select:focus-visible,.x:focus-visible,.lnk:focus-visible{outline:2px solid #6d4ff0;outline-offset:2px}
       .row{display:flex;gap:6px;align-items:center}
       .row .go{flex:1}
       select{font:inherit;font-size:12.5px;background:#fff;color:#0f1720;border:1.5px solid #dde2e7;border-radius:10px;padding:6px 8px;width:100%;box-sizing:border-box}
@@ -444,11 +444,11 @@
       .ids b{color:#0f1720;font-weight:600}
       .ids:empty{display:none}
       .st{color:#6b7684;font-size:12px;margin-bottom:7px}
-      .on{color:#00875a;font-weight:700}
+      .on{color:#6d4ff0;font-weight:700}
       .msg{margin-top:8px;font-size:12.5px;font-weight:500}
       .msg:empty{display:none}
-      .ok{color:#00875a}.warn{color:#c2410c}.err{color:#e11d48}
-      .lnk{all:unset;cursor:pointer;color:#00875a;text-decoration:underline;margin-left:6px}
+      .ok{color:#0f9a62}.warn{color:#c2410c}.err{color:#e11d48}
+      .lnk{all:unset;cursor:pointer;color:#6d4ff0;text-decoration:underline;margin-left:6px}
       .min .sec{display:none}
     </style><div class="box"><div class="h">${SEAL}<span class="tag">vitalis</span><span class="vv">${escH(VER)}</span><span class="t" id="t"></span><button class="x" id="min" title="Minimizar" aria-label="Minimizar">–</button></div>
       <div class="sec" id="sSales"><div class="row" id="whoRow" hidden style="margin-bottom:7px"><span class="st" style="margin:0">De</span><select id="who" style="flex:1" title="A quién se le cargan las ventas"></select></div><button class="go" id="go"></button><div class="ids" id="ids"></div><div class="msg" id="msg"></div></div>
@@ -579,23 +579,23 @@
     summary::before{content:'';width:0;height:0;border-left:5px solid #6b7684;border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .15s}
     details[open] summary::before{transform:rotate(90deg)}details[open]{padding-bottom:10px}#payp{color:#6b7684;font-weight:500}
     .seg{display:flex;gap:6px}.seg button{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 6px;font-weight:600;font-size:13px}
-    .seg button:hover{border-color:#6b7684}.seg button.on{border-color:#00875a;background:#e8f6ef;color:#00875a}.seg button.no{color:#9aa3ad}
+    .seg button:hover{border-color:#6b7684}.seg button.on{border-color:#6d4ff0;background:#efeafe;color:#6d4ff0}.seg button.no{color:#9aa3ad}
     .op{border:1.5px solid #d5efe1;background:#f3fbf6;border-radius:10px;padding:6px 9px;margin-bottom:6px;font-size:12.5px}.opn{color:#4b5563;font-size:12px;margin-top:2px}
     .bad{color:#be123c;font-size:12px;margin:6px 0 0}
     textarea{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 9px;resize:vertical;min-height:64px;color:#0f1720;background:#fff}
-    textarea:focus{outline:none;border-color:#00875a;box-shadow:0 0 0 2px #00875a33}
+    textarea:focus{outline:none;border-color:#6d4ff0;box-shadow:0 0 0 2px #6d4ff033}
     .row{display:flex;gap:8px;margin-top:6px;align-items:center}.row .go{flex:1}
-    .go{all:unset;box-sizing:border-box;display:block;text-align:center;cursor:pointer;background:#00875a;color:#fff;font-weight:700;border-radius:12px;padding:9px 12px;box-shadow:0 2px 0 #00573a}
+    .go{all:unset;box-sizing:border-box;display:block;text-align:center;cursor:pointer;background:#6d4ff0;color:#fff;font-weight:700;border-radius:12px;padding:9px 12px;box-shadow:0 2px 0 #00573a}
     .go:hover{background:#006e49}.go[disabled]{opacity:.6;cursor:default}.go.alt{background:#fff;color:#0f1720;border:1.5px solid #dde2e7;box-shadow:none}.go.alt:hover{border-color:#6b7684}
     .go.sm{padding:6px 10px;font-size:12.5px;flex:none}
-    .lnk{all:unset;cursor:pointer;color:#00875a;font-weight:600;font-size:12.5px;text-decoration:underline;margin-top:8px;display:inline-block}
+    .lnk{all:unset;cursor:pointer;color:#6d4ff0;font-weight:600;font-size:12.5px;text-decoration:underline;margin-top:8px;display:inline-block}
     .msg{font-size:12.5px;margin-top:6px;font-weight:600}.msg:empty{display:none}
     .en{margin-top:4px;background:#f6f7f9;border-radius:10px;padding:6px 9px;color:#0f1720;font-weight:400;max-height:96px;overflow:auto;white-space:pre-wrap}
     .ok{color:#047857}.warn{color:#b45309}.err{color:#be123c}
     .note{color:#6b7684;font-size:12.5px;margin:6px 0}.note.warn{color:#b45309}
-    .nr{display:flex;align-items:center;gap:8px}.nx-o{all:unset;cursor:pointer;color:#00875a;font-weight:600;font-size:12px;margin-left:4px;text-decoration:underline}.nt{flex:1;min-width:0}.nt b{font-size:15px}.why{color:#4b5563;font-size:12px}
+    .nr{display:flex;align-items:center;gap:8px}.nx-o{all:unset;cursor:pointer;color:#6d4ff0;font-weight:600;font-size:12px;margin-left:4px;text-decoration:underline}.nt{flex:1;min-width:0}.nt b{font-size:15px}.why{color:#4b5563;font-size:12px}
     .tb3{display:flex;gap:6px;margin-top:8px}.tb{all:unset;box-sizing:border-box;flex:1;text-align:center;cursor:pointer;border:1.5px solid #dde2e7;border-radius:12px;padding:9px 4px;font-weight:700;font-size:13px}
-    .tb:hover{border-color:#00875a;color:#00875a}.tb[disabled]{opacity:.5}
+    .tb:hover{border-color:#6d4ff0;color:#6d4ff0}.tb[disabled]{opacity:.5}
     .trow{display:flex;align-items:center;gap:8px;margin-top:8px}.brk{flex:1;font-weight:600}.brk b{font-variant-numeric:tabular-nums;margin-left:4px}.brk b.hot{color:#be123c}
     .pill{display:none;align-items:center;gap:8px;background:#fff;border:1.5px solid #00b36b;border-radius:999px;padding:7px 13px 7px 9px;box-shadow:0 8px 24px rgba(16,24,40,.16);cursor:pointer;font-weight:600;font-size:12.5px;color:#0f1720}
     .pill .mk{width:18px;height:18px}.pill .plus{color:#6b7684;font-weight:700;font-size:15px;line-height:1}.pill.stp{border-color:#f43f5e}
@@ -603,14 +603,14 @@
     .bdg{font-size:11.5px;font-weight:700;border-radius:999px;padding:1px 8px;border:1px solid}.bdg.w{background:#fffbeb;color:#92400e;border-color:#f59e0b}.bdg.ok{background:#ecfdf5;color:#047857;border-color:#00b36b}
     .pf label{display:block;color:#4b5563;font-size:12px;font-weight:700;margin:8px 0 3px}.pf label i{color:#be123c;font-style:normal}.pf label .o{color:#6b7684;font-weight:500}
     .pf input[type=text],.pf input[type=number],.pf select{box-sizing:border-box;width:100%;font:inherit;font-size:13px;border:1.5px solid #dde2e7;border-radius:10px;padding:7px 9px;color:#0f1720;background:#fff;height:36px}
-    .pf input:focus,.pf select:focus{outline:none;border-color:#00875a;box-shadow:0 0 0 2px #00875a33}.pf textarea{min-height:48px}
-    .pf label.ck{display:flex;align-items:center;gap:8px;color:#0f1720;font-size:13px;font-weight:600;cursor:pointer;margin:9px 0 2px}.pf .ck input{width:17px;height:17px;margin:0;accent-color:#00875a}
+    .pf input:focus,.pf select:focus{outline:none;border-color:#6d4ff0;box-shadow:0 0 0 2px #6d4ff033}.pf textarea{min-height:48px}
+    .pf label.ck{display:flex;align-items:center;gap:8px;color:#0f1720;font-size:13px;font-weight:600;cursor:pointer;margin:9px 0 2px}.pf .ck input{width:17px;height:17px;margin:0;accent-color:#6d4ff0}
     .two{display:flex;gap:8px}.two>div:first-child{width:70px;flex:none}.two>div:last-child{flex:1;min-width:0}
     .pst{margin:5px 0 0;font-size:12.5px;color:#4b5563}.pst:empty{display:none}.pst b{color:#0f1720}
     .pf .row{margin-top:10px}
     .tr #cmt,.tr #cmt+.row,.tr #pay,.tr .lb.cm,.tr #cmsg{display:none}
     .tr .box{width:380px;max-height:min(72vh,720px)}.tr{font-size:15px}.tr .kv{font-size:15px;padding:7px 0}.tr .lb{font-size:13px;margin:12px 0 6px}.tr .cid b{font-size:22px}.tr .nm{font-size:15px;color:#6b7684}.tr .note{font-size:14px}.tr .op{font-size:14.5px}.tr .opn{font-size:14px}.tr .go{font-size:15px;padding:10px 12px}.tr .lnk{font-size:14px}.tr #nx .kv{font-size:15px}
-    :focus-visible{outline:2px solid #00875a;outline-offset:2px}`;
+    :focus-visible{outline:2px solid #6d4ff0;outline-offset:2px}`;
   if (TOP) {
     chrome.storage.local.get('dockMin').then((x) => { dMin = !!x.dockMin; dockDraw(); }).catch(() => {});
     send({ type: 'dock-get' }).then((r) => { if (r) { dock = r.d || null; dDrafts = r.drafts || {}; dockDraw(); } });

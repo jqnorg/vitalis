@@ -87,7 +87,7 @@ let reqSeen=+local.get('reqSeen',0)||0;
 async function campReqPoll(quiet){
   if(!ready||!bkEd()||ficOk===false)return;
   try{const l=await Q(sb.from('campaign_requests').select('id,camp,aff,country,body,created_by,created_at').eq('done',false).order('created_at',{ascending:false}).limit(20));
-    const fresh=l.filter(q=>+new Date(q.created_at)>reqSeen&&q.created_by!==me);
+    const fresh=l.filter(q=>+new Date(q.created_at)>reqSeen&&q.created_by!==me);campReqs=l;if(cur==='cmbandeja')refresh();
     if(l.length)reqSeen=Math.max(reqSeen,...l.map(q=>+new Date(q.created_at)));local.set('reqSeen',reqSeen);
     if(!quiet)for(const q of fresh.slice(0,3))toast(`✏️ <b>${esc(first(q.created_by))}</b> pidió un cambio en la campaña <b>${esc(q.camp)}</b>: ${esc(clip(q.body,140))}`,'imp',{key:'cr'+q.id,ms:15000});
   }catch(e){}

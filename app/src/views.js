@@ -23,6 +23,13 @@ const rw=(k,v,cls='')=>`<div class="rw ${cls}"><span class="k">${k}</span><span 
 
 /* ---------- inicio ---------- */
 // la racha: días laborables seguidos con al menos un FTD (si hoy todavía no vendiste, cuenta hasta ayer; los días que no se trabajan no la cortan)
+// las dos últimas semanas, un punto por día con venta (Mi día, debajo de la racha)
+function rachaCal(uid){
+  const days=new Set(team.filter(f=>f.uid===uid).map(f=>f.date)),te=todayS(),ws=weekStart(te),from=addDays(ws,-7),H=['L','M','M','J','V','S','D'];
+  let h=H.map(x=>`<span class="h">${x}</span>`).join('');
+  for(let i=0;i<14;i++){const d=addDays(from,i),fut=d>te,has=days.has(d),cls=d===te?'on':has?'has':(fut||noTrabajo(d))?'off':'';h+=`<span class="${cls}" title="${esc(d)}">${+d.slice(8)}</span>`}
+  return `<div class="rk-cal">${h}</div>`;
+}
 function racha(uid){
   const days=new Set(team.filter(f=>f.uid===uid).map(f=>f.date)),te=todayS();
   let d=te,n=0;const hoy=days.has(te);if(!hoy)d=addDays(te,-1);
@@ -48,11 +55,11 @@ V.inicio={
     $('#iKpis').innerHTML=TL?mesaSide():
       kpi('Hoy',`${hoy.length} <small>FTD${hoy.length===1?'':'s'}</small>`,`${money(hoy.reduce((a,f)=>a+(+f.amount||0),0))} USD${m&&m.fph!=null&&hoy.length?' · '+nf(m.fph,2)+' por hora':''}`)+
       kpi('Esta semana',`${wN} <small>FTD${wN===1?'':'s'}</small>`,`A esta altura la semana pasada: ${pwN}`)+
-      (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca','racha'+(r.n>=3?' on':''))})();
+      (()=>{const r=racha(me);return kpi('Racha',`<svg class="ic" aria-hidden="true"><use href="#i-racha"/></svg>${r.n} <small>día${r.n===1?'':'s'}</small>`,(r.n?(r.hoy?'Vendiendo seguido, hoy incluido':'Vendé hoy para no cortarla'):'Tu primera venta la arranca')+rachaCal(me),'racha'+(r.n>=3?' on':''))})();
     $('#iBank').hidden=true; // las fallas de pago ya no van en el Inicio (lo pidió el dueño): quedan en Banking y en la marca del menú
     crmLoad();
     $('#iMesa').hidden=false;$('#iMesa').innerHTML=TL?mesaBoard():mesaCard(); // la mesa contra su target
-    $('#iHoy').innerHTML=hoyMesaCard();
+    $('#iHoy').innerHTML=hoyMesaCard()+(TL?'':`<p class="mt"><button type="button" class="lnkp" data-go="historial">Ver tu historial ›</button></p>`);
     {const dl=TL?'':diaLine();$('#iDia').hidden=!dl;$('#iDia').innerHTML=dl}hotNotify(); // tu día según a qué hora llegó el primer FTD; campaña caliente
     this.turno(true);
   },
@@ -483,15 +490,15 @@ V.sueldo={
 };
 
 /* ---------- config ---------- */
-const TEMAS=[['auto','Automático'],['claro','Claro'],['oscuro','Oscuro']];
+const TEMAS=[['oscuro','Noche'],['claro','Claro'],['auto','Como la compu']]; // Noche (oscuro, morado) es el predeterminado desde el 27/11/2026
 const darkMq=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
 function applyTheme(t){
-  t=t||cfg.tema;if(!['claro','oscuro'].includes(t))t='auto';local.set('tema',t);
+  t=t||cfg.tema;if(!['claro','oscuro','auto'].includes(t))t='oscuro';local.set('tema',t);
   const dark=t==='oscuro'||(t==='auto'&&!!(darkMq&&darkMq.matches));
   document.body.classList.toggle('dark',dark);
-  const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#0d1210':'#f1f4ef';
+  const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#0e0f11':'#f6f7f8';
 }
-if(darkMq&&darkMq.addEventListener)darkMq.addEventListener('change',()=>{applyTheme(ready?cfg.tema:local.get('tema','auto'));if(ready)refresh()});
+if(darkMq&&darkMq.addEventListener)darkMq.addEventListener('change',()=>{applyTheme(ready?cfg.tema:local.get('tema','oscuro'));if(ready)refresh()});
 let bonosDraft=null;
 V.config={
   build(){
@@ -562,7 +569,7 @@ V.config={
       el.disabled=readOnly;
     });
     if(!bonosDraft||!$('#cfBonos').contains(document.activeElement)){bonosDraft=tiers().map(([t,u])=>[String(t),String(u)]);this.drawBonos()}
-    const tm=['claro','oscuro'].includes(cfg.tema)?cfg.tema:'auto';$$('[data-tema]',$('#cfTemas')).forEach(b=>b.classList.toggle('on',b.dataset.tema===tm));
+    const tm=['claro','oscuro','auto'].includes(cfg.tema)?cfg.tema:'oscuro';$$('[data-tema]',$('#cfTemas')).forEach(b=>b.classList.toggle('on',b.dataset.tema===tm));
     const LB=cfg.laborables||DEF.laborables;$$('[data-dow]',$('#cfDow')).forEach(c=>c.classList.toggle('on',LB.includes(+c.dataset.dow)));
     if($('#cfInicio')!==document.activeElement)$('#cfInicio').value=cfg.inicio||'';
     const sf=cfg.sinFer||DEF.sinFer,y=+todayS().slice(0,4),fl=t=>feriadosUY(y).filter(x=>x.t===t).map(x=>`${dm(x.d)} ${x.n}`).join('\n');
@@ -871,7 +878,9 @@ function importarRespaldo(){
 /* ---------- arranque ---------- */
 
 function onReady(){
-  ready=true;applyTheme();
+  ready=true;
+  if(!local.get('noche',0)){local.set('noche',1);if(cfg.tema!=='oscuro'){cfg={...cfg,tema:'oscuro'};if(!readOnly)setTimeout(()=>{if(cfg.tema==='oscuro')B.saveCfg()},4000)}} // se guarda después, sin pisarse con el alta de la cuenta // Noche (27/11/2026): una vez, todos pasan al tema nuevo; después cada uno elige en Ajustes
+  applyTheme();
   document.body.classList.remove('auth');const A=$('#auth');if(A)A.remove();
   navRoles();
   go(landing()); // la primera vez del día, Inicio; después, directo al Panel
@@ -881,7 +890,7 @@ function onReady(){
   if(!ftds.length&&!team.length)toast(`Bienvenido a Vitalis, ${esc(profile.name.split(/\s+/)[0])}. Las ventas entran solas desde el CRM con la extensión (se baja en Ajustes).`,'ok',{ms:12000});
 }
 function boot(){
-  applyTheme(local.get('tema','auto'));
+  applyTheme(local.get('tema','oscuro'));
   $('#ver').textContent='Vitalis '+VERSION;
   for(const v of VIEWS)V[v].build();
   V.cuenta.build();
